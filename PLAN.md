@@ -12,11 +12,11 @@
 
 ## Current Status
 
-**Active:** v0.4 series complete for owner review (SHA, live git, bottom panel, tree, settings, VS Code, commit overlay, recents).
+**Active:** v0.4.7 — owner-review punch list (2026-08-21). v0.4.0–0.4.6 landed; Browse review named the defects below.
 
 Live: UI `http://127.0.0.1:1420` · engine `http://127.0.0.1:7733`
 
-Each v0.4.x: design → code → e2e. Owner reviews the whole 0.4 series when this pass completes.
+Each v0.4.x: design → code → e2e. Do not start v0.5 until this punch list is done and the owner re-reviews.
 
 ---
 
@@ -61,11 +61,33 @@ Each v0.4.x: design → code → e2e. Owner reviews the whole 0.4 series when th
 ### v0.4.6 — Navrail recents picker (COMPLETE)
 - [x] History icon; card overlay (title, path, branch); persist recents.json
 
+### v0.4.7 — Owner review punch list (2026-08-21)
+
+Settings
+- [ ] Field labels clipped in the settings panel (titles unreadable)
+
+Main Browse
+- [ ] Graph / main card too round — smaller Material radius, not pill-like
+- [ ] Bottom panel resizable (drag splitter vs the revision grid)
+
+Left panel
+- [ ] Real tree, not a flat/fake list: hierarchy, expand/collapse, nested remotes and tags as tree nodes
+
+Commit overlay
+- [ ] Current popup overlaps, clips, and does not match Git Extensions FormCommit. Rebuild the *layout* of the original commit window (unstaged | staged | diff | message). Material chrome only — do not restyle WinForms, do match the arrangement.
+
+Bottom panel
+- [ ] Per-commit **file tree** of the repo at that revision (GE File tree), not only a flat change list
+- [ ] Files and diff in a **left–right split** (GE split). Tabs-only stacked view is not enough
+- [ ] Diff colors match Git Extensions (add / remove / header / hunk). Do not invent a new palette
+
+Graph context menu
+- [ ] Right-click on a revision/ref is missing. Add the Git Extensions basics: Checkout Branch, Reset branch, Rebase. Behaviour identical to Git Extensions (`RevisionGridMenuCommands` / FormCheckoutBranch, FormResetCurrentBranch, FormRebase) — same guards, prompts, and git operations. Material menu chrome only.
+
 ## v0.5 — Welcome / home (parked)
 Recent repos with diff stats, Open, Clone.
 
 ## Later
-- Graph context menu
 - Fetch / Pull / Push
 - Design-demo step/pause bar (opt-in `npm run test:demo`)
 - Visual screenshot suite (`npm run test:visual`, owner-triggered)
