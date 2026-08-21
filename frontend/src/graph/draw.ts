@@ -11,6 +11,9 @@ import {
 
 type Point = { x: number; y: number }
 
+/** Breathing room between the rounded container edge and the first lane. */
+export const GRAPH_LEFT_PAD = 14
+
 type LanesInfo = {
   startLane: number
   centerLane: number
@@ -38,7 +41,7 @@ export function graphWidth(rows: GraphRow[]): number {
     maxLane = Math.max(maxLane, row.lane)
     for (const s of row.segments) maxLane = Math.max(maxLane, s.lane)
   }
-  return Math.min(maxLane + 1, MAX_LANES) * LANE_WIDTH + 8
+  return GRAPH_LEFT_PAD + Math.min(maxLane + 1, MAX_LANES) * LANE_WIDTH + 8
 }
 
 export function drawRows(
@@ -112,7 +115,7 @@ export function drawRows(
 
 function xFor(lane: number): number {
   if (lane < 0) return 0
-  return (lane + 0.5) * LANE_WIDTH
+  return GRAPH_LEFT_PAD + (lane + 0.5) * LANE_WIDTH
 }
 
 function laneOn(row: GraphRow | undefined, segmentId: string): number {

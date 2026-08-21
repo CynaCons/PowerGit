@@ -19,7 +19,7 @@ import {
   type RepoStatus,
   type StatusFile,
 } from "../engine"
-import { statusColor } from "./CompactFileList"
+import { CompactFileList } from "./CompactFileList"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { IgnoreDialog } from "./IgnoreDialog"
@@ -44,7 +44,7 @@ export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Prop
   const [diffOpts, setDiffOpts] = useState<DiffOptions>({ context: 3, ws: false, full: false })
   const [message, setMessage] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number; staged: boolean } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; staged: boolean; path: string } | null>(null)
   const [ignoreFor, setIgnoreFor] = useState<string | null>(null)
   const anchorRef = useRef<{ unstaged: number; staged: number }>({ unstaged: -1, staged: -1 })
 
@@ -152,12 +152,13 @@ export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Prop
           />
           <FileListBox
             testid="unstaged-list"
+            staged={false}
             files={status?.unstaged ?? []}
             selected={selUnstaged}
             emptyText="Working tree clean."
             onClick={(_f, i, e) => clickRow(status?.unstaged ?? [], false, i, e)}
             onToggle={toggle}
-            onContext={(x, y) => setMenu({ x, y, staged: false })}
+            onContext={(f, x, y) => setMenu({ x, y, staged: false, path: f.path })}
           />
           <ListHeader
             label={`Staged (${status?.stagedCount ?? 0})`}
@@ -166,12 +167,13 @@ export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Prop
           />
           <FileListBox
             testid="staged-list"
+            staged={true}
             files={status?.staged ?? []}
             selected={selStaged}
             emptyText="Nothing staged. Double-click an unstaged file to stage it."
             onClick={(_f, i, e) => clickRow(status?.staged ?? [], true, i, e)}
             onToggle={toggle}
-            onContext={(x, y) => setMenu({ x, y, staged: true })}
+            onContext={(f, x, y) => setMenu({ x, y, staged: true, path: f.path })}
           />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -243,8 +245,7 @@ export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Prop
         <MenuItem
           data-testid="ctx-ignore-file"
           onClick={() => {
-            const paths = menu ? [...(menu.staged ? selStaged : selUnstaged)] : []
-            if (paths.length > 0) setIgnoreFor(paths[0])
+            if (menu) setIgnoreFor(menu.path)
             setMenu(null)
           }}
         >
@@ -284,6 +285,7 @@ function ListHeader({
 
 function FileListBox({
   files,
+  staged,
   selected,
   emptyText,
   onClick,
@@ -292,67 +294,33 @@ function FileListBox({
   testid,
 }: {
   files: StatusFile[]
+  staged: boolean
   selected: Set<string>
   emptyText: string
   onClick: (f: StatusFile, index: number, e: React.MouseEvent) => void
   onToggle: (f: StatusFile) => void
-  onContext: (x: number, y: number) => void
+  onContext: (f: StatusFile, x: number, y: number) => void
   testid: string
 }) {
   return (
-    <CompactFileListShell testid={testid}>
-      {files.length === 0 ? (
-        <Box sx={{ p: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            {emptyText}
-          </Typography>
-        </Box>
-      ) : (
-        files.map((f, i) => (
-          <Box
-            key={`${testid}:${f.path}`}
-            onClick={(e) => onClick(f, i, e)}
-            onDoubleClick={() => onToggle(f)}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              if (!selected.has(f.path)) onClick(f, i, { ...e, ctrlKey: false, shiftKey: false, metaKey: false } as React.MouseEvent)
-              onContext(e.clientX, e.clientY)
-            }}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 0.75,
-              px: 1,
-              py: 0.0625,
-              cursor: "default",
-              bgcolor: selected.has(f.path) ? "action.selected" : "transparent",
-              "&:hover": { bgcolor: "action.hover" },
-              fontFamily: "Fira Code, ui-monospace, monospace",
-              fontSize: 11.5,
-              lineHeight: 1.6,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <Box component="span" sx={{ width: 10, flexShrink: 0, fontWeight: 700, color: statusColor(f.status) }}>
-              {f.status}
-            </Box>
-            <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }} title={f.path}>
-              {f.path}
-            </Box>
-          </Box>
-        ))
-      )}
-    </CompactFileListShell>
-  )
-}
-
-function CompactFileListShell({ testid, children }: { testid: string; children: React.ReactNode }) {
-  return (
-    <Box
-      data-testid={testid}
-      sx={{ flex: 1, minHeight: 80, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}
-    >
-      {children}
-    </Box>
+    <CompactFileList
+      testid={testid}
+      files={files}
+      selectedSet={selected}
+      emptyText={emptyText}
+      onRowClick={(f, index, e) => {
+        const full = files[index]
+        if (full) onClick(full, index, e)
+        else onClick({ ...f, staged }, index, e)
+      }}
+      onToggle={(f) => {
+        const full = files.find((x) => x.path === f.path)
+        onToggle(full ?? { ...f, staged })
+      }}
+      onRowContext={(f, _index, x, y) => {
+        const full = files.find((x) => x.path === f.path)
+        onContext(full ?? { ...f, staged }, x, y)
+      }}
+    />
   )
 }

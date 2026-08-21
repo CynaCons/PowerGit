@@ -52,6 +52,21 @@ const theme = createTheme({
         root: { maxWidth: "calc(100% - 24px)", overflow: "visible" },
       },
     },
+    MuiMenu: {
+      styleOverrides: {
+        paper: { borderRadius: 8 },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          fontSize: 13,
+          minHeight: 30,
+          py: 0.5,
+          "& .MuiListItemText-primary": { fontSize: 13 },
+        },
+      },
+    },
   },
 })
 

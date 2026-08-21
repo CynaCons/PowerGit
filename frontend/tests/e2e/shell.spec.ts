@@ -95,6 +95,16 @@ test("revision context menu offers checkout, reset, rebase", async ({ page }) =>
 test("left tree uses consistent indentation per depth", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("left-panel")).toBeVisible()
+
+  // Section titles share the rows' leading geometry: their own content
+  // starts at the same 6px indent as row chevrons — never deeper.
+  for (const title of ["branches", "remotes", "tags", "submodules"]) {
+    const header = page.locator(`[data-testid="tree-section-${title}"]`)
+    if ((await header.count()) === 0) continue
+    const pl = await header.evaluate((el) => getComputedStyle(el).paddingLeft)
+    expect(pl, `section ${title}`).toBe("6px")
+  }
+
   const rows = page.locator('[data-testid="tree-row"]')
   await expect(rows.first()).toBeVisible()
   const count = await rows.count()

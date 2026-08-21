@@ -16,22 +16,31 @@ export function statusColor(status: string): string {
 export type CompactFile = { path: string; status: string }
 
 // Dense Git Extensions-style change row: colored status letter + full path,
-// single line, minimal height.
+// single line, minimal height. One geometry for every consumer.
 export function CompactFileList({
   testid,
   files,
   selectedPath,
+  selectedSet,
   emptyText,
   onSelect,
+  onRowClick,
   onToggle,
+  onRowContext,
 }: {
   testid: string
   files: CompactFile[]
-  selectedPath: string | null
+  selectedPath?: string | null
+  selectedSet?: Set<string>
   emptyText: string
-  onSelect: (f: CompactFile) => void
+  onSelect?: (f: CompactFile, index: number) => void
+  onRowClick?: (f: CompactFile, index: number, e: React.MouseEvent) => void
   onToggle?: (f: CompactFile) => void
+  onRowContext?: (f: CompactFile, index: number, x: number, y: number) => void
 }) {
+  const isHighlighted = (f: CompactFile) =>
+    selectedSet ? selectedSet.has(f.path) : selectedPath === f.path
+
   return (
     <Box
       data-testid={testid}
@@ -44,27 +53,37 @@ export function CompactFileList({
           </Typography>
         </Box>
       ) : (
-        files.map((f) => (
+        files.map((f, index) => (
           <Box
             key={`${testid}:${f.path}`}
-            onClick={() => onSelect(f)}
+            data-testid={`${testid}-row`}
+            onClick={(e) => (onRowClick ? onRowClick(f, index, e) : onSelect?.(f, index))}
             onDoubleClick={onToggle ? () => onToggle(f) : undefined}
+            onContextMenu={
+              onRowContext
+                ? (e) => {
+                    e.preventDefault()
+                    onRowContext(f, index, e.clientX, e.clientY)
+                  }
+                : undefined
+            }
             sx={{
               display: "flex",
               alignItems: "center",
               gap: 0.75,
               px: 1,
               py: 0.0625,
-              cursor: "pointer",
-              bgcolor: selectedPath === f.path ? "action.selected" : "transparent",
+              cursor: "default",
+              bgcolor: isHighlighted(f) ? "action.selected" : "transparent",
               "&:hover": { bgcolor: "action.hover" },
               fontFamily: "Fira Code, ui-monospace, monospace",
               fontSize: 11.5,
-              lineHeight: 1.6,
+              lineHeight: 1.5,
               whiteSpace: "nowrap",
+              userSelect: "none",
             }}
           >
-            <Box component="span" sx={{ width: 10, flexShrink: 0, fontWeight: 700, color: statusColor(f.status) }}>
+            <Box component="span" sx={{ width: 12, flexShrink: 0, fontWeight: 700, textAlign: "center", color: statusColor(f.status) }}>
               {f.status}
             </Box>
             <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }} title={f.path}>

@@ -363,10 +363,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
           cursor: "pointer",
           userSelect: "none",
           lineHeight: "28px",
+          pl: `${TREE_ROW_INDENT}px`,
           "&:hover": { color: "text.primary" },
         }}
       >
-        <Box component="span" sx={{ display: "inline-flex", width: 18, justifyContent: "center", mr: 0.25 }}>
+        <Box component="span" sx={{ display: "inline-flex", width: 16, justifyContent: "center", mr: 0.5 }}>
           {open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />}
         </Box>
         {title}
