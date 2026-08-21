@@ -124,6 +124,9 @@ Recent repos with diff stats, Open, Clone.
 > One-command Windows artifact: portable zip (app + sidecar engine) plus the NSIS installer, versioned from tauri.conf.json.
 **Goal:** scripts/package-windows.ps1 produces distributable, self-sufficient Windows artifacts.
 - [x] package-windows.ps1: portable zip + NSIS installer, zip smoke-verified self-sufficient
+### v0.5.3 — Release pipeline
+> Tag-triggered GitHub Actions workflow producing Windows zip/installer and Linux AppImage/deb, attached to a GitHub release.
+**Goal:** Pushing a vX.Y.Z tag builds and attaches release binaries for both platforms.
 ## Later
 - Fetch / Pull / Push
 - Design-demo step/pause bar (opt-in `npm run test:demo`)
