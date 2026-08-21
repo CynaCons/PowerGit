@@ -124,9 +124,18 @@ Recent repos with diff stats, Open, Clone.
 > One-command Windows artifact: portable zip (app + sidecar engine) plus the NSIS installer, versioned from tauri.conf.json.
 **Goal:** scripts/package-windows.ps1 produces distributable, self-sufficient Windows artifacts.
 - [x] package-windows.ps1: portable zip + NSIS installer, zip smoke-verified self-sufficient
-### v0.5.3 — Release pipeline
+### v0.5.3 — Release pipeline (2026-08-21) (COMPLETE)
 > Tag-triggered GitHub Actions workflow producing Windows zip/installer and Linux AppImage/deb, attached to a GitHub release.
 **Goal:** Pushing a vX.Y.Z tag builds and attaches release binaries for both platforms.
+- [x] release.yml: windows (zip+installer) + linux (AppImage+deb) jobs, sidecar sh script
+### v0.5.4 — Pages showcase (2026-08-21) (COMPLETE)
+> GitHub Pages showcase: captured screenshots, static site, auto-deploy workflow.
+**Goal:** docs/site deployed to GitHub Pages on push, showing real feature screenshots from real builds.
+- [x] showcase site + screenshots + pages.yml deploy workflow
+### v0.5.5 — Release skill (2026-08-21) (COMPLETE)
+> release skill registered for opencode (.opencode/skills) and claude (.claude/skills): preflight, version bump, artifacts, tag, notes, Pages refresh.
+**Goal:** Any agent can cut a release by following the skill.
+- [x] release skill in .opencode/skills and .claude/skills
 ## Later
 - Fetch / Pull / Push
 - Design-demo step/pause bar (opt-in `npm run test:demo`)
