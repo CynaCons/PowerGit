@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "powerspawn": {
+      "type": "local",
+      "command": ["python", "-m", "powerspawn.mcp_server"],
+      "environment": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "enabled": true
+    },
+    "powerplan": {
+      "type": "local",
+      "command": ["python", "powerspawn/powerplan/powerplan_server.py"],
+      "environment": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "enabled": true
+    }
+  }
+}

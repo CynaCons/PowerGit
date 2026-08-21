@@ -1,0 +1,10 @@
+:root {
+  --pg-row-height: 28px;
+  --pg-grid-sel: #eff6ff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}

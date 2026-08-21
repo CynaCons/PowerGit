@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PowerGit.Engine</RootNamespace>
+    <AssemblyName>PowerGit.Engine</AssemblyName>
+    <Description>Headless git host for the PowerGit Tauri UI. No WinForms.</Description>
+  </PropertyGroup>
+</Project>

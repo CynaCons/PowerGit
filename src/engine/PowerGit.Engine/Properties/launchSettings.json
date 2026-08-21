@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "PowerGit.Engine": {
+      "commandName": "Project",
+      "applicationUrl": "http://127.0.0.1:7733",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
