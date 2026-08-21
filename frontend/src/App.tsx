@@ -1,5 +1,5 @@
-import AddIcon from "@mui/icons-material/Add"
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
+import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutlined"
 import HistoryIcon from "@mui/icons-material/History"
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
@@ -144,8 +144,19 @@ export default function App() {
   }, [refreshRepo])
 
   async function onOpenFolder(path?: string) {
-    const target = path ?? window.prompt("Open repository path")
-    if (!target) return
+    let target = path
+    if (!target) {
+      if ("__TAURI_INTERNALS__" in window) {
+        const { open } = await import("@tauri-apps/plugin-dialog")
+        const picked = await open({ directory: true, multiple: false, title: "Open repository" })
+        if (typeof picked !== "string") return
+        target = picked
+      } else {
+        const answer = window.prompt("Open repository path")
+        if (!answer) return
+        target = answer
+      }
+    }
     try {
       const info = await openRepo(target)
       setRepo(info)
@@ -326,6 +337,11 @@ export default function App() {
             <AccountTreeOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+        <Tooltip title="Open repository…" placement="right">
+          <IconButton data-testid="open-repo-button" onClick={() => onOpenFolder()} sx={{ borderRadius: 2 }}>
+            <CreateNewFolderOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Recent repositories" placement="right">
           <IconButton onClick={() => setRecentsOpen(true)} sx={{ borderRadius: 2 }}>
             <HistoryIcon fontSize="small" />
@@ -335,11 +351,6 @@ export default function App() {
         <Tooltip title="Settings" placement="right">
           <IconButton onClick={() => setSettingsOpen(true)} sx={{ borderRadius: 2 }} data-testid="settings-button">
             <SettingsOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Open repository" placement="right">
-          <IconButton onClick={() => onOpenFolder()} sx={{ borderRadius: 2 }}>
-            <AddIcon />
           </IconButton>
         </Tooltip>
       </Box>
@@ -430,7 +441,7 @@ export default function App() {
       />
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <RecentsDialog open={recentsOpen} onClose={() => setRecentsOpen(false)} recents={recents} onPick={(p) => onOpenFolder(p)} />
+      <RecentsDialog open={recentsOpen} onClose={() => setRecentsOpen(false)} recents={recents} onPick={(p) => { if (p) onOpenFolder(p) }} />
 
       <RevisionContextMenu
         target={ctxTarget}
