@@ -7,10 +7,7 @@ import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
-import ListItemIcon from "@mui/material/ListItemIcon"
-import ListItemText from "@mui/material/ListItemText"
 import List from "@mui/material/List"
-import ListItemButton from "@mui/material/ListItemButton"
 import ListSubheader from "@mui/material/ListSubheader"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
@@ -43,6 +40,11 @@ type CtxMenu =
   | { kind: "tag"; name: string; x: number; y: number }
   | { kind: "remote"; name: string; x: number; y: number }
   | { kind: "submodule"; path: string; x: number; y: number }
+
+// Uniform row geometry for every node in the tree:
+// [padding-left 6 + 16*depth][16px chevron slot][16px icon slot][label]
+export const TREE_ROW_INDENT = 6
+export const TREE_ROW_LEVEL = 16
 
 function insert(root: TreeNode, segments: string[], item: RefItem) {
   let node = root
@@ -107,6 +109,9 @@ export function RepoTree({
       .map(([remote, items]) => ({ node: { name: remote, children: buildTree(items, 1) }, count: items.length }))
   }, [tree])
 
+  const branchIcon = <CallSplitIcon sx={{ fontSize: 13 }} />
+  const tagIcon = <SellOutlinedIcon sx={{ fontSize: 12 }} />
+
   return (
     <Paper data-testid="left-panel" sx={{ width: 232, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center" }}>
@@ -122,60 +127,57 @@ export function RepoTree({
       <List dense disablePadding sx={{ overflow: "auto", userSelect: "none" }}>
         <Section title="Branches">
           {branchRoot.map((n) => (
-            <BranchableRow
+            <NodeRow
               key={n.name}
               node={n}
               depth={0}
-              isDir={n.children.length > 0}
               defaultOpen
-              icon={<CallSplitIcon sx={{ fontSize: 14 }} />}
+              icon={branchIcon}
               onSelectTarget={onSelectTarget}
-              onContext={(x, y) => setCtx({ kind: "branch", name: n.name, x, y })}
+              onLeafContext={
+                n.children.length === 0 && !n.current
+                  ? (x, y) => setCtx({ kind: "branch", name: n.name, x, y })
+                  : undefined
+              }
             />
           ))}
         </Section>
         <Section title="Remotes">
           {remoteRoots.map(({ node }) => (
-            <RemoteGroupRow
+            <NodeRow
               key={node.name}
-              node={node}
+              node={{ ...node, target: undefined }}
+              depth={0}
+              defaultOpen
+              icon={<CloudOutlinedIcon sx={{ fontSize: 13 }} />}
               onSelectTarget={onSelectTarget}
-              onContext={(x, y) => setCtx({ kind: "remote", name: node.name, x, y })}
+              onDirContext={(x, y) => setCtx({ kind: "remote", name: node.name, x, y })}
             />
           ))}
         </Section>
         <Section title="Tags">
           {tagRoot.map((n) => (
-            <BranchableRow
+            <NodeRow
               key={n.name}
               node={n}
               depth={0}
-              isDir={n.children.length > 0}
               defaultOpen={false}
-              icon={<SellOutlinedIcon sx={{ fontSize: 13 }} />}
+              icon={tagIcon}
               onSelectTarget={onSelectTarget}
-              onContext={(x, y) => setCtx({ kind: "tag", name: n.name, x, y })}
+              onLeafContext={(x, y) => setCtx({ kind: "tag", name: n.name, x, y })}
             />
           ))}
         </Section>
         <Section title="Submodules">
           {(tree?.submodules ?? []).map((s) => (
-            <ListItemButton
+            <TreeRow
               key={s.path}
-              dense
-              sx={{ pl: 1, py: 0 }}
+              depth={0}
+              label={s.name}
+              icon={<FolderOutlinedIcon sx={{ fontSize: 13 }} />}
               onClick={() => onOpenSubmodule?.(s.path)}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                setCtx({ kind: "submodule", path: s.path, x: e.clientX, y: e.clientY })
-              }}
-            >
-              <Box component="span" sx={{ display: "inline-flex", width: 20, justifyContent: "center", flexShrink: 0 }} />
-              <ListItemIcon sx={{ minWidth: 20 }}>
-                <FolderOutlinedIcon sx={{ fontSize: 14 }} />
-              </ListItemIcon>
-              <ListItemText primary={s.name} slotProps={{ primary: { variant: "body2" } }} />
-            </ListItemButton>
+              onContextMenu={(x, y) => setCtx({ kind: "submodule", path: s.path, x, y })}
+            />
           ))}
         </Section>
       </List>
@@ -189,6 +191,69 @@ export function RepoTree({
       </Menu>
     </Paper>
   )
+
+  function NodeRow({
+    node,
+    depth,
+    defaultOpen,
+    icon,
+    onSelectTarget,
+    onDirContext,
+    onLeafContext,
+  }: {
+    node: TreeNode
+    depth: number
+    defaultOpen: boolean
+    icon: ReactNode
+    onSelectTarget?: (sha: string) => void
+    onDirContext?: (x: number, y: number) => void
+    onLeafContext?: (x: number, y: number) => void
+  }) {
+    const [open, setOpen] = useState(defaultOpen)
+    const isDir = node.children.length > 0
+    if (isDir) {
+      return (
+        <>
+          <TreeRow
+            depth={depth}
+            label={node.name}
+            expandable
+            open={open}
+            icon={icon}
+            muted
+            onClick={() => setOpen((v) => !v)}
+            onContextMenu={onDirContext}
+          />
+          {open &&
+            node.children.map((child) => (
+              <NodeRow
+                key={child.name}
+                node={child}
+                depth={depth + 1}
+                defaultOpen={false}
+                icon={icon}
+                onSelectTarget={onSelectTarget}
+                onDirContext={onDirContext}
+                onLeafContext={onLeafContext}
+              />
+            ))}
+        </>
+      )
+    }
+    return (
+      <TreeRow
+        depth={depth}
+        label={node.name}
+        icon={icon}
+        current={node.current}
+        onClick={() => onSelectTarget?.(node.target!)}
+        onContextMenu={(x, y) => {
+          if (node.current) return
+          ;(onLeafContext ?? onDirContext)?.(x, y)
+        }}
+      />
+    )
+  }
 
   function itemsFor(c: CtxMenu | null): { label: string; testid: string; action: () => void }[] {
     if (!c) return []
@@ -214,126 +279,73 @@ export function RepoTree({
   }
 }
 
-function RemoteGroupRow({
-  node,
-  onSelectTarget,
-  onContext,
+function TreeRow({
+  depth,
+  label,
+  icon,
+  expandable,
+  open,
+  current,
+  muted,
+  onClick,
+  onContextMenu,
 }: {
-  node: TreeNode
-  onSelectTarget?: (sha: string) => void
-  onContext: (x: number, y: number) => void
+  depth: number
+  label: string
+  icon?: ReactNode
+  expandable?: boolean
+  open?: boolean
+  current?: boolean
+  muted?: boolean
+  onClick: () => void
+  onContextMenu?: (x: number, y: number) => void
 }) {
-  const [open, setOpen] = useState(true)
   return (
-    <>
-      <ListItemButton
-        dense
-        sx={{ pl: 1, py: 0 }}
-        onClick={() => setOpen((v) => !v)}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          onContext(e.clientX, e.clientY)
+    <Box
+      data-testid="tree-row"
+      data-depth={depth}
+      data-label={label}
+      onClick={onClick}
+      onContextMenu={
+        onContextMenu
+          ? (e) => {
+              e.preventDefault()
+              onContextMenu(e.clientX, e.clientY)
+            }
+          : undefined
+      }
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        pl: `${TREE_ROW_INDENT + depth * TREE_ROW_LEVEL}px`,
+        pr: 1,
+        py: 0.0625,
+        cursor: "default",
+        bgcolor: current ? "action.selected" : "transparent",
+        "&:hover": { bgcolor: "action.hover" },
+      }}
+    >
+      <Box component="span" sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center" }}>
+        {expandable ? (open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />) : null}
+      </Box>
+      <Box
+        component="span"
+        sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center", mr: 0.5, color: current ? "primary.main" : "text.secondary" }}
+      >
+        {icon ?? null}
+      </Box>
+      <Typography
+        variant="body2"
+        noWrap
+        sx={{
+          fontSize: 12.5,
+          fontWeight: current ? 700 : 400,
+          color: current ? "primary.main" : muted ? "text.secondary" : "text.primary",
         }}
       >
-        <Box component="span" sx={{ display: "inline-flex", width: 20, justifyContent: "center", flexShrink: 0 }}>
-          {open ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
-        </Box>
-        <ListItemIcon sx={{ minWidth: 20 }}>
-          <CloudOutlinedIcon sx={{ fontSize: 14 }} />
-        </ListItemIcon>
-        <ListItemText
-          primary={node.name}
-          slotProps={{ primary: { variant: "body2", sx: { color: "text.secondary" } } }}
-        />
-      </ListItemButton>
-      {open && node.children.map((child) => (
-        <BranchableRow
-          key={child.name}
-          node={child}
-          depth={1}
-          isDir={child.children.length > 0}
-          defaultOpen={false}
-          icon={<CallSplitIcon sx={{ fontSize: 13 }} />}
-          onSelectTarget={onSelectTarget}
-        />
-      ))}
-    </>
-  )
-}
-
-function BranchableRow({
-  node,
-  depth,
-  isDir,
-  defaultOpen,
-  icon,
-  onSelectTarget,
-  onContext,
-}: {
-  node: TreeNode
-  depth: number
-  isDir: boolean
-  defaultOpen: boolean
-  icon?: ReactNode
-  onSelectTarget?: (sha: string) => void
-  onContext?: (x: number, y: number) => void
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <>
-      <ListItemButton
-        dense
-        selected={!isDir && node.current}
-        sx={{ pl: 1 + depth * 1.5, py: 0 }}
-        onClick={() => (isDir ? setOpen((v) => !v) : onSelectTarget?.(node.target!))}
-        onContextMenu={
-          onContext
-            ? (e) => {
-                e.preventDefault()
-                onContext(e.clientX, e.clientY)
-              }
-            : undefined
-        }
-      >
-        <Box component="span" sx={{ display: "inline-flex", width: 20, justifyContent: "center", flexShrink: 0 }}>
-          {isDir &&
-            (open ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />)}
-        </Box>
-        {!isDir && icon && (
-          <ListItemIcon sx={{ minWidth: 20 }}>
-            {icon}
-          </ListItemIcon>
-        )}
-        <ListItemText
-          primary={node.name}
-          slotProps={{
-            primary: {
-              variant: "body2",
-              sx: {
-                fontWeight: !isDir && node.current ? 700 : 400,
-                color: !isDir && node.current ? "primary.main" : isDir ? "text.secondary" : "text.primary",
-              },
-            },
-          }}
-        />
-      </ListItemButton>
-      {isDir && open && (
-        <>
-          {node.children.map((child) => (
-            <BranchableRow
-              key={child.name}
-              node={child}
-              depth={depth + 1}
-              isDir={child.children.length > 0}
-              defaultOpen={false}
-              icon={icon}
-              onSelectTarget={onSelectTarget}
-              onContext={onContext}
-            />
-          ))}
-        </>
-      )}
-    </>
+        {label}
+      </Typography>
+    </Box>
   )
 }
 

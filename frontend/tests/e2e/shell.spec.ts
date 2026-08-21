@@ -92,6 +92,43 @@ test("revision context menu offers checkout, reset, rebase", async ({ page }) =>
   await page.getByRole("button", { name: "Cancel" }).click()
 })
 
+test("left tree uses consistent indentation per depth", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.getByTestId("left-panel")).toBeVisible()
+  const rows = page.locator('[data-testid="tree-row"]')
+  await expect(rows.first()).toBeVisible()
+  const count = await rows.count()
+
+  // Every row at the same depth must carry exactly one padding-left,
+  // and it must match the uniform formula 6px + 16px * depth.
+  const byDepth = new Map<number, Set<string>>()
+  for (let i = 0; i < count; i++) {
+    const row = rows.nth(i)
+    const depth = Number(await row.getAttribute("data-depth"))
+    const pl = await row.evaluate((el) => getComputedStyle(el).paddingLeft)
+    const set = byDepth.get(depth) ?? new Set<string>()
+    set.add(pl)
+    byDepth.set(depth, set)
+  }
+  expect(byDepth.size).toBeGreaterThan(0)
+  for (const [depth, paddings] of byDepth) {
+    expect(paddings.size, `depth ${depth} has mixed padding: ${[...paddings].join(", ")}`).toBe(1)
+    expect(paddings.values().next().value).toBe(`${6 + depth * 16}px`)
+  }
+
+  // Nested rows (e.g. branches under a remote group) indent one level deeper
+  // than top-level rows.
+  const child = page.locator('[data-testid="tree-row"][data-depth="1"]')
+  if ((await child.count()) > 0) {
+    const topLevelPl = await page
+      .locator('[data-testid="tree-row"][data-depth="0"]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).paddingLeft)
+    const childPl = await child.first().evaluate((el) => getComputedStyle(el).paddingLeft)
+    expect(Number.parseFloat(childPl)).toBeGreaterThan(Number.parseFloat(topLevelPl))
+  }
+})
+
 test("bottom panel splitter resizes", async ({ page }) => {
   await page.goto("/")
   const panel = page.getByTestId("bottom-panel")

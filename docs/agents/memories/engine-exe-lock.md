@@ -18,6 +18,12 @@ Stop-Process -Name PowerGit.Engine -Force -ErrorAction SilentlyContinue
   `%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe`.
 - Restart the engine after engine changes; the frontend expects it on
   `http://127.0.0.1:7733`.
+- Launching the built `PowerGit.Engine.exe` directly fails on this machine:
+  the apphost resolves to system .NET (6/8). Set
+  `DOTNET_ROOT=%LOCALAPPDATA%\Microsoft\dotnet` first.
+- Playwright e2e starts only Vite (`webServer` in playwright.config.ts).
+  A live engine on :7733 must already be running or engine-backed tests
+  (File Tree tab) fail with "Failed to fetch".
 
 # Engine ops endpoints (v0.4.7)
 - `POST /checkout {ref, force}` — 400 with a "force" hint when tree is dirty.
