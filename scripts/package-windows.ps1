@@ -16,6 +16,9 @@ if (-not $SkipBuild) {
     pwsh -NoProfile -File "$repo\scripts\build-engine-sidecar.ps1"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Push-Location $frontend
+    npm ci
+    $code = $LASTEXITCODE
+    if ($code -ne 0) { Pop-Location; exit $code }
     npm run tauri build
     $code = $LASTEXITCODE
     Pop-Location
