@@ -124,15 +124,16 @@ Recent repos with diff stats, Open, Clone.
 
 ## Backlog
 - Drop leftover 2021 origin branches
-### Branch restructure + first Tauri build (2026-08-21)
 
+### Branch restructure + first Tauri build (2026-08-21)
 - Local worktree was accidentally reset to the upstream pin; recovered via
   `git fetch` + fast-forward to `origin/master`, then re-applied the v0.4.7
-  session deltas. Verified: engine tests 17/17, e2e 10/10.
-- New orphan branch `powergit`: commit 1 = docs only (README rewritten for
-  PowerGit, PRD, PLAN, SRS, agent guides, license), commit 2 = engine +
+  session deltas.
+- New orphan branch `powergit`: commit 1 = docs only, commit 2 = engine +
   frontend + tooling. `master` keeps full GitExtensions history as reference.
-- First Tauri release build: `frontend/src-tauri/target/release/powergit.exe`
-  and NSIS installer `PowerGit_0.3.0_x64-setup.exe`. Launch smoke passed
-  (app process alive, engine health ok). Nothing pushed yet.
-- v0.4.9 — stash handling: stash panel + topbar mini menu, stash/pending-changes nodes in graph (GE parity)
+- First Tauri release build + launch smoke passed.
+
+## v0.5 — Release track
+- [ ] GitHub Pages showcase site: new features + visuals screenshots
+- [ ] Release skill for opencode and claude agents (.opencode/skills + .claude/skills): how to cut a release, update Pages visuals and main README
+- [ ] Build and attach binaries to GitHub releases (Windows portable zip, Linux AppImage)
