@@ -13,7 +13,7 @@ public sealed partial class GitHost
             root,
             60_000,
             "-c", "core.quotepath=false",
-            "log", "--topo-order", "--branches",
+            "log", "--topo-order", "--branches", "--tags",
             $"-n{Math.Clamp(max, 1, 5000)}",
             $"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
 
@@ -113,14 +113,22 @@ public sealed partial class GitHost
         return files;
     }
 
-    public DiffDto GetDiff(string id, string path)
+    public DiffDto GetDiff(string id, string path, int context = 3, bool ignoreWhitespace = false, bool fullFile = false)
     {
         string root = RequireRoot();
-        CommandResult show = RunTimed(
-            root,
-            30_000,
+        int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
+        List<string> args = [
             "-c", "core.quotepath=false",
-            "show", "--format=", "--find-renames", id, "--", path);
+            "show", "--format=", "--find-renames", $"-U{u}",
+            id,
+        ];
+        if (ignoreWhitespace)
+        {
+            args.Add("-w");
+        }
+
+        args.AddRange(["--", path]);
+        CommandResult show = RunTimed(root, 30_000, [.. args]);
         if (show.ExitCode != 0)
         {
             throw new InvalidOperationException(show.StdErr.Trim());
@@ -178,13 +186,36 @@ public sealed partial class GitHost
         return [.. entries.OrderBy(e => e.Type != "tree").ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
-    public DiffDto GetWorkTreeDiff(string path, bool staged)
+    public DiffDto GetBlob(string id, string path)
     {
         string root = RequireRoot();
-        List<string> args = ["-c", "core.quotepath=false", "diff", "--no-color"];
+        CommandResult result = RunTimed(root, 30_000, "-c", "core.quotepath=false", "show", $"{id}:{path.Replace('\\', '/')}");
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+
+        if (result.StdOut.Contains('\0'))
+        {
+            return new DiffDto(path, "Binary file (not shown)", true);
+        }
+
+        return new DiffDto(path, result.StdOut, false);
+    }
+
+    public DiffDto GetWorkTreeDiff(string path, bool staged, int context = 3, bool ignoreWhitespace = false, bool fullFile = false)
+    {
+        string root = RequireRoot();
+        int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
+        List<string> args = ["-c", "core.quotepath=false", "diff", "--no-color", $"-U{u}"];
         if (staged)
         {
             args.Add("--cached");
+        }
+
+        if (ignoreWhitespace)
+        {
+            args.Add("-w");
         }
 
         args.AddRange(["--", path]);

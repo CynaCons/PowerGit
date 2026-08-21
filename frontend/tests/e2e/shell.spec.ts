@@ -60,6 +60,7 @@ test("diff tab splits files and diff side by side", async ({ page }) => {
   await page.getByRole("tab", { name: /Diff/ }).click()
   await expect(page.getByTestId("file-list")).toBeVisible()
   await expect(page.getByTestId("diff-pane")).toBeVisible()
+  await expect(page.getByTestId("diff-options-bar")).toBeVisible()
   const list = page.getByTestId("file-list")
   const pane = page.getByTestId("diff-pane")
   const listBox = await list.boundingBox()

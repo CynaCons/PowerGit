@@ -6,14 +6,17 @@ import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { CompactFileList } from "./CompactFileList"
+import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
-import { fetchCommit, fetchDiff, fetchFiles, type CommitDetail, type DiffDto, type FileChange } from "../engine"
+import { fetchBlob, fetchCommit, fetchDiff, fetchFiles, type CommitDetail, type DiffDto, type DiffOptions, type FileChange } from "../engine"
 import type { GraphRow } from "../graph/types"
 
 type Props = {
   current: GraphRow | undefined
   height: number
 }
+
+const DEFAULT_DIFF_OPTIONS: DiffOptions = { context: 3, ws: false, full: false }
 
 export function BottomPanel({ current, height }: Props) {
   const [tab, setTab] = useState(0)
@@ -22,6 +25,9 @@ export function BottomPanel({ current, height }: Props) {
   const [file, setFile] = useState<string | null>(null)
   const [diff, setDiff] = useState<DiffDto | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [diffOpts, setDiffOpts] = useState<DiffOptions>(DEFAULT_DIFF_OPTIONS)
+  const [treeFile, setTreeFile] = useState<string | null>(null)
+  const [blob, setBlob] = useState<DiffDto | null>(null)
 
   useEffect(() => {
     if (!current) {
@@ -29,6 +35,8 @@ export function BottomPanel({ current, height }: Props) {
       setFiles([])
       setFile(null)
       setDiff(null)
+      setTreeFile(null)
+      setBlob(null)
       return
     }
 
@@ -39,6 +47,8 @@ export function BottomPanel({ current, height }: Props) {
     setError(null)
     setFile(null)
     setDiff(null)
+    setTreeFile(null)
+    setBlob(null)
     fetchCommit(id)
       .then(setDetail)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "commit failed"))
@@ -51,12 +61,12 @@ export function BottomPanel({ current, height }: Props) {
   }, [current])
 
   useEffect(() => {
-    if (!current || !file || current.rev.id.length < 16) {
-      setDiff(null)
+    if (!current || !file || current.rev.id.length < 16 || tab === 2) {
+      if (tab !== 1) setDiff(null)
       return
     }
     let cancelled = false
-    fetchDiff(current.rev.id, file)
+    fetchDiff(current.rev.id, file, diffOpts)
       .then((d) => {
         if (!cancelled) setDiff(d)
       })
@@ -66,7 +76,26 @@ export function BottomPanel({ current, height }: Props) {
     return () => {
       cancelled = true
     }
-  }, [current, file])
+  }, [current, file, diffOpts, tab])
+
+  useEffect(() => {
+    if (!current || !treeFile || current.rev.id.length < 16) {
+      setBlob(null)
+      return
+    }
+    let cancelled = false
+    setBlob(null)
+    fetchBlob(current.rev.id, treeFile)
+      .then((b) => {
+        if (!cancelled) setBlob(b)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setBlob({ path: treeFile, text: e instanceof Error ? e.message : "open failed", binary: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [current, treeFile])
 
   return (
     <Paper data-testid="bottom-panel" sx={{ height, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -120,37 +149,83 @@ export function BottomPanel({ current, height }: Props) {
                 onSelect={(f) => setFile(f.path)}
               />
             </Box>
-            <DiffPane diff={diff} file={file} />
+            <DiffPane diff={diff} file={file} options={diffOpts} onOptions={setDiffOpts} />
           </>
         )}
         {tab === 2 && (
-          <CommitFileTree
-            commitId={current && current.rev.id.length >= 16 ? current.rev.id : null}
-            onSelectFile={(path) => {
-              setFile(path)
-              setTab(1)
-            }}
-          />
+          <>
+            <Box sx={{ width: 340, flexShrink: 0, overflow: "auto", borderRight: 1, borderColor: "divider" }} data-testid="commit-file-tree-wrap">
+              <CommitFileTree
+                commitId={current && current.rev.id.length >= 16 ? current.rev.id : null}
+                onSelectFile={(path) => setTreeFile(path)}
+              />
+            </Box>
+            <BlobPane blob={blob} path={treeFile} />
+          </>
         )}
       </Box>
     </Paper>
   )
 }
 
-function DiffPane({ diff, file }: { diff: DiffDto | null; file: string | null }) {
+function DiffPane({
+  diff,
+  file,
+  options,
+  onOptions,
+}: {
+  diff: DiffDto | null
+  file: string | null
+  options: DiffOptions
+  onOptions: (o: DiffOptions) => void
+}) {
   return (
-    <Box
-      data-testid="diff-pane"
-      sx={{
-        m: 0,
-        p: 2,
-        flex: 1,
-        minWidth: 0,
-        overflow: "auto",
-        bgcolor: "#ffffff",
-      }}
-    >
-      {diff ? <DiffView text={diff.text} /> : file ? "Loading diff…" : "Select a file."}
+    <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <Box
+        data-testid="diff-pane"
+        sx={{
+          m: 0,
+          p: 2,
+          flex: 1,
+          minWidth: 0,
+          overflow: "auto",
+          bgcolor: "#ffffff",
+        }}
+      >
+        {diff ? <DiffView text={diff.text} /> : file ? "Loading diff…" : "Select a file."}
+      </Box>
+      <DiffOptionsBar options={options} onChange={onOptions} />
+    </Box>
+  )
+}
+
+function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | null }) {
+  return (
+    <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ px: 1.5, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
+        <Typography variant="caption" sx={{ fontFamily: "Fira Code, ui-monospace, monospace" }}>
+          {path ?? "Select a file in the tree."}
+        </Typography>
+      </Box>
+      <Box
+        data-testid="blob-pane"
+        component="pre"
+        sx={{
+          m: 0,
+          p: 2,
+          flex: 1,
+          minWidth: 0,
+          overflow: "auto",
+          fontFamily: "Fira Code, ui-monospace, monospace",
+          fontSize: 12,
+          lineHeight: 1.5,
+          bgcolor: "#ffffff",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all",
+        }}
+      >
+        {blob ? blob.text : path ? "Loading…" : ""}
+      </Box>
     </Box>
   )
 }

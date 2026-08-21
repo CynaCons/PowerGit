@@ -124,7 +124,7 @@ app.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git) =>
     }
 });
 
-app.MapGet("/commits/{id}/diff", (string id, string path, GitHost git) =>
+app.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? context, bool? ws, bool? full) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -133,7 +133,7 @@ app.MapGet("/commits/{id}/diff", (string id, string path, GitHost git) =>
 
     try
     {
-        return Results.Ok(git.GetDiff(id, path));
+        return Results.Ok(git.GetDiff(id, path, context ?? 3, ws ?? false, full ?? false));
     }
     catch (Exception ex)
     {
@@ -141,7 +141,7 @@ app.MapGet("/commits/{id}/diff", (string id, string path, GitHost git) =>
     }
 });
 
-app.MapGet("/diff/worktree", (string path, bool staged, GitHost git) =>
+app.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -150,7 +150,125 @@ app.MapGet("/diff/worktree", (string path, bool staged, GitHost git) =>
 
     try
     {
-        return Results.Ok(git.GetWorkTreeDiff(path, staged));
+        return Results.Ok(git.GetBlob(id, path));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? context, bool? ws, bool? full) =>
+{
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        return Results.BadRequest(new ErrorResponse("path is required"));
+    }
+
+    try
+    {
+        return Results.Ok(git.GetWorkTreeDiff(path, staged, context ?? 3, ws ?? false, full ?? false));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/files/delete", (FilesDeleteRequest body, GitHost git) =>
+{
+    try
+    {
+        git.DeleteFiles(body.Paths);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
+{
+    try
+    {
+        git.AddToIgnore(body.Pattern);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/ignore/preview", (IgnoreRequest body, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.PreviewIgnore(body.Pattern));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapGet("/remotes", (GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.ListRemotes());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPut("/remotes", (RemoteUpdate body, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.SaveRemote(body.Name, body.Url));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/fetch", (FetchRequest body, GitHost git) =>
+{
+    try
+    {
+        string output = git.FetchRemote(body.Remote);
+        return Results.Ok(new { output });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/branches/delete", (NameRequest body, GitHost git) =>
+{
+    try
+    {
+        git.DeleteBranch(body.Name);
+        return Results.Ok(git.GetRefs());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/tags/delete", (NameRequest body, GitHost git) =>
+{
+    try
+    {
+        git.DeleteTag(body.Name);
+        return Results.Ok(git.GetRefs());
     }
     catch (Exception ex)
     {

@@ -80,4 +80,193 @@ public sealed partial class GitHost
         CommandResult status = Run(root, "status", "--porcelain=v1");
         return !string.IsNullOrWhiteSpace(status.StdOut);
     }
+
+    public void DeleteBranch(string name)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("branch name is required");
+        }
+
+        string current = Run(root, "rev-parse", "--abbrev-ref", "HEAD").StdOut.Trim();
+        if (name == current)
+        {
+            throw new InvalidOperationException("Cannot delete the checked-out branch.");
+        }
+
+        CommandResult result = Run(root, "branch", "-D", name);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+    }
+
+    public void DeleteTag(string name)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("tag name is required");
+        }
+
+        CommandResult result = Run(root, "tag", "-d", name);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+    }
+
+    public string FetchRemote(string remote)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(remote))
+        {
+            throw new InvalidOperationException("remote is required");
+        }
+
+        CommandResult result = RunTimed(root, 300_000, "fetch", "--prune", remote);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
+        }
+
+        return string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
+    }
+
+    public IReadOnlyList<RemoteInfoDto> ListRemotes()
+    {
+        string root = RequireRoot();
+        CommandResult result = Run(root, "remote", "-v");
+        Dictionary<string, string> urls = new(StringComparer.Ordinal);
+        foreach (string line in result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] parts = line.Split('\t');
+            if (parts.Length == 2 && parts[1].EndsWith("(fetch)", StringComparison.Ordinal))
+            {
+                urls[parts[0]] = parts[1]["(fetch)".Length..].Trim();
+            }
+        }
+
+        return [.. urls.Select(kv => new RemoteInfoDto(kv.Key, kv.Value)).OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    public RemoteInfoDto SaveRemote(string name, string url)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(url))
+        {
+            throw new InvalidOperationException("name and url are required");
+        }
+
+        bool exists = Run(root, "remote", "get-url", name).ExitCode == 0;
+        CommandResult result = exists
+            ? Run(root, "remote", "set-url", name, url)
+            : Run(root, "remote", "add", name, url);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+
+        return new RemoteInfoDto(name, url);
+    }
+
+    public void DeleteFiles(IReadOnlyList<string> paths)
+    {
+        string root = RequireRoot();
+        foreach (string path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            string full = Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar));
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !File.Exists(full))
+            {
+                continue;
+            }
+
+            CommandResult tracked = Run(root, "ls-files", "--error-unmatch", "--", path);
+            CommandResult result = tracked.ExitCode == 0
+                ? Run(root, "rm", "-f", "-q", "--", path)
+                : Run(root, "rm", "-f", "-q", "--cached", "--", path);
+            if (result.ExitCode != 0 && File.Exists(full))
+            {
+                File.Delete(full);
+            }
+        }
+    }
+
+    public void AddToIgnore(string pattern)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            throw new InvalidOperationException("pattern is required");
+        }
+
+        string gitignore = Path.Combine(root, ".gitignore");
+        string line = pattern.Trim().Replace('\\', '/');
+        File.AppendAllLines(gitignore, [line]);
+    }
+
+    public IgnorePreviewDto PreviewIgnore(string pattern)
+    {
+        string root = RequireRoot();
+        string clean = pattern.Trim().Replace('\\', '/').TrimEnd('/');
+        if (clean.Length == 0)
+        {
+            return new IgnorePreviewDto(pattern, [], 0);
+        }
+
+        CommandResult result = Run(root, "-c", "core.quotepath=false", "ls-files", "--cached", "--others", "--exclude-standard");
+        List<string> matches = [];
+        Func<string, bool> isMatch = GitIgnoreMatcher(clean);
+        foreach (string line in result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string file = line.Trim().Replace('\\', '/');
+            if (file.Length > 0 && isMatch(file))
+            {
+                matches.Add(file);
+            }
+        }
+
+        return new IgnorePreviewDto(pattern, [.. matches.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)], matches.Count);
+    }
+
+    internal static Func<string, bool> GitIgnoreMatcher(string pattern)
+    {
+        bool dirOnly = pattern.EndsWith("/", StringComparison.Ordinal);
+        if (dirOnly)
+        {
+            pattern = pattern[..^1];
+        }
+
+        bool anchored = pattern.Contains('/', StringComparison.Ordinal);
+        string regex = "^";
+        if (!anchored)
+        {
+            regex += "(?:.*/)?";
+        }
+
+        foreach (char c in pattern)
+        {
+            switch (c)
+            {
+                case '*': regex += "[^/]*"; break;
+                case '?': regex += "[^/]"; break;
+                default: regex += RegexEscape(c); break;
+            }
+        }
+
+        regex += dirOnly ? "(/.*)?$" : "(/.*)?$";
+        var rx = new System.Text.RegularExpressions.Regex(regex, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return path => rx.IsMatch(path);
+    }
+
+    private static readonly char[] SpecialRegexChars = ['*', '+', '?', '|', '{', '[', '(', ')', '\\', '^', '$', '.', ' '];
+
+    private static string RegexEscape(char c)
+        => SpecialRegexChars.Contains(c) ? "\\" + c : c.ToString();
 }

@@ -74,3 +74,17 @@ public sealed record CheckoutRequest(string Ref, bool Force = false);
 public sealed record ResetRequest(string Commit, string Mode);
 
 public sealed record RebaseRequest(string Onto);
+
+public sealed record RemoteInfoDto(string Name, string Url);
+
+public sealed record RemoteUpdate(string Name, string Url);
+
+public sealed record FetchRequest(string Remote);
+
+public sealed record FilesDeleteRequest(string[] Paths);
+
+public sealed record IgnoreRequest(string Pattern);
+
+public sealed record IgnorePreviewDto(string Pattern, string[] Files, int Count);
+
+public sealed record NameRequest(string Name);

@@ -61,29 +61,41 @@ Each v0.4.x: design → code → e2e. Do not start v0.5 until this punch list is
 ### v0.4.6 — Navrail recents picker (COMPLETE)
 - [x] History icon; card overlay (title, path, branch); persist recents.json
 
-### v0.4.7 — Owner review punch list (2026-08-21)
+### v0.4.7 — Owner review punch list (2026-08-21) (COMPLETE)
 
 Settings
-- [ ] Field labels clipped in the settings panel (titles unreadable)
+- [x] Field labels clipped in the settings panel (titles unreadable)
 
 Main Browse
-- [ ] Graph / main card too round — smaller Material radius, not pill-like
-- [ ] Bottom panel resizable (drag splitter vs the revision grid)
+- [x] Graph / main card too round — smaller Material radius, not pill-like
+- [x] Bottom panel resizable (drag splitter vs the revision grid)
 
 Left panel
-- [ ] Real tree, not a flat/fake list: hierarchy, expand/collapse, nested remotes and tags as tree nodes
+- [x] Real tree, not a flat/fake list: hierarchy, expand/collapse, nested remotes and tags as tree nodes
 
 Commit overlay
-- [ ] Current popup overlaps, clips, and does not match Git Extensions FormCommit. Rebuild the *layout* of the original commit window (unstaged | staged | diff | message). Material chrome only — do not restyle WinForms, do match the arrangement.
+- [x] Current popup overlaps, clips, and does not match Git Extensions FormCommit. Rebuild the *layout* of the original commit window (unstaged | staged | diff | message). Material chrome only — do not restyle WinForms, do match the arrangement.
 
 Bottom panel
-- [ ] Per-commit **file tree** of the repo at that revision (GE File tree), not only a flat change list
-- [ ] Files and diff in a **left–right split** (GE split). Tabs-only stacked view is not enough
-- [ ] Diff colors match Git Extensions (add / remove / header / hunk). Do not invent a new palette
+- [x] Per-commit **file tree** of the repo at that revision (GE File tree), not only a flat change list
+- [x] Files and diff in a **left–right split** (GE split). Tabs-only stacked view is not enough
+- [x] Diff colors match Git Extensions (add / remove / header / hunk). Do not invent a new palette
 
 Graph context menu
-- [ ] Right-click on a revision/ref is missing. Add the Git Extensions basics: Checkout Branch, Reset branch, Rebase. Behaviour identical to Git Extensions (`RevisionGridMenuCommands` / FormCheckoutBranch, FormResetCurrentBranch, FormRebase) — same guards, prompts, and git operations. Material menu chrome only.
+- [x] Right-click on a revision/ref is missing. Add the Git Extensions basics: Checkout Branch, Reset branch, Rebase. Behaviour identical to Git Extensions (`RevisionGridMenuCommands` / FormCheckoutBranch, FormResetCurrentBranch, FormRebase) — same guards, prompts, and git operations. Material menu chrome only.
 
+### v0.4.8 — Owner review punch list #2 (2026-08-21) (COMPLETE)
+> Owner feedback round 2: appbar/navrail integration, full ref graph with GE colors, real file tree with blob viewing, floating diff-options toolbar, commit-dialog selection overhaul with file context menu + gitignore preview, GE-style left tree, author highlight. Stash handling planned for v0.4.9.
+- [x] v0.4.8-1: AppBar visually integrated with navrail (single continuous chrome)
+- [x] v0.4.8-2: graph always shows all local branches + tags, GE lane colors
+- [x] v0.4.8-3: bottom panel resize — full-width visible splitter
+- [x] v0.4.8-4: File Tree tab = full repo tree at commit; open unchanged files via new engine blob endpoint
+- [x] v0.4.8-5: floating diff-options bar (context lines / full file / ignore whitespace), compact-on-idle, in commit dialog + bottom panel diff; engine diff options
+- [x] v0.4.8-6: commit dialog multi-select (shift/ctrl, no text selection), stage/unstage selection
+- [x] v0.4.8-7: right-click menu on staged/unstaged lists: stage/unstage/delete/add-to-gitignore; gitignore preview dialog with match count
+- [x] v0.4.8-8: left tree GE look — icons per ref type, bold current branch
+- [x] v0.4.8-9: author highlight — selecting a commit tints other commits by same author
+- [x] v0.4.8-10: left tree right-click menus per element type — branch (checkout/delete), remote (fetch/configure), tag (checkout/delete), submodule (open); engine ops behind them
 ## v0.5 — Welcome / home (parked)
 Recent repos with diff stats, Open, Clone.
 
@@ -97,3 +109,15 @@ Recent repos with diff stats, Open, Clone.
 
 ## Backlog
 - Drop leftover 2021 origin branches
+### Branch restructure + first Tauri build (2026-08-21)
+
+- Local worktree was accidentally reset to the upstream pin; recovered via
+  `git fetch` + fast-forward to `origin/master`, then re-applied the v0.4.7
+  session deltas. Verified: engine tests 17/17, e2e 10/10.
+- New orphan branch `powergit`: commit 1 = docs only (README rewritten for
+  PowerGit, PRD, PLAN, SRS, agent guides, license), commit 2 = engine +
+  frontend + tooling. `master` keeps full GitExtensions history as reference.
+- First Tauri release build: `frontend/src-tauri/target/release/powergit.exe`
+  and NSIS installer `PowerGit_0.3.0_x64-setup.exe`. Launch smoke passed
+  (app process alive, engine health ok). Nothing pushed yet.
+- v0.4.9 — stash handling: stash panel + topbar mini menu, stash/pending-changes nodes in graph (GE parity)

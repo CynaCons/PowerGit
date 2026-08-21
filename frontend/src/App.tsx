@@ -19,17 +19,21 @@ import { BottomPanel } from "./components/BottomPanel"
 import { CommitDialog } from "./components/CommitDialog"
 import { CheckoutBranchDialog, RebaseDialog, ResetBranchDialog, RevisionContextMenu, type ContextTarget } from "./components/GitOps"
 import { RecentsDialog } from "./components/RecentsDialog"
+import { RemoteDialog } from "./components/RemoteDialog"
 import { RepoTree } from "./components/RepoTree"
 import { RevisionGrid } from "./components/RevisionGrid"
 import { SettingsDialog } from "./components/SettingsDialog"
 import {
   checkoutRef,
   createCommit,
+  deleteBranch,
+  deleteTag,
   fetchCurrent,
   fetchHealth,
   fetchRecents,
   fetchRefs,
   fetchRevisions,
+  fetchRemote,
   fetchStatus,
   openRepo,
   rebaseOnto,
@@ -74,6 +78,7 @@ export default function App() {
   const [checkoutBranch, setCheckoutBranch] = useState<string | null>(null)
   const [resetRow, setResetRow] = useState<ContextTarget["row"] | null>(null)
   const [rebaseRow, setRebaseRow] = useState<ContextTarget["row"] | null>(null)
+  const [remoteConfigFor, setRemoteConfigFor] = useState<string | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const dragState = useRef<{ startY: number; startH: number } | null>(null)
 
@@ -169,8 +174,70 @@ export default function App() {
     await refreshRepo()
   }
 
+  async function doDeleteBranch(name: string) {
+    if (!window.confirm(`Delete branch '${name}'?`)) return
+    try {
+      setRefs(await deleteBranch(name))
+    } catch (e) {
+      setEngineError(e instanceof Error ? e.message : "delete failed")
+    }
+  }
+  async function doDeleteTag(name: string) {
+    if (!window.confirm(`Delete tag '${name}'?`)) return
+    try {
+      setRefs(await deleteTag(name))
+    } catch (e) {
+      setEngineError(e instanceof Error ? e.message : "delete failed")
+    }
+  }
+  async function doFetchRemote(name: string) {
+    try {
+      await fetchRemote(name)
+      await refreshRepo()
+    } catch (e) {
+      setEngineError(e instanceof Error ? e.message : "fetch failed")
+    }
+  }
+  function doOpenSubmodule(path: string) {
+    if (!repo) return
+    const sep = repo.root.endsWith("/") || repo.root.endsWith("\\") ? "" : "/"
+    onOpenFolder(`${repo.root}${sep}${path}`)
+  }
+
   return (
-    <Box data-testid="browse-shell" sx={{ display: "flex", height: "100%", bgcolor: "background.default" }}>
+    <Box data-testid="browse-shell" sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
+      <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 1, minHeight: 44, px: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ mr: 1, fontWeight: 700 }}>
+            PowerGit
+          </Typography>
+          <Badge
+            badgeContent={dirty || 0}
+            color="primary"
+            overlap="rectangular"
+            sx={{ "& .MuiBadge-badge": { fontSize: 10, minWidth: 16, height: 16, px: 0.5 } }}
+          >
+            <Button variant="contained" size="small" data-testid="commit-button" onClick={() => setCommitOpen(true)}>
+              Commit
+            </Button>
+          </Badge>
+          <Button size="small" startIcon={<CloudDownloadOutlinedIcon />} disabled>
+            Fetch
+          </Button>
+          <Button size="small" startIcon={<CallReceivedOutlinedIcon />} disabled>
+            Pull
+          </Button>
+          <Button size="small" startIcon={<CloudUploadOutlinedIcon />} disabled>
+            Push
+          </Button>
+          <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+            {health ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · synthetic"}` : (engineError ?? "engine offline")}
+            {repo ? ` · ${repo.name} (${repo.branch})` : ""}
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
       <Box
         component="nav"
         data-testid="navrail"
@@ -212,40 +279,19 @@ export default function App() {
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 1, minHeight: 44, px: 1.5 }}>
-            <Typography variant="subtitle1" sx={{ mr: 1, fontWeight: 700 }}>
-              PowerGit
-            </Typography>
-            <Badge
-              badgeContent={dirty || 0}
-              color="primary"
-              overlap="rectangular"
-              sx={{ "& .MuiBadge-badge": { fontSize: 10, minWidth: 16, height: 16, px: 0.5 } }}
-            >
-              <Button variant="contained" size="small" data-testid="commit-button" onClick={() => setCommitOpen(true)}>
-                Commit
-              </Button>
-            </Badge>
-            <Button size="small" startIcon={<CloudDownloadOutlinedIcon />} disabled>
-              Fetch
-            </Button>
-            <Button size="small" startIcon={<CallReceivedOutlinedIcon />} disabled>
-              Pull
-            </Button>
-            <Button size="small" startIcon={<CloudUploadOutlinedIcon />} disabled>
-              Push
-            </Button>
-            <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
-              {health ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · synthetic"}` : (engineError ?? "engine offline")}
-              {repo ? ` · ${repo.name} (${repo.branch})` : ""}
-            </Typography>
-          </Toolbar>
-        </AppBar>
-
         <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, p: 0.75, display: "flex", gap: 0.75 }}>
           {leftOpen ? (
-            <RepoTree tree={refs} onSelectTarget={onSelectTarget} onCollapse={() => setLeftOpen(false)} />
+            <RepoTree
+              tree={refs}
+              onSelectTarget={onSelectTarget}
+              onCollapse={() => setLeftOpen(false)}
+              onCheckoutRef={(name) => doCheckout(name, false).catch((e: unknown) => setEngineError(e instanceof Error ? e.message : "checkout failed"))}
+              onDeleteBranch={doDeleteBranch}
+              onDeleteTag={doDeleteTag}
+              onFetchRemote={doFetchRemote}
+              onConfigureRemote={(name) => setRemoteConfigFor(name)}
+              onOpenSubmodule={doOpenSubmodule}
+            />
           ) : (
             <Box
               data-testid="left-panel-collapsed"
@@ -280,6 +326,7 @@ export default function App() {
                   rows={rows}
                   selected={selected}
                   onSelect={setSelected}
+                  selectedAuthor={rows[selected]?.rev.author}
                   onRowContextMenu={(e, index) => {
                     e.preventDefault()
                     setCtxTarget({ x: e.clientX, y: e.clientY, row: rows[index] })
@@ -293,19 +340,17 @@ export default function App() {
               onPointerMove={onDividerMove}
               onPointerUp={onDividerUp}
               sx={{
-                height: 8,
+                height: 6,
                 flexShrink: 0,
                 cursor: "row-resize",
-                borderRadius: 1,
-                mx: "auto",
-                width: 48,
-                bgcolor: "transparent",
-                "&:hover": { bgcolor: "divider" },
+                bgcolor: "divider",
+                "&:hover": { bgcolor: "primary.main" },
               }}
             />
             <BottomPanel current={current} height={bottomHeight} />
           </Box>
         </Box>
+      </Box>
       </Box>
 
       <CommitDialog
@@ -363,6 +408,9 @@ export default function App() {
           onClose={() => setRebaseRow(null)}
           onConfirm={doRebase}
         />
+      )}
+      {remoteConfigFor !== null && (
+        <RemoteDialog open name={remoteConfigFor} onClose={() => setRemoteConfigFor(null)} />
       )}
     </Box>
   )

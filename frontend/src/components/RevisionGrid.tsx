@@ -8,9 +8,10 @@ type Props = {
   selected: number
   onSelect: (index: number) => void
   onRowContextMenu?: (e: React.MouseEvent, index: number) => void
+  selectedAuthor?: string
 }
 
-export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu }: Props) {
+export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selectedAuthor }: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hovered, setHovered] = useState(-1)
@@ -88,6 +89,10 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu }: Pro
                   left: 0,
                   width: "100%",
                   transform: `translateY(${item.start}px)`,
+                  backgroundColor:
+                    item.index !== selected && selectedAuthor && row.rev.author === selectedAuthor
+                      ? "rgba(37, 99, 235, 0.05)"
+                      : undefined,
                 }}
               >
                 <div className="graph-cell" />
