@@ -9,13 +9,19 @@ public sealed partial class GitHost
     {
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
-        CommandResult log = RunTimed(
-            root,
-            60_000,
+        bool hasStash = Run(root, "rev-parse", "--verify", "-q", "refs/stash").ExitCode == 0;
+        List<string> logArgs = [
             "-c", "core.quotepath=false",
             "log", "--topo-order", "--branches", "--tags",
-            $"-n{Math.Clamp(max, 1, 5000)}",
-            $"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
+        ];
+        if (hasStash)
+        {
+            logArgs.Add("refs/stash");
+        }
+
+        logArgs.Add($"-n{Math.Clamp(max, 1, 5000)}");
+        logArgs.Add($"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
+        CommandResult log = RunTimed(root, 60_000, [.. logArgs]);
 
         if (log.ExitCode != 0)
         {

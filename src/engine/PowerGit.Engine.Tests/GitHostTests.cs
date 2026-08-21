@@ -111,10 +111,58 @@ public sealed class GitHostTests
         Assert.Contains(log, r => r.Subject == "main-advance");
         Assert.Equal(log[0].Parents[0], log.First(r => r.Subject == "main-advance").Id);
     }
+    [Fact]
+    public void Stash_lifecycle_works()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+        Assert.Empty(host.ListStashes());
+
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "changed\n");
+        host.StashChanges("wip change", keepIndex: false, includeUntracked: true);
+        Assert.Single(host.ListStashes());
+        Assert.False(repo.IsDirtyPublic());
+
+        System.Collections.Generic.IReadOnlyList<RevisionDto> log = host.ListRevisions(50);
+        Assert.Contains(log, r => r.Subject == "On main: wip change");
+
+        host.ApplyStash("stash@{0}", pop: true);
+        Assert.True(repo.IsDirtyPublic());
+        Assert.Equal("changed", File.ReadAllText(Path.Combine(repo.Dir, "a.txt")).Trim());
+        Assert.Empty(host.ListStashes());
+
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "again\n");
+        host.StashChanges(null, false, false);
+        Assert.Single(host.ListStashes());
+        host.DropStash("stash@{0}");
+        Assert.Empty(host.ListStashes());
+    }
+
+    [Fact]
+    public void Stash_requires_dirty_tree()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+        Assert.Throws<InvalidOperationException>(() => host.StashChanges(null, false, false));
+    }
 }
 
-internal sealed class TempRepo : IDisposable
+internal sealed partial class TempRepo : IDisposable
 {
+    public bool IsDirtyPublic()
+    {
+        System.Diagnostics.ProcessStartInfo psi = new("git", "status --porcelain=v1")
+        {
+            WorkingDirectory = Dir,
+            RedirectStandardOutput = true,
+        };
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(30_000);
+        return !string.IsNullOrWhiteSpace(p?.StandardOutput.ReadToEnd());
+    }
+
     public TempRepo()
     {
         Dir = Directory.CreateTempSubdirectory("powergit-ops-").FullName;

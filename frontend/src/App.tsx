@@ -1,6 +1,7 @@
 import AddIcon from "@mui/icons-material/Add"
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
 import HistoryIcon from "@mui/icons-material/History"
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined"
@@ -23,6 +24,9 @@ import { RemoteDialog } from "./components/RemoteDialog"
 import { RepoTree } from "./components/RepoTree"
 import { RevisionGrid } from "./components/RevisionGrid"
 import { SettingsDialog } from "./components/SettingsDialog"
+import { StashDialog } from "./components/StashDialog"
+import Menu from "@mui/material/Menu"
+import MenuItem from "@mui/material/MenuItem"
 import {
   checkoutRef,
   createCommit,
@@ -35,7 +39,11 @@ import {
   fetchRevisions,
   fetchRemote,
   fetchStatus,
+  fetchStashes,
   openRepo,
+  applyStash,
+  dropStash,
+  type StashInfo,
   rebaseOnto,
   resetBranch,
   type Health,
@@ -79,6 +87,9 @@ export default function App() {
   const [resetRow, setResetRow] = useState<ContextTarget["row"] | null>(null)
   const [rebaseRow, setRebaseRow] = useState<ContextTarget["row"] | null>(null)
   const [remoteConfigFor, setRemoteConfigFor] = useState<string | null>(null)
+  const [stashOpen, setStashOpen] = useState(false)
+  const [stashAnchor, setStashAnchor] = useState<HTMLElement | null>(null)
+  const [stashes, setStashes] = useState<StashInfo[]>([])
   const contentRef = useRef<HTMLDivElement | null>(null)
   const dragState = useRef<{ startY: number; startH: number } | null>(null)
 
@@ -107,6 +118,7 @@ export default function App() {
     setStatus(st)
     setSelected(0)
     setLive(true)
+    fetchStashes().then(setStashes).catch(() => setStashes([]))
   }, [])
 
   useEffect(() => {
@@ -221,6 +233,60 @@ export default function App() {
               Commit
             </Button>
           </Badge>
+          <Button size="small" startIcon={<Inventory2OutlinedIcon />} data-testid="stash-button" onClick={(e) => setStashAnchor(e.currentTarget)}>
+            Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
+          </Button>
+          <Menu open={stashAnchor !== null} anchorEl={stashAnchor} onClose={() => setStashAnchor(null)}>
+            <MenuItem data-testid="stash-manage" onClick={() => { setStashAnchor(null); setStashOpen(true) }}>
+              Manage stashes…
+            </MenuItem>
+            <MenuItem
+              data-testid="stash-apply-latest"
+              disabled={stashes.length === 0}
+              onClick={async () => {
+                setStashAnchor(null)
+                try {
+                  setStatus(await applyStash("stash@{0}"))
+                  await refreshRepo()
+                } catch (err) {
+                  setEngineError(err instanceof Error ? err.message : "apply failed")
+                }
+              }}
+            >
+              Apply stash@{"{0}"}
+            </MenuItem>
+            <MenuItem
+              data-testid="stash-pop-latest"
+              disabled={stashes.length === 0}
+              onClick={async () => {
+                setStashAnchor(null)
+                try {
+                  setStatus(await applyStash("stash@{0}", true))
+                  await refreshRepo()
+                } catch (err) {
+                  setEngineError(err instanceof Error ? err.message : "pop failed")
+                }
+              }}
+            >
+              Pop stash@{"{0}"}
+            </MenuItem>
+            <MenuItem
+              data-testid="stash-drop-latest"
+              disabled={stashes.length === 0}
+              onClick={async () => {
+                setStashAnchor(null)
+                if (!window.confirm("Drop stash@{0}? This cannot be undone.")) return
+                try {
+                  await dropStash("stash@{0}")
+                  await refreshRepo()
+                } catch (err) {
+                  setEngineError(err instanceof Error ? err.message : "drop failed")
+                }
+              }}
+            >
+              Drop stash@{"{0}"}
+            </MenuItem>
+          </Menu>
           <Button size="small" startIcon={<CloudDownloadOutlinedIcon />} disabled>
             Fetch
           </Button>
@@ -412,6 +478,15 @@ export default function App() {
       {remoteConfigFor !== null && (
         <RemoteDialog open name={remoteConfigFor} onClose={() => setRemoteConfigFor(null)} />
       )}
+      <StashDialog
+        open={stashOpen}
+        dirtyCount={dirty}
+        onClose={() => {
+          setStashOpen(false)
+          refreshRepo()
+        }}
+        onStatus={setStatus}
+      />
     </Box>
   )
 }

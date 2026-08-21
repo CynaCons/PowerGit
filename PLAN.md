@@ -96,6 +96,12 @@ Graph context menu
 - [x] v0.4.8-8: left tree GE look — icons per ref type, bold current branch
 - [x] v0.4.8-9: author highlight — selecting a commit tints other commits by same author
 - [x] v0.4.8-10: left tree right-click menus per element type — branch (checkout/delete), remote (fetch/configure), tag (checkout/delete), submodule (open); engine ops behind them
+### v0.4.9 — Stash handling (2026-08-21) (COMPLETE)
+> Final 0.4.x iteration: GE-parity stash handling — engine stash ops, stashes visible in graph, topbar mini menu + manage dialog.
+**Goal:** Stash handling at Git Extensions parity: stash/apply/pop/drop from the UI, stashes visible in the revision graph, FormStash-style management dialog.
+- [x] v0.4.9-1: engine stash ops — GET /stashes, POST /stash, /stash/apply, /stash/drop + tests
+- [x] v0.4.9-2: stashes as graph nodes (include refs/stash in revisions) + distinct ref chip
+- [x] v0.4.9-3: topbar Stash mini menu + FormStash-style manage dialog (list, stash w/ message+options, apply/pop/drop)
 ## v0.5 — Welcome / home (parked)
 Recent repos with diff stats, Open, Clone.
 

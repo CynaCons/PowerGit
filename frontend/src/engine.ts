@@ -216,6 +216,40 @@ export async function deleteTag(name: string): Promise<RefTree> {
   return json<RefTree>(res)
 }
 
+export type StashInfo = { reference: string; id: string; subject: string }
+
+export async function fetchStashes(): Promise<StashInfo[]> {
+  const res = await fetch(`${ENGINE_URL}/stashes`)
+  return json<StashInfo[]>(res)
+}
+
+export async function stashChanges(message: string | null, keepIndex = false, includeUntracked = false): Promise<RepoStatus> {
+  const res = await fetch(`${ENGINE_URL}/stash`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, keepIndex, includeUntracked }),
+  })
+  return json<RepoStatus>(res)
+}
+
+export async function applyStash(reference: string, pop = false): Promise<RepoStatus> {
+  const res = await fetch(`${ENGINE_URL}/stash/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reference, pop }),
+  })
+  return json<RepoStatus>(res)
+}
+
+export async function dropStash(reference: string): Promise<void> {
+  const res = await fetch(`${ENGINE_URL}/stash/drop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: reference }),
+  })
+  await json<{ ok: boolean }>(res)
+}
+
 export async function fetchStatus(): Promise<RepoStatus> {
   const res = await fetch(`${ENGINE_URL}/status`)
   return json<RepoStatus>(res)

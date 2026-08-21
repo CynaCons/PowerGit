@@ -88,3 +88,9 @@ public sealed record IgnoreRequest(string Pattern);
 public sealed record IgnorePreviewDto(string Pattern, string[] Files, int Count);
 
 public sealed record NameRequest(string Name);
+
+public sealed record StashDto(string Reference, string Id, string Subject);
+
+public sealed record StashRequest(string? Message, bool KeepIndex = false, bool IncludeUntracked = false);
+
+public sealed record StashApplyRequest(string Reference, bool Pop = false);

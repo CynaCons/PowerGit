@@ -400,6 +400,57 @@ app.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
     }
 });
 
+app.MapGet("/stashes", (GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.ListStashes());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/stash", (StashRequest body, GitHost git) =>
+{
+    try
+    {
+        git.StashChanges(body.Message, body.KeepIndex, body.IncludeUntracked);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/stash/apply", (StashApplyRequest body, GitHost git) =>
+{
+    try
+    {
+        git.ApplyStash(body.Reference, body.Pop);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
+{
+    try
+    {
+        git.DropStash(body.Name);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 app.Run();
 
 public partial class Program;

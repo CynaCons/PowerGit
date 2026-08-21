@@ -101,7 +101,7 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
                     {refs.shown.map((ref) => (
                       <span
                         key={ref}
-                        className={`ref${ref === "HEAD" ? " head" : ref.includes("/") ? " remote" : ""}`}
+                        className={`ref${ref === "HEAD" ? " head" : ref.includes("stash") ? " stash" : ref.includes("/") ? " remote" : ""}`}
                       >
                         {ref}
                       </span>

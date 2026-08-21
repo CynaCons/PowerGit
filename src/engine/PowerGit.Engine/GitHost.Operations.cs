@@ -267,6 +267,90 @@ public sealed partial class GitHost
 
     private static readonly char[] SpecialRegexChars = ['*', '+', '?', '|', '{', '[', '(', ')', '\\', '^', '$', '.', ' '];
 
+    public IReadOnlyList<StashDto> ListStashes()
+    {
+        string root = RequireRoot();
+        CommandResult result = Run(
+            root,
+            "-c", "core.quotepath=false",
+            "stash", "list", "--format=%gd\u001f%H\u001f%s");
+        List<StashDto> stashes = [];
+        foreach (string line in result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] f = line.Split('\u001f');
+            if (f.Length >= 3)
+            {
+                stashes.Add(new StashDto(f[0], f[1], f[2]));
+            }
+        }
+
+        return stashes;
+    }
+
+    public void StashChanges(string? message, bool keepIndex, bool includeUntracked)
+    {
+        string root = RequireRoot();
+        if (!IsDirty(root))
+        {
+            throw new InvalidOperationException("There are no local changes to stash.");
+        }
+
+        List<string> args = ["stash", "push"];
+        if (keepIndex)
+        {
+            args.Add("-k");
+        }
+
+        if (includeUntracked)
+        {
+            args.Add("-u");
+        }
+
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            args.AddRange(["-m", message.Trim()]);
+        }
+
+        CommandResult result = Run(root, [.. args]);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
+        }
+    }
+
+    public void ApplyStash(string reference, bool pop)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            throw new InvalidOperationException("stash reference is required");
+        }
+
+        CommandResult result = Run(root, "stash", pop ? "pop" : "apply", reference);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                "Apply failed" +
+                (result.StdOut.Contains("conflict", StringComparison.OrdinalIgnoreCase) ? " (conflicts); your stash was kept." : ".") +
+                " " + (string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim()));
+        }
+    }
+
+    public void DropStash(string reference)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            throw new InvalidOperationException("stash reference is required");
+        }
+
+        CommandResult result = Run(root, "stash", "drop", reference);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+    }
+
     private static string RegexEscape(char c)
         => SpecialRegexChars.Contains(c) ? "\\" + c : c.ToString();
 }
