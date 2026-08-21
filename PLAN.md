@@ -114,6 +114,16 @@ Graph context menu
 ## v0.5 — Welcome / home (parked)
 Recent repos with diff stats, Open, Clone.
 
+### v0.5.1 — Engine sidecar spawn (2026-08-21) (COMPLETE)
+> Make shipped builds self-sufficient: bundle the engine as a Tauri sidecar spawned at startup, so end users don't need to run anything manually.
+**Goal:** Engine auto-start inside the packaged app (sidecar), verified by a real release build smoke test.
+- [x] v0.5.1-1: publish engine as self-contained single-file exe into src-tauri/binaries with target-triple name
+- [x] v0.5.1-2: tauri externalBin + shell plugin + Rust startup spawn on :7733
+- [x] v0.5.1-3: release build smoke — packaged app spawns engine, health ok, no manual steps
+### v0.5.2 — Windows artifacts (2026-08-21) (COMPLETE)
+> One-command Windows artifact: portable zip (app + sidecar engine) plus the NSIS installer, versioned from tauri.conf.json.
+**Goal:** scripts/package-windows.ps1 produces distributable, self-sufficient Windows artifacts.
+- [x] package-windows.ps1: portable zip + NSIS installer, zip smoke-verified self-sufficient
 ## Later
 - Fetch / Pull / Push
 - Design-demo step/pause bar (opt-in `npm run test:demo`)
