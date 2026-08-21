@@ -102,6 +102,15 @@ Graph context menu
 - [x] v0.4.9-1: engine stash ops — GET /stashes, POST /stash, /stash/apply, /stash/drop + tests
 - [x] v0.4.9-2: stashes as graph nodes (include refs/stash in revisions) + distinct ref chip
 - [x] v0.4.9-3: topbar Stash mini menu + FormStash-style manage dialog (list, stash w/ message+options, apply/pop/drop)
+### v0.4.10 — Visual polish, resolutions, Linux check (2026-08-21) (COMPLETE)
+> Polish + infrastructure: menu typography, commit-dialog row unification, graph offset, GE app icon, multi-resolution visual test suite, Docker Ubuntu check, regular pushes.
+**Goal:** Fix menu/dialog visual defects, take over the GE app icon, and establish resolution + Linux verification so layout bugs (e.g. fullscreen clipping) are caught automatically.
+- [x] v0.4.10-1: right-click menus — app font + compact size (theme-level)
+- [x] v0.4.10-2: commit dialog rows unified on CompactFileList (kill offset divergence)
+- [x] v0.4.10-3: graph left padding inside rounded container
+- [x] v0.4.10-4: GE app icon for Tauri build
+- [x] v0.4.10-5: multi-resolution e2e suite incl. fullscreen clipping check
+- [x] v0.4.10-6: Docker Ubuntu smoke (engine + UI + e2e headless)
 ## v0.5 — Welcome / home (parked)
 Recent repos with diff stats, Open, Clone.
 
