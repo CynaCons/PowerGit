@@ -7,3 +7,6 @@
 [submodule "Externals/ICSharpCode.TextEditor"]
 	path = externals/ICSharpCode.TextEditor
 	url = ../../gitextensions/ICSharpCode.TextEditor.git
+[submodule "powerspawn"]
+	path = powerspawn
+	url = https://github.com/CynaCons/PowerSpawn.git

@@ -1,0 +1,142 @@
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.grid-header,
+.grid-row {
+  display: grid;
+  grid-template-columns: var(--graph-width, 96px) minmax(180px, 1fr) 128px 142px 86px;
+  align-items: center;
+  height: var(--pg-row-height, 28px);
+}
+
+.grid-header {
+  padding: 0 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #737373;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.grid-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+
+.grid-row {
+  padding: 0 16px 0 0;
+  cursor: default;
+  background: transparent;
+}
+
+.grid-row .msg,
+.grid-row .author,
+.grid-row .date,
+.grid-row .sha {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.grid-row:hover .msg,
+.grid-row:hover .author,
+.grid-row:hover .date,
+.grid-row:hover .sha {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.grid-row.selected .msg,
+.grid-row.selected .author,
+.grid-row.selected .date,
+.grid-row.selected .sha {
+  background: #eff6ff;
+}
+
+.graph-cell {
+  position: relative;
+  height: 100%;
+  background: transparent;
+}
+
+.graph-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.msg {
+  overflow: hidden;
+  padding-left: 12px;
+  font-size: 13px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.msg-refs {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  max-width: 46%;
+  overflow: hidden;
+}
+
+.msg-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #2563eb;
+  white-space: nowrap;
+}
+
+.ref.extra {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.ref.remote {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.ref.head {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.author,
+.date,
+.sha {
+  color: #737373;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sha {
+  font-family: "Fira Code", ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  justify-content: flex-end;
+  padding-right: 8px;
+}
