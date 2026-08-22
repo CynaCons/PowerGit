@@ -43,10 +43,14 @@ npm run dev               # Vite http://127.0.0.1:1420
 npm run dev:all           # engine + Vite
 npm run test:unit         # graph layout + 10k perf
 npm run test:e2e          # headless Playwright assertions (default proof)
-npm run test:e2e:debug    # headed inspector while writing a test
+npm run test:resolution   # layout at 5 viewports up to 4K fullscreen
+npm run test:live         # probe the deployed Pages site renders + demo draws
 npm run test:visual       # pixel diffs — only when the owner asks
 npm run test:demo         # slow headed owner walkthrough — only when asked
 npm run tauri dev         # native window (needs engine running for health)
+```
+
+`test:e2e:debug` exists for headed debugging while writing a test.
 ```
 
 ## How we verify (token budget)

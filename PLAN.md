@@ -137,11 +137,10 @@ Recent repos with diff stats, Open, Clone.
 **Goal:** Any agent can cut a release by following the skill.
 - [x] release skill in .opencode/skills and .claude/skills
 ## Later
-- Fetch / Pull / Push
+- Fetch / Pull / Push **dialogs** (buttons are wired to engine `/fetch`, `/pull`, `/push` since v0.6.4; richer dialogs later)
 - Design-demo step/pause bar (opt-in `npm run test:demo`)
 - Visual screenshot suite (`npm run test:visual`, owner-triggered)
-- Tauri sidecar spawn; zip / AppImage
-- Dark theme; stashes/worktrees
+- Dark theme; worktrees
 - Extract GitCommands
 
 ## Backlog
@@ -175,3 +174,10 @@ Recent repos with diff stats, Open, Clone.
 > Embed the real PowerGit frontend (built with a /demo/ base path) in an iframe — it renders the revision graph from its built-in synthetic history when no engine is present, so visitors interact with the actual UI, not a video.
 **Goal:** Live interactive demo of the real UI on the Pages site.
 - [x] demo: real frontend built at /demo/ base, iframe embed with sample-data notice
+### v0.6.4 — Remaining cleanup sweep (2026-08-22) (COMPLETE)
+> Sweep up everything left from the repo analysis: sync engine version constant, promote the live-demo probe to a proper script, refresh stale PLAN "Later" list and AGENTS commands, then a full packaged-build verification pass.
+**Goal:** No known loose ends left in the repository outside explicitly backlogged items.
+- [x] sync engineVersion constant with release version (drifted at 0.4.0)
+- [x] check-live-demo.cjs -> npm run test:live, documented in release skill post-deploy step
+- [x] refresh PLAN Later list + AGENTS commands (sidecar/packaging/stashes now shipped)
+- [x] full verification: engine tests, e2e, resolution, unit, packaged-build smoke
