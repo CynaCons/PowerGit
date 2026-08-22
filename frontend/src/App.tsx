@@ -136,9 +136,9 @@ export default function App() {
           setLive(false)
         }
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         setHealth(null)
-        setEngineError(err instanceof Error ? err.message : "engine offline")
+        setEngineError(null)
       })
     return () => ctrl.abort()
   }, [refreshRepo])
@@ -307,12 +307,21 @@ export default function App() {
           <Button size="small" startIcon={<CloudUploadOutlinedIcon />} disabled>
             Push
           </Button>
-          <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
-            {health ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · synthetic"}` : (engineError ?? "engine offline")}
-            {repo ? ` · ${repo.name} (${repo.branch})` : ""}
-          </Typography>
+            <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+              {health
+                ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · synthetic"}`
+                : live
+                  ? "engine offline"
+                  : "sample data · connect an engine for real repositories"}
+              {repo ? ` · ${repo.name} (${repo.branch})` : ""}
+            </Typography>
         </Toolbar>
-      </AppBar>
+        </AppBar>
+        {engineError && (
+          <Typography variant="caption" color="error" sx={{ px: 2, py: 0.5, display: "block" }}>
+            {engineError}
+          </Typography>
+        )}
 
       <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
       <Box
