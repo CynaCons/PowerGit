@@ -159,3 +159,16 @@ Recent repos with diff stats, Open, Clone.
 - [ ] GitHub Pages showcase site: new features + visuals screenshots
 - [ ] Release skill for opencode and claude agents (.opencode/skills + .claude/skills): how to cut a release, update Pages visuals and main README
 - [ ] Build and attach binaries to GitHub releases (Windows portable zip, Linux AppImage)
+### v0.6.1 — README scope rewrite
+> Rewrite README to state the fork's scope crisply: a new, modern, portable, cross-platform frontend for Git Extensions.
+**Goal:** A visitor understands within seconds what PowerGit is, what it is not yet, and why it exists.
+- [ ] README: scope-first rewrite (modern/portable/cross-platform frontend for GitExtensions)
+### v0.6.2 — React showcase site
+> Replace the static HTML page with a Vite + React site: hero, feature cards, screenshot gallery.
+**Goal:** docs/site replaced by a React webapp under website/, built in CI and deployed to Pages.
+- [ ] website/: Vite+React+MUI hero site (features, screens)
+- [ ] pages.yml builds website + demo bundle, deploys combined artifact
+### v0.6.3 — Live demo embed
+> Embed the real PowerGit frontend (built with a /demo/ base path) in an iframe — it renders the revision graph from its built-in synthetic history when no engine is present, so visitors interact with the actual UI, not a video.
+**Goal:** Live interactive demo of the real UI on the Pages site.
+- [ ] demo: real frontend built at /demo/ base, iframe embed with sample-data notice
