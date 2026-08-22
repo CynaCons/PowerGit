@@ -35,7 +35,7 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
   sidecar; no prerequisites on the machine.
 
 <p align="center">
-  <img src="docs/site/assets/browse.png" alt="PowerGit Browse" width="820" />
+  <img src="website/public/assets/browse.png" alt="PowerGit Browse" width="820" />
 </p>
 
 More screenshots and an interactive live demo:

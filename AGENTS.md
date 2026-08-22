@@ -129,3 +129,22 @@ Do not put secrets there.
 
 Return a coordinator-usable report: what changed (paths), how it was verified,
 what is still open, which memory files you added or updated.
+
+## Additions since v0.4 (current reality)
+
+- website/ — React showcase site deployed to GitHub Pages (workflow:
+  .github/workflows/pages.yml). The live demo at /PowerGit/demo/ is the
+  real frontend built with a /PowerGit/demo/ Vite base; it renders its
+  built-in synthetic history when no engine is reachable.
+- Screenshots: canonical location is website/public/assets/. Regenerate with
+  
+ode frontend/scripts/capture-showcase.mjs (needs a live engine).
+  Do not write screenshots anywhere else.
+- Packaging & release: see the elease skill (.opencode/skills/release/
+  and .claude/skills/release/). Key scripts: scripts/build-engine-sidecar.ps1|.sh,
+  scripts/package-windows.ps1, tag-triggered .github/workflows/release.yml.
+- Engine URL is overridable with VITE_ENGINE_URL for dev/demo setups
+  (default http://127.0.0.1:7733).
+- Linux smoke check: pwsh scripts/ubuntu-check.ps1 (requires Docker Desktop).
+- On this branch (powergit) the upstream GitExtensions tree is gitignored;
+  it belongs to master. Do not commit GE files here.

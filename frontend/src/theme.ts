@@ -17,7 +17,7 @@ const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         "html, body, #root": { height: "100%", margin: 0 },
-        body: { backgroundColor: "#f4f6f8" },
+        body: { backgroundColor: "#f4f6f8", overflow: "hidden" },
       },
     },
     MuiPaper: {

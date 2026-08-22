@@ -140,6 +140,83 @@ public sealed class GitHostTests
     }
 
     [Fact]
+    public void Push_then_pull_roundtrip_via_bare_remote()
+    {
+        string bare = Directory.CreateTempSubdirectory("powergit-bare-").FullName;
+        try
+        {
+            using TempRepo repo = new();
+            RunGit(bare, "init", "--bare", "-b", "main");
+            RunGit(repo.Dir, "remote", "add", "origin", bare);
+
+            GitHost host = new();
+            host.Open(repo.Dir);
+            host.Push(); // no upstream yet -> -u origin HEAD
+
+            string clone = Path.Combine(Path.GetTempPath(), "powergit-clone-" + Guid.NewGuid().ToString("N"));
+            RunGit(Path.GetTempPath(), "clone", bare, clone);
+            try
+            {
+                GitHost cloner = new();
+                cloner.Open(clone);
+
+                File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "origin-edit\n");
+                repo.StageAndCommit("origin-change");
+                host.Push();
+
+                cloner.Pull(); // fast-forward
+                Assert.Equal("origin-change", cloner.ListRevisions(10)[0].Subject);
+
+                // diverge: both sides edit the same file
+                File.WriteAllText(Path.Combine(clone, "a.txt"), "clone-edit\n");
+                cloner.Stage(["a.txt"], false);
+                cloner.Commit("clone-change");
+
+                File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "second-origin-edit\n");
+                repo.StageAndCommit("second-origin-change");
+                host.Push();
+
+                Assert.Throws<InvalidOperationException>(() => cloner.Push()); // rejected, non-fast-forward
+                Assert.Throws<InvalidOperationException>(() => cloner.Pull()); // ff-only impossible
+            }
+            finally
+            {
+                ForceDelete(clone);
+            }
+        }
+        finally
+        {
+            ForceDelete(bare);
+        }
+    }
+
+    private static void ForceDelete(string path)
+    {
+        foreach (string f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(f, FileAttributes.Normal);
+        }
+
+        Directory.Delete(path, recursive: true);
+    }
+
+    private static void RunGit(string workdir, params string[] args)
+    {
+        System.Diagnostics.ProcessStartInfo psi = new("git", args)
+        {
+            WorkingDirectory = workdir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(60_000);
+        if (p is null || p.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"git {string.Join(' ', args)} failed: {p?.StandardError.ReadToEnd()}");
+        }
+    }
+
+    [Fact]
     public void Stash_requires_dirty_tree()
     {
         using TempRepo repo = new();

@@ -10,6 +10,15 @@ down to implementation files and tests as those appear. Priority is implied by
 
 Product intent: [PRD.md](../../PRD.md).
 
+### Implementation status (2026-08)
+
+Implemented and verified: shell, navrail, left panel, revision graph,
+commit details, settings, commit overlay. **Not yet implemented** (planned,
+see PLAN.md "Later"): working-directory/index artificial rows
+(SRS-DET-010/011, SRS-GRAPH-004), fetch/pull/push surfaces, dark theme,
+worktrees. Requirements below are the target behavior, not a claim that
+everything is built.
+
 ## Requirement ID scheme
 
 `SRS-<FEAT>-<NNN>` — `FEAT` is the feature tag, `NNN` a zero-padded sequence

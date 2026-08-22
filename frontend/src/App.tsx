@@ -43,6 +43,8 @@ import {
   openRepo,
   applyStash,
   dropStash,
+  pullBranch,
+  pushBranch,
   type StashInfo,
   rebaseOnto,
   resetBranch,
@@ -90,6 +92,7 @@ export default function App() {
   const [stashOpen, setStashOpen] = useState(false)
   const [stashAnchor, setStashAnchor] = useState<HTMLElement | null>(null)
   const [stashes, setStashes] = useState<StashInfo[]>([])
+  const [busy, setBusy] = useState(false)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const dragState = useRef<{ startY: number; startH: number } | null>(null)
 
@@ -298,13 +301,65 @@ export default function App() {
               Drop stash@{"{0}"}
             </MenuItem>
           </Menu>
-          <Button size="small" startIcon={<CloudDownloadOutlinedIcon />} disabled>
+          <Button
+            size="small"
+            startIcon={<CloudDownloadOutlinedIcon />}
+            data-testid="fetch-button"
+            disabled={!live || busy}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                const remote = refs?.remotes[0]?.name.split("/")[0] ?? "origin"
+                await fetchRemote(remote)
+                await refreshRepo()
+                setEngineError(null)
+              } catch (e) {
+                setEngineError(e instanceof Error ? e.message : "fetch failed")
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
             Fetch
           </Button>
-          <Button size="small" startIcon={<CallReceivedOutlinedIcon />} disabled>
+          <Button
+            size="small"
+            startIcon={<CallReceivedOutlinedIcon />}
+            data-testid="pull-button"
+            disabled={!live || busy}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await pullBranch()
+                await refreshRepo()
+                setEngineError(null)
+              } catch (e) {
+                setEngineError(e instanceof Error ? e.message : "pull failed")
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
             Pull
           </Button>
-          <Button size="small" startIcon={<CloudUploadOutlinedIcon />} disabled>
+          <Button
+            size="small"
+            startIcon={<CloudUploadOutlinedIcon />}
+            data-testid="push-button"
+            disabled={!live || busy}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await pushBranch()
+                await refreshRepo()
+                setEngineError(null)
+              } catch (e) {
+                setEngineError(e instanceof Error ? e.message : "push failed")
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
             Push
           </Button>
             <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>

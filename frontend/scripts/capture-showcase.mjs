@@ -1,11 +1,12 @@
-// Captures showcase screenshots for the GitHub Pages site into docs/site/assets.
+// Captures showcase screenshots into website/public/assets — the single
+// canonical location used by both the Pages site and the README.
 // Requires the engine on :7733. Starts Vite itself and shuts it down after.
 import { chromium } from "playwright"
 import { spawn } from "node:child_process"
 import { mkdirSync } from "node:fs"
 
 const root = new URL("../..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")
-const assets = `${root}/docs/site/assets`
+const assets = `${root}/website/public/assets`
 mkdirSync(assets, { recursive: true })
 
 const vite = spawn("npm", ["run", "dev"], { cwd: `${root}/frontend`, shell: true, stdio: "ignore" })

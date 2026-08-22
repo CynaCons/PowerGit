@@ -265,6 +265,54 @@ public sealed partial class GitHost
         return path => rx.IsMatch(path);
     }
 
+    public string Pull()
+    {
+        string root = RequireRoot();
+        CommandResult upstream = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}");
+        if (upstream.ExitCode != 0)
+        {
+            throw new InvalidOperationException("The current branch has no upstream. Push with -u first or configure an upstream.");
+        }
+
+        if (IsDirty(root))
+        {
+            throw new InvalidOperationException("The working tree has uncommitted changes. Commit or stash before pulling.");
+        }
+
+        CommandResult result = RunTimed(root, 300_000, "pull", "--ff-only");
+        if (result.ExitCode != 0)
+        {
+            string err = string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
+            throw new InvalidOperationException(
+                err.Contains("divergent", StringComparison.OrdinalIgnoreCase) || err.Contains("not possible to fast-forward", StringComparison.OrdinalIgnoreCase)
+                    ? $"Pull failed: local branch and upstream have diverged. {err}"
+                    : $"Pull failed. {err}");
+        }
+
+        return string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
+    }
+
+    public string Push()
+    {
+        string root = RequireRoot();
+        CommandResult upstream = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}");
+        List<string> args = upstream.ExitCode == 0
+            ? ["push"]
+            : ["push", "-u", "origin", "HEAD"];
+
+        CommandResult result = RunTimed(root, 300_000, [.. args]);
+        if (result.ExitCode != 0)
+        {
+            string err = string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
+            throw new InvalidOperationException(
+                err.Contains("rejected", StringComparison.OrdinalIgnoreCase)
+                    ? $"Push rejected (non-fast-forward). Pull first to integrate remote changes. {err}"
+                    : $"Push failed. {err}");
+        }
+
+        return string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
+    }
+
     private static readonly char[] SpecialRegexChars = ['*', '+', '?', '|', '{', '[', '(', ')', '\\', '^', '$', '.', ' '];
 
     public IReadOnlyList<StashDto> ListStashes()

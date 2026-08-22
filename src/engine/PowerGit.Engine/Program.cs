@@ -451,6 +451,32 @@ app.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
     }
 });
 
+app.MapPost("/pull", (GitHost git) =>
+{
+    try
+    {
+        string output = git.Pull();
+        return Results.Ok(new { output });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/push", (GitHost git) =>
+{
+    try
+    {
+        string output = git.Push();
+        return Results.Ok(new { output });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 app.Run();
 
 public partial class Program;

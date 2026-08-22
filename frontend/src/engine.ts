@@ -1,4 +1,6 @@
-export const ENGINE_URL = "http://127.0.0.1:7733"
+/** Engine base URL. Override with VITE_ENGINE_URL (e.g. remote engine or
+ *  demo setups); the packaged app always uses the bundled sidecar default. */
+export const ENGINE_URL = import.meta.env.VITE_ENGINE_URL ?? "http://127.0.0.1:7733"
 
 export type Health = {
   engine: string
@@ -195,6 +197,16 @@ export async function fetchRemote(name: string): Promise<{ output: string }> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ remote: name }),
   })
+  return json<{ output: string }>(res)
+}
+
+export async function pullBranch(): Promise<{ output: string }> {
+  const res = await fetch(`${ENGINE_URL}/pull`, { method: "POST" })
+  return json<{ output: string }>(res)
+}
+
+export async function pushBranch(): Promise<{ output: string }> {
+  const res = await fetch(`${ENGINE_URL}/push`, { method: "POST" })
   return json<{ output: string }>(res)
 }
 
