@@ -144,7 +144,15 @@ export default function App() {
           await refreshRepo()
           setRecents(await fetchRecents())
         } catch {
-          setLive(false)
+          // One transient failure at boot (cold engine/git) shouldn't leave
+          // the app dataless — retry once before giving up.
+          await new Promise((r) => setTimeout(r, 1500))
+          try {
+            await refreshRepo()
+            setRecents(await fetchRecents())
+          } catch {
+            setLive(false)
+          }
         }
       })
       .catch(() => {
