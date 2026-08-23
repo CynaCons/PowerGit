@@ -1,6 +1,6 @@
 [package]
 name = "powergit"
-version = "0.6.0"
+version = "0.6.1"
 description = "PowerGit — Git Extensions UI on Tauri"
 authors = ["CynaCons"]
 edition = "2021"
