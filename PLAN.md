@@ -181,3 +181,11 @@ Recent repos with diff stats, Open, Clone.
 - [x] check-live-demo.cjs -> npm run test:live, documented in release skill post-deploy step
 - [x] refresh PLAN Later list + AGENTS commands (sidecar/packaging/stashes now shipped)
 - [x] full verification: engine tests, e2e, resolution, unit, packaged-build smoke
+### v0.7.0 — File Tree correctness + GE-style command bars (planned)
+**Goal:** Fix nested File Tree browsing (files invisible below depth 1), close the e2e coverage gap that missed it, and bring the topbar split-buttons and revision context menu closer to Git Extensions design fidelity.
+- [ ] Engine: normalize ListTree (GitHost.Queries.cs) so entry `name` is relative to the requested directory — strip the path prefix git ls-tree emits when `path` is passed; add engine test asserting nested fetch of docs/srs returns bare basenames
+- [ ] UI: fix CommitFileTree child path/label building to match normalized DTO; verify blob pane opens files at depth >= 2
+- [ ] E2E coverage: new spec that expands nested directories in the File Tree tab (e.g. frontend -> components) and asserts file rows render; must fail on the pre-fix engine
+- [ ] Topbar: Git Extensions-style split buttons (icon + dropdown caret) for Commit / Stash / Fetch / Pull / Push, with secondary actions (amend, force push variants, manage stashes) in the dropdown menus; match GE iconography and ordering
+- [ ] Revision context menu: expand toward GE parity (create branch/tag here, copy SHA, cherry-pick/revert placeholders as feasible); keep existing checkout/reset/rebase entries and testids stable
+- [ ] Verification: dotnet test src/engine/PowerGit.Engine.sln + npm run test:e2e green; smoke npm run dev once
