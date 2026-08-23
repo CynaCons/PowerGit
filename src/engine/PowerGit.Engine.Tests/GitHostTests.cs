@@ -33,8 +33,10 @@ public sealed class GitHostTests
     public void Open_this_repo_sets_current()
     {
         GitHost host = new();
-        RepoInfo info = host.Open(RepoRoot());
-        Assert.Equal("PowerGit", info.Name);
+        string root = RepoRoot();
+        RepoInfo info = host.Open(root);
+        string expected = root.TrimEnd(Path.DirectorySeparatorChar, '/').Split('/', '\\')[^1];
+        Assert.Equal(expected, info.Name);
         Assert.False(string.IsNullOrWhiteSpace(info.Branch));
         Assert.Equal(info, host.Current);
         Assert.True(Directory.Exists(Path.Combine(info.Root, ".git")) || File.Exists(Path.Combine(info.Root, ".git")));
@@ -155,6 +157,8 @@ public sealed class GitHostTests
 
             string clone = Path.Combine(Path.GetTempPath(), "powergit-clone-" + Guid.NewGuid().ToString("N"));
             RunGit(Path.GetTempPath(), "clone", bare, clone);
+            RunGit(clone, "config", "user.email", "test@example.com");
+            RunGit(clone, "config", "user.name", "test");
             try
             {
                 GitHost cloner = new();

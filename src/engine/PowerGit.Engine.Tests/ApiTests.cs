@@ -35,7 +35,8 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         opened.EnsureSuccessStatusCode();
         RepoInfo? info = await opened.Content.ReadFromJsonAsync<RepoInfo>();
         Assert.NotNull(info);
-        Assert.Equal("PowerGit", info.Name);
+        string expected = root.TrimEnd(Path.DirectorySeparatorChar, '/').Split('/', '\\')[^1];
+        Assert.Equal(expected, info.Name);
 
         HttpResponseMessage current = await client.GetAsync("/repos/current");
         current.EnsureSuccessStatusCode();
