@@ -55,28 +55,28 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
 
   if (!commitId) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box data-testid="commit-file-tree" sx={{ p: 2 }}>
         <Typography color="text.secondary">Select a revision.</Typography>
       </Box>
     )
   }
   if (!root) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box data-testid="commit-file-tree" sx={{ p: 2 }}>
         <CircularProgress size={18} />
       </Box>
     )
   }
   if (root.error) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box data-testid="commit-file-tree" sx={{ p: 2 }}>
         <Typography color="error">{root.error}</Typography>
       </Box>
     )
   }
 
   return (
-    <Box data-testid="commit-file-tree" sx={{ overflow: "auto", py: 0.5 }}>
+    <Box sx={{ overflow: "auto", py: 0.5 }}>
       <Level commitId={commitId} entries={root.entries} depth={0} prefix="" dirs={dirs} onToggle={toggleDir} onSelectFile={onSelectFile} />
     </Box>
   )

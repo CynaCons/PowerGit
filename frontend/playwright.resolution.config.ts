@@ -12,6 +12,7 @@ export default defineConfig({
     trace: "off",
     screenshot: "off",
     video: "off",
+    chromiumSandbox: false,
   },
   webServer: {
     command: "npm run dev",

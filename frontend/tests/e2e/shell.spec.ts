@@ -72,6 +72,7 @@ test("diff tab splits files and diff side by side", async ({ page }) => {
 
 test("file tree tab shows repo tree at revision", async ({ page }) => {
   await page.goto("/")
+  await expect(page.getByTestId("grid-row").first()).toBeVisible()
   await page.getByRole("tab", { name: "File Tree" }).click()
   await expect(page.getByTestId("commit-file-tree")).toBeVisible()
 })

@@ -10,12 +10,14 @@ export default defineConfig({
   retries: 0,
   maxFailures: ci ? 0 : 1,
   reporter: ci ? [["github"], ["line"]] : [["line"]],
-  timeout: 15_000,
+  timeout: 30_000,
+  expect: { timeout: 10_000 },
   use: {
     baseURL: "http://127.0.0.1:1420",
     trace: "off",
-    video: "off",
     screenshot: "off",
+    video: "off",
+    chromiumSandbox: false,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

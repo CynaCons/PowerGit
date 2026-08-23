@@ -70,7 +70,10 @@ function toRevision(dto: RevisionDto): Revision {
 }
 
 export default function App() {
-  const [revisions, setRevisions] = useState<Revision[]>(() => syntheticHistory(200).map((r) => ({ ...r, id: r.id.length >= 7 ? r.id : r.id.padEnd(7, "0") })))
+  // Synthetic rows are ONLY for the offline/demo case (engine unreachable).
+  // While booting or loading a live repo the grid is empty — never fake data.
+  const [offline, setOffline] = useState(false)
+  const [revisions, setRevisions] = useState<Revision[]>([])
   const [selected, setSelected] = useState(0)
   const [commitOpen, setCommitOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -110,7 +113,12 @@ export default function App() {
     dragState.current = null
   }
 
-  const rows = useMemo(() => layoutGraph(revisions), [revisions])
+  const liveRows = useMemo(() => layoutGraph(revisions), [revisions])
+  const syntheticRows = useMemo(
+    () => layoutGraph(syntheticHistory(200).map((r) => ({ ...r, id: r.id.length >= 7 ? r.id : r.id.padEnd(7, "0") }))),
+    [],
+  )
+  const rows = offline ? syntheticRows : liveRows
   const current = rows[selected]
   const dirty = (status?.unstagedCount ?? 0) + (status?.stagedCount ?? 0)
 
@@ -142,6 +150,7 @@ export default function App() {
       .catch(() => {
         setHealth(null)
         setEngineError(null)
+        setOffline(true)
       })
     return () => ctrl.abort()
   }, [refreshRepo])
@@ -364,10 +373,10 @@ export default function App() {
           </Button>
             <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
               {health
-                ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · synthetic"}`
-                : live
-                  ? "engine offline"
-                  : "sample data · connect an engine for real repositories"}
+                ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
+                : offline
+                  ? "sample data · connect an engine for real repositories"
+                  : "connecting…"}
               {repo ? ` · ${repo.name} (${repo.branch})` : ""}
             </Typography>
         </Toolbar>
