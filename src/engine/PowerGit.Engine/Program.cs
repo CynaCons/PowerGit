@@ -1,6 +1,6 @@
 using PowerGit.Engine;
 
-const string engineVersion = "0.6.1"; // keep in sync with tauri.conf.json / package.json (see release skill)
+const string engineVersion = "0.9.0"; // keep in sync with tauri.conf.json / package.json (see release skill)
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -239,10 +239,41 @@ app.MapPut("/remotes", (RemoteUpdate body, GitHost git) =>
 
 app.MapPost("/fetch", (FetchRequest body, GitHost git) =>
 {
+    if (string.IsNullOrWhiteSpace(body.Remote))
+    {
+        return Results.BadRequest(new ErrorResponse("remote is required"));
+    }
+
     try
     {
-        string output = git.FetchRemote(body.Remote);
-        return Results.Ok(new { output });
+        string id = git.StartJob("fetch", () => git.FetchRemote(body.Remote));
+        return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "fetch"));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/branches/create", (CreateRefRequest body, GitHost git) =>
+{
+    try
+    {
+        git.CreateBranch(body.Name, body.Commit);
+        return Results.Ok(git.GetRefs());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/tags/create", (CreateRefRequest body, GitHost git) =>
+{
+    try
+    {
+        git.CreateTag(body.Name, body.Commit);
+        return Results.Ok(git.GetRefs());
     }
     catch (Exception ex)
     {
@@ -355,7 +386,7 @@ app.MapPost("/commit", (CommitRequest body, GitHost git) =>
 {
     try
     {
-        string id = git.Commit(body.Message);
+        string id = git.Commit(body.Message, body.Amend);
         return Results.Ok(new { id });
     }
     catch (Exception ex)
@@ -451,12 +482,13 @@ app.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/pull", (GitHost git) =>
+app.MapPost("/pull", (PullRequest? body, GitHost git) =>
 {
     try
     {
-        string output = git.Pull();
-        return Results.Ok(new { output });
+        bool rebase = body?.Rebase ?? false;
+        string id = git.StartJob("pull", () => git.Pull(rebase));
+        return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "pull"));
     }
     catch (Exception ex)
     {
@@ -464,18 +496,24 @@ app.MapPost("/pull", (GitHost git) =>
     }
 });
 
-app.MapPost("/push", (GitHost git) =>
+app.MapPost("/push", (PushRequest? body, GitHost git) =>
 {
     try
     {
-        string output = git.Push();
-        return Results.Ok(new { output });
+        bool forceWithLease = body?.ForceWithLease ?? false;
+        string id = git.StartJob("push", () => git.Push(forceWithLease));
+        return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "push"));
     }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
 });
+
+app.MapGet("/jobs/{id}", (string id, GitHost git) =>
+    git.GetJob(id) is { } job ? Results.Ok(job) : Results.Json(new ErrorResponse("no such job"), statusCode: StatusCodes.Status404NotFound));
+
+app.MapGet("/jobs", (GitHost git) => Results.Ok(git.ListJobs()));
 
 app.Run();
 
