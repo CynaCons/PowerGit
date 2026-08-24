@@ -43,9 +43,10 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.6.0 (Browse product +
-release pipeline + Pages showcase). Parked: fetch/pull/push buttons, dark
-theme, worktrees.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.9.0 (Browse product, GE-style
+command bars, job-based fetch/pull/push with progress, large-repo
+responsiveness, release pipeline + Pages showcase). Parked: dark theme,
+worktrees.
 
 ## Development
 
