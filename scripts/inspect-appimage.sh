@@ -34,7 +34,22 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cd "$WORK"
 
-"$APPIMAGE" --appimage-extract >/dev/null
+# CI runners may hand us a non-executable file; the type-2 runtime also
+# sometimes fails to exec in restricted environments. Fall back to
+# locating the squashfs magic and extracting with unsquashfs directly.
+chmod +x "$APPIMAGE" 2>/dev/null || true
+if ! "$APPIMAGE" --appimage-extract >/dev/null 2>&1; then
+  echo "runtime self-extract unavailable; extracting via squashfs offset"
+  offset=$(python3 - "$APPIMAGE" <<'EOF'
+import sys
+with open(sys.argv[1], "rb") as f:
+    head = f.read(2 * 1024 * 1024)
+print(head.find(b"hsqs"))
+EOF
+)
+  [ -n "$offset" ] && [ "$offset" -ge 0 ] || { echo "no squashfs magic found" >&2; exit 2; }
+  unsquashfs -o "$offset" -d squashfs-root "$APPIMAGE" >/dev/null
+fi
 ROOT=squashfs-root
 echo "== AppImage: $(basename "$APPIMAGE") =="
 
@@ -107,7 +122,17 @@ mv "$OUT" "$APPIMAGE"
 echo "Repacked $APPIMAGE without mismatched objects."
 
 # Re-inspect to prove cleanliness.
-"$APPIMAGE" --appimage-extract >/dev/null
+rm -rf "$ROOT"
+if ! "$APPIMAGE" --appimage-extract >/dev/null 2>&1; then
+  offset=$(python3 - "$APPIMAGE" <<'EOF'
+import sys
+with open(sys.argv[1], "rb") as f:
+    head = f.read(2 * 1024 * 1024)
+print(head.find(b"hsqs"))
+EOF
+)
+  unsquashfs -o "$offset" -d squashfs-root "$APPIMAGE" >/dev/null
+fi
 leftover=0
 for m in $(find "$ROOT" -path '*gio/modules/*.so' 2>/dev/null || true); do
   if objdump -T "$m" | grep -Eq "UND.*(g_task_set_static_name|g_assertion_message_cmpint)"; then
