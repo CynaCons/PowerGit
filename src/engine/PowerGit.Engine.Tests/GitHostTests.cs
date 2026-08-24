@@ -228,6 +228,47 @@ public sealed class GitHostTests
         host.Open(repo.Dir);
         Assert.Throws<InvalidOperationException>(() => host.StashChanges(null, false, false));
     }
+
+    [Fact]
+    public void CreateBranch_and_CreateTag_at_commit()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        host.CreateBranch("created-branch", "HEAD");
+        host.CreateTag("v9.9", null); // defaults to HEAD
+        Assert.Throws<InvalidOperationException>(() => host.CreateBranch("feature", null)); // already exists
+
+        RefTreeDto refs = host.GetRefs();
+        Assert.Contains(refs.Branches, b => b.Name == "created-branch");
+        Assert.Contains(refs.Tags, t => t.Name == "v9.9");
+
+        // Branch points at the requested commit, not wherever HEAD is now.
+        string target = host.ListRevisions(10).First(r => r.Subject == "feature-commit").Id;
+        host.Checkout("created-branch", force: true);
+        Assert.Equal(target, host.ListRevisions(1)[0].Id);
+    }
+
+    [Fact]
+    public void Commit_amend_replaces_last_commit()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        File.WriteAllText(Path.Combine(repo.Dir, "x.txt"), "x\n");
+        repo.StageAndCommit("base");
+        System.Collections.Generic.IReadOnlyList<RevisionDto> log = host.ListRevisions(10);
+        string replacedId = log.First(r => r.Subject == "base").Id;
+        string grandparentId = log.First(r => r.Subject == "init").Id;
+
+        host.Commit("amended subject", amend: true);
+
+        RevisionDto amended = host.ListRevisions(10).First(r => r.Subject == "amended subject");
+        Assert.NotEqual(replacedId, amended.Id);
+        Assert.Equal(grandparentId, amended.Parents[0]);
+    }
 }
 
 internal sealed partial class TempRepo : IDisposable

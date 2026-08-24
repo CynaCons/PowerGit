@@ -27,6 +27,8 @@ import { IgnoreDialog } from "./IgnoreDialog"
 type Props = {
   open: boolean
   status: RepoStatus | null
+  amend?: boolean
+  initialMessage?: string
   onClose: () => void
   onStatus: (status: RepoStatus) => void
   onCommit: (message: string) => Promise<void>
@@ -36,7 +38,7 @@ type Props = {
 // the left, selected-file diff on the right, commit message bottom-right.
 // Selection follows GE: click selects, ctrl+click toggles, shift+click ranges,
 // double-click stages/unstages. Right-click opens the file context menu.
-export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Props) {
+export function CommitDialog({ open, status, amend, initialMessage, onClose, onStatus, onCommit }: Props) {
   const [selected, setSelected] = useState<{ path: string; staged: boolean } | null>(null)
   const [selUnstaged, setSelUnstaged] = useState<Set<string>>(new Set())
   const [selStaged, setSelStaged] = useState<Set<string>>(new Set())
@@ -54,10 +56,10 @@ export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Prop
     setSelUnstaged(new Set())
     setSelStaged(new Set())
     setDiff(null)
-    setMessage("")
+    setMessage(amend ? (initialMessage ?? "") : "")
     setError(null)
     setMenu(null)
-  }, [open])
+  }, [open, amend, initialMessage])
 
   useEffect(() => {
     if (!selected) {
@@ -211,7 +213,7 @@ export function CommitDialog({ open, status, onClose, onStatus, onCommit }: Prop
                 setMessage("")
               }}
             >
-              Commit
+              {amend ? "Amend" : "Commit"}
             </Button>
           </Box>
         </Box>

@@ -1,3 +1,22 @@
+/* Self-hosted variable fonts: the packaged app must render identically
+   offline (no Google Fonts CDN — that fallback caused low-quality system
+   rasterization on Linux/AppImage). */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin-var.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fira Code";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/firacode-latin-var.woff2") format("woff2");
+}
+
 :root {
   --pg-row-height: 28px;
   --pg-grid-sel: #eff6ff;

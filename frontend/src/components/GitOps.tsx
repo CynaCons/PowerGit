@@ -1,5 +1,7 @@
 import BuildIcon from "@mui/icons-material/Build"
 import CallSplitIcon from "@mui/icons-material/CallSplit"
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import UndoIcon from "@mui/icons-material/Undo"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
@@ -15,6 +17,7 @@ import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import Radio from "@mui/material/Radio"
 import RadioGroup from "@mui/material/RadioGroup"
+import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import type { GraphRow } from "../graph/types"
@@ -28,6 +31,8 @@ export function RevisionContextMenu({
   onCheckout,
   onReset,
   onRebase,
+  onCreateBranch,
+  onCreateTag,
 }: {
   target: ContextTarget | null
   branches: string[]
@@ -35,6 +40,8 @@ export function RevisionContextMenu({
   onCheckout: (branch: string) => void
   onReset: () => void
   onRebase: () => void
+  onCreateBranch: (sha: string) => void
+  onCreateTag: (sha: string) => void
 }) {
   const localBranches = target ? branches.filter((b) => target.row.rev.refs.includes(b)) : []
   return (
@@ -56,6 +63,32 @@ export function RevisionContextMenu({
           <CallSplitIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Checkout Branch…</ListItemText>
+      </MenuItem>
+      <MenuItem
+        data-testid="ctx-create-branch"
+        onClick={() => {
+          const sha = target!.row.rev.id
+          onClose()
+          onCreateBranch(sha)
+        }}
+      >
+        <ListItemIcon>
+          <CallSplitIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Create Branch Here…</ListItemText>
+      </MenuItem>
+      <MenuItem
+        data-testid="ctx-create-tag"
+        onClick={() => {
+          const sha = target!.row.rev.id
+          onClose()
+          onCreateTag(sha)
+        }}
+      >
+        <ListItemIcon>
+          <SellOutlinedIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Create Tag Here…</ListItemText>
       </MenuItem>
       <MenuItem
         data-testid="ctx-reset"
@@ -81,7 +114,105 @@ export function RevisionContextMenu({
         </ListItemIcon>
         <ListItemText>Rebase Current Branch onto Here…</ListItemText>
       </MenuItem>
+      <MenuItem
+        data-testid="ctx-copy-sha"
+        onClick={() => {
+          if (target) void navigator.clipboard?.writeText(target.row.rev.id)
+          onClose()
+        }}
+      >
+        <ListItemIcon>
+          <ContentCopyIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Copy SHA</ListItemText>
+      </MenuItem>
+      <MenuItem data-testid="ctx-cherry-pick" disabled>
+        <ListItemText>Cherry-pick (coming soon)</ListItemText>
+      </MenuItem>
+      <MenuItem data-testid="ctx-revert" disabled>
+        <ListItemText>Revert (coming soon)</ListItemText>
+      </MenuItem>
     </Menu>
+  )
+}
+
+export function CreateRefDialog({
+  open,
+  kind,
+  commit,
+  subject,
+  existingNames,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean
+  kind: "branch" | "tag"
+  commit: string
+  subject?: string
+  existingNames: string[]
+  onClose: () => void
+  onConfirm: (name: string) => Promise<void>
+}) {
+  const [name, setName] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setName("")
+      setError(null)
+    }
+  }, [open])
+
+  async function run() {
+    const clean = name.trim()
+    if (!clean) {
+      setError(`A ${kind} name is required.`)
+      return
+    }
+    if (existingNames.includes(clean)) {
+      setError(`'${clean}' already exists.`)
+      return
+    }
+    try {
+      await onConfirm(clean)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `create ${kind} failed`)
+    }
+  }
+
+  return (
+    <OpDialog
+      open={open}
+      title={`Create ${kind} at ${commit.slice(0, 7)}${subject ? ` (${subject})` : ""}`}
+      onClose={onClose}
+      actions={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="contained" onClick={run} data-testid="create-ref-confirm">
+            Create {kind}
+          </Button>
+        </>
+      }
+    >
+      <TextField
+        autoFocus
+        fullWidth
+        size="small"
+        label={`${kind === "branch" ? "Branch" : "Tag"} name`}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void run()
+        }}
+        data-testid="create-ref-name"
+      />
+      {error && (
+        <Typography variant="body2" color="error">
+          {error}
+        </Typography>
+      )}
+    </OpDialog>
   )
 }
 

@@ -67,13 +67,21 @@ public sealed record VsCodeInfo(bool Found, string? Path, bool Applied);
 
 public sealed record StageRequest(string[] Paths, bool Unstage = false);
 
-public sealed record CommitRequest(string Message);
+public sealed record CommitRequest(string Message, bool Amend = false);
 
 public sealed record CheckoutRequest(string Ref, bool Force = false);
 
 public sealed record ResetRequest(string Commit, string Mode);
 
 public sealed record RebaseRequest(string Onto);
+
+public sealed record PullRequest(bool Rebase = false);
+
+public sealed record PushRequest(bool ForceWithLease = false);
+
+public sealed record CreateRefRequest(string Name, string? Commit = null);
+
+public sealed record JobStartedDto(string Id, string Kind);
 
 public sealed record RemoteInfoDto(string Name, string Url);
 

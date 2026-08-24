@@ -265,7 +265,7 @@ public sealed partial class GitHost
         return path => rx.IsMatch(path);
     }
 
-    public string Pull()
+    public string Pull(bool rebase = false)
     {
         string root = RequireRoot();
         CommandResult upstream = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}");
@@ -279,7 +279,7 @@ public sealed partial class GitHost
             throw new InvalidOperationException("The working tree has uncommitted changes. Commit or stash before pulling.");
         }
 
-        CommandResult result = RunTimed(root, 300_000, "pull", "--ff-only");
+        CommandResult result = RunTimed(root, 300_000, "pull", rebase ? "--rebase" : "--ff-only");
         if (result.ExitCode != 0)
         {
             string err = string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
@@ -292,13 +292,21 @@ public sealed partial class GitHost
         return string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
     }
 
-    public string Push()
+    public string Push(bool forceWithLease = false)
     {
         string root = RequireRoot();
+        if (forceWithLease && IsDirty(root))
+        {
+            // Force variants are dangerous enough on a dirty tree; GE guards it too.
+            throw new InvalidOperationException("The working tree has uncommitted changes. Commit or stash before pushing.");
+        }
+
         CommandResult upstream = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}");
-        List<string> args = upstream.ExitCode == 0
-            ? ["push"]
-            : ["push", "-u", "origin", "HEAD"];
+        List<string> args = upstream.ExitCode == 0 ? ["push"] : ["push", "-u", "origin", "HEAD"];
+        if (forceWithLease)
+        {
+            args.Add("--force-with-lease");
+        }
 
         CommandResult result = RunTimed(root, 300_000, [.. args]);
         if (result.ExitCode != 0)

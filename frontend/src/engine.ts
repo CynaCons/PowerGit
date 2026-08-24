@@ -200,14 +200,79 @@ export async function fetchRemote(name: string): Promise<{ output: string }> {
   return json<{ output: string }>(res)
 }
 
-export async function pullBranch(): Promise<{ output: string }> {
-  const res = await fetch(`${ENGINE_URL}/pull`, { method: "POST" })
+export async function pullBranch(rebase = false): Promise<{ output: string }> {
+  const res = await fetch(`${ENGINE_URL}/pull`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rebase }),
+  })
   return json<{ output: string }>(res)
 }
 
-export async function pushBranch(): Promise<{ output: string }> {
-  const res = await fetch(`${ENGINE_URL}/push`, { method: "POST" })
+export async function pushBranch(forceWithLease = false): Promise<{ output: string }> {
+  const res = await fetch(`${ENGINE_URL}/push`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ forceWithLease }),
+  })
   return json<{ output: string }>(res)
+}
+
+export async function createBranch(name: string, commit?: string): Promise<RefTree> {
+  const res = await fetch(`${ENGINE_URL}/branches/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, commit }),
+  })
+  return json<RefTree>(res)
+}
+
+export async function createTag(name: string, commit?: string): Promise<RefTree> {
+  const res = await fetch(`${ENGINE_URL}/tags/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, commit }),
+  })
+  return json<RefTree>(res)
+}
+
+export type GitJob = {
+  id: string
+  kind: string
+  status: "running" | "completed" | "failed"
+  output: string | null
+  error: string | null
+}
+export type JobStarted = { id: string; kind: string }
+
+async function startJob(url: string, body?: unknown): Promise<JobStarted> {
+  const res = await fetch(`${ENGINE_URL}${url}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return json<JobStarted>(res)
+}
+
+export const startFetch = (remote: string) => startJob("/fetch", { remote })
+export const startPull = (rebase = false) => startJob("/pull", { rebase })
+export const startPush = (forceWithLease = false) => startJob("/push", { forceWithLease })
+
+export async function getJob(id: string): Promise<GitJob> {
+  const res = await fetch(`${ENGINE_URL}/jobs/${encodeURIComponent(id)}`)
+  return json<GitJob>(res)
+}
+
+/** Polls a job until it reaches a terminal state. */
+export async function waitJob(id: string, onTick?: (job: GitJob) => void, timeoutMs = 300_000): Promise<GitJob> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const job = await getJob(id)
+    onTick?.(job)
+    if (job.status !== "running") return job
+    if (Date.now() > deadline) throw new Error("operation timed out")
+    await new Promise((r) => setTimeout(r, 400))
+  }
 }
 
 export async function deleteBranch(name: string): Promise<RefTree> {
@@ -310,11 +375,11 @@ export async function stagePaths(paths: string[], unstage = false): Promise<Repo
   return json<RepoStatus>(res)
 }
 
-export async function createCommit(message: string): Promise<{ id: string }> {
+export async function createCommit(message: string, amend = false): Promise<{ id: string }> {
   const res = await fetch(`${ENGINE_URL}/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, amend }),
   })
   return json<{ id: string }>(res)
 }

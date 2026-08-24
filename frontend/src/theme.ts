@@ -4,8 +4,10 @@ const theme = createTheme({
   palette: {
     primary: { main: "#2563eb", dark: "#1d4ed8" },
     background: { default: "#f4f6f8", paper: "#ffffff" },
-    text: { primary: "#1a1a1a", secondary: "#737373" },
-    divider: "#e5e5e5",
+    // Contrast tuned for Linux rasterizers: light greys looked washed-out
+    // and low-quality on Ubuntu (owner feedback 2026-08-24).
+    text: { primary: "#111827", secondary: "#4b5563" },
+    divider: "#d1d5db",
   },
   typography: {
     fontFamily: "Inter, system-ui, -apple-system, sans-serif",
@@ -24,7 +26,7 @@ const theme = createTheme({
       defaultProps: { elevation: 0 },
       styleOverrides: {
         root: {
-          border: "1px solid #e5e5e5",
+          border: "1px solid #d1d5db",
           backgroundImage: "none",
         },
       },

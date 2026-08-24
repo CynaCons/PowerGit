@@ -81,6 +81,16 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         nested.EnsureSuccessStatusCode();
         TreeEntryDto[] srcEntries = await nested.Content.ReadFromJsonAsync<TreeEntryDto[]>() ?? [];
         Assert.Contains(srcEntries, e => e.Type == "tree" || e.Type == "blob");
+        // Names must be relative to the requested directory (bare basenames),
+        // otherwise the UI builds child paths like "src/src/components" and
+        // blob lookups fail with "path does not exist in <sha>".
+        Assert.All(srcEntries, e => Assert.DoesNotContain("/", e.Name));
+
+        HttpResponseMessage deep = await client.GetAsync($"/commits/{revisions[0].Id}/tree?path=frontend/src/graph");
+        deep.EnsureSuccessStatusCode();
+        TreeEntryDto[] graphEntries = await deep.Content.ReadFromJsonAsync<TreeEntryDto[]>() ?? [];
+        Assert.NotEmpty(graphEntries);
+        Assert.All(graphEntries, e => Assert.DoesNotContain("/", e.Name));
     }
 
     private static string FindRepoRoot()

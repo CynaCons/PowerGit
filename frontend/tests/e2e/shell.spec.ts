@@ -30,7 +30,11 @@ test("selecting a row updates commit details", async ({ page }) => {
 
 test("grid virtualizes a large history", async ({ page }) => {
   await page.goto("/")
+  // Large repos load revisions asynchronously; never fall back to counting
+  // an empty or synthetic grid.
+  await expect(page.getByTestId("engine-status")).toContainText("(", { timeout: 30_000 })
   const rows = page.getByTestId("grid-row")
+  await expect(rows.first()).toBeVisible({ timeout: 30_000 })
   const count = await rows.count()
   expect(count).toBeGreaterThan(8)
   expect(count).toBeLessThan(200)

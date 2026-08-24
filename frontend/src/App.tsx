@@ -1,5 +1,6 @@
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
 import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutlined"
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown"
 import HistoryIcon from "@mui/icons-material/History"
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
@@ -11,14 +12,16 @@ import AppBar from "@mui/material/AppBar"
 import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
+import CircularProgress from "@mui/material/CircularProgress"
 import IconButton from "@mui/material/IconButton"
+import LinearProgress from "@mui/material/LinearProgress"
 import Toolbar from "@mui/material/Toolbar"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { BottomPanel } from "./components/BottomPanel"
 import { CommitDialog } from "./components/CommitDialog"
-import { CheckoutBranchDialog, RebaseDialog, ResetBranchDialog, RevisionContextMenu, type ContextTarget } from "./components/GitOps"
+import { CheckoutBranchDialog, CreateRefDialog, RebaseDialog, ResetBranchDialog, RevisionContextMenu, type ContextTarget } from "./components/GitOps"
 import { RecentsDialog } from "./components/RecentsDialog"
 import { RemoteDialog } from "./components/RemoteDialog"
 import { RepoTree } from "./components/RepoTree"
@@ -29,22 +32,26 @@ import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import {
   checkoutRef,
+  createBranch,
   createCommit,
+  createTag,
   deleteBranch,
   deleteTag,
+  fetchCommit,
   fetchCurrent,
   fetchHealth,
   fetchRecents,
   fetchRefs,
   fetchRevisions,
-  fetchRemote,
   fetchStatus,
   fetchStashes,
   openRepo,
   applyStash,
   dropStash,
-  pullBranch,
-  pushBranch,
+  startFetch,
+  startPull,
+  startPush,
+  waitJob,
   type StashInfo,
   rebaseOnto,
   resetBranch,
@@ -56,6 +63,7 @@ import {
 } from "./engine"
 import { layoutGraph } from "./graph/layout"
 import { syntheticHistory } from "./graph/synthetic"
+import type { GraphRow } from "./graph/types"
 import type { Revision } from "./graph/types"
 
 function toRevision(dto: RevisionDto): Revision {
@@ -93,9 +101,12 @@ export default function App() {
   const [rebaseRow, setRebaseRow] = useState<ContextTarget["row"] | null>(null)
   const [remoteConfigFor, setRemoteConfigFor] = useState<string | null>(null)
   const [stashOpen, setStashOpen] = useState(false)
-  const [stashAnchor, setStashAnchor] = useState<HTMLElement | null>(null)
   const [stashes, setStashes] = useState<StashInfo[]>([])
   const [busy, setBusy] = useState(false)
+  const [jobLabel, setJobLabel] = useState<string | null>(null)
+  const [amend, setAmend] = useState(false)
+  const [initialMsg, setInitialMsg] = useState<string | undefined>(undefined)
+  const [createRef, setCreateRef] = useState<{ kind: "branch" | "tag"; sha: string; subject?: string } | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const dragState = useRef<{ startY: number; startH: number } | null>(null)
 
@@ -113,23 +124,55 @@ export default function App() {
     dragState.current = null
   }
 
-  const liveRows = useMemo(() => layoutGraph(revisions), [revisions])
+  // Lane layout runs in a Web Worker; rows update when the latest request
+  // finishes. The grid keeps showing the previous layout until then.
+  const [liveGraphRows, setLiveGraphRows] = useState<GraphRow[]>([])
+  const layoutWorker = useRef<Worker | null>(null)
+  const layoutSeq = useRef(0)
+
+  useEffect(() => {
+    const worker = new Worker(new URL("./graph/layout.worker.ts", import.meta.url), { type: "module" })
+    worker.onmessage = (e: MessageEvent<{ seq: number; rows: GraphRow[] }>) => {
+      if (e.data.seq === layoutSeq.current) setLiveGraphRows(e.data.rows)
+    }
+    layoutWorker.current = worker
+    return () => {
+      worker.terminate()
+      layoutWorker.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (offline) return
+    const worker = layoutWorker.current
+    if (!worker) return
+    const seq = ++layoutSeq.current
+    worker.postMessage({ seq, revisions })
+  }, [offline, revisions])
+
   const syntheticRows = useMemo(
     () => layoutGraph(syntheticHistory(200).map((r) => ({ ...r, id: r.id.length >= 7 ? r.id : r.id.padEnd(7, "0") }))),
     [],
   )
-  const rows = offline ? syntheticRows : liveRows
+  const rows = offline ? syntheticRows : liveGraphRows
   const current = rows[selected]
   const dirty = (status?.unstagedCount ?? 0) + (status?.stagedCount ?? 0)
 
+  // Stale-while-revalidate, per-panel: every piece of repo data updates the
+  // moment its own request lands. Nothing here blocks another panel, and a
+  // slow revisions call never delays refs or status.
   const refreshRepo = useCallback(async () => {
-    const [rev, tree, st] = await Promise.all([fetchRevisions(800), fetchRefs(), fetchStatus()])
-    setRevisions(rev.map(toRevision))
-    setRefs(tree)
-    setStatus(st)
-    setSelected(0)
-    setLive(true)
-    fetchStashes().then(setStashes).catch(() => setStashes([]))
+    await Promise.allSettled([
+      fetchRevisions(800)
+        .then((rev) => {
+          setRevisions(rev.map(toRevision))
+          setLive(true)
+        })
+        .catch(() => undefined),
+      fetchRefs().then(setRefs).catch(() => undefined),
+      fetchStatus().then(setStatus).catch(() => undefined),
+      fetchStashes().then(setStashes).catch(() => setStashes([])),
+    ])
   }, [])
 
   useEffect(() => {
@@ -138,6 +181,7 @@ export default function App() {
       .then(async (h) => {
         setHealth(h)
         setEngineError(null)
+        setOffline(false)
         const currentRepo = await fetchCurrent()
         if (currentRepo) setRepo(currentRepo)
         try {
@@ -156,6 +200,8 @@ export default function App() {
         }
       })
       .catch(() => {
+        // StrictMode remounts abort the first run; that is not "engine down".
+        if (ctrl.signal.aborted) return
         setHealth(null)
         setEngineError(null)
         setOffline(true)
@@ -194,13 +240,58 @@ export default function App() {
   }
 
   async function onCommit(msg: string) {
-    if (!msg.trim() || !status?.stagedCount) return
-    await createCommit(msg.trim())
+    if (!msg.trim() || (!status?.stagedCount && !amend)) return
+    await createCommit(msg.trim(), amend)
     setCommitOpen(false)
+    setAmend(false)
+    setInitialMsg(undefined)
     await refreshRepo()
   }
 
+  async function openAmend() {
+    try {
+      const d = await fetchCommit("HEAD")
+      setInitialMsg(d.body ? `${d.subject}\n\n${d.body}` : d.subject)
+    } catch {
+      setInitialMsg(undefined)
+    }
+    setAmend(true)
+    setCommitOpen(true)
+  }
+
+  async function doCreateRef(name: string) {
+    if (!createRef) return
+    const tree =
+      createRef.kind === "branch"
+        ? await createBranch(name, createRef.sha)
+        : await createTag(name, createRef.sha)
+    setRefs(tree)
+  }
+
   const branchNames = useMemo(() => (refs?.branches ?? []).map((b) => b.name), [refs])
+  const remoteNames = useMemo(
+    () => [...new Set((refs?.remotes ?? []).map((r) => r.name.split("/")[0]).filter(Boolean))],
+    [refs],
+  )
+  const defaultRemote = remoteNames[0] ?? "origin"
+
+  async function runJob(label: string, start: () => Promise<{ id: string; kind: string }>) {
+    if (busy) return
+    setBusy(true)
+    setJobLabel(label)
+    try {
+      const { id } = await start()
+      const job = await waitJob(id)
+      if (job.status === "failed") throw new Error(job.error ?? `${label} failed`)
+      await refreshRepo()
+      setEngineError(null)
+    } catch (e) {
+      setEngineError(e instanceof Error ? e.message : `${label} failed`)
+    } finally {
+      setBusy(false)
+      setJobLabel(null)
+    }
+  }
 
   async function doCheckout(branch: string, force: boolean) {
     setStatus(await checkoutRef(branch, force))
@@ -234,12 +325,7 @@ export default function App() {
     }
   }
   async function doFetchRemote(name: string) {
-    try {
-      await fetchRemote(name)
-      await refreshRepo()
-    } catch (e) {
-      setEngineError(e instanceof Error ? e.message : "fetch failed")
-    }
+    await runJob("Fetching", () => startFetch(name))
   }
   function doOpenSubmodule(path: string) {
     if (!repo) return
@@ -250,7 +336,27 @@ export default function App() {
   return (
     <Box data-testid="browse-shell" sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
       <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 1, minHeight: 44, px: 1.5 }}>
+        <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 0.75, minHeight: 44, px: 1.5, position: "relative" }}>
+          {jobLabel !== null && (
+            <Box
+              data-testid="topbar-progress"
+              sx={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                pointerEvents: "none",
+              }}
+            >
+              <CircularProgress size={16} thickness={4} />
+              <Typography variant="caption" color="text.secondary">
+                {jobLabel}…
+              </Typography>
+            </Box>
+          )}
           <Typography variant="subtitle1" sx={{ mr: 1, fontWeight: 700 }}>
             PowerGit
           </Typography>
@@ -260,22 +366,35 @@ export default function App() {
             overlap="rectangular"
             sx={{ "& .MuiBadge-badge": { fontSize: 10, minWidth: 16, height: 16, px: 0.5 } }}
           >
-            <Button variant="contained" size="small" data-testid="commit-button" onClick={() => setCommitOpen(true)}>
-              Commit
-            </Button>
+            <SplitButton
+              label="Commit"
+              testid="commit-button"
+              variant="contained"
+              onMainClick={() => {
+                setAmend(false)
+                setInitialMsg(undefined)
+                setCommitOpen(true)
+              }}
+            >
+              <MenuItem data-testid="commit-amend" onClick={() => void openAmend()}>
+                Amend last commit…
+              </MenuItem>
+            </SplitButton>
           </Badge>
-          <Button size="small" startIcon={<Inventory2OutlinedIcon />} data-testid="stash-button" onClick={(e) => setStashAnchor(e.currentTarget)}>
-            Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
-          </Button>
-          <Menu open={stashAnchor !== null} anchorEl={stashAnchor} onClose={() => setStashAnchor(null)}>
-            <MenuItem data-testid="stash-manage" onClick={() => { setStashAnchor(null); setStashOpen(true) }}>
+          <SplitButton
+            label={stashes.length > 0 ? `Stash (${stashes.length})` : "Stash"}
+            icon={<Inventory2OutlinedIcon fontSize="small" />}
+            testid="stash-button"
+            disabled={!live}
+            onMainClick={() => setStashOpen(true)}
+          >
+            <MenuItem data-testid="stash-manage" onClick={() => setStashOpen(true)}>
               Manage stashes…
             </MenuItem>
             <MenuItem
               data-testid="stash-apply-latest"
               disabled={stashes.length === 0}
               onClick={async () => {
-                setStashAnchor(null)
                 try {
                   setStatus(await applyStash("stash@{0}"))
                   await refreshRepo()
@@ -290,7 +409,6 @@ export default function App() {
               data-testid="stash-pop-latest"
               disabled={stashes.length === 0}
               onClick={async () => {
-                setStashAnchor(null)
                 try {
                   setStatus(await applyStash("stash@{0}", true))
                   await refreshRepo()
@@ -305,7 +423,6 @@ export default function App() {
               data-testid="stash-drop-latest"
               disabled={stashes.length === 0}
               onClick={async () => {
-                setStashAnchor(null)
                 if (!window.confirm("Drop stash@{0}? This cannot be undone.")) return
                 try {
                   await dropStash("stash@{0}")
@@ -317,68 +434,47 @@ export default function App() {
             >
               Drop stash@{"{0}"}
             </MenuItem>
-          </Menu>
-          <Button
-            size="small"
-            startIcon={<CloudDownloadOutlinedIcon />}
-            data-testid="fetch-button"
+          </SplitButton>
+          <SplitButton
+            label="Fetch"
+            icon={<CloudDownloadOutlinedIcon fontSize="small" />}
+            testid="fetch-button"
             disabled={!live || busy}
-            onClick={async () => {
-              setBusy(true)
-              try {
-                const remote = refs?.remotes[0]?.name.split("/")[0] ?? "origin"
-                await fetchRemote(remote)
-                await refreshRepo()
-                setEngineError(null)
-              } catch (e) {
-                setEngineError(e instanceof Error ? e.message : "fetch failed")
-              } finally {
-                setBusy(false)
-              }
-            }}
+            onMainClick={() => runJob("Fetching", () => startFetch(defaultRemote))}
           >
-            Fetch
-          </Button>
-          <Button
-            size="small"
-            startIcon={<CallReceivedOutlinedIcon />}
-            data-testid="pull-button"
+            {remoteNames.map((r) => (
+              <MenuItem key={r} data-testid={`fetch-${r}`} onClick={() => runJob("Fetching", () => startFetch(r))}>
+                {r}
+              </MenuItem>
+            ))}
+            {remoteNames.length > 1 && (
+              <MenuItem data-testid="fetch-all" onClick={() => runJob("Fetching all remotes", () => Promise.all(remoteNames.map((r) => startFetch(r))).then(([first]) => first))}>
+                Fetch all remotes
+              </MenuItem>
+            )}
+          </SplitButton>
+          <SplitButton
+            label="Pull"
+            icon={<CallReceivedOutlinedIcon fontSize="small" />}
+            testid="pull-button"
             disabled={!live || busy}
-            onClick={async () => {
-              setBusy(true)
-              try {
-                await pullBranch()
-                await refreshRepo()
-                setEngineError(null)
-              } catch (e) {
-                setEngineError(e instanceof Error ? e.message : "pull failed")
-              } finally {
-                setBusy(false)
-              }
-            }}
+            onMainClick={() => runJob("Pulling", () => startPull(false))}
           >
-            Pull
-          </Button>
-          <Button
-            size="small"
-            startIcon={<CloudUploadOutlinedIcon />}
-            data-testid="push-button"
+            <MenuItem data-testid="pull-rebase" onClick={() => runJob("Pulling (rebase)", () => startPull(true))}>
+              Pull (rebase onto upstream)
+            </MenuItem>
+          </SplitButton>
+          <SplitButton
+            label="Push"
+            icon={<CloudUploadOutlinedIcon fontSize="small" />}
+            testid="push-button"
             disabled={!live || busy}
-            onClick={async () => {
-              setBusy(true)
-              try {
-                await pushBranch()
-                await refreshRepo()
-                setEngineError(null)
-              } catch (e) {
-                setEngineError(e instanceof Error ? e.message : "push failed")
-              } finally {
-                setBusy(false)
-              }
-            }}
+            onMainClick={() => runJob("Pushing", () => startPush(false))}
           >
-            Push
-          </Button>
+            <MenuItem data-testid="push-force-lease" onClick={() => runJob("Pushing (force with lease)", () => startPush(true))}>
+              Push (force with lease)
+            </MenuItem>
+          </SplitButton>
             <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
               {health
                 ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
@@ -388,6 +484,10 @@ export default function App() {
               {repo ? ` · ${repo.name} (${repo.branch})` : ""}
             </Typography>
         </Toolbar>
+        {!live && !offline && health !== null && (
+          <LinearProgress data-testid="boot-progress" sx={{ height: 2 }} />
+        )}
+        {busy && jobLabel !== null && <LinearProgress sx={{ height: 2 }} />}
         </AppBar>
         {engineError && (
           <Typography variant="caption" color="error" sx={{ px: 2, py: 0.5, display: "block" }}>
@@ -401,7 +501,7 @@ export default function App() {
         data-testid="navrail"
         aria-label="Repositories"
         sx={{
-          width: 64,
+          width: 48,
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
@@ -419,18 +519,18 @@ export default function App() {
           </IconButton>
         </Tooltip>
         <Tooltip title="Open repository…" placement="right">
-          <IconButton data-testid="open-repo-button" onClick={() => onOpenFolder()} sx={{ borderRadius: 2 }}>
+          <IconButton data-testid="open-repo-button" onClick={() => onOpenFolder()} sx={{ borderRadius: 2 }} aria-label="Open repository">
             <CreateNewFolderOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Recent repositories" placement="right">
-          <IconButton onClick={() => setRecentsOpen(true)} sx={{ borderRadius: 2 }}>
+          <IconButton onClick={() => setRecentsOpen(true)} sx={{ borderRadius: 2 }} aria-label="Recent repositories">
             <HistoryIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Box sx={{ flex: 1 }} />
         <Tooltip title="Settings" placement="right">
-          <IconButton onClick={() => setSettingsOpen(true)} sx={{ borderRadius: 2 }} data-testid="settings-button">
+          <IconButton onClick={() => setSettingsOpen(true)} sx={{ borderRadius: 2 }} data-testid="settings-button" aria-label="Settings">
             <SettingsOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -514,7 +614,13 @@ export default function App() {
       <CommitDialog
         open={commitOpen}
         status={status}
-        onClose={() => setCommitOpen(false)}
+        amend={amend}
+        initialMessage={initialMsg}
+        onClose={() => {
+          setCommitOpen(false)
+          setAmend(false)
+          setInitialMsg(undefined)
+        }}
         onStatus={setStatus}
         onCommit={async (msg) => {
           await onCommit(msg)
@@ -535,7 +641,20 @@ export default function App() {
         onRebase={() => {
           if (ctxTarget) setRebaseRow(ctxTarget.row)
         }}
+        onCreateBranch={(sha) => setCreateRef({ kind: "branch", sha, subject: ctxTarget?.row.rev.message })}
+        onCreateTag={(sha) => setCreateRef({ kind: "tag", sha, subject: ctxTarget?.row.rev.message })}
       />
+      {createRef !== null && (
+        <CreateRefDialog
+          open
+          kind={createRef.kind}
+          commit={createRef.sha}
+          subject={createRef.subject}
+          existingNames={createRef.kind === "branch" ? branchNames : (refs?.tags ?? []).map((t) => t.name)}
+          onClose={() => setCreateRef(null)}
+          onConfirm={doCreateRef}
+        />
+      )}
       {checkoutBranch !== null && (
         <CheckoutBranchDialog
           open
@@ -580,5 +699,69 @@ export default function App() {
         onStatus={setStatus}
       />
     </Box>
+  )
+}
+
+// Git Extensions-style split button: main action on the left, dropdown caret
+// for secondary actions. Material chrome only.
+function SplitButton({
+  label,
+  icon,
+  testid,
+  variant = "text",
+  disabled,
+  onMainClick,
+  children,
+}: {
+  label: string
+  icon?: ReactNode
+  testid: string
+  variant?: "text" | "contained"
+  disabled?: boolean
+  onMainClick: () => void
+  children?: ReactNode
+}) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  const shared = {
+    size: "small" as const,
+    disabled,
+    sx: { minWidth: 0 },
+  }
+  return (
+    <>
+      <Box sx={{ display: "inline-flex", alignItems: "stretch" }}>
+        <Button
+          {...shared}
+          variant={variant}
+          data-testid={testid}
+          startIcon={icon}
+          onClick={onMainClick}
+          sx={{ ...shared.sx, borderTopRightRadius: 0, borderBottomRightRadius: 0, pr: 1 }}
+        >
+          {label}
+        </Button>
+        <Button
+          {...shared}
+          variant={variant}
+          data-testid={`${testid}-menu`}
+          aria-label={`${label} options`}
+          onClick={(e) => setAnchor(e.currentTarget)}
+          sx={{
+            ...shared.sx,
+            px: 0.25,
+            borderTopLeftRadius: 0,
+            borderBottomLeftRadius: 0,
+            borderLeft: 1,
+            borderColor: variant === "contained" ? "rgba(255,255,255,0.35)" : "divider",
+            alignSelf: "stretch",
+          }}
+        >
+          <ArrowDropDownIcon fontSize="small" />
+        </Button>
+      </Box>
+      <Menu open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)}>
+        {children}
+      </Menu>
+    </>
   )
 }

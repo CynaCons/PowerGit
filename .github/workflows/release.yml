@@ -55,6 +55,13 @@ jobs:
         run: |
           npm ci
           npm run tauri build
+      - name: Inspect AppImage for GLib/GIO/curl bundling mismatches
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends squashfs-tools binutils
+          chmod +x scripts/inspect-appimage.sh
+          APP=$(ls frontend/src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)
+          scripts/inspect-appimage.sh "$APP" --fix
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:

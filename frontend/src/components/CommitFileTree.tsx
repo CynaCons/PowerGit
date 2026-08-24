@@ -76,7 +76,7 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
   }
 
   return (
-    <Box sx={{ overflow: "auto", py: 0.5 }}>
+    <Box data-testid="commit-file-tree" sx={{ overflow: "auto", py: 0.5 }}>
       <Level commitId={commitId} entries={root.entries} depth={0} prefix="" dirs={dirs} onToggle={toggleDir} onSelectFile={onSelectFile} />
     </Box>
   )
@@ -112,6 +112,7 @@ function Level({
                 depth={depth}
                 icon={open ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
                 label={e.name}
+                path={path}
                 folder
                 onClick={() => onToggle(path)}
               />
@@ -135,6 +136,7 @@ function Level({
             depth={depth}
             icon={<DescriptionOutlinedIcon sx={{ fontSize: 15 }} />}
             label={e.name}
+            path={path}
             onClick={() => onSelectFile?.(path)}
           />
         )
@@ -147,17 +149,22 @@ function TreeRow({
   depth,
   icon,
   label,
+  path,
   folder,
   onClick,
 }: {
   depth: number
   icon: ReactNode
   label: string
+  path: string
   folder?: boolean
   onClick: () => void
 }) {
   return (
     <Box
+      data-testid="commit-file-tree-row"
+      data-path={path}
+      data-type={folder ? "tree" : "blob"}
       onClick={onClick}
       sx={{
         display: "flex",

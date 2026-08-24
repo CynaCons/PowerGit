@@ -10,18 +10,31 @@ public sealed partial class GitHost
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
         bool hasStash = Run(root, "rev-parse", "--verify", "-q", "refs/stash").ExitCode == 0;
-        List<string> logArgs = [
-            "-c", "core.quotepath=false",
-            "log", "--topo-order", "--branches", "--tags",
-        ];
+
+        // Every local AND remote-tracking branch tip plus tags are passed as
+        // explicit revisions: the -n cap can then never hide a branch tip, and
+        // remote branches show by default (owner decision 2026-08-24, GE parity;
+        // overrides the v0.4.0 stale-remotes exclusion).
+        CommandResult tipRefs = Run(root, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags");
+        List<string> tips = [.. tipRefs.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()];
         if (hasStash)
         {
-            logArgs.Add("refs/stash");
+            tips.Add("refs/stash");
         }
 
-        logArgs.Add($"-n{Math.Clamp(max, 1, 5000)}");
-        logArgs.Add($"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
-        CommandResult log = RunTimed(root, 60_000, [.. logArgs]);
+        if (tips.Count == 0)
+        {
+            tips.Add("HEAD");
+        }
+
+        List<string> logArgs = [
+            "-c", "core.quotepath=false",
+            "log", "--topo-order", "--decorate=short",
+            $"-n{Math.Clamp(max, 1, 5000)}",
+            $"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}",
+        ];
+        logArgs.AddRange(tips);
+        CommandResult log = RunTimed(root, 120_000, [.. logArgs]);
 
         if (log.ExitCode != 0)
         {
@@ -158,11 +171,15 @@ public sealed partial class GitHost
     public IReadOnlyList<TreeEntryDto> ListTree(string id, string? path)
     {
         string root = RequireRoot();
+        // With a pathspec git ls-tree emits repo-root-relative paths; the DTO
+        // contract is names relative to the requested directory, so strip it.
+        string? prefix = null;
         List<string> args = ["-c", "core.quotepath=false", "ls-tree", "-z", id];
         if (!string.IsNullOrWhiteSpace(path))
         {
+            prefix = path.Trim().Replace('\\', '/').TrimEnd('/') + "/";
             args.Add("--");
-            args.Add(path.Trim().TrimEnd('/') + "/");
+            args.Add(prefix);
         }
 
         CommandResult result = Run(root, [.. args]);
@@ -186,7 +203,13 @@ public sealed partial class GitHost
                 continue;
             }
 
-            entries.Add(new TreeEntryDto(rec[(tab + 1)..], meta[1], meta[2]));
+            string name = rec[(tab + 1)..];
+            if (prefix is not null && name.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                name = name[prefix.Length..];
+            }
+
+            entries.Add(new TreeEntryDto(name, meta[1], meta[2]));
         }
 
         return [.. entries.OrderBy(e => e.Type != "tree").ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
@@ -416,7 +439,7 @@ public sealed partial class GitHost
         }
     }
 
-    public string Commit(string message)
+    public string Commit(string message, bool amend = false)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(message))
@@ -424,13 +447,57 @@ public sealed partial class GitHost
             throw new InvalidOperationException("commit message is required");
         }
 
-        CommandResult result = Run(root, "commit", "-m", message.Trim());
+        List<string> args = amend ? ["commit", "--amend", "-m"] : ["commit", "-m"];
+        args.Add(message.Trim());
+        CommandResult result = Run(root, [.. args]);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
         }
 
         return Run(root, "rev-parse", "HEAD").StdOut.Trim();
+    }
+
+    public void CreateBranch(string name, string? commit)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("branch name is required");
+        }
+
+        List<string> args = ["branch", name];
+        if (!string.IsNullOrWhiteSpace(commit))
+        {
+            args.Add(commit.Trim());
+        }
+
+        CommandResult result = Run(root, [.. args]);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+    }
+
+    public void CreateTag(string name, string? commit)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("tag name is required");
+        }
+
+        List<string> args = ["tag", name];
+        if (!string.IsNullOrWhiteSpace(commit))
+        {
+            args.Add(commit.Trim());
+        }
+
+        CommandResult result = Run(root, [.. args]);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
     }
 
     private string? GetConfigValue(string root, string key)
