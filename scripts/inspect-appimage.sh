@@ -25,7 +25,9 @@
 set -euo pipefail
 
 [ $# -ge 1 ] || { echo "usage: $0 <file.AppImage> [--fix]" >&2; exit 2; }
-APPIMAGE=$1
+# Resolve before cd'ing into the temp workdir — callers pass relative paths.
+APPIMAGE=$(readlink -f "$1")
+[ -f "$APPIMAGE" ] || { echo "no such file: $1" >&2; exit 2; }
 FIX=${2:-}
 command -v unsquashfs >/dev/null || { echo "unsquashfs not found (apt-get install squashfs-tools)" >&2; exit 2; }
 command -v objdump >/dev/null || { echo "objdump not found (apt-get install binutils)" >&2; exit 2; }
