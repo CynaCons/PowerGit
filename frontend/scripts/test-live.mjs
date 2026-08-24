@@ -1,4 +1,4 @@
-const { chromium } = require("playwright")
+import { chromium } from "playwright"
 ;(async () => {
   const b = await chromium.launch()
   const p = await b.newPage({ viewport: { width: 1400, height: 900 } })
