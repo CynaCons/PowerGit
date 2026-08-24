@@ -58,7 +58,7 @@ jobs:
       - name: Inspect AppImage for GLib/GIO/curl bundling mismatches
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends squashfs-tools binutils
+          sudo apt-get install -y --no-install-recommends squashfs-tools binutils libfuse2
           chmod +x scripts/inspect-appimage.sh
           APP=$(ls frontend/src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)
           scripts/inspect-appimage.sh "$APP" --fix
