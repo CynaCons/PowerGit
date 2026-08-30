@@ -1,6 +1,6 @@
 using PowerGit.Engine;
 
-const string engineVersion = "0.9.0"; // keep in sync with tauri.conf.json / package.json (see release skill)
+const string engineVersion = "0.11.0"; // keep in sync with tauri.conf.json / package.json (see release skill)
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
