@@ -21,6 +21,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import type { GraphRow } from "../graph/types"
+import { shortcutLabel } from "../hotkeys"
 
 export type ContextTarget = { x: number; y: number; row: GraphRow }
 
@@ -63,6 +64,9 @@ export function RevisionContextMenu({
           <CallSplitIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Checkout Branch…</ListItemText>
+        <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+          {shortcutLabel("browse.checkoutBranch")}
+        </Typography>
       </MenuItem>
       <MenuItem
         data-testid="ctx-create-branch"
@@ -76,6 +80,9 @@ export function RevisionContextMenu({
           <CallSplitIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Create Branch Here…</ListItemText>
+        <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+          {shortcutLabel("browse.createBranch")}
+        </Typography>
       </MenuItem>
       <MenuItem
         data-testid="ctx-create-tag"
@@ -89,6 +96,9 @@ export function RevisionContextMenu({
           <SellOutlinedIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Create Tag Here…</ListItemText>
+        <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+          {shortcutLabel("browse.createTag")}
+        </Typography>
       </MenuItem>
       <MenuItem
         data-testid="ctx-reset"
@@ -113,6 +123,9 @@ export function RevisionContextMenu({
           <BuildIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Rebase Current Branch onto Here…</ListItemText>
+        <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+          {shortcutLabel("browse.rebase")}
+        </Typography>
       </MenuItem>
       <MenuItem
         data-testid="ctx-copy-sha"

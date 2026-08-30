@@ -35,6 +35,7 @@ that is never reused. Deleted requirements leave a gap.
 | LEFT | [SRS-left-panel.md](SRS-left-panel.md) | Branches, remotes, tags, submodules |
 | NAV | [SRS-navrail.md](SRS-navrail.md) | Repo switching |
 | SET | [SRS-settings.md](SRS-settings.md) | Identity, CRLF, VS Code tools |
+| KEY | [SRS-hotkeys.md](SRS-hotkeys.md) | Git Extensions keyboard shortcuts |
 | XP | [SRS-cross-platform.md](SRS-cross-platform.md) | Linux / Windows / macOS |
 
 ## Table format

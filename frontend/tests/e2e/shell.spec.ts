@@ -15,6 +15,10 @@ test("commit overlay opens from the toolbar", async ({ page }) => {
   await page.goto("/")
   await page.getByTestId("commit-button").click()
   await expect(page.getByTestId("commit-overlay")).toBeVisible()
+  await expect(page.getByTestId("stage-selected")).toBeVisible()
+  await expect(page.getByTestId("stage-all")).toBeVisible()
+  await expect(page.getByTestId("unstage-selected")).toBeVisible()
+  await expect(page.getByTestId("unstage-all")).toBeVisible()
   await page.keyboard.press("Escape")
 })
 
@@ -157,3 +161,108 @@ test("bottom panel splitter resizes", async ({ page }) => {
   const after = (await panel.boundingBox())!.height
   expect(after).toBeGreaterThan(before + 50)
 })
+
+test("left tree filter finds refs by substring", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.getByTestId("left-panel")).toBeVisible()
+  await expect(page.locator('[data-testid="tree-row"]').first()).toBeVisible()
+
+  // Filter mode lists matches with their FULL ref names — the guaranteed way
+  // to find a branch among thousands.
+  const filter = page.getByTestId("tree-filter")
+  await filter.fill("power")
+  await expect(page.locator('[data-testid="tree-row"][data-label*="power"]').first()).toBeVisible()
+
+  await filter.fill("no-such-ref-zzz")
+  await expect(page.locator('[data-testid="tree-row"]')).toHaveCount(0)
+
+  await filter.fill("")
+  await expect(page.locator('[data-testid="tree-row"]').first()).toBeVisible()
+})
+
+test("grid arrow keys move the selection", async ({ page }) => {
+  await page.goto("/")
+  const rows = page.getByTestId("grid-row")
+  await expect(rows.first()).toBeVisible()
+  await rows.first().click()
+  const before = await page.getByTestId("commit-info").innerText()
+  await page.keyboard.press("ArrowDown")
+  await expect(page.getByTestId("commit-info")).not.toHaveText(before)
+  await expect(rows.nth(1)).toHaveClass(/selected/)
+})
+
+test("Ctrl+Space opens the commit overlay", async ({ page }) => {
+  await page.goto("/")
+  await page.keyboard.press("Control+Space")
+  await expect(page.getByTestId("commit-overlay")).toBeVisible()
+  await page.keyboard.press("Escape")
+})
+
+test("Ctrl+Comma opens settings", async ({ page }) => {
+  await page.goto("/")
+  await page.keyboard.press("Control+Comma")
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
+  await page.getByRole("button", { name: "Cancel" }).click()
+})
+
+test("F5 does not reload the SPA", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.getByTestId("browse-shell")).toBeVisible()
+  await page.evaluate(() => {
+    ;(window as Window & { __pgHotkey?: number }).__pgHotkey = 1
+  })
+  await page.keyboard.press("F5")
+  await expect(page.getByTestId("browse-shell")).toBeVisible()
+  expect(await page.evaluate(() => (window as Window & { __pgHotkey?: number }).__pgHotkey)).toBe(1)
+})
+
+test("commit overlay S stages selected files and types in the message", async ({ page }) => {
+  await page.goto("/")
+  await page.keyboard.press("Control+Space")
+  await expect(page.getByTestId("commit-overlay")).toBeVisible()
+
+  const message = page.getByTestId("commit-message-input")
+  await message.click()
+  await page.keyboard.press("s")
+  await expect(message).toHaveValue("s")
+  await message.fill("")
+
+  const unstaged = page.getByTestId("unstaged-list-row")
+  if ((await unstaged.count()) === 0) return
+  const first = unstaged.first()
+  const path = await first.locator("[title]").getAttribute("title")
+  await first.click()
+  await page.keyboard.press("s")
+  const staged = page.getByTestId("staged-list-row").locator(`[title="${path}"]`)
+  await expect(staged).toBeVisible()
+  await staged.click()
+  await page.keyboard.press("u")
+  await expect(page.getByTestId("unstaged-list-row").locator(`[title="${path}"]`)).toBeVisible()
+})
+
+test("commit overlay size does not jump when selecting a file", async ({ page }) => {
+  await page.goto("/")
+  await page.getByTestId("commit-button").click()
+  await expect(page.getByTestId("commit-overlay")).toBeVisible()
+  const paper = page.locator(".MuiDialog-paper")
+  await expect(paper).toBeVisible()
+  const before = await paper.boundingBox()
+  expect(before).not.toBeNull()
+  const row = page.getByTestId("unstaged-list-row").first()
+  if ((await row.count()) > 0) {
+    await row.click()
+    await expect(page.getByTestId("diff-view").or(page.getByTestId("commit-diff"))).toBeVisible()
+    const after = await paper.boundingBox()
+    expect(after).not.toBeNull()
+    expect(Math.abs(after!.height - before!.height)).toBeLessThan(2)
+    expect(Math.abs(after!.width - before!.width)).toBeLessThan(2)
+  }
+})
+
+test("Ctrl+3 focuses the Diff tab", async ({ page }) => {
+  await page.goto("/")
+  await page.keyboard.press("Control+3")
+  await expect(page.getByTestId("file-list")).toBeVisible()
+  await expect(page.getByTestId("diff-pane")).toBeVisible()
+})
+

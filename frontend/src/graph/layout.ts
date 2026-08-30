@@ -17,93 +17,109 @@ type Segment = {
 
 const MERGE_COMMON_PARENT = true
 
-export function layoutGraph(revisions: Revision[]): GraphRow[] {
-  const byId = new Map<string, Revision>()
-  for (const rev of revisions) byId.set(rev.id, rev)
+export type GraphLayouter = {
+  /** Lays out the next batch of revisions and returns ONLY the new rows. */
+  append(revisions: Revision[]): GraphRow[]
+  rowCount(): number
+}
 
+// History loads in pages; the layouter keeps its segment state between
+// appends so a new page never re-lays-out the prefix. A full run and any
+// sequence of appends over the same revisions produce identical rows
+// (guarded by layout.test.ts).
+export function createLayouter(): GraphLayouter {
   const startByChild = new Map<string, Segment[]>()
-  for (const rev of revisions) {
-    const segs: Segment[] = []
-    for (const parentId of rev.parents) {
-      if (!parentId) continue
-      segs.push({
-        id: `${rev.id}:${parentId}`,
-        childId: rev.id,
-        parentId,
-        color: 0,
-        secondarySince: Number.MAX_SAFE_INTEGER,
-      })
-    }
-    startByChild.set(rev.id, segs)
-  }
-
   const rows: GraphRow[] = []
 
-  for (let i = 0; i < revisions.length; i++) {
-    const rev = revisions[i]
-    const startSegments = startByChild.get(rev.id) ?? []
-    let segments: Segment[] = []
-
-    if (i === 0) {
-      segments = [...startSegments]
-      let prev: Segment | undefined
-      for (const seg of segments) {
-        seg.color = pickColor(seg, prev)
-        prev = seg
+  function append(revisions: Revision[]): GraphRow[] {
+    for (const rev of revisions) {
+      const segs: Segment[] = []
+      for (const parentId of rev.parents) {
+        if (!parentId) continue
+        segs.push({
+          id: `${rev.id}:${parentId}`,
+          childId: rev.id,
+          parentId,
+          color: 0,
+          secondarySince: Number.MAX_SAFE_INTEGER,
+        })
       }
-    } else {
-      const prevRow = rows[i - 1]
-      const continuing: Segment[] = []
-      const prevSegs = prevRow.segments.map((s) => findSegment(startByChild, s.id)).filter(Boolean) as Segment[]
+      startByChild.set(rev.id, segs)
+    }
 
-      let startAdded = false
-      for (let p = 0; p < prevSegs.length; p++) {
-        const segment = prevSegs[p]
-        if (segment.parentId === prevRow.rev.id) continue
-        continuing.push(segment)
+    const from = rows.length
+    for (const rev of revisions) {
+      const i = rows.length
+      const startSegments = startByChild.get(rev.id) ?? []
+      let segments: Segment[] = []
 
-        if (rev.id === segment.parentId) {
-          if (!startAdded) {
-            startAdded = true
-            continuing.push(...startSegments)
-          }
-          let prevSeg = segment
-          for (let s = 0; s < startSegments.length; s++) {
-            const start = startSegments[s]
-            if (s === 0) {
-              start.color = segment.color
-            } else {
-              start.color = pickColor(start, prevSeg, startSegments[s + 1], segment.color)
+      if (i === 0) {
+        segments = [...startSegments]
+        let prev: Segment | undefined
+        for (const seg of segments) {
+          seg.color = pickColor(seg, prev)
+          prev = seg
+        }
+      } else {
+        const prevRow = rows[i - 1]
+        const continuing: Segment[] = []
+        const prevSegs = prevRow.segments.map((s) => findSegment(startByChild, s.id)).filter(Boolean) as Segment[]
+
+        let startAdded = false
+        for (let p = 0; p < prevSegs.length; p++) {
+          const segment = prevSegs[p]
+          if (segment.parentId === prevRow.rev.id) continue
+          continuing.push(segment)
+
+          if (rev.id === segment.parentId) {
+            if (!startAdded) {
+              startAdded = true
+              continuing.push(...startSegments)
             }
+            let prevSeg = segment
+            for (let s = 0; s < startSegments.length; s++) {
+              const start = startSegments[s]
+              if (s === 0) {
+                start.color = segment.color
+              } else {
+                start.color = pickColor(start, prevSeg, startSegments[s + 1], segment.color)
+              }
+              prevSeg = start
+            }
+          }
+        }
+
+        if (!startAdded) {
+          let prevSeg = continuing.at(-1)
+          continuing.push(...startSegments)
+          for (const start of startSegments) {
+            start.color = pickColor(start, prevSeg)
             prevSeg = start
           }
         }
+
+        segments = continuing
       }
 
-      if (!startAdded) {
-        let prevSeg = continuing.at(-1)
-        continuing.push(...startSegments)
-        for (const start of startSegments) {
-          start.color = pickColor(start, prevSeg)
-          prevSeg = start
-        }
-      }
-
-      segments = continuing
+      const assigned = assignLanes(rev.id, segments, i)
+      rows.push({
+        rev,
+        lane: assigned.revisionLane,
+        color: colorForLane(assigned.revisionLane, segments, rev.id),
+        hasRefs: rev.refs.length > 0,
+        isHead: rev.refs.includes("HEAD"),
+        segments: assigned.rowSegments,
+      })
     }
 
-    const assigned = assignLanes(rev.id, segments, i)
-    rows.push({
-      rev,
-      lane: assigned.revisionLane,
-      color: colorForLane(assigned.revisionLane, segments, rev.id),
-      hasRefs: rev.refs.length > 0,
-      isHead: rev.refs.includes("HEAD"),
-      segments: assigned.rowSegments,
-    })
+    return rows.slice(from)
   }
 
-  return rows
+  return { append, rowCount: () => rows.length }
+}
+
+export function layoutGraph(revisions: Revision[]): GraphRow[] {
+  return createLayouter().append(revisions)
 }
 
 function findSegment(startByChild: Map<string, Segment[]>, id: string): Segment | undefined {

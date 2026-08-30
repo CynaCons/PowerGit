@@ -57,17 +57,26 @@ echo "== AppImage: $(basename "$APPIMAGE") =="
 
 problems=0
 
+# Generic unresolved-symbol check: resolve the object against the bundle's
+# own libs first (mirrors runtime), and report ANY undefined symbol — not a
+# hard-coded list, so a runner-image bump introducing a new GLib/nghttp2
+# mismatch is caught the same way the known ones were.
+check_unresolved() {
+  local so=$1
+  LD_LIBRARY_PATH="$ROOT/usr/lib:$ROOT/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}" \
+    ldd -r "$so" 2>&1 | grep "undefined symbol" || true
+}
+
 # --- GIO modules bundled next to a bundled libgio -------------------------
 echo "== bundled GIO modules =="
 gio_modules=$(find "$ROOT" -path '*gio/modules/*.so' 2>/dev/null || true)
 for m in $gio_modules; do
   echo "  $m"
-  for sym in g_task_set_static_name g_assertion_message_cmpint; do
-    if objdump -T "$m" | grep -q "UND.*$sym"; then
-      echo "    MISMATCH: requires $sym (GLib >= 2.76)"
-      problems=$((problems + 1))
-    fi
-  done
+  unresolved=$(check_unresolved "$m")
+  if [ -n "$unresolved" ]; then
+    echo "$unresolved" | sed 's/^/    MISMATCH: /'
+    problems=$((problems + 1))
+  fi
 done
 [ -z "$gio_modules" ] && echo "  (none bundled)"
 
@@ -76,16 +85,11 @@ echo "== bundled curl/nghttp2 =="
 curl_libs=$(find "$ROOT" \( -name 'libcurl*.so*' -o -name 'libnghttp2*.so*' \) 2>/dev/null || true)
 for c in $curl_libs; do
   echo "  $c"
-done
-for c in $curl_libs; do
-  case "$c" in
-    *libcurl*)
-      if objdump -T "$c" | grep -q "UND.*nghttp2_option_set_no_rc9113_leading_and_trailing_ws_validation"; then
-        echo "    MISMATCH: libcurl requires nghttp2 >= 1.50 symbol"
-        problems=$((problems + 1))
-      fi
-      ;;
-  esac
+  unresolved=$(check_unresolved "$c")
+  if [ -n "$unresolved" ]; then
+    echo "$unresolved" | sed 's/^/    MISMATCH: /'
+    problems=$((problems + 1))
+  fi
 done
 # nghttp2 bundled alongside a curl that does NOT need it is dead weight but
 # harmless; only report.
@@ -137,7 +141,7 @@ EOF
 fi
 leftover=0
 for m in $(find "$ROOT" -path '*gio/modules/*.so' 2>/dev/null || true); do
-  if objdump -T "$m" | grep -Eq "UND.*(g_task_set_static_name|g_assertion_message_cmpint)"; then
+  if [ -n "$(check_unresolved "$m")" ]; then
     leftover=$((leftover + 1))
   fi
 done

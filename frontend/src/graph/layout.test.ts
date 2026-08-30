@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { layoutGraph } from "./layout"
+import { createLayouter, layoutGraph } from "./layout"
 import { syntheticHistory } from "./synthetic"
 
 test("linear history stays on lane 0", () => {
@@ -35,4 +35,21 @@ test("10k synthetic layout stays under 400ms and within 40 lanes", () => {
   const maxLane = rows.reduce((m, r) => Math.max(m, r.lane), 0)
   expect(maxLane).toBeLessThan(40)
   expect(ms).toBeLessThan(400)
+})
+
+test("append-only layout is identical to a full relayout", () => {
+  const revs = syntheticHistory(2_000)
+  const full = layoutGraph(revs)
+
+  // Uneven chunk sizes on purpose: 1-row batches, page-sized batches, and a
+  // final partial page must all continue the layout without disturbing it.
+  const layouter = createLayouter()
+  const cuts = [0, 1, 3, 250, 251, 1000, 1999, 2000]
+  const incremental = []
+  for (let c = 0; c < cuts.length - 1; c++) {
+    incremental.push(...layouter.append(revs.slice(cuts[c], cuts[c + 1])))
+  }
+
+  expect(layouter.rowCount()).toBe(full.length)
+  expect(incremental).toEqual(full)
 })

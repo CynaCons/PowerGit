@@ -7,6 +7,9 @@ import { expect, test } from "@playwright/test"
 test("file tree expands nested directories and opens files at depth >= 2", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
+  // The newest graph row may be an upstream GE tip without frontend/.
+  // File Tree must be asserted against the checked-out commit.
+  await page.locator('[data-testid="tree-row"][data-label="powergit"]').first().click()
   await page.getByRole("tab", { name: "File Tree" }).click()
   const tree = page.getByTestId("commit-file-tree")
 
@@ -31,6 +34,7 @@ test("file tree expands nested directories and opens files at depth >= 2", async
 test("file rows carry full paths and types", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
+  await page.locator('[data-testid="tree-row"][data-label="powergit"]').first().click()
   await page.getByRole("tab", { name: "File Tree" }).click()
   const tree = page.getByTestId("commit-file-tree")
   const frontend = tree.locator('[data-path="frontend"]')

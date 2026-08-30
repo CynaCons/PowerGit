@@ -9,7 +9,15 @@ const FEATURES = [
   },
   {
     title: "Real staging",
-    body: "FormCommit-style window: unstaged │ staged │ diff │ message. Multi-select with shift/ctrl, right-click stage, delete and gitignore with a live ignore preview.",
+    body: "FormCommit-style window: unstaged │ staged │ diff │ message. Always-visible Stage / Unstage / Stage all / Unstage all, plus S/U keys. Multi-select, right-click, gitignore preview. Overlay size stays put.",
+  },
+  {
+    title: "Keyboard muscle memory",
+    body: "Git Extensions defaults: Ctrl+Space commit, Ctrl+, settings, arrows on the graph, F5 refresh, panel focus Ctrl+0–4. Letter keys never steal from the commit message.",
+  },
+  {
+    title: "Heavy repos stay fluid",
+    body: "Paged history, virtualized ref tree with filter, jump-to-ref loads until the tip is visible, live refresh when .git changes. Find any branch even among thousands.",
   },
   {
     title: "Branch ops with GE guards",
@@ -28,7 +36,7 @@ const FEATURES = [
 const SCREENS = [
   { file: "diff-options.png", caption: "Diff tab — files left, diff right, floating options bar" },
   { file: "file-tree.png", caption: "Full repo tree at any commit — open unchanged files" },
-  { file: "commit-dialog.png", caption: "Commit window: unstaged │ staged │ diff │ message" },
+  { file: "commit-dialog.png", caption: "Commit window: unstaged │ staged │ diff │ message, Stage/Unstage bar" },
   { file: "stash-menu.png", caption: "Stash handling from the topbar mini-menu" },
 ]
 

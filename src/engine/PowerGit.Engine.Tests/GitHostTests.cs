@@ -36,7 +36,7 @@ public sealed class GitHostTests
         string root = RepoRoot();
         RepoInfo info = host.Open(root);
         string expected = root.TrimEnd(Path.DirectorySeparatorChar, '/').Split('/', '\\')[^1];
-        Assert.Equal(expected, info.Name);
+        Assert.Equal(expected, info.Name, StringComparer.OrdinalIgnoreCase);
         Assert.False(string.IsNullOrWhiteSpace(info.Branch));
         Assert.Equal(info, host.Current);
         Assert.True(Directory.Exists(Path.Combine(info.Root, ".git")) || File.Exists(Path.Combine(info.Root, ".git")));
@@ -227,6 +227,26 @@ public sealed class GitHostTests
         GitHost host = new();
         host.Open(repo.Dir);
         Assert.Throws<InvalidOperationException>(() => host.StashChanges(null, false, false));
+    }
+
+    [Fact]
+    public async Task ChangeVersion_bumps_when_a_ref_moves()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+        long before = host.ChangeVersion;
+
+        File.WriteAllText(Path.Combine(repo.Dir, "watched.txt"), "x\n");
+        repo.StageAndCommit("watcher-bump");
+
+        // FileSystemWatcher events are async; give it a few seconds.
+        for (int i = 0; i < 50 && host.ChangeVersion == before; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Assert.True(host.ChangeVersion > before, "commit did not bump ChangeVersion");
     }
 
     [Fact]

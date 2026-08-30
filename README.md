@@ -43,10 +43,9 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.9.0 (Browse product, GE-style
-command bars, job-based fetch/pull/push with progress, large-repo
-responsiveness, release pipeline + Pages showcase). Parked: dark theme,
-worktrees.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.11.0 (Git Extensions
+keyboard shortcuts, commit overlay stage bar, paged history + live refresh
+on heavy repos). Parked: dark theme, worktrees, hotkey remapping UI.
 
 ## Development
 

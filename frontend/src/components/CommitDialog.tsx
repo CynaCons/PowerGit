@@ -9,6 +9,7 @@ import MenuItem from "@mui/material/MenuItem"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useRef, useState } from "react"
+import { shortcutLabel, useHotkeyLayer } from "../hotkeys"
 import {
   addToIgnore,
   deleteFiles,
@@ -122,6 +123,19 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
     }
   }
 
+  async function stageAll(unstage: boolean) {
+    const files = unstage ? status?.staged : status?.unstaged
+    const paths = (files ?? []).map((f) => f.path)
+    if (paths.length === 0) return
+    try {
+      onStatus(await stagePaths(paths, unstage))
+      setSelStaged(new Set())
+      setSelUnstaged(new Set())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "stage failed")
+    }
+  }
+
   async function deleteSelection(staged: boolean) {
     const paths = [...(staged ? selStaged : selUnstaged)]
     if (paths.length === 0) return
@@ -143,15 +157,42 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
 
   const canCommit = Boolean(message.trim()) && (status?.stagedCount ?? 0) > 0
 
+  useHotkeyLayer(
+    "commit",
+    {
+      "diff.stageSelected": () => {
+        const testid = document.activeElement?.closest("[data-hotkey-surface='file-list']")?.getAttribute("data-testid")
+        if (testid === "unstaged-list") void stageSelection(false)
+      },
+      "diff.unstageSelected": () => {
+        const testid = document.activeElement?.closest("[data-hotkey-surface='file-list']")?.getAttribute("data-testid")
+        if (testid === "staged-list") void stageSelection(true)
+      },
+    },
+    open,
+  )
+
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg" data-testid="commit-overlay">
-      <DialogContent sx={{ display: "flex", gap: 2, minHeight: 480, p: 2 }}>
-        <Box sx={{ width: 340, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1, userSelect: "none" }}>
-          <ListHeader
-            label={`Unstaged (${status?.unstagedCount ?? 0})`}
-            actionLabel="Stage selected"
-            onAction={selUnstaged.size > 0 ? () => stageSelection(false) : undefined}
-          />
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth={false}
+      data-testid="commit-overlay"
+      slotProps={{
+        paper: {
+          sx: {
+            width: "min(96vw, 1100px)",
+            height: "min(80vh, 720px)",
+            maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
+          },
+        },
+      }}
+    >
+      <DialogContent sx={{ display: "flex", gap: 2, p: 2, flex: 1, minHeight: 0, overflow: "hidden" }}>
+        <Box sx={{ width: 340, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1, userSelect: "none", minHeight: 0 }}>
+          <ListHeader label={`Unstaged (${status?.unstagedCount ?? 0})`} />
           <FileListBox
             testid="unstaged-list"
             staged={false}
@@ -162,23 +203,63 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
             onToggle={toggle}
             onContext={(f, x, y) => setMenu({ x, y, staged: false, path: f.path })}
           />
-          <ListHeader
-            label={`Staged (${status?.stagedCount ?? 0})`}
-            actionLabel="Unstage selected"
-            onAction={selStaged.size > 0 ? () => stageSelection(true) : undefined}
-          />
+          <Box data-testid="commit-stage-bar" sx={{ display: "flex", justifyContent: "space-between", gap: 0.5, flexShrink: 0 }}>
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              <Button
+                size="small"
+                data-testid="stage-selected"
+                disabled={selUnstaged.size === 0}
+                onClick={() => void stageSelection(false)}
+              >
+                Stage
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
+                  {shortcutLabel("diff.stageSelected")}
+                </Typography>
+              </Button>
+              <Button
+                size="small"
+                data-testid="stage-all"
+                disabled={(status?.unstagedCount ?? 0) === 0}
+                onClick={() => void stageAll(false)}
+              >
+                Stage all
+              </Button>
+            </Box>
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              <Button
+                size="small"
+                data-testid="unstage-selected"
+                disabled={selStaged.size === 0}
+                onClick={() => void stageSelection(true)}
+              >
+                Unstage
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
+                  {shortcutLabel("diff.unstageSelected")}
+                </Typography>
+              </Button>
+              <Button
+                size="small"
+                data-testid="unstage-all"
+                disabled={(status?.stagedCount ?? 0) === 0}
+                onClick={() => void stageAll(true)}
+              >
+                Unstage all
+              </Button>
+            </Box>
+          </Box>
+          <ListHeader label={`Staged (${status?.stagedCount ?? 0})`} />
           <FileListBox
             testid="staged-list"
             staged={true}
             files={status?.staged ?? []}
             selected={selStaged}
-            emptyText="Nothing staged. Double-click an unstaged file to stage it."
+            emptyText="Nothing staged. Double-click an unstaged file or use Stage."
             onClick={(_f, i, e) => clickRow(status?.staged ?? [], true, i, e)}
             onToggle={toggle}
             onContext={(f, x, y) => setMenu({ x, y, staged: true, path: f.path })}
           />
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1, minHeight: 0 }}>
           <Box sx={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box
               data-testid="commit-diff"
@@ -192,17 +273,22 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
             </Box>
             <DiffOptionsBar options={diffOpts} onChange={setDiffOpts} />
           </Box>
-          {error && <Typography color="error">{error}</Typography>}
+          <Typography variant="body2" color="error" sx={{ minHeight: 20, flexShrink: 0 }}>
+            {error ?? "\u00a0"}
+          </Typography>
           <TextField
             data-testid="commit-message"
             fullWidth
             multiline
             minRows={3}
+            maxRows={4}
             placeholder="Commit message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            slotProps={{ htmlInput: { "data-testid": "commit-message-input" } }}
+            sx={{ flexShrink: 0 }}
           />
-          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>
             <Button onClick={onClose}>Cancel</Button>
             <Button
               data-testid="commit-submit"
@@ -234,6 +320,9 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
         >
           <ListItemIcon />
           <ListItemText>{menu?.staged ? "Unstage selected" : "Stage selected"}</ListItemText>
+          <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+            {menu?.staged ? shortcutLabel("diff.unstageSelected") : shortcutLabel("diff.stageSelected")}
+          </Typography>
         </MenuItem>
         <MenuItem
           data-testid="ctx-delete-file"
@@ -262,25 +351,12 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
   )
 }
 
-function ListHeader({
-  label,
-  actionLabel,
-  onAction,
-}: {
-  label: string
-  actionLabel: string
-  onAction?: () => void
-}) {
+function ListHeader({ label }: { label: string }) {
   return (
-    <Box sx={{ display: "flex", alignItems: "center", px: 0.5 }}>
+    <Box sx={{ display: "flex", alignItems: "center", px: 0.5, flexShrink: 0 }}>
       <Typography variant="subtitle2" sx={{ flex: 1 }}>
         {label}
       </Typography>
-      {onAction && (
-        <Button size="small" sx={{ py: 0, fontSize: 11 }} onClick={onAction}>
-          {actionLabel}
-        </Button>
-      )}
     </Box>
   )
 }

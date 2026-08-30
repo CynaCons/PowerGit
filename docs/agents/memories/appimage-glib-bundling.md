@@ -21,6 +21,15 @@ container lacks Rust/tauri prereqs. The regression guard therefore runs as a
 release.yml step (`Inspect AppImage ...`, runs inspect-appimage.sh --fix)
 right after `tauri build` and before upload. Don't try to reproduce locally.
 
+## Two-layer guard since v0.10.0
+inspect-appimage.sh now reports ANY unresolved symbol (`ldd -r` against the
+bundle's own libs), not a hard-coded symbol list. After it, release.yml
+launches the repacked AppImage headless (xvfb) inside a stock ubuntu:22.04
+Docker container — real user package versions, not the runner's updated
+stack — and fails on `undefined symbol|Failed to load module` in stderr.
+Both verify only on the next tagged release; treat the first post-v0.10.0
+tag's linux job as the acceptance run.
+
 ## atk-bridge warning is cosmetic
 The "atk-bridge get_device_revents unknown signature" warning comes from the
 host accessibility bus; harmless. Do not chase it as a bundling bug.

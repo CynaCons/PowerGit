@@ -4,16 +4,17 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight"
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined"
+import SearchIcon from "@mui/icons-material/Search"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
-import List from "@mui/material/List"
-import ListSubheader from "@mui/material/ListSubheader"
+import InputBase from "@mui/material/InputBase"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
-import { useMemo, useState, type ReactNode } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { RefItem, RefTree } from "../engine"
 
 type Props = {
@@ -33,6 +34,8 @@ type TreeNode = {
   children: TreeNode[]
   target?: string
   current?: boolean
+  /** Full ref name of the leaf (e.g. "feature/x", "origin/main"). */
+  full?: string
 }
 
 type CtxMenu =
@@ -46,6 +49,14 @@ type CtxMenu =
 export const TREE_ROW_INDENT = 6
 export const TREE_ROW_LEVEL = 16
 
+const ROW_HEIGHT = 22
+const SECTION_HEIGHT = 28
+
+// Above this many refs a section/group starts collapsed: a monorepo can hold
+// thousands of remote branches, and expanding them all by default buries the
+// local branches. The filter box always searches ALL refs regardless.
+const COLLAPSE_THRESHOLD = 500
+
 function insert(root: TreeNode, segments: string[], item: RefItem) {
   let node = root
   for (let i = 0; i < segments.length; i++) {
@@ -58,6 +69,7 @@ function insert(root: TreeNode, segments: string[], item: RefItem) {
     if (i === segments.length - 1) {
       child.target = item.target
       child.current = item.current
+      child.full = item.name
     }
     node = child
   }
@@ -80,6 +92,22 @@ function sortNodes(nodes: TreeNode[]) {
     if (aDir !== bDir) return aDir ? -1 : 1
     return a.name.localeCompare(b.name)
   })
+  for (const node of nodes) sortNodes(node.children)
+}
+
+type Item = {
+  key: string
+  section?: string
+  depth: number
+  label: string
+  count?: number
+  icon?: "branch" | "remote" | "tag" | "submodule"
+  expandable?: boolean
+  open?: boolean
+  current?: boolean
+  muted?: boolean
+  onClick: () => void
+  onContext?: (x: number, y: number) => void
 }
 
 export function RepoTree({
@@ -94,6 +122,12 @@ export function RepoTree({
   onOpenSubmodule,
 }: Props) {
   const [ctx, setCtx] = useState<CtxMenu | null>(null)
+  const [filter, setFilter] = useState("")
+  // Explicit user toggles override the size-based defaults.
+  const [sectionOverride, setSectionOverride] = useState<ReadonlyMap<string, boolean>>(new Map())
+  const [nodeOverride, setNodeOverride] = useState<ReadonlyMap<string, boolean>>(new Map())
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   const branchRoot = useMemo(() => buildTree(tree?.branches ?? []), [tree])
   const tagRoot = useMemo(() => buildTree(tree?.tags ?? []), [tree])
   const remoteRoots = useMemo(() => {
@@ -106,11 +140,177 @@ export function RepoTree({
     }
     return [...groups.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([remote, items]) => ({ node: { name: remote, children: buildTree(items, 1) }, count: items.length }))
+      .map(([remote, items]) => ({ node: { name: remote, children: buildTree(items, 1) } as TreeNode, count: items.length }))
   }, [tree])
 
-  const branchIcon = <CallSplitIcon sx={{ fontSize: 13 }} />
-  const tagIcon = <SellOutlinedIcon sx={{ fontSize: 12 }} />
+  const remoteTotal = tree?.remotes.length ?? 0
+  const tagTotal = tree?.tags.length ?? 0
+
+  const items = useMemo(() => {
+    const out: Item[] = []
+    const q = filter.trim().toLowerCase()
+
+    const toggleSection = (title: string) =>
+      setSectionOverride((prev) => {
+        const next = new Map(prev)
+        next.set(title, !(prev.get(title) ?? sectionDefault(title)))
+        return next
+      })
+    const sectionDefault = (title: string) => (title === "Tags" ? tagTotal <= COLLAPSE_THRESHOLD : true)
+    const sectionOpen = (title: string) => sectionOverride.get(title) ?? sectionDefault(title)
+    const toggleNode = (path: string, def: boolean) =>
+      setNodeOverride((prev) => {
+        const next = new Map(prev)
+        next.set(path, !(prev.get(path) ?? def))
+        return next
+      })
+    const nodeOpen = (path: string, def: boolean) => nodeOverride.get(path) ?? def
+
+    const pushSection = (title: string, count?: number) =>
+      out.push({
+        key: `sec:${title}`,
+        section: title,
+        depth: 0,
+        label: title,
+        count,
+        expandable: true,
+        open: q ? true : sectionOpen(title),
+        onClick: () => toggleSection(title),
+      })
+
+    const leafCtx = (icon: Item["icon"], full: string): ((x: number, y: number) => void) | undefined => {
+      switch (icon) {
+        case "branch":
+          return (x, y) => setCtx({ kind: "branch", name: full, x, y })
+        case "tag":
+          return (x, y) => setCtx({ kind: "tag", name: full, x, y })
+        case "remote":
+          return (x, y) => setCtx({ kind: "remote", name: full.split("/")[0] ?? full, x, y })
+        default:
+          return undefined
+      }
+    }
+
+    const walk = (nodes: TreeNode[], pathPrefix: string, depth: number, icon: Item["icon"], dirDefaultOpen: boolean, dirCtx?: (x: number, y: number) => void) => {
+      for (const node of nodes) {
+        const path = `${pathPrefix}/${node.name}`
+        const isDir = node.children.length > 0
+        if (isDir) {
+          const open = nodeOpen(path, dirDefaultOpen)
+          out.push({
+            key: path,
+            depth,
+            label: node.name,
+            icon,
+            expandable: true,
+            open,
+            muted: true,
+            onClick: () => toggleNode(path, dirDefaultOpen),
+            onContext: dirCtx,
+          })
+          if (open) walk(node.children, path, depth + 1, icon, false, dirCtx)
+        } else {
+          const full = node.full ?? node.name
+          out.push({
+            key: path,
+            depth,
+            label: node.name,
+            icon,
+            current: node.current,
+            onClick: () => {
+              if (node.target) onSelectTarget?.(node.target)
+            },
+            onContext: node.current ? undefined : (dirCtx && icon === "remote" ? dirCtx : (leafCtx(icon, full) ?? dirCtx)),
+          })
+        }
+      }
+    }
+
+    if (q) {
+      // Filter mode: flat matches over ALL refs with their full names — the
+      // guaranteed way to find any of thousands of branches.
+      const bs = (tree?.branches ?? []).filter((b) => b.name.toLowerCase().includes(q))
+      const rs = (tree?.remotes ?? []).filter((r) => r.name.toLowerCase().includes(q))
+      const ts = (tree?.tags ?? []).filter((t) => t.name.toLowerCase().includes(q))
+      const flat = (list: RefItem[], icon: Item["icon"], prefix: string) => {
+        for (const item of list) {
+          out.push({
+            key: `${prefix}:${item.name}`,
+            depth: 0,
+            label: item.name,
+            icon,
+            current: item.current,
+            onClick: () => onSelectTarget?.(item.target),
+            onContext: item.current ? undefined : leafCtx(icon, item.name),
+          })
+        }
+      }
+      pushSection("Branches", bs.length)
+      flat(bs, "branch", "b")
+      pushSection("Remotes", rs.length)
+      flat(rs, "remote", "r")
+      pushSection("Tags", ts.length)
+      flat(ts, "tag", "t")
+      return out
+    }
+
+    pushSection("Branches")
+    if (sectionOpen("Branches")) walk(branchRoot, "b", 0, "branch", true)
+
+    pushSection("Remotes", remoteTotal > COLLAPSE_THRESHOLD ? remoteTotal : undefined)
+    if (sectionOpen("Remotes")) {
+      for (const { node, count } of remoteRoots) {
+        const path = `r/${node.name}`
+        const def = remoteTotal <= COLLAPSE_THRESHOLD
+        const open = nodeOpen(path, def)
+        const remoteCtx = (x: number, y: number) => setCtx({ kind: "remote", name: node.name, x, y })
+        out.push({
+          key: path,
+          depth: 0,
+          label: node.name,
+          count: open ? undefined : count,
+          icon: "remote",
+          expandable: true,
+          open,
+          muted: true,
+          onClick: () => toggleNode(path, def),
+          onContext: remoteCtx,
+        })
+        if (open) walk(node.children, path, 1, "remote", false, remoteCtx)
+      }
+    }
+
+    pushSection("Tags", tagTotal > COLLAPSE_THRESHOLD ? tagTotal : undefined)
+    if (sectionOpen("Tags")) walk(tagRoot, "t", 0, "tag", false)
+
+    pushSection("Submodules")
+    if (sectionOpen("Submodules")) {
+      for (const s of tree?.submodules ?? []) {
+        out.push({
+          key: `s/${s.path}`,
+          depth: 0,
+          label: s.name,
+          icon: "submodule",
+          onClick: () => onOpenSubmodule?.(s.path),
+          onContext: (x, y) => setCtx({ kind: "submodule", path: s.path, x, y }),
+        })
+      }
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree, filter, sectionOverride, nodeOverride, branchRoot, tagRoot, remoteRoots, remoteTotal, tagTotal])
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (i) => (items[i].section ? SECTION_HEIGHT : ROW_HEIGHT),
+    overscan: 20,
+  })
+  // Expanding/filtering remaps index → item kind; drop stale size measurements.
+  useEffect(() => {
+    virtualizer.measure()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
 
   return (
     <Paper data-testid="left-panel" sx={{ width: 232, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -124,63 +324,35 @@ export function RepoTree({
           </IconButton>
         )}
       </Box>
-      <List dense disablePadding sx={{ overflow: "auto", userSelect: "none" }}>
-        <Section title="Branches">
-          {branchRoot.map((n) => (
-            <NodeRow
-              key={n.name}
-              node={n}
-              depth={0}
-              defaultOpen
-              icon={branchIcon}
-              onSelectTarget={onSelectTarget}
-              onLeafContext={
-                n.children.length === 0 && !n.current
-                  ? (x, y) => setCtx({ kind: "branch", name: n.name, x, y })
-                  : undefined
-              }
-            />
-          ))}
-        </Section>
-        <Section title="Remotes">
-          {remoteRoots.map(({ node }) => (
-            <NodeRow
-              key={node.name}
-              node={{ ...node, target: undefined }}
-              depth={0}
-              defaultOpen
-              icon={<CloudOutlinedIcon sx={{ fontSize: 13 }} />}
-              onSelectTarget={onSelectTarget}
-              onDirContext={(x, y) => setCtx({ kind: "remote", name: node.name, x, y })}
-            />
-          ))}
-        </Section>
-        <Section title="Tags">
-          {tagRoot.map((n) => (
-            <NodeRow
-              key={n.name}
-              node={n}
-              depth={0}
-              defaultOpen={false}
-              icon={tagIcon}
-              onSelectTarget={onSelectTarget}
-              onLeafContext={(x, y) => setCtx({ kind: "tag", name: n.name, x, y })}
-            />
-          ))}
-        </Section>
-        <Section title="Submodules">
-          {(tree?.submodules ?? []).map((s) => (
-            <TreeRow
-              key={s.path}
-              depth={0}
-              label={s.name}
-              icon={<FolderOutlinedIcon sx={{ fontSize: 13 }} />}
-              onClick={() => onOpenSubmodule?.(s.path)}
-              onContextMenu={(x, y) => setCtx({ kind: "submodule", path: s.path, x, y })}
-            />
-          ))}
-        </Section>
-      </List>
+      <Box sx={{ px: 1, py: 0.5, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center", gap: 0.5 }}>
+        <SearchIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+        <InputBase
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter refs…"
+          inputProps={{ "data-testid": "tree-filter", "aria-label": "Filter refs" }}
+          sx={{ flex: 1, fontSize: 12.5, "& input": { p: 0 } }}
+        />
+      </Box>
+      <Box ref={scrollRef} sx={{ flex: 1, overflow: "auto", userSelect: "none" }}>
+        <Box sx={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+          {virtualizer.getVirtualItems().map((vi) => {
+            const item = items[vi.index]
+            const style: React.CSSProperties = {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              transform: `translateY(${vi.start}px)`,
+            }
+            return item.section ? (
+              <SectionHeader key={item.key} item={item} style={style} />
+            ) : (
+              <TreeRow key={item.key} item={item} style={style} />
+            )
+          })}
+        </Box>
+      </Box>
 
       <Menu open={ctx !== null} onClose={() => setCtx(null)} anchorReference="anchorPosition" anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}>
         {itemsFor(ctx).map((item) => (
@@ -191,69 +363,6 @@ export function RepoTree({
       </Menu>
     </Paper>
   )
-
-  function NodeRow({
-    node,
-    depth,
-    defaultOpen,
-    icon,
-    onSelectTarget,
-    onDirContext,
-    onLeafContext,
-  }: {
-    node: TreeNode
-    depth: number
-    defaultOpen: boolean
-    icon: ReactNode
-    onSelectTarget?: (sha: string) => void
-    onDirContext?: (x: number, y: number) => void
-    onLeafContext?: (x: number, y: number) => void
-  }) {
-    const [open, setOpen] = useState(defaultOpen)
-    const isDir = node.children.length > 0
-    if (isDir) {
-      return (
-        <>
-          <TreeRow
-            depth={depth}
-            label={node.name}
-            expandable
-            open={open}
-            icon={icon}
-            muted
-            onClick={() => setOpen((v) => !v)}
-            onContextMenu={onDirContext}
-          />
-          {open &&
-            node.children.map((child) => (
-              <NodeRow
-                key={child.name}
-                node={child}
-                depth={depth + 1}
-                defaultOpen={false}
-                icon={icon}
-                onSelectTarget={onSelectTarget}
-                onDirContext={onDirContext}
-                onLeafContext={onLeafContext}
-              />
-            ))}
-        </>
-      )
-    }
-    return (
-      <TreeRow
-        depth={depth}
-        label={node.name}
-        icon={icon}
-        current={node.current}
-        onClick={() => onSelectTarget?.(node.target!)}
-        onContextMenu={(x, y) => {
-          if (node.current) return
-          ;(onLeafContext ?? onDirContext)?.(x, y)
-        }}
-      />
-    )
-  }
 
   function itemsFor(c: CtxMenu | null): { label: string; testid: string; action: () => void }[] {
     if (!c) return []
@@ -279,100 +388,95 @@ export function RepoTree({
   }
 }
 
-function TreeRow({
-  depth,
-  label,
-  icon,
-  expandable,
-  open,
-  current,
-  muted,
-  onClick,
-  onContextMenu,
-}: {
-  depth: number
-  label: string
-  icon?: ReactNode
-  expandable?: boolean
-  open?: boolean
-  current?: boolean
-  muted?: boolean
-  onClick: () => void
-  onContextMenu?: (x: number, y: number) => void
-}) {
+const ICONS: Record<NonNullable<Item["icon"]>, ReactNode> = {
+  branch: <CallSplitIcon sx={{ fontSize: 13 }} />,
+  remote: <CloudOutlinedIcon sx={{ fontSize: 13 }} />,
+  tag: <SellOutlinedIcon sx={{ fontSize: 12 }} />,
+  submodule: <FolderOutlinedIcon sx={{ fontSize: 13 }} />,
+}
+
+function SectionHeader({ item, style }: { item: Item; style: React.CSSProperties }) {
   return (
     <Box
-      data-testid="tree-row"
-      data-depth={depth}
-      data-label={label}
-      onClick={onClick}
-      onContextMenu={
-        onContextMenu
-          ? (e) => {
-              e.preventDefault()
-              onContextMenu(e.clientX, e.clientY)
-            }
-          : undefined
-      }
+      data-testid={`tree-section-${item.label.toLowerCase()}`}
+      onClick={item.onClick}
+      style={style}
       sx={{
         display: "flex",
         alignItems: "center",
-        pl: `${TREE_ROW_INDENT + depth * TREE_ROW_LEVEL}px`,
+        cursor: "pointer",
+        userSelect: "none",
+        height: `${SECTION_HEIGHT}px`,
+        lineHeight: `${SECTION_HEIGHT}px`,
+        pl: `${TREE_ROW_INDENT}px`,
+        fontSize: 12,
+        fontWeight: 500,
+        color: "text.secondary",
+        bgcolor: "background.paper",
+        "&:hover": { color: "text.primary" },
+      }}
+    >
+      <Box component="span" sx={{ display: "inline-flex", width: 16, justifyContent: "center", mr: 0.5 }}>
+        {item.open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />}
+      </Box>
+      {item.label}
+      {item.count !== undefined && (
+        <Box component="span" sx={{ ml: 0.5, fontWeight: 400 }}>
+          ({item.count})
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+function TreeRow({ item, style }: { item: Item; style: React.CSSProperties }) {
+  return (
+    <Box
+      data-testid="tree-row"
+      data-depth={item.depth}
+      data-label={item.label}
+      onClick={item.onClick}
+      onContextMenu={
+        item.onContext
+          ? (e) => {
+              e.preventDefault()
+              item.onContext!(e.clientX, e.clientY)
+            }
+          : undefined
+      }
+      style={style}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        height: `${ROW_HEIGHT}px`,
+        pl: `${TREE_ROW_INDENT + item.depth * TREE_ROW_LEVEL}px`,
         pr: 1,
-        py: 0.0625,
         cursor: "default",
-        bgcolor: current ? "action.selected" : "transparent",
+        bgcolor: item.current ? "action.selected" : "transparent",
         "&:hover": { bgcolor: "action.hover" },
       }}
     >
       <Box component="span" sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center" }}>
-        {expandable ? (open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />) : null}
+        {item.expandable ? (item.open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />) : null}
       </Box>
       <Box
         component="span"
-        sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center", mr: 0.5, color: current ? "primary.main" : "text.secondary" }}
+        sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center", mr: 0.5, color: item.current ? "primary.main" : "text.secondary" }}
       >
-        {icon ?? null}
+        {item.icon ? ICONS[item.icon] : null}
       </Box>
       <Typography
         variant="body2"
         noWrap
         sx={{
           fontSize: 12.5,
-          fontWeight: current ? 700 : 400,
-          color: current ? "primary.main" : muted ? "text.secondary" : "text.primary",
+          fontWeight: item.current ? 700 : 400,
+          color: item.current ? "primary.main" : item.muted ? "text.secondary" : "text.primary",
         }}
       >
-        {label}
+        {item.label}
+        {item.count !== undefined ? ` (${item.count})` : ""}
       </Typography>
     </Box>
-  )
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true)
-  return (
-    <>
-      <ListSubheader
-        disableSticky
-        data-testid={`tree-section-${title.toLowerCase()}`}
-        onClick={() => setOpen((v) => !v)}
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          cursor: "pointer",
-          userSelect: "none",
-          lineHeight: "28px",
-          pl: `${TREE_ROW_INDENT}px`,
-          "&:hover": { color: "text.primary" },
-        }}
-      >
-        <Box component="span" sx={{ display: "inline-flex", width: 16, justifyContent: "center", mr: 0.5 }}>
-          {open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />}
-        </Box>
-        {title}
-      </ListSubheader>
-      {open && children}
-    </>
   )
 }

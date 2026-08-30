@@ -60,6 +60,15 @@ public sealed partial class GitHost
 
         _current = new RepoInfo(name, root, branch);
         RecentsStore.Remember(_current);
+        try
+        {
+            WatchRepo(root);
+        }
+        catch
+        {
+            // Live refresh is best-effort; the app works without it.
+        }
+
         return _current;
     }
 

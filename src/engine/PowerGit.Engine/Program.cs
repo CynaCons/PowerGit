@@ -76,11 +76,11 @@ app.MapGet("/repos/current", (GitHost git) =>
 
 app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
 
-app.MapGet("/revisions", (GitHost git, int? max) =>
+app.MapGet("/revisions", (GitHost git, int? max, int? skip) =>
 {
     try
     {
-        return Results.Ok(git.ListRevisions(max ?? 800));
+        return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0));
     }
     catch (Exception ex)
     {
@@ -514,6 +514,36 @@ app.MapGet("/jobs/{id}", (string id, GitHost git) =>
     git.GetJob(id) is { } job ? Results.Ok(job) : Results.Json(new ErrorResponse("no such job"), statusCode: StatusCodes.Status404NotFound));
 
 app.MapGet("/jobs", (GitHost git) => Results.Ok(git.ListJobs()));
+
+// Server-sent events: streams the repo's ChangeVersion whenever git metadata
+// (HEAD, refs, packed-refs, index) changes on disk, so the UI live-refreshes
+// on external git activity without polling the data endpoints.
+app.MapGet("/events", async (GitHost git, HttpContext ctx) =>
+{
+    ctx.Response.Headers.ContentType = "text/event-stream";
+    ctx.Response.Headers.CacheControl = "no-cache";
+    try
+    {
+        long last = git.ChangeVersion;
+        await ctx.Response.WriteAsync($"data: {last}\n\n", ctx.RequestAborted);
+        await ctx.Response.Body.FlushAsync(ctx.RequestAborted);
+        while (!ctx.RequestAborted.IsCancellationRequested)
+        {
+            await Task.Delay(500, ctx.RequestAborted);
+            long version = git.ChangeVersion;
+            if (version != last)
+            {
+                last = version;
+                await ctx.Response.WriteAsync($"data: {version}\n\n", ctx.RequestAborted);
+                await ctx.Response.Body.FlushAsync(ctx.RequestAborted);
+            }
+        }
+    }
+    catch (OperationCanceledException)
+    {
+        // Client disconnected; EventSource reconnects on its own.
+    }
+});
 
 app.Run();
 

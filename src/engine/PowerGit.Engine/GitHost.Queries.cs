@@ -5,35 +5,38 @@ public sealed partial class GitHost
     private const char Field = '\u001f';
     private const char Record = '\u001e';
 
-    public IReadOnlyList<RevisionDto> ListRevisions(int max = 800)
+    public IReadOnlyList<RevisionDto> ListRevisions(int max = 800, int skip = 0)
     {
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
         bool hasStash = Run(root, "rev-parse", "--verify", "-q", "refs/stash").ExitCode == 0;
 
-        // Every local AND remote-tracking branch tip plus tags are passed as
-        // explicit revisions: the -n cap can then never hide a branch tip, and
-        // remote branches show by default (owner decision 2026-08-24, GE parity;
-        // overrides the v0.4.0 stale-remotes exclusion).
-        CommandResult tipRefs = Run(root, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags");
-        List<string> tips = [.. tipRefs.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()];
-        if (hasStash)
-        {
-            tips.Add("refs/stash");
-        }
-
-        if (tips.Count == 0)
-        {
-            tips.Add("HEAD");
-        }
-
+        // Ref GLOBS, never explicit tips: a repo can hold thousands of refs,
+        // and expanding them into argv blows the 32K Windows command-line
+        // limit (killed /revisions outright on heavy repos). --branches
+        // --remotes --tags select the same commits (all local + remote branch
+        // tips and tags — owner decision 2026-08-24, GE parity); HEAD covers
+        // the detached case and refs/stash has no glob, so both stay as
+        // single argv entries. skip/max page the topo-ordered stream so the
+        // UI can load history incrementally.
         List<string> logArgs = [
             "-c", "core.quotepath=false",
             "log", "--topo-order", "--decorate=short",
+            "--branches", "--remotes", "--tags",
             $"-n{Math.Clamp(max, 1, 5000)}",
-            $"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}",
         ];
-        logArgs.AddRange(tips);
+        if (skip > 0)
+        {
+            logArgs.Add($"--skip={Math.Clamp(skip, 0, 1_000_000)}");
+        }
+
+        logArgs.Add($"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
+        logArgs.Add("HEAD");
+        if (hasStash)
+        {
+            logArgs.Add("refs/stash");
+        }
+
         CommandResult log = RunTimed(root, 120_000, [.. logArgs]);
 
         if (log.ExitCode != 0)
@@ -306,7 +309,7 @@ public sealed partial class GitHost
         CommandResult show = Run(
             root,
             "for-each-ref",
-            "--format=%(objectname)%09%(refname)%09%(refname:short)",
+            "--format=%(objectname)%09%(*objectname)%09%(refname)%09%(refname:short)",
             "refs/heads", "refs/remotes", "refs/tags");
         if (show.ExitCode != 0)
         {
@@ -319,17 +322,21 @@ public sealed partial class GitHost
         foreach (string line in show.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             string[] p = line.Split('\t');
-            if (p.Length < 3)
+            if (p.Length < 4)
             {
                 continue;
             }
 
-            RefItemDto item = new(p[2], p[1], p[0], Current: p[2] == current);
-            if (p[1].StartsWith("refs/heads/", StringComparison.Ordinal))
+            // Annotated tags peel (%(*objectname)) to the commit they tag;
+            // the UI jumps to Target in the revision graph, so it must be a
+            // commit id, never the tag object id.
+            string target = string.IsNullOrWhiteSpace(p[1]) ? p[0] : p[1];
+            RefItemDto item = new(p[3], p[2], target, Current: p[3] == current);
+            if (p[2].StartsWith("refs/heads/", StringComparison.Ordinal))
             {
                 branches.Add(item);
             }
-            else if (p[1].StartsWith("refs/remotes/", StringComparison.Ordinal))
+            else if (p[2].StartsWith("refs/remotes/", StringComparison.Ordinal))
             {
                 remotes.Add(item);
             }

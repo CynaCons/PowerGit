@@ -31,6 +31,7 @@ import { StashDialog } from "./components/StashDialog"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import {
+  ENGINE_URL,
   checkoutRef,
   createBranch,
   createCommit,
@@ -52,6 +53,7 @@ import {
   startPull,
   startPush,
   waitJob,
+  type JobStarted,
   type StashInfo,
   rebaseOnto,
   resetBranch,
@@ -61,6 +63,7 @@ import {
   type RepoStatus,
   type RevisionDto,
 } from "./engine"
+import { shortcutLabel, useHotkeyLayer, type CommandId } from "./hotkeys"
 import { layoutGraph } from "./graph/layout"
 import { syntheticHistory } from "./graph/synthetic"
 import type { GraphRow } from "./graph/types"
@@ -77,12 +80,24 @@ function toRevision(dto: RevisionDto): Revision {
   }
 }
 
+// History pages in from the engine: the first page renders fast, autofill
+// keeps loading in the background up to EAGER_CEILING, and scrolling or
+// jumping to a ref keeps loading up to HARD_CEILING.
+const PAGE = 1000
+const EAGER_CEILING = 10_000
+const HARD_CEILING = 100_000
+
+type RefreshScope = { revisions?: boolean; refs?: boolean; status?: boolean; stashes?: boolean }
+
 export default function App() {
   // Synthetic rows are ONLY for the offline/demo case (engine unreachable).
   // While booting or loading a live repo the grid is empty — never fake data.
   const [offline, setOffline] = useState(false)
   const [revisions, setRevisions] = useState<Revision[]>([])
-  const [selected, setSelected] = useState(0)
+  const [historyComplete, setHistoryComplete] = useState(false)
+  const [loadingTail, setLoadingTail] = useState(false)
+  const [historyNote, setHistoryNote] = useState<string | null>(null)
+  const [selectedSha, setSelectedSha] = useState<string | null>(null)
   const [commitOpen, setCommitOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [recentsOpen, setRecentsOpen] = useState(false)
@@ -107,8 +122,17 @@ export default function App() {
   const [amend, setAmend] = useState(false)
   const [initialMsg, setInitialMsg] = useState<string | undefined>(undefined)
   const [createRef, setCreateRef] = useState<{ kind: "branch" | "tag"; sha: string; subject?: string } | null>(null)
+  const [bottomTab, setBottomTab] = useState(0)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const dragState = useRef<{ startY: number; startH: number } | null>(null)
+
+  // History bookkeeping lives in refs so async loaders never read stale
+  // state. All revision mutations flow through reloadHistory/extendHistory.
+  const revisionsRef = useRef<Revision[]>([])
+  const historyCompleteRef = useRef(false)
+  const histGen = useRef(0)
+  const revCount = useRef(0)
+  const extendRun = useRef<Promise<void> | null>(null)
 
   const onDividerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragState.current = { startY: e.clientY, startH: bottomHeight }
@@ -124,18 +148,25 @@ export default function App() {
     dragState.current = null
   }
 
-  // Lane layout runs in a Web Worker; rows update when the latest request
-  // finishes. The grid keeps showing the previous layout until then.
+  // Lane layout runs in a Web Worker. History pages append to the worker's
+  // existing layout; a refresh resets it. Replies older than the last reset
+  // are dropped so a slow relayout can never clobber newer state.
   const [liveGraphRows, setLiveGraphRows] = useState<GraphRow[]>([])
   const layoutWorker = useRef<Worker | null>(null)
   const layoutSeq = useRef(0)
+  const resetSeq = useRef(0)
+  const lastSent = useRef<Revision[]>([])
 
   useEffect(() => {
     const worker = new Worker(new URL("./graph/layout.worker.ts", import.meta.url), { type: "module" })
-    worker.onmessage = (e: MessageEvent<{ seq: number; rows: GraphRow[] }>) => {
-      if (e.data.seq === layoutSeq.current) setLiveGraphRows(e.data.rows)
+    worker.onmessage = (e: MessageEvent<{ seq: number; reset: boolean; from: number; rows: GraphRow[] }>) => {
+      const { seq, reset, from, rows } = e.data
+      if (seq < resetSeq.current) return
+      setLiveGraphRows((prev) => (reset ? rows : [...prev.slice(0, from), ...rows]))
     }
     layoutWorker.current = worker
+    // A fresh worker has no layout state; force the next post to be a reset.
+    lastSent.current = []
     return () => {
       worker.terminate()
       layoutWorker.current = null
@@ -146,8 +177,20 @@ export default function App() {
     if (offline) return
     const worker = layoutWorker.current
     if (!worker) return
+    const prev = lastSent.current
+    const isAppend =
+      prev.length > 0 &&
+      revisions.length > prev.length &&
+      revisions[0] === prev[0] &&
+      revisions[prev.length - 1] === prev[prev.length - 1]
     const seq = ++layoutSeq.current
-    worker.postMessage({ seq, revisions })
+    if (isAppend) {
+      worker.postMessage({ seq, reset: false, revisions: revisions.slice(prev.length) })
+    } else {
+      resetSeq.current = seq
+      worker.postMessage({ seq, reset: true, revisions })
+    }
+    lastSent.current = revisions
   }, [offline, revisions])
 
   const syntheticRows = useMemo(
@@ -155,25 +198,125 @@ export default function App() {
     [],
   )
   const rows = offline ? syntheticRows : liveGraphRows
-  const current = rows[selected]
+
+  // Selection is keyed by SHA so it survives refreshes and history appends;
+  // the index is derived for the grid.
+  const selected = useMemo(() => {
+    if (rows.length === 0) return -1
+    if (!selectedSha) return 0
+    const i = rows.findIndex((r) => r.rev.id === selectedSha)
+    return i >= 0 ? i : 0
+  }, [rows, selectedSha])
+  const current = selected >= 0 ? rows[selected] : undefined
   const dirty = (status?.unstagedCount ?? 0) + (status?.stagedCount ?? 0)
 
-  // Stale-while-revalidate, per-panel: every piece of repo data updates the
-  // moment its own request lands. Nothing here blocks another panel, and a
-  // slow revisions call never delays refs or status.
-  const refreshRepo = useCallback(async () => {
-    await Promise.allSettled([
-      fetchRevisions(800)
-        .then((rev) => {
-          setRevisions(rev.map(toRevision))
-          setLive(true)
-        })
-        .catch(() => undefined),
-      fetchRefs().then(setRefs).catch(() => undefined),
-      fetchStatus().then(setStatus).catch(() => undefined),
-      fetchStashes().then(setStashes).catch(() => setStashes([])),
-    ])
+  // Loads further history pages up to targetCount. Single-flight: concurrent
+  // callers (scroll, ref jump, autofill) share the in-flight run.
+  const extendHistory = useCallback((targetCount: number): Promise<void> => {
+    if (extendRun.current) return extendRun.current
+    if (historyCompleteRef.current) return Promise.resolve()
+    const gen = histGen.current
+    const cap = Math.min(targetCount, HARD_CEILING)
+    setLoadingTail(true)
+    const run = (async () => {
+      try {
+        while (revCount.current < cap && histGen.current === gen && !historyCompleteRef.current) {
+          const page = await fetchRevisions(PAGE, revCount.current)
+          if (histGen.current !== gen) return
+          if (page.length > 0) {
+            revCount.current += page.length
+            revisionsRef.current = [...revisionsRef.current, ...page.map(toRevision)]
+            setRevisions(revisionsRef.current)
+          }
+          if (page.length < PAGE) {
+            historyCompleteRef.current = true
+            setHistoryComplete(true)
+            return
+          }
+        }
+      } catch {
+        // Tail loading is best-effort; the next scroll or refresh retries.
+      } finally {
+        extendRun.current = null
+        setLoadingTail(false)
+      }
+    })()
+    extendRun.current = run
+    return run
   }, [])
+
+  // Refreshes history without shrinking what the user has loaded: refetch
+  // page 0 and splice it onto the already-loaded tail where they overlap
+  // (the common case after a commit). Anything odd falls back to a fresh
+  // first page and lazy reloading.
+  const reloadHistory = useCallback(async () => {
+    const gen = ++histGen.current
+    const page = await fetchRevisions(PAGE, 0)
+    if (histGen.current !== gen) return
+    const fresh = page.map(toRevision)
+    let next = fresh
+    let complete = page.length < PAGE
+    if (!complete) {
+      const old = revisionsRef.current
+      const lastId = fresh[fresh.length - 1]?.id
+      const k = lastId ? old.findIndex((r) => r.id === lastId) : -1
+      if (k >= 0) {
+        const seen = new Set(fresh.map((r) => r.id))
+        next = [...fresh, ...old.slice(k + 1).filter((r) => !seen.has(r.id))]
+        complete = historyCompleteRef.current
+      }
+    }
+    revCount.current = next.length
+    revisionsRef.current = next
+    historyCompleteRef.current = complete
+    setHistoryComplete(complete)
+    setRevisions(next)
+    setLive(true)
+    if (!complete && next.length < EAGER_CEILING) void extendHistory(EAGER_CEILING)
+  }, [extendHistory])
+
+  // Per-panel refresh: callers name what an action could have changed so a
+  // stage/commit never re-runs the full 4-call sweep. Every piece updates
+  // the moment its own request lands (stale-while-revalidate).
+  const lastRefreshAt = useRef(0)
+  const refresh = useCallback(
+    async (scope?: RefreshScope) => {
+      lastRefreshAt.current = Date.now()
+      const s = scope ?? { revisions: true, refs: true, status: true, stashes: true }
+      const jobs: Promise<unknown>[] = []
+      if (s.revisions) jobs.push(reloadHistory().catch(() => undefined))
+      if (s.refs) jobs.push(fetchRefs().then(setRefs).catch(() => undefined))
+      if (s.status) jobs.push(fetchStatus().then(setStatus).catch(() => undefined))
+      if (s.stashes) jobs.push(fetchStashes().then(setStashes).catch(() => setStashes([])))
+      await Promise.all(jobs)
+      lastRefreshAt.current = Date.now()
+    },
+    [reloadHistory],
+  )
+
+  // Live refresh: the engine streams a change version whenever .git metadata
+  // moves (HEAD, refs, index) — external git activity shows up on its own.
+  // Debounced so an event burst (e.g. a rebase) refreshes once, and muted
+  // right after our own refreshes so in-app actions don't refresh twice.
+  useEffect(() => {
+    if (offline || !live) return
+    const source = new EventSource(`${ENGINE_URL}/events`)
+    let timer: number | undefined
+    let last: string | null = null
+    source.onmessage = (e) => {
+      if (last === e.data) return
+      const isFirst = last === null
+      last = e.data
+      if (isFirst) return // initial snapshot, nothing changed
+      if (Date.now() - lastRefreshAt.current < 2000) return // our own action
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => void refresh(), 400)
+    }
+    return () => {
+      window.clearTimeout(timer)
+      source.close()
+    }
+  }, [offline, live, refresh])
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -185,14 +328,14 @@ export default function App() {
         const currentRepo = await fetchCurrent()
         if (currentRepo) setRepo(currentRepo)
         try {
-          await refreshRepo()
+          await refresh()
           setRecents(await fetchRecents())
         } catch {
           // One transient failure at boot (cold engine/git) shouldn't leave
           // the app dataless — retry once before giving up.
           await new Promise((r) => setTimeout(r, 1500))
           try {
-            await refreshRepo()
+            await refresh()
             setRecents(await fetchRecents())
           } catch {
             setLive(false)
@@ -207,7 +350,7 @@ export default function App() {
         setOffline(true)
       })
     return () => ctrl.abort()
-  }, [refreshRepo])
+  }, [refresh])
 
   async function onOpenFolder(path?: string) {
     let target = path
@@ -227,17 +370,44 @@ export default function App() {
       const info = await openRepo(target)
       setRepo(info)
       setEngineError(null)
-      await refreshRepo()
+      // A different repo: drop the loaded history instead of splicing.
+      histGen.current += 1
+      revCount.current = 0
+      revisionsRef.current = []
+      historyCompleteRef.current = false
+      setHistoryComplete(false)
+      setSelectedSha(null)
+      await refresh()
       setRecents(await fetchRecents())
     } catch (err) {
       setEngineError(err instanceof Error ? err.message : "open failed")
     }
   }
 
-  function onSelectTarget(sha: string) {
-    const idx = rows.findIndex((r) => r.rev.id.startsWith(sha) || sha.startsWith(r.rev.id))
-    if (idx >= 0) setSelected(idx)
-  }
+  // Owner requirement: with thousands of branches most tips are NOT in the
+  // loaded history — jumping to a ref keeps loading pages until its commit
+  // appears (or the ceiling is hit) instead of silently doing nothing.
+  const jumpToRef = useCallback(
+    async (sha: string) => {
+      const find = () => revisionsRef.current.find((r) => r.id.startsWith(sha) || sha.startsWith(r.id))
+      let hit = find()
+      const gen = histGen.current
+      while (!hit && !historyCompleteRef.current && revCount.current < HARD_CEILING && histGen.current === gen) {
+        const before = revCount.current
+        setHistoryNote(`Loading history… ${before.toLocaleString()} commits`)
+        await extendHistory(before + 5 * PAGE)
+        hit = find()
+        if (revCount.current === before) break // fetch failed; don't spin
+      }
+      setHistoryNote(null)
+      if (hit) {
+        setSelectedSha(hit.id)
+      } else {
+        setEngineError(`Commit ${sha.slice(0, 10)} is not within the first ${revCount.current.toLocaleString()} commits`)
+      }
+    },
+    [extendHistory],
+  )
 
   async function onCommit(msg: string) {
     if (!msg.trim() || (!status?.stagedCount && !amend)) return
@@ -245,7 +415,7 @@ export default function App() {
     setCommitOpen(false)
     setAmend(false)
     setInitialMsg(undefined)
-    await refreshRepo()
+    await refresh({ revisions: true, refs: true, status: true })
   }
 
   async function openAmend() {
@@ -266,6 +436,7 @@ export default function App() {
         ? await createBranch(name, createRef.sha)
         : await createTag(name, createRef.sha)
     setRefs(tree)
+    await refresh({ revisions: true })
   }
 
   const branchNames = useMemo(() => (refs?.branches ?? []).map((b) => b.name), [refs])
@@ -275,15 +446,14 @@ export default function App() {
   )
   const defaultRemote = remoteNames[0] ?? "origin"
 
-  async function runJob(label: string, start: () => Promise<{ id: string; kind: string }>) {
+  // Shows the topbar progress indicator around any mutating engine call —
+  // sync ops (checkout, reset, rebase, stash) give the same feedback as jobs.
+  async function withBusy(label: string, fn: () => Promise<void>) {
     if (busy) return
     setBusy(true)
     setJobLabel(label)
     try {
-      const { id } = await start()
-      const job = await waitJob(id)
-      if (job.status === "failed") throw new Error(job.error ?? `${label} failed`)
-      await refreshRepo()
+      await fn()
       setEngineError(null)
     } catch (e) {
       setEngineError(e instanceof Error ? e.message : `${label} failed`)
@@ -293,25 +463,49 @@ export default function App() {
     }
   }
 
+  // The engine runs one network job at a time (single-flight guard), so a
+  // multi-remote fetch must run sequentially, never Promise.all.
+  async function runJobSequence(label: string, starts: Array<() => Promise<JobStarted>>) {
+    await withBusy(label, async () => {
+      for (const start of starts) {
+        const { id } = await start()
+        const job = await waitJob(id)
+        if (job.status === "failed") throw new Error(job.error ?? `${label} failed`)
+      }
+      await refresh()
+    })
+  }
+
+  async function runJob(label: string, start: () => Promise<JobStarted>) {
+    await runJobSequence(label, [start])
+  }
+
   async function doCheckout(branch: string, force: boolean) {
-    setStatus(await checkoutRef(branch, force))
-    await refreshRepo()
+    await withBusy("Checking out", async () => {
+      setStatus(await checkoutRef(branch, force))
+      await refresh({ revisions: true, refs: true, status: true })
+    })
   }
   async function doReset(mode: "soft" | "mixed" | "hard") {
     if (!resetRow) return
-    setStatus(await resetBranch(resetRow.rev.id, mode))
-    await refreshRepo()
+    await withBusy("Resetting", async () => {
+      setStatus(await resetBranch(resetRow.rev.id, mode))
+      await refresh({ revisions: true, refs: true, status: true })
+    })
   }
   async function doRebase() {
     if (!rebaseRow) return
-    setStatus(await rebaseOnto(rebaseRow.rev.id))
-    await refreshRepo()
+    await withBusy("Rebasing", async () => {
+      setStatus(await rebaseOnto(rebaseRow.rev.id))
+      await refresh({ revisions: true, refs: true, status: true })
+    })
   }
 
   async function doDeleteBranch(name: string) {
     if (!window.confirm(`Delete branch '${name}'?`)) return
     try {
       setRefs(await deleteBranch(name))
+      await refresh({ revisions: true })
     } catch (e) {
       setEngineError(e instanceof Error ? e.message : "delete failed")
     }
@@ -320,6 +514,7 @@ export default function App() {
     if (!window.confirm(`Delete tag '${name}'?`)) return
     try {
       setRefs(await deleteTag(name))
+      await refresh({ revisions: true })
     } catch (e) {
       setEngineError(e instanceof Error ? e.message : "delete failed")
     }
@@ -333,11 +528,103 @@ export default function App() {
     onOpenFolder(`${repo.root}${sep}${path}`)
   }
 
+  const onNearEnd = useCallback(() => {
+    if (offline || !live || historyComplete) return
+    void extendHistory(revCount.current + PAGE)
+  }, [offline, live, historyComplete, extendHistory])
+
+  const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
+
+  const blockingDialog =
+    settingsOpen ||
+    recentsOpen ||
+    stashOpen ||
+    createRef !== null ||
+    checkoutBranch !== null ||
+    resetRow !== null ||
+    rebaseRow !== null ||
+    remoteConfigFor !== null
+
+  useHotkeyLayer(
+    "browse",
+    {
+      "browse.commit": () => {
+        setAmend(false)
+        setInitialMsg(undefined)
+        setCommitOpen(true)
+      },
+      "browse.openRepo": () => void onOpenFolder(),
+      "browse.openSettings": () => setSettingsOpen(true),
+      "browse.createBranch": () => {
+        if (!current) return
+        setCreateRef({ kind: "branch", sha: current.rev.id, subject: current.rev.message })
+      },
+      "browse.createTag": () => {
+        if (!current) return
+        setCreateRef({ kind: "tag", sha: current.rev.id, subject: current.rev.message })
+      },
+      "browse.checkoutBranch": () => {
+        const name = repo?.branch ?? branchNames[0]
+        if (name) setCheckoutBranch(name)
+      },
+      "browse.rebase": () => {
+        if (current) setRebaseRow(current)
+      },
+      "browse.pull": () => {
+        if (live && !busy) void runJob("Pulling", () => startPull(false))
+      },
+      "browse.push": () => {
+        if (live && !busy) void runJob("Pushing", () => startPush(false))
+      },
+      "browse.quickFetch": () => {
+        if (live && !busy) void runJob("Fetching", () => startFetch(defaultRemote))
+      },
+      "browse.quickPull": () => {
+        if (live && !busy) void runJob("Pulling", () => startPull(false))
+      },
+      "browse.quickPush": () => {
+        if (live && !busy) void runJob("Pushing", () => startPush(false))
+      },
+      "browse.quickPullOrFetch": () => {
+        if (live && !busy) void runJob("Pulling", () => startPull(false))
+      },
+      "browse.stash": () => {
+        if (live) setStashOpen(true)
+      },
+      "browse.stashPop": () => {
+        if (!live || stashes.length === 0) return
+        void withBusy("Popping stash", async () => {
+          setStatus(await applyStash("stash@{0}", true))
+          await refresh({ revisions: true, status: true, stashes: true })
+        })
+      },
+      "browse.toggleLeftPanel": () => setLeftOpen((o) => !o),
+      "browse.focusLeftPanel": () => {
+        if (!leftOpen) setLeftOpen(true)
+        requestAnimationFrame(() => {
+          ;(document.querySelector('[data-testid="tree-filter"]') as HTMLElement | null)?.focus()
+        })
+      },
+      "browse.focusRevisionGrid": () => {
+        ;(document.querySelector('[data-testid="grid-body"]') as HTMLElement | null)?.focus()
+      },
+      "browse.focusCommitInfo": () => setBottomTab(0),
+      "browse.focusDiff": () => setBottomTab(1),
+      "browse.focusFileTree": () => setBottomTab(2),
+      "browse.focusNextTab": () => setBottomTab((t) => (t + 1) % 3),
+      "browse.focusPrevTab": () => setBottomTab((t) => (t + 2) % 3),
+      "browse.refresh": () => {
+        if (live) void refresh()
+      },
+    } satisfies Partial<Record<CommandId, () => void>>,
+    !commitOpen && !blockingDialog,
+  )
+
   return (
     <Box data-testid="browse-shell" sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
       <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
         <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 0.75, minHeight: 44, px: 1.5, position: "relative" }}>
-          {jobLabel !== null && (
+          {progressLabel !== null && (
             <Box
               data-testid="topbar-progress"
               sx={{
@@ -353,7 +640,7 @@ export default function App() {
             >
               <CircularProgress size={16} thickness={4} />
               <Typography variant="caption" color="text.secondary">
-                {jobLabel}…
+                {progressLabel}
               </Typography>
             </Box>
           )}
@@ -370,6 +657,7 @@ export default function App() {
               label="Commit"
               testid="commit-button"
               variant="contained"
+              shortcut={shortcutLabel("browse.commit")}
               onMainClick={() => {
                 setAmend(false)
                 setInitialMsg(undefined)
@@ -386,6 +674,7 @@ export default function App() {
             icon={<Inventory2OutlinedIcon fontSize="small" />}
             testid="stash-button"
             disabled={!live}
+            shortcut={shortcutLabel("browse.stash")}
             onMainClick={() => setStashOpen(true)}
           >
             <MenuItem data-testid="stash-manage" onClick={() => setStashOpen(true)}>
@@ -394,42 +683,36 @@ export default function App() {
             <MenuItem
               data-testid="stash-apply-latest"
               disabled={stashes.length === 0}
-              onClick={async () => {
-                try {
+              onClick={() =>
+                withBusy("Applying stash", async () => {
                   setStatus(await applyStash("stash@{0}"))
-                  await refreshRepo()
-                } catch (err) {
-                  setEngineError(err instanceof Error ? err.message : "apply failed")
-                }
-              }}
+                  await refresh({ revisions: true, status: true, stashes: true })
+                })
+              }
             >
               Apply stash@{"{0}"}
             </MenuItem>
             <MenuItem
               data-testid="stash-pop-latest"
               disabled={stashes.length === 0}
-              onClick={async () => {
-                try {
+              onClick={() =>
+                withBusy("Popping stash", async () => {
                   setStatus(await applyStash("stash@{0}", true))
-                  await refreshRepo()
-                } catch (err) {
-                  setEngineError(err instanceof Error ? err.message : "pop failed")
-                }
-              }}
+                  await refresh({ revisions: true, status: true, stashes: true })
+                })
+              }
             >
-              Pop stash@{"{0}"}
+              Pop stash@{"{0}"} ({shortcutLabel("browse.stashPop")})
             </MenuItem>
             <MenuItem
               data-testid="stash-drop-latest"
               disabled={stashes.length === 0}
-              onClick={async () => {
+              onClick={() => {
                 if (!window.confirm("Drop stash@{0}? This cannot be undone.")) return
-                try {
+                void withBusy("Dropping stash", async () => {
                   await dropStash("stash@{0}")
-                  await refreshRepo()
-                } catch (err) {
-                  setEngineError(err instanceof Error ? err.message : "drop failed")
-                }
+                  await refresh({ revisions: true, status: true, stashes: true })
+                })
               }}
             >
               Drop stash@{"{0}"}
@@ -440,6 +723,7 @@ export default function App() {
             icon={<CloudDownloadOutlinedIcon fontSize="small" />}
             testid="fetch-button"
             disabled={!live || busy}
+            shortcut={shortcutLabel("browse.quickFetch")}
             onMainClick={() => runJob("Fetching", () => startFetch(defaultRemote))}
           >
             {remoteNames.map((r) => (
@@ -448,7 +732,15 @@ export default function App() {
               </MenuItem>
             ))}
             {remoteNames.length > 1 && (
-              <MenuItem data-testid="fetch-all" onClick={() => runJob("Fetching all remotes", () => Promise.all(remoteNames.map((r) => startFetch(r))).then(([first]) => first))}>
+              <MenuItem
+                data-testid="fetch-all"
+                onClick={() =>
+                  runJobSequence(
+                    "Fetching all remotes",
+                    remoteNames.map((r) => () => startFetch(r)),
+                  )
+                }
+              >
                 Fetch all remotes
               </MenuItem>
             )}
@@ -458,6 +750,7 @@ export default function App() {
             icon={<CallReceivedOutlinedIcon fontSize="small" />}
             testid="pull-button"
             disabled={!live || busy}
+            shortcut={shortcutLabel("browse.pull")}
             onMainClick={() => runJob("Pulling", () => startPull(false))}
           >
             <MenuItem data-testid="pull-rebase" onClick={() => runJob("Pulling (rebase)", () => startPull(true))}>
@@ -469,6 +762,7 @@ export default function App() {
             icon={<CloudUploadOutlinedIcon fontSize="small" />}
             testid="push-button"
             disabled={!live || busy}
+            shortcut={shortcutLabel("browse.push")}
             onMainClick={() => runJob("Pushing", () => startPush(false))}
           >
             <MenuItem data-testid="push-force-lease" onClick={() => runJob("Pushing (force with lease)", () => startPush(true))}>
@@ -518,7 +812,7 @@ export default function App() {
             <AccountTreeOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Open repository…" placement="right">
+        <Tooltip title={`Open repository… (${shortcutLabel("browse.openRepo")})`} placement="right">
           <IconButton data-testid="open-repo-button" onClick={() => onOpenFolder()} sx={{ borderRadius: 2 }} aria-label="Open repository">
             <CreateNewFolderOutlinedIcon fontSize="small" />
           </IconButton>
@@ -529,7 +823,7 @@ export default function App() {
           </IconButton>
         </Tooltip>
         <Box sx={{ flex: 1 }} />
-        <Tooltip title="Settings" placement="right">
+        <Tooltip title={`Settings (${shortcutLabel("browse.openSettings")})`} placement="right">
           <IconButton onClick={() => setSettingsOpen(true)} sx={{ borderRadius: 2 }} data-testid="settings-button" aria-label="Settings">
             <SettingsOutlinedIcon fontSize="small" />
           </IconButton>
@@ -541,9 +835,9 @@ export default function App() {
           {leftOpen ? (
             <RepoTree
               tree={refs}
-              onSelectTarget={onSelectTarget}
+              onSelectTarget={(sha) => void jumpToRef(sha)}
               onCollapse={() => setLeftOpen(false)}
-              onCheckoutRef={(name) => doCheckout(name, false).catch((e: unknown) => setEngineError(e instanceof Error ? e.message : "checkout failed"))}
+              onCheckoutRef={(name) => void doCheckout(name, false)}
               onDeleteBranch={doDeleteBranch}
               onDeleteTag={doDeleteTag}
               onFetchRemote={doFetchRemote}
@@ -583,8 +877,10 @@ export default function App() {
                 <RevisionGrid
                   rows={rows}
                   selected={selected}
-                  onSelect={setSelected}
-                  selectedAuthor={rows[selected]?.rev.author}
+                  onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
+                  selectedAuthor={current?.rev.author}
+                  loadingTail={loadingTail}
+                  onNearEnd={onNearEnd}
                   onRowContextMenu={(e, index) => {
                     e.preventDefault()
                     setCtxTarget({ x: e.clientX, y: e.clientY, row: rows[index] })
@@ -605,7 +901,7 @@ export default function App() {
                 "&:hover": { bgcolor: "primary.main" },
               }}
             />
-            <BottomPanel current={current} height={bottomHeight} />
+            <BottomPanel current={current} height={bottomHeight} tab={bottomTab} onTab={setBottomTab} />
           </Box>
         </Box>
       </Box>
@@ -694,7 +990,7 @@ export default function App() {
         dirtyCount={dirty}
         onClose={() => {
           setStashOpen(false)
-          refreshRepo()
+          void refresh({ revisions: true, status: true, stashes: true })
         }}
         onStatus={setStatus}
       />
@@ -710,6 +1006,7 @@ function SplitButton({
   testid,
   variant = "text",
   disabled,
+  shortcut,
   onMainClick,
   children,
 }: {
@@ -718,6 +1015,7 @@ function SplitButton({
   testid: string
   variant?: "text" | "contained"
   disabled?: boolean
+  shortcut?: string
   onMainClick: () => void
   children?: ReactNode
 }) {
@@ -735,6 +1033,7 @@ function SplitButton({
           variant={variant}
           data-testid={testid}
           startIcon={icon}
+          title={shortcut ? `${label} (${shortcut})` : undefined}
           onClick={onMainClick}
           sx={{ ...shared.sx, borderTopRightRadius: 0, borderBottomRightRadius: 0, pr: 1 }}
         >

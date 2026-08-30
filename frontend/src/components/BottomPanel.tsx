@@ -14,12 +14,16 @@ import type { GraphRow } from "../graph/types"
 type Props = {
   current: GraphRow | undefined
   height: number
+  tab?: number
+  onTab?: (tab: number) => void
 }
 
 const DEFAULT_DIFF_OPTIONS: DiffOptions = { context: 3, ws: false, full: false }
 
-export function BottomPanel({ current, height }: Props) {
-  const [tab, setTab] = useState(0)
+export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
+  const [tabState, setTabState] = useState(0)
+  const tab = tabProp ?? tabState
+  const setTab = onTab ?? setTabState
   const [detail, setDetail] = useState<CommitDetail | null>(null)
   const [files, setFiles] = useState<FileChange[]>([])
   const [file, setFile] = useState<string | null>(null)
@@ -44,20 +48,25 @@ export function BottomPanel({ current, height }: Props) {
     if (id.length < 16) {
       return
     }
-    setError(null)
-    setFile(null)
-    setDiff(null)
-    setTreeFile(null)
-    setBlob(null)
-    fetchCommit(id)
-      .then(setDetail)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "commit failed"))
-    fetchFiles(id)
-      .then((list) => {
-        setFiles(list)
-        if (list[0]) setFile(list[0].path)
-      })
-      .catch(() => setFiles([]))
+    // Debounced: arrow-keying or click-scrubbing through rows must not fire
+    // two engine requests per intermediate row.
+    const timer = setTimeout(() => {
+      setError(null)
+      setFile(null)
+      setDiff(null)
+      setTreeFile(null)
+      setBlob(null)
+      fetchCommit(id)
+        .then(setDetail)
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "commit failed"))
+      fetchFiles(id)
+        .then((list) => {
+          setFiles(list)
+          if (list[0]) setFile(list[0].path)
+        })
+        .catch(() => setFiles([]))
+    }, 150)
+    return () => clearTimeout(timer)
   }, [current])
 
   useEffect(() => {

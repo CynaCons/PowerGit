@@ -9,9 +9,11 @@ type Props = {
   onSelect: (index: number) => void
   onRowContextMenu?: (e: React.MouseEvent, index: number) => void
   selectedAuthor?: string
+  loadingTail?: boolean
+  onNearEnd?: () => void
 }
 
-export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selectedAuthor }: Props) {
+export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selectedAuthor, loadingTail, onNearEnd }: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hovered, setHovered] = useState(-1)
@@ -26,6 +28,19 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
   const virtualItems = virtualizer.getVirtualItems()
   const start = virtualItems[0]?.index ?? 0
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
+
+  // Jumping to a ref can select a row far outside the viewport; keep the
+  // selection visible. align:auto is a no-op for already-visible rows.
+  useEffect(() => {
+    if (selected >= 0) virtualizer.scrollToIndex(selected, { align: "auto" })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected])
+
+  // History pages in lazily: ask for more when the viewport approaches the
+  // loaded tail. The parent guards re-entrancy and the ceiling.
+  useEffect(() => {
+    if (onNearEnd && rows.length > 0 && end >= rows.length - 60) onNearEnd()
+  }, [end, rows.length, onNearEnd])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -56,7 +71,40 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
         ref={parentRef}
         className="grid-body"
         data-testid="grid-body"
+        tabIndex={0}
         onMouseLeave={() => setHovered(-1)}
+        onKeyDown={(e) => {
+          if (e.altKey || e.ctrlKey || e.metaKey) return
+          if (rows.length === 0) return
+          const last = rows.length - 1
+          const cur = selected < 0 ? 0 : selected
+          const page = Math.max(1, Math.floor((parentRef.current?.clientHeight ?? ROW_HEIGHT) / ROW_HEIGHT) - 1)
+          let next = cur
+          switch (e.key) {
+            case "ArrowDown":
+              next = Math.min(cur + 1, last)
+              break
+            case "ArrowUp":
+              next = Math.max(cur - 1, 0)
+              break
+            case "PageDown":
+              next = Math.min(cur + page, last)
+              break
+            case "PageUp":
+              next = Math.max(cur - page, 0)
+              break
+            case "Home":
+              next = 0
+              break
+            case "End":
+              next = last
+              break
+            default:
+              return
+          }
+          e.preventDefault()
+          onSelect(next)
+        }}
       >
         <div
           style={{
@@ -80,7 +128,10 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
                 className={`grid-row${item.index === selected ? " selected" : ""}`}
                 data-testid="grid-row"
                 data-index={item.index}
-                onClick={() => onSelect(item.index)}
+                onClick={() => {
+                  onSelect(item.index)
+                  parentRef.current?.focus()
+                }}
                 onContextMenu={onRowContextMenu ? (e) => { onSelect(item.index); onRowContextMenu(e, item.index) } : undefined}
                 onMouseEnter={() => setHovered(item.index)}
                 style={{
@@ -120,6 +171,11 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
           })}
         </div>
       </div>
+      {loadingTail && (
+        <div className="grid-tail" data-testid="history-tail-loading">
+          Loading more history…
+        </div>
+      )}
     </div>
   )
 }

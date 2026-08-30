@@ -20,6 +20,8 @@ Traces up to: [PRD.md](../../PRD.md) §5.3; upstream FormCommit (presented here 
 | SRS-CMT-011 | The overlay shall provide a commit message editor (subject + body). | The actual job. | Test | CommitMessageManager |
 | SRS-CMT-012 | Commit shall be disabled when the index is empty or the message subject is empty. | Match Git Extensions guardrails. | Test | FormCommit |
 | SRS-CMT-013 | A successful commit shall close the overlay, refresh the graph, and select the new HEAD. | Immediate feedback. | Test | graph reload |
+| SRS-CMT-014 | The overlay shall always show Stage, Stage all, Unstage, and Unstage all actions (disabled when the corresponding list or selection is empty), not hide them until a file is selected. | Git Extensions FormCommit `toolbarStaged` (`toolStageItem`, `toolStageAllItem`, `toolUnstageItem`, `toolUnstageAllItem`). | Test | `CommitDialog` |
+| SRS-CMT-015 | The overlay's outer size shall be independent of which file is selected and of diff length; file lists and the diff pane shall scroll internally. | Growing/shrinking the window on selection is disorienting. | Test | `CommitDialog` paper |
 
 ## Amend (minimum)
 

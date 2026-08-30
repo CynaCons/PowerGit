@@ -17,7 +17,8 @@
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
     "test:demo": "playwright test --config playwright.demo.config.ts",
     "test:resolution": "playwright test --config playwright.resolution.config.ts",
-    "test:live": "node scripts/test-live.mjs"
+    "test:live": "node scripts/test-live.mjs",
+    "test:perf": "node scripts/perf-run.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

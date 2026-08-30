@@ -44,7 +44,18 @@ export function CompactFileList({
   return (
     <Box
       data-testid={testid}
-      sx={{ flex: 1, minHeight: 80, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}
+      data-hotkey-surface="file-list"
+      tabIndex={0}
+      sx={{
+        flex: 1,
+        minHeight: 80,
+        overflow: "auto",
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 1,
+        outline: "none",
+        "&:focus-visible": { boxShadow: "inset 0 0 0 1px", borderColor: "primary.main" },
+      }}
     >
       {files.length === 0 ? (
         <Box sx={{ p: 1 }}>
@@ -57,7 +68,11 @@ export function CompactFileList({
           <Box
             key={`${testid}:${f.path}`}
             data-testid={`${testid}-row`}
-            onClick={(e) => (onRowClick ? onRowClick(f, index, e) : onSelect?.(f, index))}
+            onClick={(e) => {
+              ;(e.currentTarget.parentElement as HTMLElement | null)?.focus()
+              if (onRowClick) onRowClick(f, index, e)
+              else onSelect?.(f, index)
+            }}
             onDoubleClick={onToggle ? () => onToggle(f) : undefined}
             onContextMenu={
               onRowContext

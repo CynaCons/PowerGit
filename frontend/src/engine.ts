@@ -114,8 +114,8 @@ export async function fetchRecents(): Promise<RepoInfo[]> {
   return json<RepoInfo[]>(res)
 }
 
-export async function fetchRevisions(max = 800): Promise<RevisionDto[]> {
-  const res = await fetch(`${ENGINE_URL}/revisions?max=${max}`)
+export async function fetchRevisions(max = 800, skip = 0): Promise<RevisionDto[]> {
+  const res = await fetch(`${ENGINE_URL}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`)
   return json<RevisionDto[]>(res)
 }
 

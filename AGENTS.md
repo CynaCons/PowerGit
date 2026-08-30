@@ -45,6 +45,7 @@ npm run test:unit         # graph layout + 10k perf
 npm run test:e2e          # headless Playwright assertions (default proof)
 npm run test:resolution   # layout at 5 viewports up to 4K fullscreen
 npm run test:live         # probe the deployed Pages site renders + demo draws
+npm run test:perf         # heavy-repo perf budgets (50k commits, 2500 refs; builds the fixture on first run)
 npm run test:visual       # pixel diffs — only when the owner asks
 npm run test:demo         # slow headed owner walkthrough — only when asked
 npm run tauri dev         # native window (needs engine running for health)
