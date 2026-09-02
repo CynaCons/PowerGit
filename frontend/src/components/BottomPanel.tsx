@@ -3,11 +3,12 @@ import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
 import Tabs from "@mui/material/Tabs"
 import Typography from "@mui/material/Typography"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { CompactFileList } from "./CompactFileList"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
+import { SplitHandle } from "./SplitHandle"
 import { fetchBlob, fetchCommit, fetchDiff, fetchFiles, type CommitDetail, type DiffDto, type DiffOptions, type FileChange } from "../engine"
 import type { GraphRow } from "../graph/types"
 
@@ -19,6 +20,29 @@ type Props = {
 }
 
 const DEFAULT_DIFF_OPTIONS: DiffOptions = { context: 3, ws: false, full: false }
+
+const FILES_WIDTH_STORAGE_KEY = "pg.bottomFilesWidth"
+const DEFAULT_FILES_WIDTH = 340
+const MIN_FILES_WIDTH = 180
+const MAX_FILES_WIDTH_RATIO = 0.7
+
+function readStoredFilesWidth(): number {
+  try {
+    const raw = window.localStorage.getItem(FILES_WIDTH_STORAGE_KEY)
+    const parsed = raw ? Number(raw) : NaN
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FILES_WIDTH
+  } catch {
+    return DEFAULT_FILES_WIDTH
+  }
+}
+
+function writeStoredFilesWidth(width: number): void {
+  try {
+    window.localStorage.setItem(FILES_WIDTH_STORAGE_KEY, String(Math.round(width)))
+  } catch {
+    // Ignore storage failures (private mode, quota exceeded, disabled).
+  }
+}
 
 export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const [tabState, setTabState] = useState(0)
@@ -32,6 +56,10 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const [diffOpts, setDiffOpts] = useState<DiffOptions>(DEFAULT_DIFF_OPTIONS)
   const [treeFile, setTreeFile] = useState<string | null>(null)
   const [blob, setBlob] = useState<DiffDto | null>(null)
+  // Shared by the Files (Diff) tab and File Tree tab so both file columns
+  // resize together and remember one width across sessions.
+  const [filesWidth, setFilesWidth] = useState<number>(() => readStoredFilesWidth())
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!current) {
@@ -106,6 +134,17 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
     }
   }, [current, treeFile])
 
+  const splitHandleProps = {
+    testid: "bottom-split-handle",
+    value: filesWidth,
+    defaultValue: DEFAULT_FILES_WIDTH,
+    min: MIN_FILES_WIDTH,
+    maxRatio: MAX_FILES_WIDTH_RATIO,
+    getContainerWidth: () => panelRef.current?.clientWidth ?? filesWidth,
+    onChange: setFilesWidth,
+    onCommit: writeStoredFilesWidth,
+  }
+
   return (
     <Paper data-testid="bottom-panel" sx={{ height, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Tabs value={tab} onChange={(_, v: number) => setTab(v)} sx={{ px: 0.5, minHeight: 34, "& .MuiTab-root": { minHeight: 34, py: 0.5 }, borderBottom: 1, borderColor: "divider" }}>
@@ -113,7 +152,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
         <Tab label="File Tree" />
       </Tabs>
-      <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+      <Box ref={panelRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>
         {tab === 0 && (
           <Box data-testid="commit-info" sx={{ flex: 1, overflow: "auto", p: 2 }}>
             {error && <Typography color="error">{error}</Typography>}
@@ -149,7 +188,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         )}
         {tab === 1 && (
           <>
-            <Box sx={{ width: 340, flexShrink: 0, overflow: "auto", borderRight: 1, borderColor: "divider", display: "flex", flexDirection: "column" }}>
+            <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
               <CompactFileList
                 testid="file-list"
                 files={files}
@@ -158,17 +197,19 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
                 onSelect={(f) => setFile(f.path)}
               />
             </Box>
+            <SplitHandle {...splitHandleProps} />
             <DiffPane diff={diff} file={file} options={diffOpts} onOptions={setDiffOpts} />
           </>
         )}
         {tab === 2 && (
           <>
-            <Box sx={{ width: 340, flexShrink: 0, overflow: "auto", borderRight: 1, borderColor: "divider" }} data-testid="commit-file-tree-wrap">
+            <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto" }} data-testid="commit-file-tree-wrap">
               <CommitFileTree
                 commitId={current && current.rev.id.length >= 16 ? current.rev.id : null}
                 onSelectFile={(path) => setTreeFile(path)}
               />
             </Box>
+            <SplitHandle {...splitHandleProps} />
             <BlobPane blob={blob} path={treeFile} />
           </>
         )}

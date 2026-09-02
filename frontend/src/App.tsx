@@ -649,7 +649,7 @@ export default function App() {
   return (
     <Box data-testid="browse-shell" sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
       <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 0.75, minHeight: 44, px: 1.5, position: "relative" }}>
+        <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 0.5, minHeight: 30, py: 0.25, px: 1, position: "relative" }}>
           {progressLabel !== null && (
             <Box
               data-testid="topbar-progress"
@@ -681,7 +681,7 @@ export default function App() {
             shortcut={shortcutLabel("browse.refresh")}
             onClick={() => void refresh()}
           />
-          <Divider orientation="vertical" flexItem sx={{ my: 0.75 }} />
+          <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center", my: 0 }} />
           <Badge
             badgeContent={dirty || 0}
             color="primary"
@@ -754,7 +754,7 @@ export default function App() {
               Drop stash@{"{0}"}
             </MenuItem>
           </SplitButton>
-          <Divider orientation="vertical" flexItem sx={{ my: 0.75 }} />
+          <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center", my: 0 }} />
           <SplitButton
             label="Pull"
             icon={<ArrowDownwardIcon fontSize="small" />}
@@ -806,7 +806,7 @@ export default function App() {
               </MenuItem>
             )}
           </SplitButton>
-          <Divider orientation="vertical" flexItem sx={{ my: 0.75 }} />
+          <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center", my: 0 }} />
           <SplitButton
             label="Branch"
             icon={<CallSplitIcon fontSize="small" />}
@@ -854,7 +854,13 @@ export default function App() {
             shortcut={shortcutLabel("browse.createTag")}
             onClick={openCreateTag}
           />
-            <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+            <Typography
+              data-testid="engine-status"
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              sx={{ ml: "auto", minWidth: 0 }}
+            >
               {health
                 ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
                 : offline
@@ -1083,6 +1089,34 @@ export default function App() {
   )
 }
 
+// Git Extensions density for the whole command bar: ~26px buttons keep the
+// toolbar row to ~28-30px total instead of MUI's default ~31-33px "small"
+// button metrics stacking up with the toolbar's own padding. Icons keep
+// their fontSize="small" prop at call sites (untouched) and are rescaled to
+// 18px here via the MuiSvgIcon-root descendant selector, so every toolbar
+// icon shrinks uniformly without editing each call site.
+const TOOLBAR_BUTTON_SX = {
+  height: 26,
+  minWidth: 0,
+  px: 1,
+  py: 0,
+  fontSize: 12,
+  "& .MuiSvgIcon-root": { fontSize: 18 },
+} as const
+
+// The split-button dropdown caret is its own narrow segment, not a second
+// full-width button. MuiButtonGroup applies `.MuiButtonGroup-grouped { min-
+// width: 40px }` to every grouped child via a two-class descendant selector,
+// which outranks a single-class sx utility rule on specificity alone (not
+// source order) — !important is the narrow, deliberate override for just
+// this instance.
+const TOOLBAR_CARET_SX = {
+  ...TOOLBAR_BUTTON_SX,
+  px: 0,
+  minWidth: "20px !important",
+  width: "20px !important",
+} as const
+
 // Git Extensions-style split button: main action on the left, dropdown caret
 // for secondary actions. A MUI ButtonGroup keeps both halves in one bordered
 // group with a single shared divider (no gap), so the caret is unambiguously
@@ -1115,6 +1149,7 @@ function SplitButton({
           startIcon={icon}
           title={shortcut ? `${label} (${shortcut})` : undefined}
           onClick={onMainClick}
+          sx={TOOLBAR_BUTTON_SX}
         >
           {label}
         </Button>
@@ -1122,7 +1157,7 @@ function SplitButton({
           data-testid={`${testid}-menu`}
           aria-label={`${label} options`}
           onClick={(e) => setAnchor(e.currentTarget)}
-          sx={{ px: 0.25, minWidth: 0 }}
+          sx={TOOLBAR_CARET_SX}
         >
           <ArrowDropDownIcon fontSize="small" />
         </Button>
@@ -1160,6 +1195,7 @@ function ToolbarButton({
       disabled={disabled}
       title={shortcut ? `${label} (${shortcut})` : undefined}
       onClick={onClick}
+      sx={TOOLBAR_BUTTON_SX}
     >
       {label}
     </Button>

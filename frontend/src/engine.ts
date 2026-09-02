@@ -106,9 +106,24 @@ export type GitConfig = {
 }
 export type VsCodeInfo = { found: boolean; path: string | null; applied: boolean }
 
+// Text-first: WebKit throws a generic DOMException ("The string did not match
+// the expected pattern") from Response.json() on any non-JSON body (empty 500,
+// proxy page, dropped connection). Read text, then parse, so the UI can show
+// the real status and body instead of that sentence.
 async function json<T>(res: Response): Promise<T> {
-  const body = await res.json()
-  if (!res.ok) throw new Error(body.error ?? `http ${res.status}`)
+  const text = await res.text()
+  let body: unknown = null
+  if (text.trim().length > 0) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      throw new Error(`http ${res.status}: ${text.slice(0, 200)}`)
+    }
+  }
+  if (!res.ok) {
+    const err = body && typeof body === "object" && "error" in body ? String((body as { error: unknown }).error) : ""
+    throw new Error(err || `http ${res.status}`)
+  }
   return body as T
 }
 

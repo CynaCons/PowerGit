@@ -248,3 +248,11 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Diff view renders font ligatures (C++ "->" became an arrow); disable ligatures everywhere code is shown, raw characters only.
 - [x] Fetch on Linux shows red "The string did not match the expected pattern" (WebKit DOMException); find the offending call and fix.
 - [x] Tooling: powerplan submodule bumped to v0.7.2 (powerspawn already current).
+### v0.12.1 — Owner feedback #5 — toolbar density + Linux author highlight (2026-09-02) (COMPLETE)
+**Goal:** Toolbar buttons are too big: make the command bar compact (GE density). On Linux/WebKitGTK the same-author highlight makes rows disappear; fix with WebKit-safe CSS.
+- [x] Toolbar too big: compact command bar (small buttons, tighter padding, 28-30px height, smaller icons/labels) at GE density.
+- [x] Linux: same-author highlight makes rows disappear on WebKitGTK; make row highlight CSS/canvas WebKit-safe and keep text visible.
+- [x] Bottom diff view: file list panel resizable (drag divider between file names and diff; width persisted).
+- [x] Ubuntu fonts look low quality and too light grey: verify self-hosted Inter/Fira Code actually load under tauri:// on WebKitGTK, darken secondary text, add font smoothing and a good Linux fallback stack.
+- [x] File Tree on Linux: cannot expand subdirectories or open files (owner report #2). Tree/blob logic and e2e are correct on Windows; subdirectory errors were silently hidden, now surfaced in the tree. Linux root cause still needs a repro.
+- [x] Linux review pass: text-first JSON parsing everywhere, engine reuse only on matching version, ls-tree timeout, AppImage bundled-GLib strip in inspect script, Docker WebKit e2e harness (25/25 webkit + chromium on Linux).

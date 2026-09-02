@@ -1,24 +1,86 @@
-/* Self-hosted variable fonts: the packaged app must render identically
-   offline (no Google Fonts CDN — that fallback caused low-quality system
-   rasterization on Linux/AppImage). */
+/* Self-hosted fonts: the packaged app must render identically offline (no
+   Google Fonts CDN — that fallback caused low-quality system rasterization
+   on Linux/AppImage).
+   Static per-weight faces, NOT the variable "wght" axis: it is unverifiable
+   whether the WebKitGTK/FreeType stack bundled in the Linux AppImage honors
+   the `font-weight: <min> <max>` range syntax and variable-font
+   interpolation. If it doesn't, the engine falls back to the font's default
+   named instance — for this build of Fira Code that default is weight 300
+   (Light), which alone would explain "too light" text regardless of any
+   `font-weight` requested in CSS. Static instances (generated with
+   `fonttools varLib.instancer`, one file per weight) make every requested
+   weight byte-identical on every engine. See
+   docs/agents/memories/linux-fonts.md. */
 @font-face {
   font-family: "Inter";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400;
   font-display: swap;
-  src: url("/fonts/inter-latin-var.woff2") format("woff2");
+  src: url("/fonts/inter-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-latin-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-latin-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin-700.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Fira Code";
   font-style: normal;
-  font-weight: 400 600;
+  font-weight: 400;
   font-display: swap;
-  src: url("/fonts/firacode-latin-var.woff2") format("woff2");
+  src: url("/fonts/firacode-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fira Code";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/firacode-latin-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fira Code";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/firacode-latin-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fira Code";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/firacode-latin-700.woff2") format("woff2");
 }
 
 :root {
   --pg-row-height: 28px;
+  /* Keep these as literal hex/rgba only (comma syntax) — no color-mix(),
+     oklch(), relative colour syntax, or light-dark(). See
+     docs/agents/memories/webkitgtk-css.md for why (WebKitGTK/AppImage
+     target). */
   --pg-grid-hover: rgba(37, 99, 235, 0.08);
   --pg-grid-author: #f8fbff;
   --pg-grid-sel: #dbeafe;

@@ -41,6 +41,11 @@
   cursor: default;
   background: transparent;
   border-left: 2px solid transparent;
+  /* Explicit stacking: guarantees row text paints above .graph-canvas
+     regardless of engine-specific stacking-context edge cases (the canvas
+     has no transform, every row does, and WebKitGTK has been observed to
+     get this ordering wrong — see docs/agents/memories/webkitgtk-css.md). */
+  z-index: 1;
 }
 
 .grid-row .msg,
@@ -53,16 +58,16 @@
 }
 
 .grid-row:hover:not(.selected) {
-  background: var(--pg-grid-hover);
+  background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
 }
 
 .grid-row.author-highlight {
-  background: var(--pg-grid-author);
+  background: var(--pg-grid-author, #f8fbff);
 }
 
 .grid-row.selected:not(.author-highlight) {
-  background: var(--pg-grid-sel);
-  border-left-color: var(--pg-grid-sel-border);
+  background: var(--pg-grid-sel, #dbeafe);
+  border-left-color: var(--pg-grid-sel-border, #2563eb);
 }
 
 .grid-row:hover .msg,
@@ -77,6 +82,30 @@
 .grid-row.selected .date,
 .grid-row.selected .sha {
   background: transparent;
+}
+
+/* Text colour must be set explicitly (not just inherited) on rows whose
+   background is toggled at runtime. Same values as the unhighlighted state
+   (body text #111827, secondary text #737373) — this is a no-op visually,
+   but it removes any dependency on multi-level inheritance/cascade
+   recomputation for these classes, which is where WebKitGTK has been known
+   to leave text unpainted after a class-only mutation (no matching `color`
+   change on the row itself to trigger a repaint of the text run). See
+   docs/agents/memories/webkitgtk-css.md. */
+.grid-row.selected .msg-text,
+.grid-row.author-highlight .msg-text {
+  color: #111827;
+  opacity: 1;
+}
+
+.grid-row.selected .author,
+.grid-row.selected .date,
+.grid-row.selected .sha,
+.grid-row.author-highlight .author,
+.grid-row.author-highlight .date,
+.grid-row.author-highlight .sha {
+  color: #737373;
+  opacity: 1;
 }
 
 .grid-tail {
@@ -96,7 +125,15 @@
 
 .graph-canvas {
   position: absolute;
-  inset: 0;
+  /* Longhand, not the `inset` shorthand: WebKitGTK builds around the 2.40
+     era have partial/buggy support for `inset` and can drop the whole
+     declaration, and the graph column is otherwise unbounded on the right —
+     see docs/agents/memories/webkitgtk-css.md. */
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
   pointer-events: none;
 }
 

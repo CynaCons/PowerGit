@@ -100,8 +100,20 @@ fn looks_like_powergit_health(response: &str) -> bool {
         return false;
     };
     let status_ok = json.get("status").and_then(|v| v.as_str()) == Some("ok");
-    let has_engine_field = json.get("engine").and_then(|v| v.as_str()).is_some();
-    status_ok && has_engine_field
+    // Only reuse an engine of OUR version. A leftover sidecar from a previous
+    // release answers /health just as happily, and reusing it would pair a
+    // new UI with an old API (missing routes look like "nothing happens").
+    // A version mismatch is treated like a stranger on the port: the caller
+    // spawns our own sidecar on a free port instead.
+    let same_version = json.get("engine").and_then(|v| v.as_str()) == Some(env!("CARGO_PKG_VERSION"));
+    if status_ok && !same_version {
+        eprintln!(
+            "[powergit] engine on port answers /health with version {:?}, expected {}; not reusing",
+            json.get("engine").and_then(|v| v.as_str()).unwrap_or("?"),
+            env!("CARGO_PKG_VERSION")
+        );
+    }
+    status_ok && same_version
 }
 
 /// Undoes HTTP/1.1 chunked transfer-coding (`<hex-size>\r\n<data>\r\n...

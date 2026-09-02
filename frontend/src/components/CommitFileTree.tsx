@@ -5,7 +5,7 @@ import Box from "@mui/material/Box"
 import CircularProgress from "@mui/material/CircularProgress"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState, type ReactNode } from "react"
-import { fetchTree, type TreeEntry } from "../engine"
+import { describeThrown, fetchTree, type TreeEntry } from "../engine"
 
 type Props = {
   commitId: string | null
@@ -28,7 +28,7 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
         if (!cancelled) setRoot({ entries, error: null })
       })
       .catch((e: unknown) => {
-        if (!cancelled) setRoot({ entries: [], error: e instanceof Error ? e.message : "tree failed" })
+        if (!cancelled) setRoot({ entries: [], error: describeThrown(e) })
       })
     return () => {
       cancelled = true
@@ -49,7 +49,7 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
     fetchTree(commitId, path)
       .then((entries) => setDirs((prev) => new Map(prev).set(path, { entries, error: null })))
       .catch((e: unknown) =>
-        setDirs((prev) => new Map(prev).set(path, { entries: [], error: e instanceof Error ? e.message : "tree failed" })),
+        setDirs((prev) => new Map(prev).set(path, { entries: [], error: describeThrown(e) })),
       )
   }
 
@@ -116,6 +116,11 @@ function Level({
                 folder
                 onClick={() => onToggle(path)}
               />
+              {open && child && child.error && (
+                <Typography color="error" variant="body2" sx={{ pl: 2 + (depth + 1) * 1.5, fontSize: 12 }} data-testid="commit-file-tree-error">
+                  {child.error}
+                </Typography>
+              )}
               {open && child && !child.error && (
                 <Level
                   commitId={commitId}

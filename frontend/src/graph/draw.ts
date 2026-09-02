@@ -58,11 +58,17 @@ export function drawRows(
   ctx.clearRect(0, 0, width, Math.max(1, end - start) * rowHeight)
   ctx.lineCap = "butt"
   ctx.lineJoin = "round"
-  const canvasStyle = getComputedStyle(ctx.canvas)
-  const selectedFill = canvasStyle.getPropertyValue("--pg-grid-sel").trim() || "#dbeafe"
-  const selectedBorder = canvasStyle.getPropertyValue("--pg-grid-sel-border").trim() || "#2563eb"
-  const authorFill = canvasStyle.getPropertyValue("--pg-grid-author").trim() || "#f8fbff"
-  const hoverFill = canvasStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
+  // Read tokens from the document root, not the canvas element: WebKit has a
+  // long-standing bug (bugs.webkit.org #14563) where getComputedStyle() can
+  // return an empty string for a custom property on some elements (canvas
+  // included), which would otherwise silently fall through to these
+  // fallbacks every frame instead of picking up the real token. Root-element
+  // lookups are the well-tested path. See docs/agents/memories/webkitgtk-css.md.
+  const rootStyle = getComputedStyle(document.documentElement)
+  const selectedFill = rootStyle.getPropertyValue("--pg-grid-sel").trim() || "#dbeafe"
+  const selectedBorder = rootStyle.getPropertyValue("--pg-grid-sel-border").trim() || "#2563eb"
+  const authorFill = rootStyle.getPropertyValue("--pg-grid-author").trim() || "#f8fbff"
+  const hoverFill = rootStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
 
   for (let i = start; i < end; i++) {
     const row = rows[i]

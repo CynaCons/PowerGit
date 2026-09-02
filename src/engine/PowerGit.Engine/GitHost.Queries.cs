@@ -201,7 +201,9 @@ public sealed partial class GitHost
             args.Add(prefix);
         }
 
-        CommandResult result = Run(root, [.. args]);
+        // Timed: a hung ls-tree must surface as an error in the UI, not as
+        // an expansion that silently stays empty.
+        CommandResult result = RunTimed(root, 30_000, [.. args]);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(result.StdErr.Trim());

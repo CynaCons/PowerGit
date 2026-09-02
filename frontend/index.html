@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#fafafa" />
     <!-- Fonts are self-hosted (public/fonts, @font-face in tokens.css): no CDN
-         request can stall first paint or degrade offline/packaged rendering. -->
+         request can stall first paint or degrade offline/packaged rendering.
+         Preload only the weights on screen at first paint (grid body/sha);
+         see docs/agents/memories/linux-fonts.md. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-400.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-500.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/firacode-latin-400.woff2" crossorigin />
     <title>PowerGit</title>
   </head>
   <body>

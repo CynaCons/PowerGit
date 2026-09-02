@@ -94,6 +94,25 @@ test("selected rows stay distinct from same-author rows", async ({ page }) => {
     { x: 1, y: sameAuthorBox.y - canvasBox.y + sameAuthorBox.height / 2, dpr },
   )
   expect(selectedCanvasPixel).not.toEqual(sameAuthorCanvasPixel)
+
+  // WebKitGTK regression guard: a same-author row must keep its message and
+  // author text visibly painted (non-transparent, fully opaque) once the
+  // author-highlight background applies — see
+  // docs/agents/memories/webkitgtk-css.md.
+  await expect(sameAuthorRow.locator(".msg-text")).toBeVisible()
+  const sameAuthorTextStyles = await sameAuthorRow.evaluate((el) => {
+    const msg = el.querySelector(".msg-text") as HTMLElement | null
+    const author = el.querySelector(".author") as HTMLElement | null
+    if (!msg || !author) throw new Error("Missing text elements on same-author row")
+    return {
+      msgColor: getComputedStyle(msg).color,
+      authorColor: getComputedStyle(author).color,
+      rowOpacity: getComputedStyle(el).opacity,
+    }
+  })
+  expect(sameAuthorTextStyles.msgColor).not.toBe("rgba(0, 0, 0, 0)")
+  expect(sameAuthorTextStyles.authorColor).not.toBe("rgba(0, 0, 0, 0)")
+  expect(sameAuthorTextStyles.rowOpacity).toBe("1")
 })
 
 test("grid virtualizes a large history", async ({ page }) => {

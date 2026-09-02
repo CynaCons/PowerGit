@@ -19,7 +19,12 @@ export default defineConfig({
     video: "off",
     chromiumSandbox: false,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // PW_WEBKIT=1 adds Playwright's WebKit — the closest stand-in for the
+  // WebKitGTK webview the Linux AppImage runs in (see docker/ubuntu-check).
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(process.env.PW_WEBKIT ? [{ name: "webkit", use: { ...devices["Desktop Safari"] } }] : []),
+  ],
   webServer: {
     command: "npm run dev",
     url: "http://127.0.0.1:1420",

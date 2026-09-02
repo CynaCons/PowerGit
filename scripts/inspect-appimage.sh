@@ -80,6 +80,21 @@ for m in $gio_modules; do
 done
 [ -z "$gio_modules" ] && echo "  (none bundled)"
 
+# --- bundled GLib family --------------------------------------------------
+# A bundled libglib/libgio/libgobject/libgmodule is loaded instead of the
+# host's, so every HOST GIO module (dconf settings backend, gvfs, libproxy)
+# resolves against an older GLib and fails to load: no dconf means WebKitGTK
+# cannot read the desktop's font antialias/hinting/rgba settings (blurry,
+# light text) and the GTK file chooser loses gvfs. webkit2gtk from the host
+# already pulls in the host GLib, so these copies are never needed.
+echo "== bundled GLib family =="
+glib_libs=$(find "$ROOT" \( -name 'libglib-2.0.so*' -o -name 'libgio-2.0.so*' -o -name 'libgobject-2.0.so*' -o -name 'libgmodule-2.0.so*' -o -name 'libgthread-2.0.so*' \) 2>/dev/null || true)
+for g in $glib_libs; do
+  echo "  MISMATCH: $g (bundled GLib shadows the host's; strip it)"
+  problems=$((problems + 1))
+done
+[ -z "$glib_libs" ] && echo "  (none bundled)"
+
 # --- libcurl / nghttp2 ----------------------------------------------------
 echo "== bundled curl/nghttp2 =="
 curl_libs=$(find "$ROOT" \( -name 'libcurl*.so*' -o -name 'libnghttp2*.so*' \) 2>/dev/null || true)
@@ -111,6 +126,7 @@ fi
 echo "== fixing =="
 for m in $gio_modules; do rm -f "$m"; done
 for c in $curl_libs; do rm -f "$c"; done
+for g in $glib_libs; do rm -f "$g"; done
 
 if ! command -v appimagetool >/dev/null 2>&1; then
   echo "Downloading appimagetool..."
@@ -145,6 +161,8 @@ for m in $(find "$ROOT" -path '*gio/modules/*.so' 2>/dev/null || true); do
     leftover=$((leftover + 1))
   fi
 done
+glib_left=$(find "$ROOT" \( -name 'libglib-2.0.so*' -o -name 'libgio-2.0.so*' -o -name 'libgobject-2.0.so*' -o -name 'libgmodule-2.0.so*' \) 2>/dev/null || true)
+[ -n "$glib_left" ] && leftover=$((leftover + 1))
 if [ "$leftover" -ne 0 ]; then
   echo "still dirty after fix" >&2
   exit 1
