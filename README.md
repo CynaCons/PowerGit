@@ -43,9 +43,9 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.11.0 (Git Extensions
-keyboard shortcuts, commit overlay stage bar, paged history + live refresh
-on heavy repos). Parked: dark theme, worktrees, hotkey remapping UI.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.12.0 (Linux AppImage
+review fixes: engine port reuse, date-ordered all-branch graph, GE-style
+toolbar, untracked diffs, raw characters in code views). Parked: dark theme, worktrees, hotkey remapping UI.
 
 ## Development
 
