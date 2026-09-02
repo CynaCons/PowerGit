@@ -43,9 +43,9 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.12.0 (Linux AppImage
-review fixes: engine port reuse, date-ordered all-branch graph, GE-style
-toolbar, untracked diffs, raw characters in code views). Parked: dark theme, worktrees, hotkey remapping UI.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.12.1 (Linux/WebKitGTK
+review pass: compact GE toolbar, static fonts + darker text, resizable
+file column, WebKit-safe highlight, Docker WebKit e2e harness). Parked: dark theme, worktrees, hotkey remapping UI.
 
 ## Development
 
