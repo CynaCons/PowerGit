@@ -32,6 +32,70 @@ test("selecting a row updates commit details", async ({ page }) => {
   await expect(rows.nth(3)).toHaveClass(/selected/)
 })
 
+test("selected rows stay distinct from same-author rows", async ({ page }) => {
+  await page.goto("/")
+  const rows = page.getByTestId("grid-row")
+  await expect(rows.first()).toBeVisible()
+
+  const duplicate = await rows.evaluateAll((elements) => {
+    const seen = new Map<string, number>()
+    for (let index = 0; index < elements.length; index++) {
+      const author = elements[index].querySelector(".author")?.textContent?.trim()
+      if (!author) continue
+      const firstIndex = seen.get(author)
+      if (firstIndex !== undefined) {
+        return { selectedIndex: firstIndex, sameAuthorIndex: index, author }
+      }
+      seen.set(author, index)
+    }
+    return null
+  })
+
+  if (duplicate === null) {
+    throw new Error("Could not find two visible rows with the same author")
+  }
+
+  const selectedRow = page.locator(`[data-testid="grid-row"][data-index="${duplicate.selectedIndex}"]`)
+  const sameAuthorRow = page.locator(`[data-testid="grid-row"][data-index="${duplicate.sameAuthorIndex}"]`)
+  const canvas = page.getByTestId("graph-canvas")
+
+  await selectedRow.click()
+  await expect(selectedRow).toHaveClass(/selected/)
+  await expect(sameAuthorRow).not.toHaveClass(/selected/)
+  await expect(canvas).toBeVisible()
+
+  const selectedBackground = await selectedRow.evaluate((el) => getComputedStyle(el).backgroundColor)
+  const sameAuthorBackground = await sameAuthorRow.evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(selectedBackground).not.toBe(sameAuthorBackground)
+  await expect(selectedRow).toHaveCSS("border-left-width", "2px")
+
+  const selectedBox = await selectedRow.boundingBox()
+  const sameAuthorBox = await sameAuthorRow.boundingBox()
+  const canvasBox = await canvas.boundingBox()
+  if (!selectedBox || !sameAuthorBox || !canvasBox) {
+    throw new Error("Missing row or canvas bounds")
+  }
+
+  const dpr = await page.evaluate(() => window.devicePixelRatio || 1)
+  const selectedCanvasPixel = await canvas.evaluate(
+    (el, { x, y, dpr }: { x: number; y: number; dpr: number }) => {
+      const ctx = el.getContext("2d")
+      if (!ctx) throw new Error("Canvas context unavailable")
+      return Array.from(ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data)
+    },
+    { x: 1, y: selectedBox.y - canvasBox.y + selectedBox.height / 2, dpr },
+  )
+  const sameAuthorCanvasPixel = await canvas.evaluate(
+    (el, { x, y, dpr }: { x: number; y: number; dpr: number }) => {
+      const ctx = el.getContext("2d")
+      if (!ctx) throw new Error("Canvas context unavailable")
+      return Array.from(ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data)
+    },
+    { x: 1, y: sameAuthorBox.y - canvasBox.y + sameAuthorBox.height / 2, dpr },
+  )
+  expect(selectedCanvasPixel).not.toEqual(sameAuthorCanvasPixel)
+})
+
 test("grid virtualizes a large history", async ({ page }) => {
   await page.goto("/")
   // Large repos load revisions asynchronously; never fall back to counting
@@ -252,6 +316,7 @@ test("commit overlay size does not jump when selecting a file", async ({ page })
   if ((await row.count()) > 0) {
     await row.click()
     await expect(page.getByTestId("diff-view").or(page.getByTestId("commit-diff"))).toBeVisible()
+    await expect(page.getByTestId("diff-view")).toHaveCSS("font-variant-ligatures", "none")
     const after = await paper.boundingBox()
     expect(after).not.toBeNull()
     expect(Math.abs(after!.height - before!.height)).toBeLessThan(2)
@@ -265,4 +330,3 @@ test("Ctrl+3 focuses the Diff tab", async ({ page }) => {
   await expect(page.getByTestId("file-list")).toBeVisible()
   await expect(page.getByTestId("diff-pane")).toBeVisible()
 })
-

@@ -6,7 +6,7 @@ import DialogTitle from "@mui/material/DialogTitle"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
-import { listRemotes, saveRemote } from "../engine"
+import { listRemotes, saveRemote, describeThrown } from "../engine"
 
 type Props = {
   open: boolean
@@ -32,7 +32,11 @@ export function RemoteDialog({ open, name, onClose }: Props) {
       await saveRemote(name, url.trim())
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "save failed")
+      // `describeThrown` (engine.ts) reads `.message` defensively: a WebKit
+      // DOMException (e.g. from a malformed response) does not reliably
+      // satisfy `instanceof Error` across engines, so the banner must not
+      // assume it does — the operation name is always kept regardless.
+      setError(`Save remote failed: ${describeThrown(e)}`)
     }
   }
 

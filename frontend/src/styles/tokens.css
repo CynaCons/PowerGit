@@ -19,7 +19,10 @@
 
 :root {
   --pg-row-height: 28px;
-  --pg-grid-sel: #eff6ff;
+  --pg-grid-hover: rgba(37, 99, 235, 0.08);
+  --pg-grid-author: #f8fbff;
+  --pg-grid-sel: #dbeafe;
+  --pg-grid-sel-border: #2563eb;
 }
 
 *,

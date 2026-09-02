@@ -1,6 +1,29 @@
+import { invoke } from "@tauri-apps/api/core"
+
 /** Engine base URL. Override with VITE_ENGINE_URL (e.g. remote engine or
- *  demo setups); the packaged app always uses the bundled sidecar default. */
-export const ENGINE_URL = import.meta.env.VITE_ENGINE_URL ?? "http://127.0.0.1:7733"
+ *  demo setups); the packaged app otherwise starts with the bundled sidecar
+ *  default and `engineReady` (below) may rewrite it once resolved. */
+export let ENGINE_URL = import.meta.env.VITE_ENGINE_URL ?? "http://127.0.0.1:7733"
+
+/**
+ *  Resolves once at module load. Under Tauri, `lib.rs` may reuse an already
+ *  running engine, spawn on 7733 (first choice), or fall back to an
+ *  OS-assigned port when 7733 is held by something that is not our engine
+ *  (see docs/agents/memories/engine-port.md) — this asks it which via the
+ *  `engine_base_url` command and rewrites `ENGINE_URL` in place. Every
+ *  request function below awaits this first so no call can fire before the
+ *  real port is known. It resolves immediately as a no-op outside Tauri or
+ *  when VITE_ENGINE_URL is set, so Vite dev and the Pages demo are unchanged.
+ */
+const engineReady: Promise<void> = (async () => {
+  if (import.meta.env.VITE_ENGINE_URL) return
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return
+  try {
+    ENGINE_URL = await invoke<string>("engine_base_url")
+  } catch {
+    // Older host build without the command, or an IPC failure — keep the default.
+  }
+})()
 
 export type Health = {
   engine: string
@@ -90,11 +113,13 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function fetchHealth(signal?: AbortSignal): Promise<Health> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/health`, { signal })
   return json<Health>(res)
 }
 
 export async function openRepo(path: string): Promise<RepoInfo> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/repos/open`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -104,53 +129,63 @@ export async function openRepo(path: string): Promise<RepoInfo> {
 }
 
 export async function fetchCurrent(): Promise<RepoInfo | null> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/repos/current`)
   if (res.status === 404) return null
   return json<RepoInfo>(res)
 }
 
 export async function fetchRecents(): Promise<RepoInfo[]> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/repos/recents`)
   return json<RepoInfo[]>(res)
 }
 
 export async function fetchRevisions(max = 800, skip = 0): Promise<RevisionDto[]> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`)
   return json<RevisionDto[]>(res)
 }
 
 export async function fetchCommit(id: string): Promise<CommitDetail> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}`)
   return json<CommitDetail>(res)
 }
 
 export async function fetchFiles(id: string): Promise<FileChange[]> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/files`)
   return json<FileChange[]>(res)
 }
 
 export async function fetchTree(id: string, path?: string): Promise<TreeEntry[]> {
   const qs = path ? `?path=${encodeURIComponent(path)}` : ""
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/tree${qs}`)
   return json<TreeEntry[]>(res)
 }
 
 export async function fetchDiff(id: string, path: string, options?: Partial<DiffOptions>): Promise<DiffDto> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}${diffParams(options)}`)
   return json<DiffDto>(res)
 }
 
 export async function fetchBlob(id: string, path: string): Promise<DiffDto> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/blob?path=${encodeURIComponent(path)}`)
   return json<DiffDto>(res)
 }
 
 export async function fetchWorkTreeDiff(path: string, staged = false, options?: Partial<DiffOptions>): Promise<DiffDto> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/diff/worktree?path=${encodeURIComponent(path)}&staged=${staged}${diffParams(options)}`)
   return json<DiffDto>(res)
 }
 
 export async function deleteFiles(paths: string[]): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/files/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -160,6 +195,7 @@ export async function deleteFiles(paths: string[]): Promise<RepoStatus> {
 }
 
 export async function addToIgnore(pattern: string): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/ignore`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -169,6 +205,7 @@ export async function addToIgnore(pattern: string): Promise<RepoStatus> {
 }
 
 export async function previewIgnore(pattern: string): Promise<IgnorePreview> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/ignore/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -178,11 +215,13 @@ export async function previewIgnore(pattern: string): Promise<IgnorePreview> {
 }
 
 export async function listRemotes(): Promise<RemoteInfo[]> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/remotes`)
   return json<RemoteInfo[]>(res)
 }
 
 export async function saveRemote(name: string, url: string): Promise<RemoteInfo> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/remotes`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -191,34 +230,84 @@ export async function saveRemote(name: string, url: string): Promise<RemoteInfo>
   return json<RemoteInfo>(res)
 }
 
+/** Normalizes a thrown value into a plain string message. DOMException
+ *  (thrown by WebKit for many string-validation failures, including
+ *  `Response.json()` on a non-JSON body) does not reliably satisfy
+ *  `instanceof Error` across browser engines, so callers must not assume
+ *  `.message` is only safe to read after that check. */
+export function describeThrown(e: unknown): string {
+  if (e instanceof Error) return e.message
+  if (e && typeof e === "object" && "message" in e && typeof (e as { message?: unknown }).message === "string") {
+    return (e as { message: string }).message
+  }
+  return String(e)
+}
+
+/** Safe response reader for the fetch/pull/push job endpoints. Deliberately
+ *  avoids `Response.json()`: WebKit throws a generic DOMException
+ *  ("The string did not match the expected pattern.") for any string that
+ *  fails its internal validation — the same wording it uses for a malformed
+ *  `URL`/`Headers` value — so a non-JSON body (e.g. an empty response from a
+ *  dropped connection, or a stray process squatting on the engine's port) is
+ *  otherwise indistinguishable from a real request-building bug. Reading as
+ *  text first keeps the failure attributable instead of leaking that
+ *  ambiguous message straight into the UI. */
+async function parseJobResponse<T>(res: Response): Promise<T> {
+  let text: string
+  try {
+    text = await res.text()
+  } catch (e) {
+    throw new Error(`could not read the engine's response: ${describeThrown(e)}`)
+  }
+  let body: unknown
+  try {
+    body = text ? JSON.parse(text) : undefined
+  } catch {
+    throw new Error(`engine returned a non-JSON response (http ${res.status})`)
+  }
+  if (!res.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && typeof (body as { error?: unknown }).error === "string"
+        ? (body as { error: string }).error
+        : `http ${res.status}`
+    throw new Error(message)
+  }
+  if (body === undefined) throw new Error("engine returned an empty response")
+  return body as T
+}
+
 export async function fetchRemote(name: string): Promise<{ output: string }> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/fetch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ remote: name }),
   })
-  return json<{ output: string }>(res)
+  return parseJobResponse<{ output: string }>(res)
 }
 
 export async function pullBranch(rebase = false): Promise<{ output: string }> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/pull`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rebase }),
   })
-  return json<{ output: string }>(res)
+  return parseJobResponse<{ output: string }>(res)
 }
 
 export async function pushBranch(forceWithLease = false): Promise<{ output: string }> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/push`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ forceWithLease }),
   })
-  return json<{ output: string }>(res)
+  return parseJobResponse<{ output: string }>(res)
 }
 
 export async function createBranch(name: string, commit?: string): Promise<RefTree> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/branches/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -228,6 +317,7 @@ export async function createBranch(name: string, commit?: string): Promise<RefTr
 }
 
 export async function createTag(name: string, commit?: string): Promise<RefTree> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/tags/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -246,12 +336,13 @@ export type GitJob = {
 export type JobStarted = { id: string; kind: string }
 
 async function startJob(url: string, body?: unknown): Promise<JobStarted> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}${url}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  return json<JobStarted>(res)
+  return parseJobResponse<JobStarted>(res)
 }
 
 export const startFetch = (remote: string) => startJob("/fetch", { remote })
@@ -259,8 +350,9 @@ export const startPull = (rebase = false) => startJob("/pull", { rebase })
 export const startPush = (forceWithLease = false) => startJob("/push", { forceWithLease })
 
 export async function getJob(id: string): Promise<GitJob> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/jobs/${encodeURIComponent(id)}`)
-  return json<GitJob>(res)
+  return parseJobResponse<GitJob>(res)
 }
 
 /** Polls a job until it reaches a terminal state. */
@@ -276,6 +368,7 @@ export async function waitJob(id: string, onTick?: (job: GitJob) => void, timeou
 }
 
 export async function deleteBranch(name: string): Promise<RefTree> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/branches/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -285,6 +378,7 @@ export async function deleteBranch(name: string): Promise<RefTree> {
 }
 
 export async function deleteTag(name: string): Promise<RefTree> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/tags/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -296,11 +390,13 @@ export async function deleteTag(name: string): Promise<RefTree> {
 export type StashInfo = { reference: string; id: string; subject: string }
 
 export async function fetchStashes(): Promise<StashInfo[]> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/stashes`)
   return json<StashInfo[]>(res)
 }
 
 export async function stashChanges(message: string | null, keepIndex = false, includeUntracked = false): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/stash`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -310,6 +406,7 @@ export async function stashChanges(message: string | null, keepIndex = false, in
 }
 
 export async function applyStash(reference: string, pop = false): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/stash/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -319,6 +416,7 @@ export async function applyStash(reference: string, pop = false): Promise<RepoSt
 }
 
 export async function dropStash(reference: string): Promise<void> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/stash/drop`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -328,21 +426,25 @@ export async function dropStash(reference: string): Promise<void> {
 }
 
 export async function fetchStatus(): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/status`)
   return json<RepoStatus>(res)
 }
 
 export async function fetchRefs(): Promise<RefTree> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/refs`)
   return json<RefTree>(res)
 }
 
 export async function fetchConfig(): Promise<GitConfig> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/config`)
   return json<GitConfig>(res)
 }
 
 export async function saveConfig(patch: Partial<GitConfig> & { global?: boolean }): Promise<GitConfig> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/config`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -357,16 +459,19 @@ export async function saveConfig(patch: Partial<GitConfig> & { global?: boolean 
 }
 
 export async function fetchVsCode(): Promise<VsCodeInfo> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/tools/vscode`)
   return json<VsCodeInfo>(res)
 }
 
 export async function applyVsCode(): Promise<VsCodeInfo> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/tools/vscode`, { method: "POST" })
   return json<VsCodeInfo>(res)
 }
 
 export async function stagePaths(paths: string[], unstage = false): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/stage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -376,6 +481,7 @@ export async function stagePaths(paths: string[], unstage = false): Promise<Repo
 }
 
 export async function createCommit(message: string, amend = false): Promise<{ id: string }> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -385,6 +491,7 @@ export async function createCommit(message: string, amend = false): Promise<{ id
 }
 
 export async function checkoutRef(ref: string, force = false): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -394,6 +501,7 @@ export async function checkoutRef(ref: string, force = false): Promise<RepoStatu
 }
 
 export async function resetBranch(commit: string, mode: "soft" | "mixed" | "hard"): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/reset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -403,6 +511,7 @@ export async function resetBranch(commit: string, mode: "soft" | "mixed" | "hard
 }
 
 export async function rebaseOnto(onto: string): Promise<RepoStatus> {
+  await engineReady
   const res = await fetch(`${ENGINE_URL}/rebase`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

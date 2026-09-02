@@ -41,6 +41,51 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void GetWorkTreeDiff_untracked_file_shows_full_added_diff()
+    {
+        // Regression: `git diff` (without --cached) only ever compares the
+        // working tree to the index, so a file git has never seen -- not
+        // even staged -- produced empty output, and the UI rendered "no
+        // diff" for a brand-new file. GetWorkTreeDiff now falls back to
+        // `git diff --no-index` for untracked paths so the full content
+        // shows as one "added" hunk.
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        File.WriteAllText(Path.Combine(repo.Dir, "new-untracked.txt"), "line1\nline2\nline3\n");
+
+        DiffDto diff = host.GetWorkTreeDiff("new-untracked.txt", staged: false);
+
+        Assert.False(diff.Binary);
+        Assert.Contains("+line1", diff.Text, StringComparison.Ordinal);
+        Assert.Contains("+line2", diff.Text, StringComparison.Ordinal);
+        Assert.Contains("+line3", diff.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("no diff", diff.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetWorkTreeDiff_staged_new_file_keeps_normal_behavior()
+    {
+        // Once `git add`ed, the path is tracked in the index (git ls-files
+        // sees it), so the untracked fallback must not kick in: --cached
+        // already renders the "added" diff, and the unstaged view correctly
+        // still says "no diff" since nothing is left unstaged for it.
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        File.WriteAllText(Path.Combine(repo.Dir, "staged-new.txt"), "hello\n");
+        RunGit(repo.Dir, "add", "staged-new.txt");
+
+        DiffDto staged = host.GetWorkTreeDiff("staged-new.txt", staged: true);
+        Assert.Contains("+hello", staged.Text, StringComparison.Ordinal);
+
+        DiffDto unstaged = host.GetWorkTreeDiff("staged-new.txt", staged: false);
+        Assert.Equal("(no diff)", unstaged.Text);
+    }
+
+    [Fact]
     public void GetRefs_lists_heads()
     {
         GitHost host = Opened();
@@ -91,6 +136,63 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void ListRevisions_uses_date_order_so_other_branches_surface_in_first_page()
+    {
+        // Regression: --topo-order tunnels down whichever branch it starts
+        // on and only backs off once that line hits a synchronization wait,
+        // so one long-lived branch (main, here) fills the entire first page
+        // before a shorter branch's commit is even considered -- even one
+        // newer than most of that page. That is exactly what made the graph
+        // look single-branch-only. --date-order fixes it by always picking
+        // the single next-newest ready commit across every branch.
+        //
+        // Layout: main gets 50 commits one minute apart; "side" forks after
+        // main-4 and gets one commit dated between main-40 and main-41. The
+        // 10 newest commits by pure date are main-49..main-41 (9 commits)
+        // then side-commit -- verified against --topo-order (drops
+        // side-commit from -n10) and --date-order (keeps it) on a live repo.
+        string dir = Directory.CreateTempSubdirectory("powergit-order-").FullName;
+        try
+        {
+            RunGit(dir, "init", "-q", "-b", "main");
+            RunGit(dir, "config", "user.email", "test@example.com");
+            RunGit(dir, "config", "user.name", "test");
+
+            const long BaseTime = 1_700_000_000;
+            for (int i = 0; i < 5; i++)
+            {
+                CommitAt(dir, $"main-{i}", BaseTime + (i * 60));
+            }
+
+            RunGit(dir, "checkout", "-q", "-b", "side");
+            CommitAt(dir, "side-commit", BaseTime + (40 * 60) + 30);
+            RunGit(dir, "checkout", "-q", "main");
+
+            for (int i = 5; i < 50; i++)
+            {
+                CommitAt(dir, $"main-{i}", BaseTime + (i * 60));
+            }
+
+            GitHost host = new();
+            host.Open(dir);
+            IReadOnlyList<RevisionDto> top = host.ListRevisions(10);
+
+            Assert.Contains(top, r => r.Subject == "side-commit");
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+            catch
+            {
+                // best effort; a lingering repo watcher handle should not fail the test
+            }
+        }
+    }
+
+    [Fact]
     public void ListRevisions_survives_thousands_of_refs()
     {
         // Regression: /revisions once expanded every ref into git-log argv,
@@ -129,5 +231,40 @@ public sealed class QueryTests
         Assert.NotEmpty(revs);
         Assert.Contains(revs, r => r.Refs.Any(name => name.StartsWith("load-test/", StringComparison.Ordinal)));
         Assert.Equal(2500 + 2, reopened.GetRefs().Branches.Length); // main + feature + generated
+    }
+
+    private static void CommitAt(string dir, string message, long unixSeconds)
+    {
+        string date = $"{unixSeconds} +0000";
+        System.Diagnostics.ProcessStartInfo psi = new("git", ["commit", "-q", "--allow-empty", "-m", message])
+        {
+            WorkingDirectory = dir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        psi.Environment["GIT_AUTHOR_DATE"] = date;
+        psi.Environment["GIT_COMMITTER_DATE"] = date;
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(30_000);
+        if (p is null || p.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"git commit failed: {p?.StandardError.ReadToEnd()}");
+        }
+    }
+
+    private static void RunGit(string workDir, params string[] args)
+    {
+        System.Diagnostics.ProcessStartInfo psi = new("git", args)
+        {
+            WorkingDirectory = workDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(30_000);
+        if (p is null || p.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"git {string.Join(' ', args)} failed: {p?.StandardError.ReadToEnd()}");
+        }
     }
 }

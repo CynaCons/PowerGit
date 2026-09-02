@@ -17,11 +17,27 @@ public sealed partial class GitHost
         // --remotes --tags select the same commits (all local + remote branch
         // tips and tags — owner decision 2026-08-24, GE parity); HEAD covers
         // the detached case and refs/stash has no glob, so both stay as
-        // single argv entries. skip/max page the topo-ordered stream so the
-        // UI can load history incrementally.
+        // single argv entries. skip/max page the ordered stream so the UI
+        // can load history incrementally.
+        //
+        // --date-order, not --topo-order: GE's default (RevisionSortOrder.
+        // GitDefault in RevisionReader.BuildArguments) passes neither sort
+        // flag, which falls back to git log's own default of reverse-
+        // chronological-by-date. --topo-order instead tunnels down whichever
+        // branch it starts on and only backs off once that line hits a
+        // synchronization wait, so one long-lived branch (typically the
+        // current one) fills the entire -n800 page before any other branch's
+        // commits are considered, even ones newer than most of that page —
+        // this is what made the graph look single-branch-only. --date-order
+        // reproduces GE's ordering (verified: identical output to the no-flag
+        // default on a diverging-branch repro) while still guaranteeing "no
+        // parent shown before its children", which the lane layout in
+        // frontend/src/graph/layout.ts relies on (it only ever resolves a
+        // segment against the immediately preceding row, so a commit must
+        // never be rendered before all of its children).
         List<string> logArgs = [
             "-c", "core.quotepath=false",
-            "log", "--topo-order", "--decorate=short",
+            "log", "--date-order", "--decorate=short",
             "--branches", "--remotes", "--tags",
             $"-n{Math.Clamp(max, 1, 5000)}",
         ];
@@ -239,6 +255,19 @@ public sealed partial class GitHost
     {
         string root = RequireRoot();
         int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
+
+        // `git diff` (without --cached) only ever compares the working tree
+        // against the index, so a path git has never seen -- not even
+        // staged -- produces no output at all: the "no diff" bug for new,
+        // unstaged files. `git ls-files` lists index entries, so a path
+        // that has been `git add`ed already shows up there and correctly
+        // keeps using the normal diff below (which rightly says "no diff"
+        // when there is nothing unstaged left to show for it).
+        if (!staged && IsUntracked(root, path))
+        {
+            return GetUntrackedDiff(root, path, u, ignoreWhitespace);
+        }
+
         List<string> args = ["-c", "core.quotepath=false", "diff", "--no-color", $"-U{u}"];
         if (staged)
         {
@@ -505,6 +534,50 @@ public sealed partial class GitHost
         {
             throw new InvalidOperationException(result.StdErr.Trim());
         }
+    }
+
+    private DiffDto GetUntrackedDiff(string root, string path, int context, bool ignoreWhitespace)
+    {
+        // git diff --no-index treats a literal "/dev/null" ("NUL" on
+        // Windows) as an empty file without touching the filesystem, so the
+        // real file comes back as one big "added" hunk through the normal
+        // diff machinery -- context, -w, and binary detection all keep
+        // working exactly like the tracked-file diff path.
+        string emptyFile = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
+        List<string> args = ["-c", "core.quotepath=false", "diff", "--no-color", "--no-index", $"-U{context}"];
+        if (ignoreWhitespace)
+        {
+            args.Add("-w");
+        }
+
+        args.AddRange(["--", emptyFile, path]);
+        CommandResult result = RunTimed(root, 30_000, [.. args]);
+
+        // --no-index exits 1 when the two sides differ, which is true for
+        // any new file with content; only >1 signals a real error.
+        if (result.ExitCode > 1)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+
+        string text = result.StdOut;
+        if (text.Contains("Binary files ", StringComparison.Ordinal))
+        {
+            return new DiffDto(path, "Binary file (not shown)", true);
+        }
+
+        if (text.Length > 1_000_000)
+        {
+            text = text[..1_000_000] + "\n… truncated …";
+        }
+
+        return new DiffDto(path, string.IsNullOrWhiteSpace(text) ? "(no diff)" : text, false);
+    }
+
+    private bool IsUntracked(string root, string path)
+    {
+        CommandResult result = Run(root, "ls-files", "--error-unmatch", "--", path);
+        return result.ExitCode != 0;
     }
 
     private string? GetConfigValue(string root, string key)

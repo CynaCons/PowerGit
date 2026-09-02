@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box"
+import { codeSx } from "../theme"
 
 // Git Extensions palette (git-coloring mode).
 // Source: src/app/GitExtUtils/GitUI/Theming/AppColorDefaults.cs,
@@ -47,7 +48,7 @@ function classifyLine(line: string): { segments: Segment[] } {
 export function DiffView({ text }: { text: string }) {
   const lines = text.split("\n")
   return (
-    <Box data-testid="diff-view" sx={{ fontFamily: "Fira Code, ui-monospace, monospace", fontSize: 12, lineHeight: 1.5 }}>
+    <Box data-testid="diff-view" sx={{ ...codeSx, fontSize: 12, lineHeight: 1.5 }}>
       {lines.map((line, i) => {
         const { segments } = classifyLine(line)
         return (

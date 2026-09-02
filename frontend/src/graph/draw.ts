@@ -52,11 +52,17 @@ export function drawRows(
   rowHeight: number,
   width: number,
   selected: number,
+  selectedAuthor?: string,
   hovered = -1,
 ): void {
   ctx.clearRect(0, 0, width, Math.max(1, end - start) * rowHeight)
   ctx.lineCap = "butt"
   ctx.lineJoin = "round"
+  const canvasStyle = getComputedStyle(ctx.canvas)
+  const selectedFill = canvasStyle.getPropertyValue("--pg-grid-sel").trim() || "#dbeafe"
+  const selectedBorder = canvasStyle.getPropertyValue("--pg-grid-sel-border").trim() || "#2563eb"
+  const authorFill = canvasStyle.getPropertyValue("--pg-grid-author").trim() || "#f8fbff"
+  const hoverFill = canvasStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
 
   for (let i = start; i < end; i++) {
     const row = rows[i]
@@ -65,10 +71,15 @@ export function drawRows(
     const centerY = y + rowHeight / 2
 
     if (i === selected) {
-      ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue("--pg-grid-sel") || "#eff6ff"
+      ctx.fillStyle = selectedFill
       ctx.fillRect(0, y, width, rowHeight)
+      ctx.fillStyle = selectedBorder
+      ctx.fillRect(0, y, 2, rowHeight)
     } else if (i === hovered) {
-      ctx.fillStyle = "rgba(37, 99, 235, 0.08)"
+      ctx.fillStyle = hoverFill
+      ctx.fillRect(0, y, width, rowHeight)
+    } else if (selectedAuthor && row.rev.author === selectedAuthor) {
+      ctx.fillStyle = authorFill
       ctx.fillRect(0, y, width, rowHeight)
     }
 

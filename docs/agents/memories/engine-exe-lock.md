@@ -24,6 +24,14 @@ Stop-Process -Name PowerGit.Engine -Force -ErrorAction SilentlyContinue
 - Playwright e2e starts only Vite (`webServer` in playwright.config.ts).
   A live engine on :7733 must already be running or engine-backed tests
   (File Tree tab) fail with "Failed to fetch".
+- Without a live engine the symptom isn't always an explicit fetch error:
+  the app falls back to offline/synthetic mode (stuck on "connecting…" on
+  a cold Vite dep cache, then `grid-row` renders but ref-name-specific
+  locators like `tree-row[data-label="powergit"]` never appear, since
+  synthetic data has no real branches). `GitHost.TryDiscover` walks up from
+  cwd/AppContext.BaseDirectory to find `.git`, so the engine exposes
+  whatever branch is actually checked out — tests asserting a literal
+  branch name depend on that.
 
 # Engine ops endpoints (v0.4.7)
 - `POST /checkout {ref, force}` — 400 with a "force" hint when tree is dirty.

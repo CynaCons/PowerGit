@@ -55,8 +55,8 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, hovered)
-  }, [rows, start, end, selected, hovered, width])
+    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, selectedAuthor, hovered)
+  }, [rows, start, end, selected, selectedAuthor, hovered, width])
 
   return (
     <div className="main" data-testid="revision-grid">
@@ -122,10 +122,11 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
           {virtualItems.map((item) => {
             const row = rows[item.index]
             const refs = visibleRefs(row.rev.refs)
+            const isAuthorHighlight = item.index !== selected && selectedAuthor && row.rev.author === selectedAuthor
             return (
               <div
                 key={row.rev.id}
-                className={`grid-row${item.index === selected ? " selected" : ""}`}
+                className={`grid-row${item.index === selected ? " selected" : ""}${isAuthorHighlight ? " author-highlight" : ""}`}
                 data-testid="grid-row"
                 data-index={item.index}
                 onClick={() => {
@@ -134,17 +135,7 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
                 }}
                 onContextMenu={onRowContextMenu ? (e) => { onSelect(item.index); onRowContextMenu(e, item.index) } : undefined}
                 onMouseEnter={() => setHovered(item.index)}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${item.start}px)`,
-                  backgroundColor:
-                    item.index !== selected && selectedAuthor && row.rev.author === selectedAuthor
-                      ? "rgba(37, 99, 235, 0.05)"
-                      : undefined,
-                }}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${item.start}px)` }}
               >
                 <div className="graph-cell" />
                 <div className="msg">

@@ -1,18 +1,27 @@
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
 import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutlined"
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown"
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward"
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward"
+import CallMergeIcon from "@mui/icons-material/CallMerge"
+import CallSplitIcon from "@mui/icons-material/CallSplit"
+import CheckIcon from "@mui/icons-material/Check"
 import HistoryIcon from "@mui/icons-material/History"
-import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"
+import Inventory2Icon from "@mui/icons-material/Inventory2"
+import LowPriorityIcon from "@mui/icons-material/LowPriority"
+import RefreshIcon from "@mui/icons-material/Refresh"
+import SellIcon from "@mui/icons-material/Sell"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
+import SyncIcon from "@mui/icons-material/Sync"
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
-import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined"
-import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined"
-import CallReceivedOutlinedIcon from "@mui/icons-material/CallReceivedOutlined"
 import AppBar from "@mui/material/AppBar"
 import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
+import ButtonGroup from "@mui/material/ButtonGroup"
 import CircularProgress from "@mui/material/CircularProgress"
+import Divider from "@mui/material/Divider"
 import IconButton from "@mui/material/IconButton"
 import LinearProgress from "@mui/material/LinearProgress"
 import Toolbar from "@mui/material/Toolbar"
@@ -38,6 +47,7 @@ import {
   createTag,
   deleteBranch,
   deleteTag,
+  describeThrown,
   fetchCommit,
   fetchCurrent,
   fetchHealth,
@@ -456,7 +466,12 @@ export default function App() {
       await fn()
       setEngineError(null)
     } catch (e) {
-      setEngineError(e instanceof Error ? e.message : `${label} failed`)
+      // Prefix the operation name: a bare browser/DOMException message (e.g.
+      // WebKit's "The string did not match the expected pattern") is
+      // otherwise impossible to trace back to what the user clicked.
+      // `describeThrown` (engine.ts) reads `.message` defensively since
+      // DOMException does not reliably satisfy `instanceof Error`.
+      setEngineError(`${label}: ${describeThrown(e)}`)
     } finally {
       setBusy(false)
       setJobLabel(null)
@@ -507,7 +522,7 @@ export default function App() {
       setRefs(await deleteBranch(name))
       await refresh({ revisions: true })
     } catch (e) {
-      setEngineError(e instanceof Error ? e.message : "delete failed")
+      setEngineError(`Delete branch failed: ${describeThrown(e)}`)
     }
   }
   async function doDeleteTag(name: string) {
@@ -516,11 +531,33 @@ export default function App() {
       setRefs(await deleteTag(name))
       await refresh({ revisions: true })
     } catch (e) {
-      setEngineError(e instanceof Error ? e.message : "delete failed")
+      setEngineError(`Delete tag failed: ${describeThrown(e)}`)
     }
   }
   async function doFetchRemote(name: string) {
     await runJob("Fetching", () => startFetch(name))
+  }
+  // Shared by the toolbar buttons and their hotkeys so both entry points
+  // always agree on behaviour.
+  function openCreateBranch() {
+    if (!current) return
+    setCreateRef({ kind: "branch", sha: current.rev.id, subject: current.rev.message })
+  }
+  function openCreateTag() {
+    if (!current) return
+    setCreateRef({ kind: "tag", sha: current.rev.id, subject: current.rev.message })
+  }
+  function openCheckoutBranch() {
+    const name = repo?.branch ?? branchNames[0]
+    if (name) setCheckoutBranch(name)
+  }
+  function openRebase() {
+    if (current) setRebaseRow(current)
+  }
+  async function doDeleteBranchPrompt() {
+    const hint = branchNames.length > 0 ? `Delete which branch?\n(${branchNames.join(", ")})` : "Delete which branch?"
+    const target = window.prompt(hint)
+    if (target?.trim()) await doDeleteBranch(target.trim())
   }
   function doOpenSubmodule(path: string) {
     if (!repo) return
@@ -555,21 +592,10 @@ export default function App() {
       },
       "browse.openRepo": () => void onOpenFolder(),
       "browse.openSettings": () => setSettingsOpen(true),
-      "browse.createBranch": () => {
-        if (!current) return
-        setCreateRef({ kind: "branch", sha: current.rev.id, subject: current.rev.message })
-      },
-      "browse.createTag": () => {
-        if (!current) return
-        setCreateRef({ kind: "tag", sha: current.rev.id, subject: current.rev.message })
-      },
-      "browse.checkoutBranch": () => {
-        const name = repo?.branch ?? branchNames[0]
-        if (name) setCheckoutBranch(name)
-      },
-      "browse.rebase": () => {
-        if (current) setRebaseRow(current)
-      },
+      "browse.createBranch": openCreateBranch,
+      "browse.createTag": openCreateTag,
+      "browse.checkoutBranch": openCheckoutBranch,
+      "browse.rebase": openRebase,
       "browse.pull": () => {
         if (live && !busy) void runJob("Pulling", () => startPull(false))
       },
@@ -647,6 +673,15 @@ export default function App() {
           <Typography variant="subtitle1" sx={{ mr: 1, fontWeight: 700 }}>
             PowerGit
           </Typography>
+          <ToolbarButton
+            label="Refresh"
+            icon={<RefreshIcon fontSize="small" />}
+            testid="refresh-button"
+            disabled={!live}
+            shortcut={shortcutLabel("browse.refresh")}
+            onClick={() => void refresh()}
+          />
+          <Divider orientation="vertical" flexItem sx={{ my: 0.75 }} />
           <Badge
             badgeContent={dirty || 0}
             color="primary"
@@ -655,6 +690,7 @@ export default function App() {
           >
             <SplitButton
               label="Commit"
+              icon={<CheckIcon fontSize="small" />}
               testid="commit-button"
               variant="contained"
               shortcut={shortcutLabel("browse.commit")}
@@ -671,7 +707,7 @@ export default function App() {
           </Badge>
           <SplitButton
             label={stashes.length > 0 ? `Stash (${stashes.length})` : "Stash"}
-            icon={<Inventory2OutlinedIcon fontSize="small" />}
+            icon={<Inventory2Icon fontSize="small" />}
             testid="stash-button"
             disabled={!live}
             shortcut={shortcutLabel("browse.stash")}
@@ -718,9 +754,34 @@ export default function App() {
               Drop stash@{"{0}"}
             </MenuItem>
           </SplitButton>
+          <Divider orientation="vertical" flexItem sx={{ my: 0.75 }} />
+          <SplitButton
+            label="Pull"
+            icon={<ArrowDownwardIcon fontSize="small" />}
+            testid="pull-button"
+            disabled={!live || busy}
+            shortcut={shortcutLabel("browse.pull")}
+            onMainClick={() => runJob("Pulling", () => startPull(false))}
+          >
+            <MenuItem data-testid="pull-rebase" onClick={() => runJob("Pulling (rebase)", () => startPull(true))}>
+              Pull (rebase onto upstream)
+            </MenuItem>
+          </SplitButton>
+          <SplitButton
+            label="Push"
+            icon={<ArrowUpwardIcon fontSize="small" />}
+            testid="push-button"
+            disabled={!live || busy}
+            shortcut={shortcutLabel("browse.push")}
+            onMainClick={() => runJob("Pushing", () => startPush(false))}
+          >
+            <MenuItem data-testid="push-force-lease" onClick={() => runJob("Pushing (force with lease)", () => startPush(true))}>
+              Push (force with lease)
+            </MenuItem>
+          </SplitButton>
           <SplitButton
             label="Fetch"
-            icon={<CloudDownloadOutlinedIcon fontSize="small" />}
+            icon={<SyncIcon fontSize="small" />}
             testid="fetch-button"
             disabled={!live || busy}
             shortcut={shortcutLabel("browse.quickFetch")}
@@ -745,30 +806,54 @@ export default function App() {
               </MenuItem>
             )}
           </SplitButton>
+          <Divider orientation="vertical" flexItem sx={{ my: 0.75 }} />
           <SplitButton
-            label="Pull"
-            icon={<CallReceivedOutlinedIcon fontSize="small" />}
-            testid="pull-button"
-            disabled={!live || busy}
-            shortcut={shortcutLabel("browse.pull")}
-            onMainClick={() => runJob("Pulling", () => startPull(false))}
+            label="Branch"
+            icon={<CallSplitIcon fontSize="small" />}
+            testid="branch-button"
+            disabled={!live || !current}
+            shortcut={shortcutLabel("browse.createBranch")}
+            onMainClick={openCreateBranch}
           >
-            <MenuItem data-testid="pull-rebase" onClick={() => runJob("Pulling (rebase)", () => startPull(true))}>
-              Pull (rebase onto upstream)
+            <MenuItem data-testid="branch-delete" onClick={() => void doDeleteBranchPrompt()}>
+              Delete branch…
             </MenuItem>
           </SplitButton>
-          <SplitButton
-            label="Push"
-            icon={<CloudUploadOutlinedIcon fontSize="small" />}
-            testid="push-button"
-            disabled={!live || busy}
-            shortcut={shortcutLabel("browse.push")}
-            onMainClick={() => runJob("Pushing", () => startPush(false))}
-          >
-            <MenuItem data-testid="push-force-lease" onClick={() => runJob("Pushing (force with lease)", () => startPush(true))}>
-              Push (force with lease)
-            </MenuItem>
-          </SplitButton>
+          <ToolbarButton
+            label="Checkout"
+            icon={<SwapHorizIcon fontSize="small" />}
+            testid="checkout-button"
+            disabled={!live}
+            shortcut={shortcutLabel("browse.checkoutBranch")}
+            onClick={openCheckoutBranch}
+          />
+          <Tooltip title="Merge branches (coming soon)">
+            <span>
+              <ToolbarButton
+                label="Merge"
+                icon={<CallMergeIcon fontSize="small" />}
+                testid="merge-button"
+                disabled
+                onClick={() => {}}
+              />
+            </span>
+          </Tooltip>
+          <ToolbarButton
+            label="Rebase"
+            icon={<LowPriorityIcon fontSize="small" />}
+            testid="rebase-button"
+            disabled={!live || !current}
+            shortcut={shortcutLabel("browse.rebase")}
+            onClick={openRebase}
+          />
+          <ToolbarButton
+            label="Tag"
+            icon={<SellIcon fontSize="small" />}
+            testid="tag-button"
+            disabled={!live || !current}
+            shortcut={shortcutLabel("browse.createTag")}
+            onClick={openCreateTag}
+          />
             <Typography data-testid="engine-status" variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
               {health
                 ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
@@ -999,12 +1084,14 @@ export default function App() {
 }
 
 // Git Extensions-style split button: main action on the left, dropdown caret
-// for secondary actions. Material chrome only.
+// for secondary actions. A MUI ButtonGroup keeps both halves in one bordered
+// group with a single shared divider (no gap), so the caret is unambiguously
+// part of the button to its left rather than floating between two buttons.
 function SplitButton({
   label,
   icon,
   testid,
-  variant = "text",
+  variant = "outlined",
   disabled,
   shortcut,
   onMainClick,
@@ -1013,54 +1100,68 @@ function SplitButton({
   label: string
   icon?: ReactNode
   testid: string
-  variant?: "text" | "contained"
+  variant?: "outlined" | "contained"
   disabled?: boolean
   shortcut?: string
   onMainClick: () => void
   children?: ReactNode
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
-  const shared = {
-    size: "small" as const,
-    disabled,
-    sx: { minWidth: 0 },
-  }
   return (
     <>
-      <Box sx={{ display: "inline-flex", alignItems: "stretch" }}>
+      <ButtonGroup size="small" variant={variant} disabled={disabled}>
         <Button
-          {...shared}
-          variant={variant}
           data-testid={testid}
           startIcon={icon}
           title={shortcut ? `${label} (${shortcut})` : undefined}
           onClick={onMainClick}
-          sx={{ ...shared.sx, borderTopRightRadius: 0, borderBottomRightRadius: 0, pr: 1 }}
         >
           {label}
         </Button>
         <Button
-          {...shared}
-          variant={variant}
           data-testid={`${testid}-menu`}
           aria-label={`${label} options`}
           onClick={(e) => setAnchor(e.currentTarget)}
-          sx={{
-            ...shared.sx,
-            px: 0.25,
-            borderTopLeftRadius: 0,
-            borderBottomLeftRadius: 0,
-            borderLeft: 1,
-            borderColor: variant === "contained" ? "rgba(255,255,255,0.35)" : "divider",
-            alignSelf: "stretch",
-          }}
+          sx={{ px: 0.25, minWidth: 0 }}
         >
           <ArrowDropDownIcon fontSize="small" />
         </Button>
-      </Box>
+      </ButtonGroup>
       <Menu open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)}>
         {children}
       </Menu>
     </>
+  )
+}
+
+// Standalone Git Extensions-style toolbar button: icon + short label, no
+// caret — reserved for actions with no attached menu (see SplitButton).
+function ToolbarButton({
+  label,
+  icon,
+  testid,
+  disabled,
+  shortcut,
+  onClick,
+}: {
+  label: string
+  icon: ReactNode
+  testid: string
+  disabled?: boolean
+  shortcut?: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      size="small"
+      variant="outlined"
+      data-testid={testid}
+      startIcon={icon}
+      disabled={disabled}
+      title={shortcut ? `${label} (${shortcut})` : undefined}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
   )
 }

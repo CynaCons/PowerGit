@@ -1,4 +1,13 @@
+import type { SxProps, Theme } from "@mui/material/styles"
 import { createTheme } from "@mui/material/styles"
+
+export const MONO_FONT = '"Fira Code", ui-monospace, monospace'
+
+export const codeSx = {
+  fontFamily: MONO_FONT,
+  fontVariantLigatures: "none",
+  fontFeatureSettings: '"liga" 0, "calt" 0',
+} satisfies SxProps<Theme>
 
 const theme = createTheme({
   palette: {
@@ -18,8 +27,16 @@ const theme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        ":root": { "--pg-font-mono": MONO_FONT },
         "html, body, #root": { height: "100%", margin: 0 },
-        body: { backgroundColor: "#f4f6f8", overflow: "hidden" },
+        // sx-generated classes cannot be matched by the inline-style selector,
+        // so disable ligatures globally; Inter has no meaningful ligatures.
+        body: {
+          backgroundColor: "#f4f6f8",
+          overflow: "hidden",
+          fontVariantLigatures: "none",
+          fontFeatureSettings: '"liga" 0, "calt" 0',
+        },
       },
     },
     MuiPaper: {
