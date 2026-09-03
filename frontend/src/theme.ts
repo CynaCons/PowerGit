@@ -1,12 +1,16 @@
 import type { SxProps, Theme } from "@mui/material/styles"
 import { createTheme } from "@mui/material/styles"
 
-// Linux fallbacks matter here: an AppImage renders offline and a WebKitGTK
-// host may briefly (font-display: swap) or permanently (load failure) miss
-// the self-hosted static faces in tokens.css, so these stacks fall through
-// to fonts actually preinstalled on mainstream Linux desktops rather than a
-// generic/thin default. See docs/agents/memories/linux-fonts.md.
-const SANS_FONT = '"Inter", "Noto Sans", "Cantarell", "Ubuntu", "DejaVu Sans", system-ui, sans-serif'
+// VS Code's own workbench stack, in VS Code's own order: the platform UI
+// font first, self-hosted Inter only as the fallback. The owner asked for
+// "the same as VS Code" after Inter read as low-quality on Ubuntu, and the
+// reason is rasterization, not the typeface: Segoe UI (Windows) and Ubuntu
+// (GNOME) ship with hinting instructions and fontconfig rules tuned for
+// their platform's rasterizer, which a webfont served through WebKitGTK
+// does not get. Inter still backstops any desktop that has neither.
+// See docs/agents/memories/linux-fonts.md.
+const SANS_FONT =
+  'system-ui, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", "Cantarell", "Noto Sans", "Inter", "DejaVu Sans", sans-serif'
 export const MONO_FONT = '"Fira Code", "JetBrains Mono", "DejaVu Sans Mono", ui-monospace, Consolas, monospace'
 
 export const codeSx = {
@@ -29,6 +33,11 @@ const theme = createTheme({
   typography: {
     fontFamily: SANS_FONT,
     fontSize: 14,
+    // Body text at 500 rather than 400: the platform UI faces above read a
+    // step lighter under WebKitGTK's rasterizer than under DirectWrite, and
+    // asking for the weight is the honest fix (the smoothing hack above was
+    // not). Segoe UI/Ubuntu both ship a real 500, so this is not synthesised.
+    fontWeightRegular: 500,
     button: { textTransform: "none", fontWeight: 600 },
   },
   shape: { borderRadius: 4 },
@@ -44,13 +53,16 @@ const theme = createTheme({
           overflow: "hidden",
           fontVariantLigatures: "none",
           fontFeatureSettings: '"liga" 0, "calt" 0',
-          // Linux/WebKitGTK grayscale antialiasing renders the same weight
-          // visibly thinner/lighter than Windows ClearType; these are no-ops
-          // on Windows/macOS but measurably darken/sharpen text on Linux
-          // (owner feedback 2026-09-02).
-          WebkitFontSmoothing: "antialiased",
-          MozOsxFontSmoothing: "grayscale",
-          textRendering: "optimizeLegibility",
+          // NOT `-webkit-font-smoothing: antialiased`. That was set here on
+          // 2026-09-02 to make Linux text darker; it does the opposite. It
+          // disables subpixel rendering and forces grayscale AA, which drops
+          // roughly a third of the coverage the rasterizer would otherwise
+          // put down — i.e. it is precisely what makes text look thin and
+          // washed out, the symptom it was meant to fix. `auto` lets each
+          // platform use its own (subpixel, where the display allows it).
+          // `textRendering: optimizeLegibility` is likewise gone: it buys
+          // nothing for UI text and perturbs metrics/kerning.
+          WebkitFontSmoothing: "auto",
         },
         // Grid rows render plain divs/spans styled by app.css, which this
         // file does not own; only the weight bump lives here (per the

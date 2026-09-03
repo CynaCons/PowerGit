@@ -54,13 +54,42 @@ export function RevisionContextMenu({
   // menu item is clicked, independent of the menu's own open/close lifecycle.
   const [cherryPickTarget, setCherryPickTarget] = useState<ContextTarget["row"] | null>(null)
   const [revertTarget, setRevertTarget] = useState<ContextTarget["row"] | null>(null)
+
+  // A MUI Menu is a Modal: its root covers the viewport and swallows every
+  // pointer event, so a second right-click landed on the modal root instead
+  // of the row underneath — the menu just closed and (before App's global
+  // handler) the WebView's own menu appeared. Letting pointer events through
+  // the root, while keeping them on the paper, makes right-clicking another
+  // row re-target the menu in one gesture, the way a desktop app behaves.
+  // Click-away then has to be wired up by hand, since it normally rides on
+  // the backdrop that no longer receives anything.
+  const open = target !== null
+  useEffect(() => {
+    if (!open) return
+    const closeIfOutside = (e: Event) => {
+      const el = e.target as HTMLElement | null
+      if (el?.closest("#revision-context-menu")) return
+      onClose()
+    }
+    document.addEventListener("mousedown", closeIfOutside, true)
+    document.addEventListener("contextmenu", closeIfOutside, true)
+    return () => {
+      document.removeEventListener("mousedown", closeIfOutside, true)
+      document.removeEventListener("contextmenu", closeIfOutside, true)
+    }
+  }, [open, onClose])
+
   return (
     <>
       <Menu
-        open={target !== null}
+        open={open}
         onClose={onClose}
         anchorReference="anchorPosition"
         anchorPosition={target ? { top: target.y, left: target.x } : undefined}
+        slotProps={{
+          root: { sx: { pointerEvents: "none" } },
+          paper: { id: "revision-context-menu", sx: { pointerEvents: "auto" } },
+        }}
       >
         <MenuItem
           data-testid="ctx-checkout"

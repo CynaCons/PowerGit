@@ -11,6 +11,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import HistoryIcon from "@mui/icons-material/History"
 import Inventory2Icon from "@mui/icons-material/Inventory2"
 import LowPriorityIcon from "@mui/icons-material/LowPriority"
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz"
 import RefreshIcon from "@mui/icons-material/Refresh"
 import SellIcon from "@mui/icons-material/Sell"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
@@ -727,30 +728,68 @@ export default function App() {
     !commitOpen && !blockingDialog,
   )
 
+  // Command-bar overflow, the standard desktop/Fluent pattern: labels drop
+  // to icons as the window narrows, then the secondary group collapses into
+  // a single "More" menu. Driven by the toolbar's own measured width (not a
+  // viewport media query) so it also reacts to the app being embedded or a
+  // scrollbar appearing, and so nothing ever wraps or overflows off-screen.
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
+  const [toolbarTier, setToolbarTier] = useState<"full" | "compact" | "overflow">("full")
+  const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    const el = toolbarRef.current
+    if (!el) return
+    const apply = (w: number) => setToolbarTier(w >= 1080 ? "full" : w >= 790 ? "compact" : "overflow")
+    apply(el.getBoundingClientRect().width)
+    // ResizeObserver is unavailable in no-DOM test shims; width then just
+    // stays at whatever the first measurement produced.
+    if (typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver((entries) => apply(entries[0].contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const iconsOnly = toolbarTier !== "full"
+  const overflowed = toolbarTier === "overflow"
+
+  // Below the overflow width there is not enough room for both the ref panel
+  // (232px fixed) and a readable grid: the Author/Date/SHA columns get pushed
+  // off the right edge. Collapse the panel automatically, and restore it when
+  // the window grows again — but only if we were the ones who closed it, so a
+  // deliberate Ctrl+B stays honoured.
+  const autoCollapsed = useRef(false)
+  useEffect(() => {
+    if (overflowed) {
+      setLeftOpen((open) => {
+        if (open) autoCollapsed.current = true
+        return false
+      })
+    } else if (autoCollapsed.current) {
+      autoCollapsed.current = false
+      setLeftOpen(true)
+    }
+  }, [overflowed])
+
+  // PowerGit is a desktop app: the WebView's own context menu must never
+  // appear. Without this, right-clicking anywhere that is not a grid row —
+  // including the MUI Menu's own backdrop, which is what the pointer lands
+  // on for the *second* right-click while a menu is open — showed the
+  // browser menu instead of ours. Capture phase, so it runs before React's
+  // delegated handlers; no stopPropagation, so row handlers still fire.
+  // Editable fields keep their native menu (cut/copy/paste).
+  useEffect(() => {
+    const onContextMenu = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el?.closest("input, textarea, [contenteditable='true']")) return
+      e.preventDefault()
+    }
+    document.addEventListener("contextmenu", onContextMenu, true)
+    return () => document.removeEventListener("contextmenu", onContextMenu, true)
+  }, [])
+
   return (
     <Box data-testid="browse-shell" sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
       <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Toolbar variant="dense" data-testid="toolbar" sx={{ gap: 0.5, minHeight: 30, py: 0.25, px: 1, position: "relative" }}>
-          {progressLabel !== null && (
-            <Box
-              data-testid="topbar-progress"
-              sx={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                pointerEvents: "none",
-              }}
-            >
-              <CircularProgress size={16} thickness={4} />
-              <Typography variant="caption" color="text.secondary">
-                {progressLabel}
-              </Typography>
-            </Box>
-          )}
+        <Toolbar ref={toolbarRef} variant="dense" data-testid="toolbar" data-tier={toolbarTier} sx={{ gap: 0.5, minHeight: 32, py: 0.25, px: 1, flexWrap: "nowrap", overflow: "hidden" }}>
           <Typography variant="subtitle1" sx={{ mr: 1, fontWeight: 700 }}>
             PowerGit
           </Typography>
@@ -758,6 +797,7 @@ export default function App() {
             label="Refresh"
             icon={<RefreshIcon fontSize="small" />}
             testid="refresh-button"
+            compact={iconsOnly}
             disabled={!live}
             shortcut={shortcutLabel("browse.refresh")}
             onClick={() => void refresh()}
@@ -790,6 +830,7 @@ export default function App() {
             label={stashes.length > 0 ? `Stash (${stashes.length})` : "Stash"}
             icon={<Inventory2Icon fontSize="small" />}
             testid="stash-button"
+            compact={iconsOnly}
             disabled={!live}
             shortcut={shortcutLabel("browse.stash")}
             onMainClick={() => setStashOpen(true)}
@@ -840,6 +881,7 @@ export default function App() {
             label="Pull"
             icon={<ArrowDownwardIcon fontSize="small" />}
             testid="pull-button"
+            compact={iconsOnly}
             disabled={!live || busy}
             shortcut={shortcutLabel("browse.pull")}
             onMainClick={() => runJob("Pulling", () => startPull(false))}
@@ -852,6 +894,7 @@ export default function App() {
             label="Push"
             icon={<ArrowUpwardIcon fontSize="small" />}
             testid="push-button"
+            compact={iconsOnly}
             disabled={!live || busy}
             shortcut={shortcutLabel("browse.push")}
             onMainClick={() => runJob("Pushing", () => startPush(false))}
@@ -864,116 +907,165 @@ export default function App() {
             label="Fetch"
             icon={<SyncIcon fontSize="small" />}
             testid="fetch-button"
+            compact={iconsOnly}
             disabled={!live || busy}
             shortcut={shortcutLabel("browse.quickFetch")}
             onMainClick={() => runJob("Fetching", () => startFetch(defaultRemote))}
           >
+            {/* "Fetch all" is a first-class Git Extensions action, so it is
+                always listed (disabled with no remotes) rather than appearing
+                only once a second remote exists. */}
+            <MenuItem
+              data-testid="fetch-all"
+              disabled={remoteNames.length === 0}
+              onClick={() =>
+                runJobSequence(
+                  "Fetching all remotes",
+                  remoteNames.map((r) => () => startFetch(r)),
+                )
+              }
+            >
+              Fetch all remotes
+            </MenuItem>
+            <Divider />
             {remoteNames.map((r) => (
               <MenuItem key={r} data-testid={`fetch-${r}`} onClick={() => runJob("Fetching", () => startFetch(r))}>
-                {r}
+                {`Fetch ${r}`}
               </MenuItem>
             ))}
-            {remoteNames.length > 1 && (
-              <MenuItem
-                data-testid="fetch-all"
-                onClick={() =>
-                  runJobSequence(
-                    "Fetching all remotes",
-                    remoteNames.map((r) => () => startFetch(r)),
-                  )
-                }
-              >
-                Fetch all remotes
-              </MenuItem>
-            )}
           </SplitButton>
           <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center", my: 0 }} />
-          <SplitButton
-            label="Branch"
-            icon={<CallSplitIcon fontSize="small" />}
-            testid="branch-button"
-            disabled={!live || !current}
-            shortcut={shortcutLabel("browse.createBranch")}
-            onMainClick={openCreateBranch}
-          >
-            <MenuItem data-testid="branch-delete" onClick={() => void doDeleteBranchPrompt()}>
-              Delete branch…
-            </MenuItem>
-          </SplitButton>
-          <ToolbarButton
-            label="Checkout"
-            icon={<SwapHorizIcon fontSize="small" />}
-            testid="checkout-button"
-            disabled={!live}
-            shortcut={shortcutLabel("browse.checkoutBranch")}
-            onClick={openCheckoutBranch}
-          />
-          <Tooltip title="Merge branches (coming soon)">
-            <span>
+          {/* Branch/Checkout/Merge/Rebase/Tag are the secondary group: they
+              show as buttons while there is room and collapse wholesale into
+              the "More" menu below that width, rather than being clipped. */}
+          {!overflowed && (
+            <>
+              <SplitButton
+                label="Branch"
+                icon={<CallSplitIcon fontSize="small" />}
+                testid="branch-button"
+                disabled={!live || !current}
+                shortcut={shortcutLabel("browse.createBranch")}
+                compact={iconsOnly}
+                onMainClick={openCreateBranch}
+              >
+                <MenuItem data-testid="branch-delete" onClick={() => void doDeleteBranchPrompt()}>
+                  Delete branch…
+                </MenuItem>
+              </SplitButton>
               <ToolbarButton
-                label="Merge"
-                icon={<CallMergeIcon fontSize="small" />}
-                testid="merge-button"
-                disabled
-                onClick={() => {}}
+                label="Checkout"
+                icon={<SwapHorizIcon fontSize="small" />}
+                testid="checkout-button"
+                disabled={!live}
+                shortcut={shortcutLabel("browse.checkoutBranch")}
+                compact={iconsOnly}
+                onClick={openCheckoutBranch}
               />
-            </span>
-          </Tooltip>
-          <ToolbarButton
-            label="Rebase"
-            icon={<LowPriorityIcon fontSize="small" />}
-            testid="rebase-button"
-            disabled={!live || !current}
-            shortcut={shortcutLabel("browse.rebase")}
-            onClick={openRebase}
-          />
-          <ToolbarButton
-            label="Tag"
-            icon={<SellIcon fontSize="small" />}
-            testid="tag-button"
-            disabled={!live || !current}
-            shortcut={shortcutLabel("browse.createTag")}
-            onClick={openCreateTag}
-          />
+              <Tooltip title="Merge branches (coming soon)">
+                <span>
+                  <ToolbarButton
+                    label="Merge"
+                    icon={<CallMergeIcon fontSize="small" />}
+                    testid="merge-button"
+                    disabled
+                    compact={iconsOnly}
+                    onClick={() => {}}
+                  />
+                </span>
+              </Tooltip>
+              <ToolbarButton
+                label="Rebase"
+                icon={<LowPriorityIcon fontSize="small" />}
+                testid="rebase-button"
+                disabled={!live || !current}
+                shortcut={shortcutLabel("browse.rebase")}
+                compact={iconsOnly}
+                onClick={openRebase}
+              />
+              <ToolbarButton
+                label="Tag"
+                icon={<SellIcon fontSize="small" />}
+                testid="tag-button"
+                disabled={!live || !current}
+                shortcut={shortcutLabel("browse.createTag")}
+                compact={iconsOnly}
+                onClick={openCreateTag}
+              />
+            </>
+          )}
+          {overflowed && (
+            <>
+              <ToolbarButton
+                label="More actions"
+                icon={<MoreHorizIcon fontSize="small" />}
+                testid="toolbar-more"
+                compact
+                onClick={(e) => setMoreAnchor(e.currentTarget)}
+              />
+              <Menu open={moreAnchor !== null} anchorEl={moreAnchor} onClose={() => setMoreAnchor(null)}>
+                <MenuItem
+                  data-testid="more-branch"
+                  disabled={!live || !current}
+                  onClick={() => {
+                    setMoreAnchor(null)
+                    openCreateBranch()
+                  }}
+                >
+                  Create branch…
+                </MenuItem>
+                <MenuItem
+                  data-testid="more-branch-delete"
+                  disabled={!live}
+                  onClick={() => {
+                    setMoreAnchor(null)
+                    void doDeleteBranchPrompt()
+                  }}
+                >
+                  Delete branch…
+                </MenuItem>
+                <MenuItem
+                  data-testid="more-checkout"
+                  disabled={!live}
+                  onClick={() => {
+                    setMoreAnchor(null)
+                    openCheckoutBranch()
+                  }}
+                >
+                  Checkout branch…
+                </MenuItem>
+                <MenuItem data-testid="more-merge" disabled>
+                  Merge… (coming soon)
+                </MenuItem>
+                <MenuItem
+                  data-testid="more-rebase"
+                  disabled={!live || !current}
+                  onClick={() => {
+                    setMoreAnchor(null)
+                    openRebase()
+                  }}
+                >
+                  Rebase…
+                </MenuItem>
+                <MenuItem
+                  data-testid="more-tag"
+                  disabled={!live || !current}
+                  onClick={() => {
+                    setMoreAnchor(null)
+                    openCreateTag()
+                  }}
+                >
+                  Create tag…
+                </MenuItem>
+              </Menu>
+            </>
+          )}
           {/* Git Extensions status strip: branch, ahead/behind vs upstream,
               dirty count; engine build info stays muted at the far right.
               The dirty count is always parenthesized (even "(0 changes)")
               so `engine-status` keeps a "(" once a repo is live, which
               several e2e specs use as a "real repo data has loaded" signal
               regardless of upstream/dirty state. */}
-            <Box
-              data-testid="engine-status"
-              sx={{ ml: "auto", minWidth: 0, display: "flex", alignItems: "baseline", gap: 0.75, overflow: "hidden" }}
-            >
-              {live && repo ? (
-                <>
-                  <Typography variant="caption" noWrap sx={{ fontWeight: 700 }}>
-                    {repo.branch}
-                  </Typography>
-                  {status?.ahead != null && status?.behind != null && (
-                    <Typography variant="caption" color="text.secondary" noWrap>
-                      {`↑${status.ahead} ↓${status.behind}`}
-                    </Typography>
-                  )}
-                  <Typography variant="caption" color="text.secondary" noWrap>
-                    {`(${dirty} change${dirty === 1 ? "" : "s"})`}
-                  </Typography>
-                  {health && (
-                    <Typography variant="caption" color="text.disabled" noWrap sx={{ ml: 0.5 }}>
-                      {`${health.gitVersion} · engine ${health.engine}`}
-                    </Typography>
-                  )}
-                </>
-              ) : (
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {health
-                    ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
-                    : offline
-                      ? "sample data · connect an engine for real repositories"
-                      : "connecting…"}
-                </Typography>
-              )}
-            </Box>
         </Toolbar>
         {!live && !offline && health !== null && (
           <LinearProgress data-testid="boot-progress" sx={{ height: 2 }} />
@@ -1125,7 +1217,6 @@ export default function App() {
                   rows={rows}
                   selected={selected}
                   onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
-                  selectedAuthor={current?.rev.author}
                   loadingTail={loadingTail}
                   onNearEnd={onNearEnd}
                   onRowContextMenu={(e, index) => {
@@ -1156,6 +1247,76 @@ export default function App() {
           </Box>
         </Box>
       </Box>
+      </Box>
+      {/* Status bar. This used to be squeezed into the right-hand end of the
+          toolbar, where it was truncated to unreadable stubs ("powe... 0...
+          (14 chan... git version 2.38.1...") at every window size, and it stole the
+          width the buttons needed. A dedicated bottom bar is what Git
+          Extensions and every IDE does, and it gives the repo state a place
+          that cannot run out of room: branch and dirty count are pinned left,
+          the build info is the only thing allowed to be elided. */}
+      <Box
+        data-testid="engine-status"
+        sx={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          px: 1.5,
+          height: 24,
+          borderTop: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          overflow: "hidden",
+        }}
+      >
+        {live && repo ? (
+          <>
+            <Typography data-testid="status-branch" variant="caption" noWrap sx={{ fontWeight: 700, flexShrink: 0 }}>
+              {repo.branch}
+            </Typography>
+            {status?.ahead != null && status?.behind != null && (
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ flexShrink: 0 }}>
+                {`\u2191${status.ahead} \u2193${status.behind}`}
+              </Typography>
+            )}
+            <Typography variant="caption" color="text.secondary" noWrap sx={{ flexShrink: 0 }}>
+              {`(${dirty} change${dirty === 1 ? "" : "s"})`}
+            </Typography>
+          </>
+        ) : (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ flexShrink: 0 }}>
+            {health
+              ? "no repository"
+              : offline
+                ? "sample data \u2014 connect an engine for real repositories"
+                : "connecting\u2026"}
+          </Typography>
+        )}
+        {/* Long-running work reports here, the way VS Code does, rather than
+            floating over the toolbar buttons. */}
+        {progressLabel !== null && (
+          <Box
+            data-testid="topbar-progress"
+            sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0, pointerEvents: "none" }}
+          >
+            <CircularProgress size={12} thickness={5} />
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {progressLabel}
+            </Typography>
+          </Box>
+        )}
+        {health && (
+          <Typography
+            data-testid="status-build"
+            variant="caption"
+            color="text.disabled"
+            noWrap
+            sx={{ ml: "auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+          >
+            {`${health.gitVersion} \u00b7 engine ${health.engine}`}
+          </Typography>
+        )}
       </Box>
 
       <CommitDialog
@@ -1295,6 +1456,17 @@ const TOOLBAR_BUTTON_SX = {
 // which outranks a single-class sx utility rule on specificity alone (not
 // source order) — !important is the narrow, deliberate override for just
 // this instance.
+// Icon-only variant used by the collapsed tiers: square, no label box, so a
+// row of them reads as a compact icon bar rather than a row of empty buttons.
+const TOOLBAR_ICON_SX = {
+  height: 26,
+  minWidth: "26px !important",
+  width: 26,
+  px: 0,
+  py: 0,
+  "& .MuiSvgIcon-root": { fontSize: 18 },
+} as const
+
 const TOOLBAR_CARET_SX = {
   ...TOOLBAR_BUTTON_SX,
   px: 0,
@@ -1313,6 +1485,7 @@ function SplitButton({
   variant = "outlined",
   disabled,
   shortcut,
+  compact = false,
   onMainClick,
   children,
 }: {
@@ -1322,21 +1495,28 @@ function SplitButton({
   variant?: "outlined" | "contained"
   disabled?: boolean
   shortcut?: string
+  compact?: boolean
   onMainClick: () => void
   children?: ReactNode
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  // Collapsed to an icon there is no visible label, so the tooltip carries
+  // the whole meaning — it always names the action, with the shortcut only
+  // as a suffix.
+  const hint = shortcut ? `${label} (${shortcut})` : label
+  const iconOnly = compact && icon !== undefined
   return (
     <>
       <ButtonGroup size="small" variant={variant} disabled={disabled}>
         <Button
           data-testid={testid}
-          startIcon={icon}
-          title={shortcut ? `${label} (${shortcut})` : undefined}
+          startIcon={iconOnly ? undefined : icon}
+          aria-label={label}
+          title={hint}
           onClick={onMainClick}
-          sx={TOOLBAR_BUTTON_SX}
+          sx={iconOnly ? TOOLBAR_ICON_SX : TOOLBAR_BUTTON_SX}
         >
-          {label}
+          {iconOnly ? icon : label}
         </Button>
         <Button
           data-testid={`${testid}-menu`}
@@ -1362,6 +1542,7 @@ function ToolbarButton({
   testid,
   disabled,
   shortcut,
+  compact = false,
   onClick,
 }: {
   label: string
@@ -1369,20 +1550,23 @@ function ToolbarButton({
   testid: string
   disabled?: boolean
   shortcut?: string
-  onClick: () => void
+  compact?: boolean
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void
 }) {
+  const hint = shortcut ? `${label} (${shortcut})` : label
   return (
     <Button
       size="small"
       variant="outlined"
       data-testid={testid}
-      startIcon={icon}
+      startIcon={compact ? undefined : icon}
       disabled={disabled}
-      title={shortcut ? `${label} (${shortcut})` : undefined}
+      aria-label={label}
+      title={hint}
       onClick={onClick}
-      sx={TOOLBAR_BUTTON_SX}
+      sx={compact ? TOOLBAR_ICON_SX : TOOLBAR_BUTTON_SX}
     >
-      {label}
+      {compact ? icon : label}
     </Button>
   )
 }

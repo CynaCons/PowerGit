@@ -32,87 +32,75 @@ test("selecting a row updates commit details", async ({ page }) => {
   await expect(rows.nth(3)).toHaveClass(/selected/)
 })
 
-test("selected rows stay distinct from same-author rows", async ({ page }) => {
+test("only the selected row is highlighted", async ({ page }) => {
   await page.goto("/")
   const rows = page.getByTestId("grid-row")
   await expect(rows.first()).toBeVisible()
 
-  const duplicate = await rows.evaluateAll((elements) => {
-    const seen = new Map<string, number>()
-    for (let index = 0; index < elements.length; index++) {
-      const author = elements[index].querySelector(".author")?.textContent?.trim()
-      if (!author) continue
-      const firstIndex = seen.get(author)
-      if (firstIndex !== undefined) {
-        return { selectedIndex: firstIndex, sameAuthorIndex: index, author }
-      }
-      seen.set(author, index)
-    }
-    return null
-  })
+  // v0.12.3 removed the "highlight every other commit by this author"
+  // behaviour outright. It was reported three times: it used the same visual
+  // channel as the selection, and on a repo with one dominant author it
+  // marked nearly every row, so the selected commit stopped standing out.
+  // The contract now is simply that exactly one row looks selected.
+  const target = rows.nth(2)
+  await target.click()
+  await expect(target).toHaveClass(/selected/)
+  await expect(target).toHaveCSS("border-left-width", "2px")
 
-  if (duplicate === null) {
-    throw new Error("Could not find two visible rows with the same author")
-  }
-
-  const selectedRow = page.locator(`[data-testid="grid-row"][data-index="${duplicate.selectedIndex}"]`)
-  const sameAuthorRow = page.locator(`[data-testid="grid-row"][data-index="${duplicate.sameAuthorIndex}"]`)
-  const canvas = page.getByTestId("graph-canvas")
-
-  await selectedRow.click()
-  await expect(selectedRow).toHaveClass(/selected/)
-  await expect(sameAuthorRow).not.toHaveClass(/selected/)
-  await expect(canvas).toBeVisible()
-
-  const selectedBackground = await selectedRow.evaluate((el) => getComputedStyle(el).backgroundColor)
-  const sameAuthorBackground = await sameAuthorRow.evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(selectedBackground).not.toBe(sameAuthorBackground)
-  await expect(selectedRow).toHaveCSS("border-left-width", "2px")
-
-  const selectedBox = await selectedRow.boundingBox()
-  const sameAuthorBox = await sameAuthorRow.boundingBox()
-  const canvasBox = await canvas.boundingBox()
-  if (!selectedBox || !sameAuthorBox || !canvasBox) {
-    throw new Error("Missing row or canvas bounds")
-  }
-
-  const dpr = await page.evaluate(() => window.devicePixelRatio || 1)
-  const selectedCanvasPixel = await canvas.evaluate(
-    (el, { x, y, dpr }: { x: number; y: number; dpr: number }) => {
-      const ctx = el.getContext("2d")
-      if (!ctx) throw new Error("Canvas context unavailable")
-      return Array.from(ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data)
-    },
-    { x: 1, y: selectedBox.y - canvasBox.y + selectedBox.height / 2, dpr },
+  const selectedBackground = await target.evaluate((el) => getComputedStyle(el).backgroundColor)
+  const others = await rows.evaluateAll((els, sel: string) =>
+    els
+      .filter((el) => !el.classList.contains("selected"))
+      // The hovered row legitimately differs; the pointer sits on the row we
+      // just clicked, so anything else tinted like the selection is a bug.
+      .map((el) => getComputedStyle(el).backgroundColor)
+      .filter((bg) => bg === sel).length,
+    selectedBackground,
   )
-  const sameAuthorCanvasPixel = await canvas.evaluate(
-    (el, { x, y, dpr }: { x: number; y: number; dpr: number }) => {
-      const ctx = el.getContext("2d")
-      if (!ctx) throw new Error("Canvas context unavailable")
-      return Array.from(ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data)
-    },
-    { x: 1, y: sameAuthorBox.y - canvasBox.y + sameAuthorBox.height / 2, dpr },
-  )
-  expect(selectedCanvasPixel).not.toEqual(sameAuthorCanvasPixel)
+  expect(others, "rows other than the selected one share its highlight").toBe(0)
 
-  // WebKitGTK regression guard: a same-author row must keep its message and
-  // author text visibly painted (non-transparent, fully opaque) once the
-  // author-highlight background applies — see
-  // docs/agents/memories/webkitgtk-css.md.
-  await expect(sameAuthorRow.locator(".msg-text")).toBeVisible()
-  const sameAuthorTextStyles = await sameAuthorRow.evaluate((el) => {
+  await expect(page.locator(".grid-row.author-highlight")).toHaveCount(0)
+
+  // WebKitGTK regression guard: unselected rows must keep their text painted
+  // (non-transparent, fully opaque) — see docs/agents/memories/webkitgtk-css.md.
+  const neighbour = rows.nth(4)
+  await expect(neighbour.locator(".msg-text")).toBeVisible()
+  const styles = await neighbour.evaluate((el) => {
     const msg = el.querySelector(".msg-text") as HTMLElement | null
     const author = el.querySelector(".author") as HTMLElement | null
-    if (!msg || !author) throw new Error("Missing text elements on same-author row")
+    if (!msg || !author) throw new Error("Missing text elements on row")
     return {
       msgColor: getComputedStyle(msg).color,
       authorColor: getComputedStyle(author).color,
       rowOpacity: getComputedStyle(el).opacity,
     }
   })
-  expect(sameAuthorTextStyles.msgColor).not.toBe("rgba(0, 0, 0, 0)")
-  expect(sameAuthorTextStyles.authorColor).not.toBe("rgba(0, 0, 0, 0)")
-  expect(sameAuthorTextStyles.rowOpacity).toBe("1")
+  expect(styles.msgColor).not.toBe("rgba(0, 0, 0, 0)")
+  expect(styles.authorColor).not.toBe("rgba(0, 0, 0, 0)")
+  expect(styles.rowOpacity).toBe("1")
+})
+
+test("the status bar sits at the bottom and is never truncated to stubs", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 })
+  await page.goto("/")
+  const bar = page.getByTestId("engine-status")
+  await expect(bar).toBeVisible()
+  await expect(bar).toContainText("(", { timeout: 30_000 })
+
+  const shell = (await page.getByTestId("browse-shell").boundingBox())!
+  const barBox = (await bar.boundingBox())!
+  // Bottom of the window, below the bottom panel - not crammed into the
+  // toolbar's leftover width, which is where it used to be elided into
+  // unreadable stubs.
+  const panel = (await page.getByTestId("bottom-panel").boundingBox())!
+  expect(barBox.y).toBeGreaterThanOrEqual(panel.y + panel.height - 1)
+  expect(Math.round(barBox.y + barBox.height)).toBeLessThanOrEqual(Math.round(shell.y + shell.height) + 1)
+
+  // The branch name and dirty count are pinned: only the build info may be
+  // elided when space runs out.
+  const branch = page.getByTestId("status-branch")
+  const clipped = await branch.evaluate((el) => el.scrollWidth > el.clientWidth + 1)
+  expect(clipped, "branch name is truncated in the status bar").toBe(false)
 })
 
 test("grid virtualizes a large history", async ({ page }) => {

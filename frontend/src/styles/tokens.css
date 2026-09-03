@@ -82,7 +82,6 @@
      docs/agents/memories/webkitgtk-css.md for why (WebKitGTK/AppImage
      target). */
   --pg-grid-hover: rgba(37, 99, 235, 0.08);
-  --pg-grid-author: #f8fbff;
   --pg-grid-sel: #dbeafe;
   --pg-grid-sel-border: #2563eb;
 }

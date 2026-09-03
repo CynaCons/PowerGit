@@ -79,3 +79,26 @@ sufficient proof for WebKitGTK. The real check is the next tagged Linux
 release's AppImage smoke path (see `appimage-glib-bundling.md`); worth a
 follow-up to add a headless `xvfb` grid-selection check alongside the
 existing undefined-symbol scan if this regresses again.
+
+## The same-author row highlight is gone (do not reintroduce it)
+
+Removed 2026-09-03 in v0.12.3 after three separate owner reports:
+
+1. v0.12.0 — "when selecting a commit it is highlighted, but the same
+   highlight is used for all other commits of that author, so we can't see
+   which commit was selected".
+2. v0.12.1 — "on linux, the highlighting of other commits from that author
+   makes everything disappear" (a WebKitGTK repaint failure after a
+   class-only mutation left the tinted rows' text unpainted).
+3. v0.12.2 — still conflicting.
+
+An intermediate fix moved the marker off the row background onto the author
+name's colour. That removed the repaint failure and the collision with the
+selection, but on a repo with one dominant author it accented nearly every
+row in the column — the same "everything is highlighted" defect wearing a
+different hat. The feature cannot distinguish anything in the common case, so
+it was deleted from `RevisionGrid.tsx`, `graph/draw.ts`, `app.css` and
+`tokens.css`. Selection now owns the row background exclusively.
+
+If it ever comes back it must be an opt-in setting, default off, and it must
+not use the row background.

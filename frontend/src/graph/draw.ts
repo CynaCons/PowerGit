@@ -52,7 +52,6 @@ export function drawRows(
   rowHeight: number,
   width: number,
   selected: number,
-  selectedAuthor?: string,
   hovered = -1,
 ): void {
   ctx.clearRect(0, 0, width, Math.max(1, end - start) * rowHeight)
@@ -67,7 +66,6 @@ export function drawRows(
   const rootStyle = getComputedStyle(document.documentElement)
   const selectedFill = rootStyle.getPropertyValue("--pg-grid-sel").trim() || "#dbeafe"
   const selectedBorder = rootStyle.getPropertyValue("--pg-grid-sel-border").trim() || "#2563eb"
-  const authorFill = rootStyle.getPropertyValue("--pg-grid-author").trim() || "#f8fbff"
   const hoverFill = rootStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
 
   for (let i = start; i < end; i++) {
@@ -84,10 +82,12 @@ export function drawRows(
     } else if (i === hovered) {
       ctx.fillStyle = hoverFill
       ctx.fillRect(0, y, width, rowHeight)
-    } else if (selectedAuthor && row.rev.author === selectedAuthor) {
-      ctx.fillStyle = authorFill
-      ctx.fillRect(0, y, width, rowHeight)
     }
+    // Nothing is painted for "other commits by the selected author". That
+    // feature was removed in v0.12.3 after three owner reports: it competed
+    // with the selection for the same visual channel, and on a repo with one
+    // dominant author it marked nearly every row, so the selected commit
+    // stopped standing out at all — which is exactly what it existed to do.
 
     ctx.save()
     ctx.beginPath()

@@ -8,12 +8,11 @@ type Props = {
   selected: number
   onSelect: (index: number) => void
   onRowContextMenu?: (e: React.MouseEvent, index: number) => void
-  selectedAuthor?: string
   loadingTail?: boolean
   onNearEnd?: () => void
 }
 
-export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selectedAuthor, loadingTail, onNearEnd }: Props) {
+export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, loadingTail, onNearEnd }: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hovered, setHovered] = useState(-1)
@@ -22,7 +21,22 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
   // with no user action; comparing SHAs (not the index) keeps that from
   // yanking the viewport.
   const lastScrolledSha = useRef<string | null>(null)
-  const width = graphWidth(rows)
+  // The graph column is sized by the deepest lane in view and can reach
+  // ~660px on a wide history, which pushed Date and SHA off the right edge
+  // at ordinary window sizes as more history paged in. Cap it at a share of
+  // the grid so the metadata columns always survive; deep lanes past the cap
+  // are clipped rather than allowed to eat the row.
+  const [bodyWidth, setBodyWidth] = useState(0)
+  useEffect(() => {
+    const el = parentRef.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    setBodyWidth(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver((entries) => setBodyWidth(entries[0].contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const naturalWidth = graphWidth(rows)
+  const width = bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -73,8 +87,8 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, selectedAuthor, hovered)
-  }, [rows, start, end, selected, selectedAuthor, hovered, width])
+    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, hovered)
+  }, [rows, start, end, selected, hovered, width])
 
   return (
     <div className="main" data-testid="revision-grid">
@@ -140,11 +154,10 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
           {virtualItems.map((item) => {
             const row = rows[item.index]
             const refs = visibleRefs(row.rev.refs)
-            const isAuthorHighlight = item.index !== selected && selectedAuthor && row.rev.author === selectedAuthor
             return (
               <div
                 key={row.rev.id}
-                className={`grid-row${item.index === selected ? " selected" : ""}${isAuthorHighlight ? " author-highlight" : ""}`}
+                className={`grid-row${item.index === selected ? " selected" : ""}`}
                 data-testid="grid-row"
                 data-index={item.index}
                 onClick={() => {

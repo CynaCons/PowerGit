@@ -15,12 +15,27 @@
   height: var(--pg-row-height, 28px);
 }
 
+/* Narrow windows: the fixed Author/Date/SHA columns plus a 180px message
+   minimum add up to more than the grid gets, which pushed Date and SHA off
+   the right edge entirely. Give the message less floor and the metadata
+   columns less width instead of losing them. Date drops to the day (the row
+   title still carries the full value on the SHA cell). */
+@media (max-width: 1200px) {
+  .grid-header,
+  .grid-row {
+    grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) 104px 106px 68px;
+  }
+  .date {
+    font-size: 11px;
+  }
+}
+
 .grid-header {
   padding: 0 16px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #737373;
+  color: #475569;
   border-bottom: 1px solid #e5e5e5;
 }
 
@@ -61,11 +76,7 @@
   background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
 }
 
-.grid-row.author-highlight {
-  background: var(--pg-grid-author, #f8fbff);
-}
-
-.grid-row.selected:not(.author-highlight) {
+.grid-row.selected {
   background: var(--pg-grid-sel, #dbeafe);
   border-left-color: var(--pg-grid-sel-border, #2563eb);
 }
@@ -86,25 +97,21 @@
 
 /* Text colour must be set explicitly (not just inherited) on rows whose
    background is toggled at runtime. Same values as the unhighlighted state
-   (body text #111827, secondary text #737373) — this is a no-op visually,
+   (body text #0f172a, secondary text #475569) — this is a no-op visually,
    but it removes any dependency on multi-level inheritance/cascade
    recomputation for these classes, which is where WebKitGTK has been known
    to leave text unpainted after a class-only mutation (no matching `color`
    change on the row itself to trigger a repaint of the text run). See
    docs/agents/memories/webkitgtk-css.md. */
-.grid-row.selected .msg-text,
-.grid-row.author-highlight .msg-text {
-  color: #111827;
+.grid-row.selected .msg-text {
+  color: #0f172a;
   opacity: 1;
 }
 
 .grid-row.selected .author,
 .grid-row.selected .date,
-.grid-row.selected .sha,
-.grid-row.author-highlight .author,
-.grid-row.author-highlight .date,
-.grid-row.author-highlight .sha {
-  color: #737373;
+.grid-row.selected .sha {
+  color: #475569;
   opacity: 1;
 }
 
@@ -112,7 +119,7 @@
   flex-shrink: 0;
   padding: 3px 16px;
   font-size: 11px;
-  color: #737373;
+  color: #475569;
   border-top: 1px solid #e5e5e5;
   background: #fafafa;
 }
@@ -196,7 +203,10 @@
 .author,
 .date,
 .sha {
-  color: #737373;
+  /* Gap between adjacent metadata columns: without it the ellipsis of a long
+     author name butts straight up against the date ("Constantin Chabira2026-09-03"). */
+  padding-right: 10px;
+  color: #475569;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   overflow: hidden;

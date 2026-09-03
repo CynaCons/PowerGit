@@ -96,3 +96,32 @@ the source). Not verified: actual rendered appearance on Ubuntu/AppImage —
 needs the next tagged Linux release's AppImage smoke pass
 (`appimage-glib-bundling.md`) or `scripts/ubuntu-check.ps1`, ideally with an
 owner-triggered `npm run test:visual` pixel diff. Neither was run here.
+
+## `-webkit-font-smoothing: antialiased` makes Linux text LIGHTER, not darker
+
+Captured 2026-09-03 (v0.12.3), correcting the 2026-09-02 entry above.
+
+That declaration was added to `theme.ts` to answer the owner's "fonts look
+low quality and too light grey" on Ubuntu. It does the opposite of what was
+intended: it turns OFF subpixel rendering and forces grayscale antialiasing,
+which lays down roughly a third less coverage per stem. It is a standard
+macOS trick for *thinning* text that looks too heavy under Quartz — using it
+to darken text is backwards. The owner reported the same symptom again on the
+next build, which is the expected outcome.
+
+The value is now `auto`, and `textRendering: optimizeLegibility` is gone too
+(it buys nothing for UI text and perturbs metrics). If Linux text still reads
+light, the levers that actually work are: a heavier requested weight (the
+theme now asks for 500 as the body weight), darker `palette.text.*`, and
+letting the platform's own hinted UI font render instead of a webfont.
+
+## The UI font stack now leads with the platform font, like VS Code
+
+`SANS_FONT` is `system-ui, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans",
+"Cantarell", "Noto Sans", "Inter", "DejaVu Sans", sans-serif`. Segoe UI and
+Ubuntu ship with hinting instructions and fontconfig rules tuned to their
+platform's rasterizer; a webfont delivered to WebKitGTK gets none of that,
+which is the real reason Inter read as "low quality" on Ubuntu and fine on
+Windows. Inter is still self-hosted as the fallback, but it is no longer
+preloaded in `index.html` — on both shipping platforms it now usually never
+loads at all.

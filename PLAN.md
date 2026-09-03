@@ -269,3 +269,14 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Cherry-pick and revert implemented (engine + context menu), replacing the disabled placeholders from v0.7.0.
 - [ ] Reopened from v0.11.0 (ticked but absent): Alt+Up/Down parent/child navigation, Ctrl+Shift+F find, Ctrl+G go-to. Deferred to next iteration.
 - [x] Empty/failed states: when /revisions fails the grid stays blank; show an inline error with Retry, and real empty states for no-commits / no-files / no-stashes.
+### v0.12.3 — Toolbar overflow, selection vs author, chrome bugs, VS Code fonts, syntax highlighting (2026-09-03) (COMPLETE)
+**Goal:** Close the owner's 2026-09-03 Ubuntu round: stop the author highlight competing with (and erasing) the selection, make the command bar survive narrow windows, get the busy indicator out from under the buttons, kill the stray WebView context menu, restore Fetch All, adopt VS Code's font stack, and highlight source in the File Tree viewer.
+- [x] Same-author marker moves off the row background onto the author name (CSS + canvas band removed), so selection owns the row background exclusively and nothing can be erased by a WebKitGTK class-mutation repaint
+- [x] Command bar collapses progressively (labels -> icons -> "More" overflow menu) from its own measured width; nothing wraps or clips at any window size
+- [x] Busy indicator moved out of its absolute centre overlay into the toolbar flow beside the status strip (it was painting over the buttons by construction)
+- [x] WebView context menu suppressed app-wide outside text fields; the revision menu re-targets on a second right-click instead of leaking the browser menu through the modal backdrop
+- [x] "Fetch all remotes" is always present in the Fetch menu (it only appeared with two or more remotes, so single-remote clones had no Fetch All at all)
+- [x] UI font stack switched to VS Code's order (platform font first, Inter as fallback); `-webkit-font-smoothing: antialiased` removed — it thins text and was the cause of the "light grey" complaint it had been added to fix
+- [x] Syntax highlighting in the File Tree blob viewer via Shiki (VS Code's own highlighter), bundled offline, lazy, with plain-text fallback and a size guard
+- [x] Repo state (branch, ahead/behind, dirty, build info) moved from the toolbar's leftover width into a real bottom status bar; it was being elided to unreadable stubs at every window size
+- [x] Narrow-window layout: ref panel auto-collapses below the overflow width (restored when the window grows, unless the user closed it), grid metadata columns shrink under 1200px so Date/SHA stop being pushed off the right edge, and adjacent columns get a gap
