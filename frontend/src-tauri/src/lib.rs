@@ -191,7 +191,16 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let sidecar = handle.shell().sidecar("powergit-engine").expect("sidecar not found");
                 let (mut rx, child) = sidecar
-                    .args(["--urls", &format!("http://{ENGINE_HOST}:{port}")])
+                    // --parent-pid lets the engine exit with us even when we
+                    // are force-killed and never reach RunEvent::Exit below.
+                    // An orphan holding the port is what produced the
+                    // "address already in use" crash on the next launch.
+                    .args([
+                        "--urls",
+                        &format!("http://{ENGINE_HOST}:{port}"),
+                        "--parent-pid",
+                        &std::process::id().to_string(),
+                    ])
                     .spawn()
                     .expect("failed to spawn powergit-engine sidecar");
                 *handle

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PowerGit.Engine;
 
 const string engineVersion = "0.12.3"; // keep in sync with tauri.conf.json / package.json (see release skill)
@@ -584,6 +585,35 @@ app.MapGet("/events", async (GitHost git, HttpContext ctx) =>
         // Client disconnected; EventSource reconnects on its own.
     }
 });
+
+// Parent-death watchdog. If PowerGit's window process goes away without a
+// clean shutdown - force-killed from Task Manager, `kill -9`, or a crash -
+// Tauri never reaches RunEvent::Exit and so never kills this sidecar. The
+// orphan keeps holding the engine port, and the NEXT launch fails with
+// "address already in use": exactly the crash the owner reported on the
+// v0.11.0 AppImage. Port probing (v0.12.0) recovers from it, but leaving a
+// stray engine serving a dead UI is still wrong, so exit with our parent.
+// No polling and no PID-reuse window: the handle is opened once, up front.
+string? parentPidArg = builder.Configuration["parent-pid"];
+if (int.TryParse(parentPidArg, out int parentPid))
+{
+    IHostApplicationLifetime lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            using Process parent = Process.GetProcessById(parentPid);
+            await parent.WaitForExitAsync();
+        }
+        catch
+        {
+            // Already exited, or not observable from here. Either way there
+            // is no live parent to serve, so stop rather than linger.
+        }
+
+        lifetime.StopApplication();
+    });
+}
 
 app.Run();
 

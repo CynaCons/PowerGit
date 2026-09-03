@@ -280,3 +280,4 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Syntax highlighting in the File Tree blob viewer via Shiki (VS Code's own highlighter), bundled offline, lazy, with plain-text fallback and a size guard
 - [x] Repo state (branch, ahead/behind, dirty, build info) moved from the toolbar's leftover width into a real bottom status bar; it was being elided to unreadable stubs at every window size
 - [x] Narrow-window layout: ref panel auto-collapses below the overflow width (restored when the window grows, unless the user closed it), grid metadata columns shrink under 1200px so Date/SHA stop being pushed off the right edge, and adjacent columns get a gap
+- [x] Engine exits with its parent (--parent-pid watchdog): a force-killed or crashed UI no longer orphans a sidecar holding the port, which was the root of the original "address already in use" launch crash
