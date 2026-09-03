@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { languageForPath } from "../../src/highlight"
 
 // The Shiki-highlighted blob view (BottomPanel.tsx's BlobPane) is a
 // progressive enhancement layered on top of the always-working plain-text
@@ -66,14 +67,44 @@ test("blob pane still renders a file with no recognised extension as plain text"
   await openFileTreeForPowergitCommit(page)
   const tree = page.getByTestId("commit-file-tree")
 
-  // ".gitignore" has no extension Shiki maps to a grammar (its only "." is
-  // the leading one), so this exercises the plain-text fallback path.
-  const fileRow = tree.locator('[data-path=".gitignore"]')
+  // Find a root-level file the highlighter has no grammar for, rather than
+  // naming one. The original version asserted on ".gitignore" containing
+  // "visual studio", which only holds for the dev checkout: in the Linux
+  // container the engine serves a seeded fixture repo that has no
+  // .gitignore at all, so the test failed there for a reason that had
+  // nothing to do with the behaviour it claims to cover.
+  // The tree loads asynchronously; querying it before the first node exists
+  // yields an empty candidate list and a misleading "no such file" failure.
+  await expect(tree.locator("[data-path]").first()).toBeVisible()
+  // Blobs only: `data-path` is on directories too, and picking one of those
+  // opens nothing (the first attempt selected ".github" and compared the
+  // pane against a tree listing).
+  const candidates = await tree.locator('[data-type="blob"][data-path]').evaluateAll((els) =>
+    els
+      .map((el) => el.getAttribute("data-path") ?? "")
+      .filter((p) => p.length > 0 && !p.includes("/")),
+  )
+  const unmapped = candidates.find((p) => languageForPath(p) === null)
+  if (!unmapped) {
+    throw new Error(`no root-level file without a mapped grammar in: ${candidates.join(", ")}`)
+  }
+
+  const fileRow = tree.locator(`[data-path="${unmapped}"]`)
   await expect(fileRow).toBeVisible()
   await fileRow.click()
 
   const blob = page.getByTestId("blob-pane")
-  await expect(blob).toContainText("visual studio")
+  // The pane must show the file's real content, verified against the engine
+  // rather than against a string that happens to be in one repo's copy.
+  const commitId = await page.locator(".grid-row.selected [data-testid='sha-cell']").getAttribute("title")
+  expect(commitId).toMatch(/^[0-9a-f]{40}$/)
+  const res = await page.request.get(
+    `${ENGINE_URL}/commits/${commitId}/blob?path=${encodeURIComponent(unmapped)}`,
+  )
+  expect(res.ok()).toBe(true)
+  const groundTruth = (await res.json()) as { text: string }
+  await expect.poll(() => blob.textContent()).toBe(groundTruth.text)
+
   // Plain-text fallback renders a single text node — no highlighted spans.
   await expect(blob.locator("[style*='color']")).toHaveCount(0)
 })

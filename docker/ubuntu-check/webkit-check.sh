@@ -42,7 +42,14 @@ echo "== blob =="; curl -s "http://127.0.0.1:7733/commits/$H/blob?path=frontend%
 echo "== revisions (first 6 subjects) =="; curl -s "http://127.0.0.1:7733/revisions?max=6" | grep -o '"subject":"[^"]*"' | head -6
 echo "== engine log tail =="; tail -5 /tmp/engine.log
 
-cd /repo/frontend
+# Work on a COPY, never in the bind mount. `npm ci` here used to install
+# Linux binaries straight over the Windows host's frontend/node_modules,
+# leaving the host checkout with a broken toolchain after every Linux run
+# (npx tsc: "'tsc' is not recognized"). Same reason the engine is built from
+# /tmp/engsrc rather than in place.
+rm -rf /tmp/fe && mkdir -p /tmp/fe
+tar -C /repo/frontend --exclude=node_modules --exclude=dist --exclude=test-results     --exclude=playwright-report -cf - . | tar -C /tmp/fe -xf -
+cd /tmp/fe
 echo "== npm ci =="; npm ci --no-audit --no-fund 2>&1 | tail -2
 echo "== playwright browsers =="; npx playwright install --with-deps chromium webkit 2>&1 | tail -3
 echo "== build =="; npx vite build 2>&1 | tail -3

@@ -13,11 +13,19 @@ test("row selection stays responsive while scrolling a long history", async ({ p
   })
   const target = page.getByTestId("grid-row").nth(5)
   await expect(target).toBeVisible()
-  // The virtualizer recycles DOM as the layout worker streams rows in, so
-  // pin the assertion to the row's data-index rather than its nth position.
-  const dataIndex = await target.getAttribute("data-index")
+  // Pin the assertion to the row's SHA, not its index. History is still
+  // streaming in at this point, so the layout worker keeps appending rows and
+  // the virtualizer recycles DOM underneath us: a row's data-index can change
+  // between reading it and clicking, and the old index may not even be
+  // rendered any more. The app keys selection by SHA precisely because
+  // indices move, so the test must assert the same way — otherwise it fails
+  // on row churn while reporting a performance regression.
+  const sha = await target.locator('[data-testid="sha-cell"]').getAttribute("title")
+  expect(sha).toMatch(/^[0-9a-f]{40}$/)
   await target.click()
-  await expect(page.locator(`[data-testid="grid-row"][data-index="${dataIndex}"]`)).toHaveClass(/selected/, { timeout: 2_000 })
+  await expect(page.locator(`.grid-row.selected [data-testid="sha-cell"][title="${sha}"]`)).toBeVisible({
+    timeout: 2_000,
+  })
 
   // Scrolling further keeps rendering rows without multi-second stalls.
   await page.getByTestId("grid-body").evaluate((el) => {

@@ -19,6 +19,19 @@ async function openRepoOnEngine(path: string): Promise<void> {
   if (!res.ok) throw new Error(`failed to open ${path} on the engine: http ${res.status}`)
 }
 
+// Whatever repository the engine had open before this spec borrowed it. This
+// used to be hardcoded to process.cwd() (the dev checkout), which is wrong
+// anywhere the harness deliberately opened something else — in the Linux
+// container the engine is pointed at a seeded fixture repo, and restoring
+// the "wrong" repo silently changed what EVERY later spec saw. Specs then
+// passed or failed by run order rather than by behaviour.
+async function currentRepoPath(): Promise<string | null> {
+  const res = await fetch(`${ENGINE_URL}/repos/current`)
+  if (!res.ok) return null
+  const info = (await res.json()) as { root?: string }
+  return info.root ?? null
+}
+
 const selectedShaLocator = (page: Page) =>
   page.locator('.grid-row.selected [data-testid="sha-cell"]')
 
@@ -47,8 +60,10 @@ test("selecting a row keeps it selected across a manual refresh", async ({ page 
 // checkout again.
 test.describe("GET /events change classification", () => {
   let repoDir: string
+  let previousRepo: string | null = null
 
-  test.beforeAll(() => {
+  test.beforeAll(async () => {
+    previousRepo = await currentRepoPath()
     repoDir = mkdtempSync(join(tmpdir(), "powergit-live-refresh-"))
     git(repoDir, "init", "-q", "-b", "main")
     git(repoDir, "config", "user.email", "test@example.com")
@@ -62,10 +77,12 @@ test.describe("GET /events change classification", () => {
   })
 
   test.afterAll(async () => {
-    // process.cwd() is the frontend/ dir (tests run from there); any path
-    // inside the real repo resolves the same root via `rev-parse
-    // --show-toplevel`, so this hands the engine back to the real checkout.
-    await openRepoOnEngine(process.cwd())
+    // Hand the engine back exactly what it had, so later specs in this
+    // serial run see the same repository the harness set up. Falls back to
+    // process.cwd() (the frontend/ dir, which resolves to the dev checkout
+    // root via `rev-parse --show-toplevel`) only if the engine had nothing
+    // open to begin with.
+    await openRepoOnEngine(previousRepo ?? process.cwd())
     // FileSystemWatcher.Dispose() (triggered by the Open() above rebuilding
     // the watcher for the real repo) doesn't always release its Windows
     // directory handle instantly, so a same-tick rmdir can race it with
