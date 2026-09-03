@@ -1,7 +1,11 @@
 using System.Diagnostics;
+using System.Reflection;
 using PowerGit.Engine;
 
-const string engineVersion = "0.12.3"; // keep in sync with tauri.conf.json / package.json (see release skill)
+// Version comes from frontend/package.json via the csproj (v0.13.5); nothing to keep in sync here.
+string engineVersion = typeof(Program).Assembly
+    .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0]
+    ?? "0.0.0";
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 

@@ -20,21 +20,43 @@ having approved the content that goes into them.
 - `npm run test:resolution`
 - Working tree clean; everything committed and pushed.
 
-## 1. Version bump (one version string, three files)
+## 1. Version bump (one file)
 
-Update all three to the same value — they are not synchronized automatically:
+`frontend/package.json` is the only version source (since v0.13.5). Bump it
+and nothing else:
 
-| File | Field |
-|---|---|
-| `frontend/src-tauri/tauri.conf.json` | `version` (drives installer/zip artifact names) |
-| `frontend/src-tauri/Cargo.toml` | `version` (commit the Cargo.lock churn) |
-| `frontend/package.json` | `version` |
+```powershell
+cd frontend
+npm version X.Y.Z --no-git-tag-version
+cd ..
+node scripts/check-version.mjs
+git commit -am "chore(release): vX.Y.Z"
+```
 
-Note: the engine's `engineVersion` constant lives in
-`src/engine/PowerGit.Engine/Program.cs` and is displayed in the app's status
-bar — bump it too so it matches (it has drifted before).
+Everything else derives from it — do not edit these by hand:
 
-Commit: `chore(release): vX.Y.Z`.
+| Derived where | How it reads package.json | Where it surfaces |
+|---|---|---|
+| `frontend/src-tauri/tauri.conf.json` | `"version": "../package.json"` | installer / zip / AppImage names, Tauri package info |
+| `frontend/src-tauri/build.rs` | exports `POWERGIT_VERSION` at compile time | Rust shell (`Cargo.toml` stays `0.0.0`, no Cargo.lock churn) |
+| `src/engine/PowerGit.Engine/PowerGit.Engine.csproj` | MSBuild regex → `<Version>` | `GET /health` `engine`, app status bar |
+| `scripts/package-windows.ps1` | reads `package.json` | `dist/PowerGit_<ver>_*` file names |
+
+## 1b. Verify the version
+
+Do this after the bump commit and again after packaging. Each line says what
+to check, where it shows, and how:
+
+| What | Where it surfaces | How to check |
+|---|---|---|
+| Static derivation intact | files above | `node scripts/check-version.mjs` (exit 0) |
+| Engine reports it | `GET /health` → `engine`, status bar bottom-right | start the engine, then `node scripts/check-version.mjs --engine-url http://127.0.0.1:7733` |
+| Artifacts carry it | `dist/PowerGit_<ver>_win64.zip`, `_x64-setup.exe` | `node scripts/check-version.mjs --dist dist` after step 2 |
+| Tag matches | GitHub release name | `node scripts/check-version.mjs --tag vX.Y.Z` before step 3 |
+| Linux artifacts | release assets `*.AppImage`, `*.deb` | `gh release view vX.Y.Z` after CI: names contain `<ver>` |
+
+The engine unit test `Health_ok` also asserts `/health` equals package.json,
+so `dotnet test` in preflight already fails on drift.
 
 ## 2. Windows artifacts (local)
 
@@ -72,10 +94,10 @@ issues, artifact list. GPL-3.0 license notice must stay intact.
 ## 5. Pages showcase refresh
 
 1. Engine running locally, then `node frontend/scripts/capture-showcase.mjs`
-   → regenerates `docs/site/assets/*.png`.
+   → regenerates `website/public/assets/*.png`.
 2. Review each screenshot — never publish one that shows an error state,
    synthetic data, or a half-loaded graph.
-3. Update `docs/site/index.html` copy if features changed (feature cards,
+3. Update the `website/` React copy if features changed (feature cards,
    screens grid captions).
 4. Commit + push `powergit`; the `pages.yml` workflow deploys automatically.
    Verify the deployment went green (`gh run list --workflow=pages`), then run

@@ -338,11 +338,11 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 
 ### v0.13.5 — Single source of truth for the version (Bad #2)
 **Goal:** The version is hand-copied in package.json, tauri.conf.json, Cargo.toml and a const in Program.cs. A mismatch silently makes the Tauri shell refuse to reuse its own engine. Derive all four from one place at build time and add a check that fails the build when they diverge.
-- [ ] package.json is the single source of the version; tauri.conf.json 'version' becomes the path '../package.json' (Tauri 2 reads it), so the config holds no copy
-- [ ] build.rs reads package.json and exports POWERGIT_VERSION as a compile-time env; lib.rs uses it instead of CARGO_PKG_VERSION; Cargo.toml keeps a placeholder nothing consumes (no more Cargo.lock churn per release)
-- [ ] Engine csproj sets Version from package.json via an MSBuild property function (regex on the file); Program.cs replaces the engineVersion const with the assembly informational version, so dotnet run and the packaged sidecar report the same number
-- [ ] scripts/check-version.mjs asserts package.json, engine /health, Tauri package info and the packaged artifact names agree; fails non-zero; runs in CI (v0.13.7) and as release preflight
-- [ ] Release skill (.claude/skills/release + .opencode mirror, kept identical): section 1 becomes 'npm version X.Y.Z --no-git-tag-version, commit chore(release)'; a new 'Verify the version' step lists WHAT is derived, WHERE it surfaces (status bar, /health, installer/zip names, GitHub release tag, Pages footer) and HOW to check each (check-version.mjs, curl /health, ls dist/, gh release view); drift footnote removed
+- [x] package.json is the single source of the version; tauri.conf.json 'version' becomes the path '../package.json' (Tauri 2 reads it), so the config holds no copy [agent: claude]
+- [x] build.rs reads package.json and exports POWERGIT_VERSION as a compile-time env; lib.rs uses it instead of CARGO_PKG_VERSION; Cargo.toml keeps a placeholder nothing consumes (no more Cargo.lock churn per release) [agent: claude]
+- [x] Engine csproj sets Version from package.json via an MSBuild property function (regex on the file); Program.cs replaces the engineVersion const with the assembly informational version, so dotnet run and the packaged sidecar report the same number [agent: claude]
+- [x] scripts/check-version.mjs asserts package.json, engine /health, Tauri package info and the packaged artifact names agree; fails non-zero; runs in CI (v0.13.7) and as release preflight [agent: claude]
+- [x] Release skill (.claude/skills/release + .opencode mirror, kept identical): section 1 becomes 'npm version X.Y.Z --no-git-tag-version, commit chore(release)'; a new 'Verify the version' step lists WHAT is derived, WHERE it surfaces (status bar, /health, installer/zip names, GitHub release tag, Pages footer) and HOW to check each (check-version.mjs, curl /health, ls dist/, gh release view); drift footnote removed [agent: claude]
 - [ ] Verification: fresh dotnet run shows the package.json version in /health; npm run tauri build artifact names carry it; check-version.mjs passes; a deliberate mismatch fails it
 
 ### v0.13.6 — Engine concurrency — one global mutable repo (Bad #3)

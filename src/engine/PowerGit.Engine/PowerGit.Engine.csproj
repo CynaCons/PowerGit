@@ -5,4 +5,14 @@
     <AssemblyName>PowerGit.Engine</AssemblyName>
     <Description>Headless git host for the PowerGit Tauri UI. No WinForms.</Description>
   </PropertyGroup>
+
+  <!-- One version source: frontend/package.json (v0.13.5). Read with a
+       property function so dotnet run and the packaged sidecar agree. -->
+  <PropertyGroup>
+    <PowerGitPackageJson>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '..', '..', '..', 'frontend', 'package.json'))</PowerGitPackageJson>
+    <PowerGitPackageJsonText Condition="Exists('$(PowerGitPackageJson)')">$([System.IO.File]::ReadAllText('$(PowerGitPackageJson)'))</PowerGitPackageJsonText>
+    <Version Condition="'$(PowerGitPackageJsonText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(PowerGitPackageJsonText)', '"version"\s*:\s*"([^"]+)"').Groups[1].Value)</Version>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
 </Project>

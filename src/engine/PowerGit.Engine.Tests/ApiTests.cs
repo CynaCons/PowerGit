@@ -24,6 +24,10 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.NotNull(body);
         Assert.Equal("ok", body.Status);
         Assert.Contains("git version", body.GitVersion, StringComparison.OrdinalIgnoreCase);
+        // Single version source (v0.13.5): the engine reports frontend/package.json's version.
+        string packageJson = File.ReadAllText(Path.Combine(FindRepoRoot(), "frontend", "package.json"));
+        string expected = System.Text.RegularExpressions.Regex.Match(packageJson, "\"version\"\\s*:\\s*\"([^\"]+)\"").Groups[1].Value;
+        Assert.Equal(expected, body.Engine);
     }
 
     [Fact]

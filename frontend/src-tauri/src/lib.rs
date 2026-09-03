@@ -159,6 +159,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn version_comes_from_package_json_via_build_rs() {
+        // v0.13.5: Cargo.toml is a 0.0.0 placeholder; the real version is
+        // exported by build.rs from frontend/package.json.
+        let v = env!("POWERGIT_VERSION");
+        assert_eq!(v.split('.').count(), 3, "{v} is not X.Y.Z");
+        assert!(v.split('.').all(|p| p.parse::<u32>().is_ok()), "{v} is not numeric");
+        assert_ne!(v, "0.0.0");
+    }
+
+    #[test]
     fn token_is_64_lowercase_hex_chars_and_unique() {
         let a = generate_token();
         let b = generate_token();

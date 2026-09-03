@@ -2,7 +2,6 @@
 // reference behaviour for powerplan's `normalize` tool (v0.13.9). Not part of
 // any workflow: PLAN.md is written by powerplan only. Usage:
 //   node scripts/plan-normalize.mjs PLAN.md [--dry]
-// task/prose line inside iterations is carried over byte-identical.
 import { readFileSync, writeFileSync } from "node:fs"
 
 const path = process.argv[2]

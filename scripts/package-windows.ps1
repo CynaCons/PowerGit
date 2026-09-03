@@ -10,7 +10,8 @@ $ErrorActionPreference = "Stop"
 
 $repo = (Resolve-Path "$PSScriptRoot\..").Path
 $frontend = Join-Path $repo "frontend"
-$version = (Get-Content "$frontend\src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json).version
+# Single version source (v0.13.5): frontend/package.json. tauri.conf.json only points at it.
+$version = (Get-Content "$frontend\package.json" -Raw | ConvertFrom-Json).version
 
 if (-not $SkipBuild) {
     pwsh -NoProfile -File "$repo\scripts\build-engine-sidecar.ps1"
