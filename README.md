@@ -43,9 +43,10 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.12.2 (owner-issue audit
-plus Linux UI/UX: unwrapped diffs with a line gutter, branch/ahead-behind
-status bar, cherry-pick and revert, stable scroll position, real error text). Parked: dark theme, worktrees, hotkey remapping UI.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.12.3 (command bar that
+collapses to an overflow menu, a real bottom status bar, VS Code font stack
+and Shiki syntax highlighting in the file viewer, and an engine that exits
+with its parent). Parked: dark theme, worktrees, hotkey remapping UI.
 
 ## Development
 
