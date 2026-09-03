@@ -12,11 +12,10 @@
 
 ## Current Status
 
-**Active:** v0.4.7 — owner-review punch list (2026-08-21). v0.4.0–0.4.6 landed; Browse review named the defects below.
-
-Live: UI `http://127.0.0.1:1420` · engine `http://127.0.0.1:7733`
-
-Each v0.4.x: design → code → e2e. Do not start v0.5 until this punch list is done and the owner re-reviews.
+The current iteration is the last heading below that is not marked COMPLETE
+(`powerplan get_current_iteration`). This header never names a version, so it
+cannot go stale. Live dev: UI `http://127.0.0.1:1420` · engine `http://127.0.0.1:7733`
+(bearer-token gated since v0.13.0).
 
 ---
 
@@ -62,7 +61,6 @@ Each v0.4.x: design → code → e2e. Do not start v0.5 until this punch list is
 - [x] History icon; card overlay (title, path, branch); persist recents.json
 
 ### v0.4.7 — Owner review punch list (2026-08-21) (COMPLETE)
-
 Settings
 - [x] Field labels clipped in the settings panel (titles unreadable)
 
@@ -114,8 +112,12 @@ Graph context menu
 - [x] v0.4.10-5: multi-resolution e2e suite incl. fullscreen clipping check
 - [x] v0.4.10-6: Docker Ubuntu smoke (engine + UI + e2e headless)
 
-## v0.5 — Welcome / home (parked)
+## v0.5 — Welcome / home (parked) · Release track
 Recent repos with diff stats, Open, Clone.
+
+- [ ] GitHub Pages showcase site: new features + visuals screenshots
+- [ ] Release skill for opencode and claude agents (.opencode/skills + .claude/skills): how to cut a release, update Pages visuals and main README
+- [ ] Build and attach binaries to GitHub releases (Windows portable zip, Linux AppImage)
 
 ### v0.5.1 — Engine sidecar spawn (2026-08-21) (COMPLETE)
 > Make shipped builds self-sufficient: bundle the engine as a Tauri sidecar spawned at startup, so end users don't need to run anything manually.
@@ -143,12 +145,149 @@ Recent repos with diff stats, Open, Clone.
 > release skill registered for opencode (.opencode/skills) and claude (.claude/skills): preflight, version bump, artifacts, tag, notes, Pages refresh.
 **Goal:** Any agent can cut a release by following the skill.
 - [x] release skill in .opencode/skills and .claude/skills
-## Later
-- Fetch / Pull / Push **dialogs** (buttons are wired to engine `/fetch`, `/pull`, `/push` since v0.6.4; richer dialogs later)
-- Design-demo step/pause bar (opt-in `npm run test:demo`)
-- Visual screenshot suite (`npm run test:visual`, owner-triggered)
-- Dark theme; worktrees
-- Extract GitCommands
+
+## v0.6 — Showcase + cleanup
+
+### v0.6.1 — README scope rewrite (2026-08-22) (COMPLETE)
+> Rewrite README to state the fork's scope crisply: a new, modern, portable, cross-platform frontend for Git Extensions.
+**Goal:** A visitor understands within seconds what PowerGit is, what it is not yet, and why it exists.
+- [x] README: scope-first rewrite (modern/portable/cross-platform frontend for GitExtensions)
+
+### v0.6.2 — React showcase site (2026-08-22) (COMPLETE)
+> Replace the static HTML page with a Vite + React site: hero, feature cards, screenshot gallery.
+**Goal:** docs/site replaced by a React webapp under website/, built in CI and deployed to Pages.
+- [x] website/: Vite+React+MUI hero site (features, screens)
+- [x] pages.yml builds website + demo bundle, deploys combined artifact
+
+### v0.6.3 — Live demo embed (2026-08-22) (COMPLETE)
+> Embed the real PowerGit frontend (built with a /demo/ base path) in an iframe — it renders the revision graph from its built-in synthetic history when no engine is present, so visitors interact with the actual UI, not a video.
+**Goal:** Live interactive demo of the real UI on the Pages site.
+- [x] demo: real frontend built at /demo/ base, iframe embed with sample-data notice
+
+### v0.6.4 — Remaining cleanup sweep (2026-08-22) (COMPLETE)
+> Sweep up everything left from the repo analysis: sync engine version constant, promote the live-demo probe to a proper script, refresh stale PLAN "Later" list and AGENTS commands, then a full packaged-build verification pass.
+**Goal:** No known loose ends left in the repository outside explicitly backlogged items.
+- [x] sync engineVersion constant with release version (drifted at 0.4.0)
+- [x] check-live-demo.cjs -> npm run test:live, documented in release skill post-deploy step
+- [x] refresh PLAN Later list + AGENTS commands (sidecar/packaging/stashes now shipped)
+- [x] full verification: engine tests, e2e, resolution, unit, packaged-build smoke
+
+## v0.7 — File Tree correctness + GE command bars
+
+### v0.7.0 — File Tree correctness + GE-style command bars (planned) (2026-08-24) (COMPLETE)
+**Goal:** Fix nested File Tree browsing (files invisible below depth 1), close the e2e coverage gap that missed it, and bring the topbar split-buttons and revision context menu closer to Git Extensions design fidelity.
+- [x] Engine: normalize ListTree (GitHost.Queries.cs) so entry `name` is relative to the requested directory — strip the path prefix git ls-tree emits when `path` is passed; add engine test asserting nested fetch of docs/srs returns bare basenames
+- [x] UI: fix CommitFileTree child path/label building to match normalized DTO; verify blob pane opens files at depth >= 2
+- [x] E2E coverage: new spec that expands nested directories in the File Tree tab (e.g. frontend -> components) and asserts file rows render; must fail on the pre-fix engine
+- [x] Topbar: Git Extensions-style split buttons (icon + dropdown caret) for Commit / Stash / Fetch / Pull / Push, with secondary actions (amend, force push variants, manage stashes) in the dropdown menus; match GE iconography and ordering
+- [x] Revision context menu: expand toward GE parity (create branch/tag here, copy SHA, cherry-pick/revert placeholders as feasible); keep existing checkout/reset/rebase entries and testids stable
+- [x] Verification: dotnet test src/engine/PowerGit.Engine.sln + npm run test:e2e green; smoke npm run dev once
+
+## v0.8 — Large-repo responsiveness
+
+### v0.8.0 — Large-repo responsiveness + owner feedback #3 (2026-08-24) (COMPLETE)
+> Owner feedback 2026-08-24: (1) show a progress indicator in the top app bar during fetch/pull/push; (2) fonts on Ubuntu AppImage look low-quality and too grey; (3) not all branches are visible by default — want Git Extensions behaviour, not just checked-out branches; (4) repos may be very heavy — never block the UI on engine responses (e.g. branch list); data must load dynamically and live-refresh; (5) visuals must scale with large projects; (6) navrail is too wide; (7) overall: on large projects the app is unusable/too laggy.
+Code findings behind the feedback: fetch/pull/push are synchronous blocking POSTs (GitHost.Operations.cs, RunTimed up to 300 s) with only a boolean `busy` flag; App.tsx refreshRepo awaits Promise.all(revisions+refs+status) before anything renders; layoutGraph re-runs fully over all rows synchronously on every revisions change (main thread); Inter/Fira Code load from Google Fonts CDN via a media="print" onload trick that yields fallback system fonts when offline/blocked (packaged AppImage) and theme greys (#737373 secondary text) are light for Linux rasterizers; navrail is fixed 64 px.
+**Goal:** On heavy repositories PowerGit stays fluid: no UI blocking on engine calls, every long git operation shows progress in the top bar, all branches are visible by default (GE parity), and typography/contrast/navrail feel desktop-quality on Windows and Linux.
+- [x] Engine job model for network ops: POST /fetch, /pull, /push return a jobId immediately and run detached (300 s cap kept); GET /jobs/{id} reports running/done/error + captured output (poll or SSE); existing sync behaviour covered by tests; + engine tests
+- [x] Topbar progress indicator: centered LinearProgress + operation label (Fetching…/Pulling…/Pushing…) in the AppBar driven by job state; buttons stay enabled for unrelated actions; errors surface as today
+- [x] Non-blocking data loading: render the shell immediately at boot; revisions / refs / status / stashes load independently (kill the Promise.all in refreshRepo) with per-panel skeletons; refreshes use stale-while-revalidate (keep showing old data until new arrives); no dialog or grid ever waits on the engine to become interactive
+- [x] All branches visible by default (GE parity): engine /revisions includes every local AND remote-tracking branch tip + tags (+stash), passing explicit tips to git log so the -n cap can never hide a branch tip; left tree shows all branches expanded as today; owner override of the v0.4.0 stale-remotes decision
+- [x] Graph layout off the main thread: move/extend layoutGraph to a Web Worker (or incremental append-only layout) so 10k+ commits never block interaction; avoid full re-layout on selection/hover; keep lane output byte-identical (unit tests + existing layout.test.ts must pass unchanged)
+- [x] Large-scale render audit + perf budget: extend the 10k unit perf test into a real budget; e2e spec on a large synthetic history asserting scroll + row-select stay responsive (no multi-frame stalls); tune virtualizer overscan/memoization as needed
+- [x] Self-hosted fonts + contrast: bundle Inter and Fira Code woff2 in frontend assets, drop the Google Fonts CDN link (offline AppImage currently falls back to poor system rasterization); darken text.secondary/divider greys in theme.ts so text stops looking washed-out on Linux; verify in packaged build
+- [x] Navrail slimming: reduce fixed width 64 px → 48 px (icon buttons compact), keep tooltips and testids stable
+- [x] Verification: dotnet test engine sln + npm run test:unit + npm run test:e2e green; smoke npm run dev once; manual large-repo check (owner-provided heavy repo if available)
+
+## v0.9 — Linux AppImage hardening
+
+### v0.9.0 — Linux AppImage runtime hardening (2026-08-24) (COMPLETE)
+> Owner report from the GitHub-release AppImage on Ubuntu: "libgvfscommon.so: undefined symbol: g_task_set_static_name" (needs GLib ≥ 2.76), failed loads of libgvfsdbus.so / libdconfsettings.so / libgioremote-volume-monitor.so ("g_assertion_message_cmpint" undefined — same GLib family), "libcurl-gnutls.so: undefined symbol nghttp2_option_set_no_rc_9113_leading_and_trailing_ws_validation" (nghttp2 ≥ ~1.50), and an atk-bridge unknown-signature warning.
+Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-gnutls that were built against newer GLib/nghttp2 than the versions they bind to at runtime (the host's system stack pulled in by webkit2gtk). Non-fatal but degrades native file dialogs (no gvfs), GTK settings persistence (no dconf), and pollutes stderr on first run.
+**Goal:** The released AppImage launches on stock Ubuntu with zero GLib/GIO/curl module errors: bundled libraries must never conflict with the host system stack that webkit2gtk already guarantees.
+- [x] Reproduce + inspect bundle: build the AppImage, list bundled gio/modules (gvfs, dconf), libcurl-gnutls and their GLib/nghttp2 versions; confirm the symbol-mismatch diagnosis against the owner's stderr report
+- [x] Fix bundling: exclude the host-provided stack from the AppImage (GIO/gvfs/dconf modules, libcurl-gnutls + its nghttp2 chain — webkit2gtk deps already guarantee them on target distros); wire exclusion flags into the linux release job (release.yml / sidecar scripts) and document them
+- [x] Regression guard: extend scripts/ubuntu-check.ps1 (Docker) and/or the release CI job to launch the AppImage headless and fail on any "undefined symbol" or "Failed to load module" stderr line; silence residual atk-bridge noise (NO_AT_BRIDGE=1) if still present
+
+## v0.10 — Large-repo scalability for real
+
+### v0.10.0 — Large-repo scalability for real (2026-08-24) (COMPLETE)
+> Re-delivers what v0.8.0/v0.9.0 checked off but did not achieve. Root findings: /revisions passes every ref as argv (breaks >~900 refs on Windows, slow topo walk re-run on every refresh); history hard-capped at 800 with no way to load more; clicking a branch whose tip is not loaded silently does nothing; RepoTree renders thousands of un-virtualized rows expanded; refreshRepo re-fetches everything after every action; sync ops (checkout/reset/rebase) give zero progress feedback; "Fetch all remotes" races the single-flight job guard; no live refresh at all; AppImage guard is a static 3-symbol scan, never launches the app. Owner emphasis: repos may have SO MANY branches they cannot all be shown — there must always be a way to find and see them (search/filter + jump-loads-history).
+**Goal:** On a repo with 100k commits and thousands of branches, PowerGit stays fluid AND every branch is findable: /revisions is argv-safe and paged, history loads incrementally with append-only layout, the left tree is virtualized with a ref filter, jumping to any ref loads history until that ref is visible, all mutating ops show progress, repo data live-refreshes on .git changes, and the AppImage guard actually launches the app.
+- [x] v0.10.0-1: Engine /revisions argv-safe + paged — replace explicit-tips argv with --branches --remotes --tags (+ refs/stash, + HEAD) so ref count can never exceed the Windows 32K command-line limit; add skip/max paging params; engine tests for paging and for a repo with 2000+ refs (generated in-test) [agent: claude]
+- [x] v0.10.0-2: Incremental history loading — UI loads revisions in pages (first page fast, background auto-fill up to a ceiling), layout worker keeps state and appends rows without re-laying-out the prefix (full-run and append runs must produce identical rows; unit test proves it); grid shows a subtle loading tail indicator [agent: claude]
+- [x] v0.10.0-3: Every branch findable (owner requirement) — left tree gets a filter/search box over ALL refs (branches/remotes/tags, uncapped for-each-ref data); clicking any ref whose tip is not yet in the loaded graph loads further pages until the tip is visible (with progress + graceful ceiling message) instead of silently doing nothing [agent: claude]
+- [x] v0.10.0-4: RepoTree virtualization — flatten visible nodes and render via the existing virtualizer so thousands of refs cost only visible rows; remotes/tags sections auto-collapse above a threshold; keep tree-row testids and context menus working [agent: claude]
+- [x] v0.10.0-5: Targeted refresh + stable selection — selection keyed by SHA (survives refresh), per-action refresh scope (status-only after stage, status+revisions+refs after commit/checkout, etc.) instead of the full 4-call sweep, debounce BottomPanel per-selection fetches [agent: claude]
+- [x] v0.10.0-6: Progress feedback for all mutating ops — checkout/reset/rebase/stash-apply show the topbar busy indicator while running; fix "Fetch all remotes" to run sequentially against the single-flight job guard (currently guaranteed to error with >1 remote) [agent: claude]
+- [x] v0.10.0-7: Live refresh (dropped v0.8.0 owner requirement) — engine watches .git metadata (HEAD, refs/, packed-refs, index) and exposes a change feed (SSE); UI subscribes, debounces, and triggers targeted refreshes so external git activity appears without user action; engine test for the watcher [agent: claude]
+- [x] v0.10.0-8: Heavy-repo fixture + perf harness — script generates a synthetic repo (50k+ commits, 2000+ branches/tags) via git fast-import; opt-in npm run test:perf drives the real app against it asserting first-paint, scroll, ref-jump and filter latency budgets; documented in AGENTS.md [agent: claude]
+- [x] v0.10.0-9: AppImage guard that actually guards — generalize inspect-appimage.sh symbol scan (ldd -r style unresolved-symbol check, not 3 hard-coded names), add a release.yml step that launches the AppImage headless (xvfb) and fails on "undefined symbol"/"Failed to load module" stderr; verification lands with the next tagged release [agent: claude]
+- [x] v0.10.0-10: Verification — dotnet test engine sln, npm run test:unit, npm run test:e2e all green; smoke npm run dev once; test:perf run recorded against the heavy fixture [agent: claude]
+> Note on v0.8.0/v0.9.0: several checked tasks delivered weaker artifacts than their text claims — the "large synthetic history" perf e2e runs against the small dev repo, and the v0.9.0 "launch headless" regression guard is a static 3-symbol scan that never launches the app. v0.10.0 supersedes those items; their checkboxes stand for what actually shipped, not the original task text.
+
+## v0.11 — Git Extensions hotkeys
+> Reintegrate Git Extensions keyboard shortcuts: catalog + dispatcher in React, GE default chords for actions PowerGit already has, commit-overlay S/U on selected files, grid arrow navigation (SRS-GRAPH-011). Unavailable GE commands stay unbound. Remapping UI last.
+
+### v0.11.0 — Git Extensions hotkeys (2026-08-30) (COMPLETE)
+> Slice 0 docs (SRS-hotkeys, agent memory) then Slice 1: TS catalog+dispatcher, Browse bindings, grid navigation (SRS-GRAPH-011), commit-overlay S/U. Later slices (commit pane-focus, grid parent/child, remapping UI) stay open.
+**Goal:** On the Browse surface, Git Extensions default shortcuts fire the actions PowerGit already has. Grid arrow keys move selection. In the commit overlay, S/U stage/unstage the selected file(s) without stealing keystrokes from the message field.
+- [x] v0.11.0-0: SRS-hotkeys.md (tag KEY) + register in docs/srs/README.md; agent memory docs/agents/memories/hotkeys.md [agent: grok]
+- [x] v0.11.0-1: frontend/src/hotkeys/ catalog + parse + typing-guard + dispatcher + HotkeyHost; unit tests for GE default chords and S-vs-message-field [agent: grok]
+- [x] v0.11.0-2: Browse bindings (commit/open/settings/fetch/pull/push/stash/create/checkout/rebase/focus/F5) + grid arrow/page/home/end (SRS-GRAPH-011) + shortcut captions on toolbar/menus [agent: grok]
+- [x] v0.11.0-3: Commit overlay S/U on selected file(s) (multi-select); CompactFileList focusable; S types in the message field [agent: grok]
+- [x] v0.11.0-4: Playwright e2e (arrows, Ctrl+Space, Ctrl+Comma, F5 no SPA reload, commit S/U + typing guard) + smoke npm run dev [agent: grok]
+- [x] Later: Slice 2 commit pane-focus/stage-all, Slice 3 grid parent/child/go-to, Slice 4 remapping UI [agent: grok]
+- [x] v0.11.0-5: Commit overlay always shows Stage / Stage all / Unstage / Unstage all (disabled when empty), matching FormCommit toolbarStaged — not selection-gated vanishing buttons [agent: grok]
+- [x] v0.11.0-6: Commit overlay paper size is fixed (independent of selected file / diff length); lists and diff scroll inside. E2e: buttons visible + overlay box does not jump on file select [agent: grok]
+
+## v0.12 — Owner feedback rounds — Linux AppImage
+
+### v0.12.0 — Owner feedback #4 — Linux AppImage review (2026-09-02) (COMPLETE)
+**Goal:** Fix the defects the owner found running the v0.11.0 AppImage on Ubuntu: engine port collision on launch, graph missing other people's branches, unclear toolbar dropdown arrows, selected row indistinguishable from same-author rows, untracked file shows no diff, diff view renders ligatures instead of raw characters, red "string did not match" on fetch.
+- [x] Engine port collision: AppImage crashes with "Failed to bind 127.0.0.1:7733 address already in use". Tauri must reuse an already-healthy engine or pick a free port, and kill the sidecar child on app exit.
+- [x] Graph shows only the current branch: GE parity — all branches (local + remote) recently updated, ordered by date (--date-order), not one branch's topo chain filling the first page.
+- [x] Top toolbar: icons closer to Git Extensions; dropdown arrows visually attached to their button (split-button grouping), not floating between neighbours.
+- [x] Selected row highlight (Linux) is identical to the same-author highlight; selected row must be visibly distinct.
+- [x] Untracked new file in commit view shows "no diff"; must show the full file as an added diff.
+- [x] Diff view renders font ligatures (C++ "->" became an arrow); disable ligatures everywhere code is shown, raw characters only.
+- [x] Fetch on Linux shows red "The string did not match the expected pattern" (WebKit DOMException); find the offending call and fix.
+- [x] Tooling: powerplan submodule bumped to v0.7.2 (powerspawn already current).
+
+### v0.12.1 — Owner feedback #5 — toolbar density + Linux author highlight (2026-09-02) (COMPLETE)
+**Goal:** Toolbar buttons are too big: make the command bar compact (GE density). On Linux/WebKitGTK the same-author highlight makes rows disappear; fix with WebKit-safe CSS.
+- [x] Toolbar too big: compact command bar (small buttons, tighter padding, 28-30px height, smaller icons/labels) at GE density.
+- [x] Linux: same-author highlight makes rows disappear on WebKitGTK; make row highlight CSS/canvas WebKit-safe and keep text visible.
+- [x] Bottom diff view: file list panel resizable (drag divider between file names and diff; width persisted).
+- [x] Ubuntu fonts look low quality and too light grey: verify self-hosted Inter/Fira Code actually load under tauri:// on WebKitGTK, darken secondary text, add font smoothing and a good Linux fallback stack.
+- [x] File Tree on Linux: cannot expand subdirectories or open files (owner report #2). Tree/blob logic and e2e are correct on Windows; subdirectory errors were silently hidden, now surfaced in the tree. Linux root cause still needs a repro.
+- [x] Linux review pass: text-first JSON parsing everywhere, engine reuse only on matching version, ls-tree timeout, AppImage bundled-GLib strip in inspect script, Docker WebKit e2e harness (25/25 webkit + chromium on Linux).
+
+### v0.12.2 — Owner-issue audit + Linux UI/UX pass (2026-09-02) (2026-09-03) (COMPLETE)
+**Goal:** Revisit every owner-reported defect from earlier iterations and confirm each is actually fixed in the current code (not just ticked); fix the ones that are partial or regressed. Second pass on Linux UI/UX polish toward Git Extensions parity. Verify on Windows and in the Docker WebKit harness, then release.
+- [x] Layout Web Worker: onerror handler + in-thread layouter fallback so a custom-scheme worker failure on WebKitGTK cannot leave the grid empty.
+- [x] Diff view: no mid-token wrapping (white-space pre, horizontal scroll, tab-size 4, line-number gutter).
+- [x] All 12 remaining catch sites use describeThrown so WebKit DOMException text reaches the UI (BottomPanel, CommitDialog, GitOps).
+- [x] Error banner becomes a dismissable Alert with copy; status bar shows branch / ahead-behind / dirty like GE instead of engine health.
+- [x] Scoped refresh: watcher events carry a kind so a status-only change does not refetch revisions/refs; selection and scroll preserved across refresh.
+- [x] Grid auto-scroll only on user navigation (keyed by SHA), not on every refresh; focus returns to the grid after dialogs and actions.
+- [x] Settings dialog label clipping (v0.4.7) verified with an e2e geometry assertion; splitters handle pointercancel.
+- [x] Cherry-pick and revert implemented (engine + context menu), replacing the disabled placeholders from v0.7.0.
+- [x] Empty/failed states: when /revisions fails the grid stays blank; show an inline error with Retry, and real empty states for no-commits / no-files / no-stashes.
+
+### v0.12.3 — Toolbar overflow, selection vs author, chrome bugs, VS Code fonts, syntax highlighting (2026-09-03) (COMPLETE)
+**Goal:** Close the owner's 2026-09-03 Ubuntu round: stop the author highlight competing with (and erasing) the selection, make the command bar survive narrow windows, get the busy indicator out from under the buttons, kill the stray WebView context menu, restore Fetch All, adopt VS Code's font stack, and highlight source in the File Tree viewer.
+- [x] Same-author marker moves off the row background onto the author name (CSS + canvas band removed), so selection owns the row background exclusively and nothing can be erased by a WebKitGTK class-mutation repaint
+- [x] Command bar collapses progressively (labels -> icons -> "More" overflow menu) from its own measured width; nothing wraps or clips at any window size
+- [x] Busy indicator moved out of its absolute centre overlay into the toolbar flow beside the status strip (it was painting over the buttons by construction)
+- [x] WebView context menu suppressed app-wide outside text fields; the revision menu re-targets on a second right-click instead of leaking the browser menu through the modal backdrop
+- [x] "Fetch all remotes" is always present in the Fetch menu (it only appeared with two or more remotes, so single-remote clones had no Fetch All at all)
+- [x] UI font stack switched to VS Code's order (platform font first, Inter as fallback); `-webkit-font-smoothing: antialiased` removed — it thins text and was the cause of the "light grey" complaint it had been added to fix
+- [x] Syntax highlighting in the File Tree blob viewer via Shiki (VS Code's own highlighter), bundled offline, lazy, with plain-text fallback and a size guard
+- [x] Repo state (branch, ahead/behind, dirty, build info) moved from the toolbar's leftover width into a real bottom status bar; it was being elided to unreadable stubs at every window size
+- [x] Narrow-window layout: ref panel auto-collapses below the overflow width (restored when the window grows, unless the user closed it), grid metadata columns shrink under 1200px so Date/SHA stop being pushed off the right edge, and adjacent columns get a gap
+- [x] Engine exits with its parent (--parent-pid watchdog): a force-killed or crashed UI no longer orphans a sidecar holding the port, which was the root of the original "address already in use" launch crash
+- [x] Test integrity: four specs were asserting something other than what they claimed (repo-restore target, repo-specific .gitignore fixture, a nested-locator strict-mode match that only passed while the diff was still loading, exact containment of a label that straddles its border by design) — all corrected; Linux harness no longer clobbers the host node_modules and seeds a git identity
 
 ## v0.13 — Hardening — security, CI, structure, truth
 > Project audit of 2026-09-03 (Good / Bad / Ugly). One iteration per finding. Ugly items first (engine exposure, docs vs repo reality), then structural debt (App.tsx, version sync, engine concurrency, CI, Rust tests).
@@ -171,14 +310,14 @@ Recent repos with diff stats, Open, Clone.
 - [x] Rewrite AGENTS.md: current project-shape block (frontend, frontend/src-tauri, src/engine, website, docker, scripts, docs), delete the three 'to be created' markers, the 'do not delete WinForms' rule and the contradictory footnote, fix the two shell-mangled strings ('ode frontend/scripts', 'elease skill'), add a Branches section [agent: claude]
 - [x] README dev section: one line on the reference worktree; replace upstream's verbatim CONTRIBUTING.md with a short PowerGit version [agent: claude]
 
-### v0.13.2 — PLAN.md header frozen at v0.4.7 (Ugly #3)
+### v0.13.2 — PLAN.md header frozen at v0.4.7 (Ugly #3) (2026-09-03) (COMPLETE)
 **Goal:** The "Current Status" header says Active v0.4.7 (2026-08-21) and "do not start v0.5 until owner re-reviews", while twelve later versions are marked COMPLETE below it. Make the header derive from, or be updated with, the real current iteration so a reader trusting the top of the file is not misled.
-- [ ] Header stops claiming a version: keep goal / philosophy / verify / upstream pin; replace the 'Active: v0.4.7' paragraph and the 'do not start v0.5' gate with one line pointing at get_current_iteration / the last non-COMPLETE heading
-- [ ] Close v0.12.2 properly: defer its one open hotkeys task (already in Backlog as Slice 2–4) so check_plan is clean and current becomes v0.13.0
-- [ ] One-time manual restructure (sanctioned exception to the powerplan-only rule, say so in the commit): majors in version order v0.0…v0.4, one merged v0.5, a major per v0.6…v0.12 with their iterations moved under them, v0.13 last; task text and checkboxes byte-identical
-- [ ] Merge 'Later' into 'Backlog' at the end of the file; move the 2026-08-21 branch-restructure narrative into docs/agents/memories/branch-model.md
-- [ ] After the restructure: powerplan check_plan reports ok; show_plan and get_current_iteration both say v0.13.0
-- [ ] Dedicated sub-iteration v0.13.9 upgrades powerplan (normalize, set_header, create_major insertion fix, lint rules) so this restructure never needs a manual edit again
+- [x] Header stops claiming a version: keep goal / philosophy / verify / upstream pin; replace the 'Active: v0.4.7' paragraph and the 'do not start v0.5' gate with one line pointing at get_current_iteration / the last non-COMPLETE heading [agent: claude]
+- [x] Close v0.12.2 properly: defer its one open hotkeys task (already in Backlog as Slice 2–4) so check_plan is clean and current becomes v0.13.0 [agent: claude]
+- [x] One-time manual restructure (sanctioned exception to the powerplan-only rule, say so in the commit): majors in version order v0.0…v0.4, one merged v0.5, a major per v0.6…v0.12 with their iterations moved under them, v0.13 last; task text and checkboxes byte-identical [agent: claude]
+- [x] Merge 'Later' into 'Backlog' at the end of the file; move the 2026-08-21 branch-restructure narrative into docs/agents/memories/branch-model.md [agent: claude]
+- [x] After the restructure: powerplan check_plan reports ok; show_plan and get_current_iteration both say v0.13.0 [agent: claude]
+- [x] Dedicated sub-iteration v0.13.9 upgrades powerplan (normalize, set_header, create_major insertion fix, lint rules) so this restructure never needs a manual edit again [agent: claude]
 
 ### v0.13.3 — Git Extensions reuse story is aspirational (Ugly #4)
 **Goal:** README and AGENTS.md promise "the proven Git Extensions engine code" and a reused lane model, but src/engine references no upstream project: it is a fresh 2.3k-line git CLI wrapper, and the graph layouter is a TypeScript reimplementation. Either make the claim true (extract/port specific GE pieces with tests proving parity) or rewrite the claim to "GE is the behavioural reference, verified by parity tests".
@@ -237,156 +376,18 @@ Recent repos with diff stats, Open, Clone.
 - [ ] Nice-to-have once sorted: move_iteration(version, major), update_major / merge_major, remove_prose / move_prose
 - [ ] Release powerplan, bump the powerspawn/powerplan submodule pin in PowerGit, run normalize + check_plan on this PLAN.md as the acceptance test
 
-## v0.5 — Release track
-- [ ] GitHub Pages showcase site: new features + visuals screenshots
-- [ ] Release skill for opencode and claude agents (.opencode/skills + .claude/skills): how to cut a release, update Pages visuals and main README
-- [ ] Build and attach binaries to GitHub releases (Windows portable zip, Linux AppImage)
-
-### v0.6.1 — README scope rewrite (2026-08-22) (COMPLETE)
-> Rewrite README to state the fork's scope crisply: a new, modern, portable, cross-platform frontend for Git Extensions.
-**Goal:** A visitor understands within seconds what PowerGit is, what it is not yet, and why it exists.
-- [x] README: scope-first rewrite (modern/portable/cross-platform frontend for GitExtensions)
-
-### v0.6.2 — React showcase site (2026-08-22) (COMPLETE)
-> Replace the static HTML page with a Vite + React site: hero, feature cards, screenshot gallery.
-**Goal:** docs/site replaced by a React webapp under website/, built in CI and deployed to Pages.
-- [x] website/: Vite+React+MUI hero site (features, screens)
-- [x] pages.yml builds website + demo bundle, deploys combined artifact
-
-### v0.6.3 — Live demo embed (2026-08-22) (COMPLETE)
-> Embed the real PowerGit frontend (built with a /demo/ base path) in an iframe — it renders the revision graph from its built-in synthetic history when no engine is present, so visitors interact with the actual UI, not a video.
-**Goal:** Live interactive demo of the real UI on the Pages site.
-- [x] demo: real frontend built at /demo/ base, iframe embed with sample-data notice
-
-### v0.6.4 — Remaining cleanup sweep (2026-08-22) (COMPLETE)
-> Sweep up everything left from the repo analysis: sync engine version constant, promote the live-demo probe to a proper script, refresh stale PLAN "Later" list and AGENTS commands, then a full packaged-build verification pass.
-**Goal:** No known loose ends left in the repository outside explicitly backlogged items.
-- [x] sync engineVersion constant with release version (drifted at 0.4.0)
-- [x] check-live-demo.cjs -> npm run test:live, documented in release skill post-deploy step
-- [x] refresh PLAN Later list + AGENTS commands (sidecar/packaging/stashes now shipped)
-- [x] full verification: engine tests, e2e, resolution, unit, packaged-build smoke
-
-### v0.7.0 — File Tree correctness + GE-style command bars (planned) (2026-08-24) (COMPLETE)
-**Goal:** Fix nested File Tree browsing (files invisible below depth 1), close the e2e coverage gap that missed it, and bring the topbar split-buttons and revision context menu closer to Git Extensions design fidelity.
-- [x] Engine: normalize ListTree (GitHost.Queries.cs) so entry `name` is relative to the requested directory — strip the path prefix git ls-tree emits when `path` is passed; add engine test asserting nested fetch of docs/srs returns bare basenames
-- [x] UI: fix CommitFileTree child path/label building to match normalized DTO; verify blob pane opens files at depth >= 2
-- [x] E2E coverage: new spec that expands nested directories in the File Tree tab (e.g. frontend -> components) and asserts file rows render; must fail on the pre-fix engine
-- [x] Topbar: Git Extensions-style split buttons (icon + dropdown caret) for Commit / Stash / Fetch / Pull / Push, with secondary actions (amend, force push variants, manage stashes) in the dropdown menus; match GE iconography and ordering
-- [x] Revision context menu: expand toward GE parity (create branch/tag here, copy SHA, cherry-pick/revert placeholders as feasible); keep existing checkout/reset/rebase entries and testids stable
-- [x] Verification: dotnet test src/engine/PowerGit.Engine.sln + npm run test:e2e green; smoke npm run dev once
-
-### v0.8.0 — Large-repo responsiveness + owner feedback #3 (2026-08-24) (COMPLETE)
-> Owner feedback 2026-08-24: (1) show a progress indicator in the top app bar during fetch/pull/push; (2) fonts on Ubuntu AppImage look low-quality and too grey; (3) not all branches are visible by default — want Git Extensions behaviour, not just checked-out branches; (4) repos may be very heavy — never block the UI on engine responses (e.g. branch list); data must load dynamically and live-refresh; (5) visuals must scale with large projects; (6) navrail is too wide; (7) overall: on large projects the app is unusable/too laggy.
-Code findings behind the feedback: fetch/pull/push are synchronous blocking POSTs (GitHost.Operations.cs, RunTimed up to 300 s) with only a boolean `busy` flag; App.tsx refreshRepo awaits Promise.all(revisions+refs+status) before anything renders; layoutGraph re-runs fully over all rows synchronously on every revisions change (main thread); Inter/Fira Code load from Google Fonts CDN via a media="print" onload trick that yields fallback system fonts when offline/blocked (packaged AppImage) and theme greys (#737373 secondary text) are light for Linux rasterizers; navrail is fixed 64 px.
-**Goal:** On heavy repositories PowerGit stays fluid: no UI blocking on engine calls, every long git operation shows progress in the top bar, all branches are visible by default (GE parity), and typography/contrast/navrail feel desktop-quality on Windows and Linux.
-- [x] Engine job model for network ops: POST /fetch, /pull, /push return a jobId immediately and run detached (300 s cap kept); GET /jobs/{id} reports running/done/error + captured output (poll or SSE); existing sync behaviour covered by tests; + engine tests
-- [x] Topbar progress indicator: centered LinearProgress + operation label (Fetching…/Pulling…/Pushing…) in the AppBar driven by job state; buttons stay enabled for unrelated actions; errors surface as today
-- [x] Non-blocking data loading: render the shell immediately at boot; revisions / refs / status / stashes load independently (kill the Promise.all in refreshRepo) with per-panel skeletons; refreshes use stale-while-revalidate (keep showing old data until new arrives); no dialog or grid ever waits on the engine to become interactive
-- [x] All branches visible by default (GE parity): engine /revisions includes every local AND remote-tracking branch tip + tags (+stash), passing explicit tips to git log so the -n cap can never hide a branch tip; left tree shows all branches expanded as today; owner override of the v0.4.0 stale-remotes decision
-- [x] Graph layout off the main thread: move/extend layoutGraph to a Web Worker (or incremental append-only layout) so 10k+ commits never block interaction; avoid full re-layout on selection/hover; keep lane output byte-identical (unit tests + existing layout.test.ts must pass unchanged)
-- [x] Large-scale render audit + perf budget: extend the 10k unit perf test into a real budget; e2e spec on a large synthetic history asserting scroll + row-select stay responsive (no multi-frame stalls); tune virtualizer overscan/memoization as needed
-- [x] Self-hosted fonts + contrast: bundle Inter and Fira Code woff2 in frontend assets, drop the Google Fonts CDN link (offline AppImage currently falls back to poor system rasterization); darken text.secondary/divider greys in theme.ts so text stops looking washed-out on Linux; verify in packaged build
-- [x] Navrail slimming: reduce fixed width 64 px → 48 px (icon buttons compact), keep tooltips and testids stable
-- [x] Verification: dotnet test engine sln + npm run test:unit + npm run test:e2e green; smoke npm run dev once; manual large-repo check (owner-provided heavy repo if available)
-
-### v0.9.0 — Linux AppImage runtime hardening (2026-08-24) (COMPLETE)
-> Owner report from the GitHub-release AppImage on Ubuntu: "libgvfscommon.so: undefined symbol: g_task_set_static_name" (needs GLib ≥ 2.76), failed loads of libgvfsdbus.so / libdconfsettings.so / libgioremote-volume-monitor.so ("g_assertion_message_cmpint" undefined — same GLib family), "libcurl-gnutls.so: undefined symbol nghttp2_option_set_no_rc_9113_leading_and_trailing_ws_validation" (nghttp2 ≥ ~1.50), and an atk-bridge unknown-signature warning.
-Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-gnutls that were built against newer GLib/nghttp2 than the versions they bind to at runtime (the host's system stack pulled in by webkit2gtk). Non-fatal but degrades native file dialogs (no gvfs), GTK settings persistence (no dconf), and pollutes stderr on first run.
-**Goal:** The released AppImage launches on stock Ubuntu with zero GLib/GIO/curl module errors: bundled libraries must never conflict with the host system stack that webkit2gtk already guarantees.
-- [x] Reproduce + inspect bundle: build the AppImage, list bundled gio/modules (gvfs, dconf), libcurl-gnutls and their GLib/nghttp2 versions; confirm the symbol-mismatch diagnosis against the owner's stderr report
-- [x] Fix bundling: exclude the host-provided stack from the AppImage (GIO/gvfs/dconf modules, libcurl-gnutls + its nghttp2 chain — webkit2gtk deps already guarantee them on target distros); wire exclusion flags into the linux release job (release.yml / sidecar scripts) and document them
-- [x] Regression guard: extend scripts/ubuntu-check.ps1 (Docker) and/or the release CI job to launch the AppImage headless and fail on any "undefined symbol" or "Failed to load module" stderr line; silence residual atk-bridge noise (NO_AT_BRIDGE=1) if still present
-
-### v0.10.0 — Large-repo scalability for real (2026-08-24) (COMPLETE)
-> Re-delivers what v0.8.0/v0.9.0 checked off but did not achieve. Root findings: /revisions passes every ref as argv (breaks >~900 refs on Windows, slow topo walk re-run on every refresh); history hard-capped at 800 with no way to load more; clicking a branch whose tip is not loaded silently does nothing; RepoTree renders thousands of un-virtualized rows expanded; refreshRepo re-fetches everything after every action; sync ops (checkout/reset/rebase) give zero progress feedback; "Fetch all remotes" races the single-flight job guard; no live refresh at all; AppImage guard is a static 3-symbol scan, never launches the app. Owner emphasis: repos may have SO MANY branches they cannot all be shown — there must always be a way to find and see them (search/filter + jump-loads-history).
-**Goal:** On a repo with 100k commits and thousands of branches, PowerGit stays fluid AND every branch is findable: /revisions is argv-safe and paged, history loads incrementally with append-only layout, the left tree is virtualized with a ref filter, jumping to any ref loads history until that ref is visible, all mutating ops show progress, repo data live-refreshes on .git changes, and the AppImage guard actually launches the app.
-- [x] v0.10.0-1: Engine /revisions argv-safe + paged — replace explicit-tips argv with --branches --remotes --tags (+ refs/stash, + HEAD) so ref count can never exceed the Windows 32K command-line limit; add skip/max paging params; engine tests for paging and for a repo with 2000+ refs (generated in-test) [agent: claude]
-- [x] v0.10.0-2: Incremental history loading — UI loads revisions in pages (first page fast, background auto-fill up to a ceiling), layout worker keeps state and appends rows without re-laying-out the prefix (full-run and append runs must produce identical rows; unit test proves it); grid shows a subtle loading tail indicator [agent: claude]
-- [x] v0.10.0-3: Every branch findable (owner requirement) — left tree gets a filter/search box over ALL refs (branches/remotes/tags, uncapped for-each-ref data); clicking any ref whose tip is not yet in the loaded graph loads further pages until the tip is visible (with progress + graceful ceiling message) instead of silently doing nothing [agent: claude]
-- [x] v0.10.0-4: RepoTree virtualization — flatten visible nodes and render via the existing virtualizer so thousands of refs cost only visible rows; remotes/tags sections auto-collapse above a threshold; keep tree-row testids and context menus working [agent: claude]
-- [x] v0.10.0-5: Targeted refresh + stable selection — selection keyed by SHA (survives refresh), per-action refresh scope (status-only after stage, status+revisions+refs after commit/checkout, etc.) instead of the full 4-call sweep, debounce BottomPanel per-selection fetches [agent: claude]
-- [x] v0.10.0-6: Progress feedback for all mutating ops — checkout/reset/rebase/stash-apply show the topbar busy indicator while running; fix "Fetch all remotes" to run sequentially against the single-flight job guard (currently guaranteed to error with >1 remote) [agent: claude]
-- [x] v0.10.0-7: Live refresh (dropped v0.8.0 owner requirement) — engine watches .git metadata (HEAD, refs/, packed-refs, index) and exposes a change feed (SSE); UI subscribes, debounces, and triggers targeted refreshes so external git activity appears without user action; engine test for the watcher [agent: claude]
-- [x] v0.10.0-8: Heavy-repo fixture + perf harness — script generates a synthetic repo (50k+ commits, 2000+ branches/tags) via git fast-import; opt-in npm run test:perf drives the real app against it asserting first-paint, scroll, ref-jump and filter latency budgets; documented in AGENTS.md [agent: claude]
-- [x] v0.10.0-9: AppImage guard that actually guards — generalize inspect-appimage.sh symbol scan (ldd -r style unresolved-symbol check, not 3 hard-coded names), add a release.yml step that launches the AppImage headless (xvfb) and fails on "undefined symbol"/"Failed to load module" stderr; verification lands with the next tagged release [agent: claude]
-- [x] v0.10.0-10: Verification — dotnet test engine sln, npm run test:unit, npm run test:e2e all green; smoke npm run dev once; test:perf run recorded against the heavy fixture [agent: claude]
-> Note on v0.8.0/v0.9.0: several checked tasks delivered weaker artifacts than their text claims — the "large synthetic history" perf e2e runs against the small dev repo, and the v0.9.0 "launch headless" regression guard is a static 3-symbol scan that never launches the app. v0.10.0 supersedes those items; their checkboxes stand for what actually shipped, not the original task text.
-
-## v0.11 — Git Extensions hotkeys
-> Reintegrate Git Extensions keyboard shortcuts: catalog + dispatcher in React, GE default chords for actions PowerGit already has, commit-overlay S/U on selected files, grid arrow navigation (SRS-GRAPH-011). Unavailable GE commands stay unbound. Remapping UI last.
-
-### v0.11.0 — Git Extensions hotkeys (2026-08-30) (COMPLETE)
-> Slice 0 docs (SRS-hotkeys, agent memory) then Slice 1: TS catalog+dispatcher, Browse bindings, grid navigation (SRS-GRAPH-011), commit-overlay S/U. Later slices (commit pane-focus, grid parent/child, remapping UI) stay open.
-**Goal:** On the Browse surface, Git Extensions default shortcuts fire the actions PowerGit already has. Grid arrow keys move selection. In the commit overlay, S/U stage/unstage the selected file(s) without stealing keystrokes from the message field.
-- [x] v0.11.0-0: SRS-hotkeys.md (tag KEY) + register in docs/srs/README.md; agent memory docs/agents/memories/hotkeys.md [agent: grok]
-- [x] v0.11.0-1: frontend/src/hotkeys/ catalog + parse + typing-guard + dispatcher + HotkeyHost; unit tests for GE default chords and S-vs-message-field [agent: grok]
-- [x] v0.11.0-2: Browse bindings (commit/open/settings/fetch/pull/push/stash/create/checkout/rebase/focus/F5) + grid arrow/page/home/end (SRS-GRAPH-011) + shortcut captions on toolbar/menus [agent: grok]
-- [x] v0.11.0-3: Commit overlay S/U on selected file(s) (multi-select); CompactFileList focusable; S types in the message field [agent: grok]
-- [x] v0.11.0-4: Playwright e2e (arrows, Ctrl+Space, Ctrl+Comma, F5 no SPA reload, commit S/U + typing guard) + smoke npm run dev [agent: grok]
-- [x] Later: Slice 2 commit pane-focus/stage-all, Slice 3 grid parent/child/go-to, Slice 4 remapping UI [agent: grok]
-- [x] v0.11.0-5: Commit overlay always shows Stage / Stage all / Unstage / Unstage all (disabled when empty), matching FormCommit toolbarStaged — not selection-gated vanishing buttons [agent: grok]
-- [x] v0.11.0-6: Commit overlay paper size is fixed (independent of selected file / diff length); lists and diff scroll inside. E2e: buttons visible + overlay box does not jump on file select [agent: grok]
-
-### v0.12.0 — Owner feedback #4 — Linux AppImage review (2026-09-02) (COMPLETE)
-**Goal:** Fix the defects the owner found running the v0.11.0 AppImage on Ubuntu: engine port collision on launch, graph missing other people's branches, unclear toolbar dropdown arrows, selected row indistinguishable from same-author rows, untracked file shows no diff, diff view renders ligatures instead of raw characters, red "string did not match" on fetch.
-- [x] Engine port collision: AppImage crashes with "Failed to bind 127.0.0.1:7733 address already in use". Tauri must reuse an already-healthy engine or pick a free port, and kill the sidecar child on app exit.
-- [x] Graph shows only the current branch: GE parity — all branches (local + remote) recently updated, ordered by date (--date-order), not one branch's topo chain filling the first page.
-- [x] Top toolbar: icons closer to Git Extensions; dropdown arrows visually attached to their button (split-button grouping), not floating between neighbours.
-- [x] Selected row highlight (Linux) is identical to the same-author highlight; selected row must be visibly distinct.
-- [x] Untracked new file in commit view shows "no diff"; must show the full file as an added diff.
-- [x] Diff view renders font ligatures (C++ "->" became an arrow); disable ligatures everywhere code is shown, raw characters only.
-- [x] Fetch on Linux shows red "The string did not match the expected pattern" (WebKit DOMException); find the offending call and fix.
-- [x] Tooling: powerplan submodule bumped to v0.7.2 (powerspawn already current).
-
-### v0.12.1 — Owner feedback #5 — toolbar density + Linux author highlight (2026-09-02) (COMPLETE)
-**Goal:** Toolbar buttons are too big: make the command bar compact (GE density). On Linux/WebKitGTK the same-author highlight makes rows disappear; fix with WebKit-safe CSS.
-- [x] Toolbar too big: compact command bar (small buttons, tighter padding, 28-30px height, smaller icons/labels) at GE density.
-- [x] Linux: same-author highlight makes rows disappear on WebKitGTK; make row highlight CSS/canvas WebKit-safe and keep text visible.
-- [x] Bottom diff view: file list panel resizable (drag divider between file names and diff; width persisted).
-- [x] Ubuntu fonts look low quality and too light grey: verify self-hosted Inter/Fira Code actually load under tauri:// on WebKitGTK, darken secondary text, add font smoothing and a good Linux fallback stack.
-- [x] File Tree on Linux: cannot expand subdirectories or open files (owner report #2). Tree/blob logic and e2e are correct on Windows; subdirectory errors were silently hidden, now surfaced in the tree. Linux root cause still needs a repro.
-- [x] Linux review pass: text-first JSON parsing everywhere, engine reuse only on matching version, ls-tree timeout, AppImage bundled-GLib strip in inspect script, Docker WebKit e2e harness (25/25 webkit + chromium on Linux).
-
-### v0.12.2 — Owner-issue audit + Linux UI/UX pass (2026-09-02) (2026-09-03) (COMPLETE)
-**Goal:** Revisit every owner-reported defect from earlier iterations and confirm each is actually fixed in the current code (not just ticked); fix the ones that are partial or regressed. Second pass on Linux UI/UX polish toward Git Extensions parity. Verify on Windows and in the Docker WebKit harness, then release.
-- [x] Layout Web Worker: onerror handler + in-thread layouter fallback so a custom-scheme worker failure on WebKitGTK cannot leave the grid empty.
-- [x] Diff view: no mid-token wrapping (white-space pre, horizontal scroll, tab-size 4, line-number gutter).
-- [x] All 12 remaining catch sites use describeThrown so WebKit DOMException text reaches the UI (BottomPanel, CommitDialog, GitOps).
-- [x] Error banner becomes a dismissable Alert with copy; status bar shows branch / ahead-behind / dirty like GE instead of engine health.
-- [x] Scoped refresh: watcher events carry a kind so a status-only change does not refetch revisions/refs; selection and scroll preserved across refresh.
-- [x] Grid auto-scroll only on user navigation (keyed by SHA), not on every refresh; focus returns to the grid after dialogs and actions.
-- [x] Settings dialog label clipping (v0.4.7) verified with an e2e geometry assertion; splitters handle pointercancel.
-- [x] Cherry-pick and revert implemented (engine + context menu), replacing the disabled placeholders from v0.7.0.
-- [ ] Reopened from v0.11.0 (ticked but absent): Alt+Up/Down parent/child navigation, Ctrl+Shift+F find, Ctrl+G go-to. Deferred to next iteration.
-- [x] Empty/failed states: when /revisions fails the grid stays blank; show an inline error with Retry, and real empty states for no-commits / no-files / no-stashes.
-
-### v0.12.3 — Toolbar overflow, selection vs author, chrome bugs, VS Code fonts, syntax highlighting (2026-09-03) (COMPLETE)
-**Goal:** Close the owner's 2026-09-03 Ubuntu round: stop the author highlight competing with (and erasing) the selection, make the command bar survive narrow windows, get the busy indicator out from under the buttons, kill the stray WebView context menu, restore Fetch All, adopt VS Code's font stack, and highlight source in the File Tree viewer.
-- [x] Same-author marker moves off the row background onto the author name (CSS + canvas band removed), so selection owns the row background exclusively and nothing can be erased by a WebKitGTK class-mutation repaint
-- [x] Command bar collapses progressively (labels -> icons -> "More" overflow menu) from its own measured width; nothing wraps or clips at any window size
-- [x] Busy indicator moved out of its absolute centre overlay into the toolbar flow beside the status strip (it was painting over the buttons by construction)
-- [x] WebView context menu suppressed app-wide outside text fields; the revision menu re-targets on a second right-click instead of leaking the browser menu through the modal backdrop
-- [x] "Fetch all remotes" is always present in the Fetch menu (it only appeared with two or more remotes, so single-remote clones had no Fetch All at all)
-- [x] UI font stack switched to VS Code's order (platform font first, Inter as fallback); `-webkit-font-smoothing: antialiased` removed — it thins text and was the cause of the "light grey" complaint it had been added to fix
-- [x] Syntax highlighting in the File Tree blob viewer via Shiki (VS Code's own highlighter), bundled offline, lazy, with plain-text fallback and a size guard
-- [x] Repo state (branch, ahead/behind, dirty, build info) moved from the toolbar's leftover width into a real bottom status bar; it was being elided to unreadable stubs at every window size
-- [x] Narrow-window layout: ref panel auto-collapses below the overflow width (restored when the window grows, unless the user closed it), grid metadata columns shrink under 1200px so Date/SHA stop being pushed off the right edge, and adjacent columns get a gap
-- [x] Engine exits with its parent (--parent-pid watchdog): a force-killed or crashed UI no longer orphans a sidecar holding the port, which was the root of the original "address already in use" launch crash
-- [x] Test integrity: four specs were asserting something other than what they claimed (repo-restore target, repo-specific .gitignore fixture, a nested-locator strict-mode match that only passed while the diff was still loading, exact containment of a label that straddles its border by design) — all corrected; Linux harness no longer clobbers the host node_modules and seeds a git identity
-
 ## Backlog
 - Drop leftover 2021 origin branches
-
-### Branch restructure + first Tauri build (2026-08-21)
-- Local worktree was accidentally reset to the upstream pin; recovered via
-  `git fetch` + fast-forward to `origin/master`, then re-applied the v0.4.7
-  session deltas.
-- New orphan branch `powergit`: commit 1 = docs only, commit 2 = engine +
-  frontend + tooling. `master` keeps full GitExtensions history as reference.
-- First Tauri release build + launch smoke passed.
-
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
-- Security: restrict engine CORS to known origins (tauri://localhost, http://tauri.localhost, dev server) and/or add a startup-generated token the frontend must send — blocks drive-by POSTs from random websites to 127.0.0.1:7733
+- Security: restrict engine CORS to known origins (tauri://localhost, http://tauri.localhost, dev server) and/or add a startup-generated token the frontend must send — blocks drive-by POSTs from random websites to 127.0.0.1:7733 — DONE in v0.13.0 (bearer token + fixed origin list).
 - Reproduce fullscreen clipping in Tauri window: need owner screen resolution + DPI scaling %; CSS overflow hardening already in place
 - [ ] Hotkeys Slice 2–4: commit pane-focus/stage-all chords, grid parent/child/go-to, remapping UI (parked from v0.11.0) [agent: grok]
 - UI zoom: Ctrl+= / Ctrl+- to scale the whole app, persisted (audit B.15; all sizes are fixed px today).
+- Reopened from v0.11.0 (ticked but absent): Alt+Up/Down parent/child navigation, Ctrl+Shift+F find, Ctrl+G go-to. Deferred to next iteration. (deferred from v0.12.2: duplicate of the Hotkeys Slice 2–4 backlog entry; v0.12.2 was already marked complete) [agent: claude]
+
+### From the former “Later” list
+- Fetch / Pull / Push **dialogs** (buttons are wired to engine `/fetch`, `/pull`, `/push` since v0.6.4; richer dialogs later)
+- Design-demo step/pause bar (opt-in `npm run test:demo`)
+- Visual screenshot suite (`npm run test:visual`, owner-triggered)
+- Dark theme; worktrees
+- Extract GitCommands — superseded: v0.13.3 keeps the small net10.0 engine and proves GE parity with golden tests instead.
