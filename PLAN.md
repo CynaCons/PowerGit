@@ -162,14 +162,14 @@ Recent repos with diff stats, Open, Clone.
 - [x] Dev/test paths: standalone engine (dev:all, dotnet run, engine.ps1, Docker harness) reads the token from env or prints a generated one; playwright config and scripts pass it [agent: claude]
 - [x] Verification: engine tests for 401 without token / 200 with; e2e from the Vite origin with a wrong token expects rejection; dotnet test + test:unit + test:e2e green [agent: claude]
 
-### v0.13.1 — Docs vs repo reality — orphan branch, missing upstream tree (Ugly #2)
+### v0.13.1 — Docs vs repo reality — orphan branch, missing upstream tree (Ugly #2) (2026-09-03) (COMPLETE)
 **Goal:** AGENTS.md claims the WinForms tree stays in-tree as the behavioural spec and forbids deleting it, but the powergit branch is an orphan with 226 tracked files; src/app, externals and tests/ exist on disk only because .gitignore excludes them. master (17305 commits) and powergit (54) share no ancestor, so PRs against master cannot work. AGENTS.md still lists frontend/, src-tauri/ and src/engine/ as "to be created". Decide the branch model and make the docs tell the truth.
-- [ ] Connect histories: on powergit, git merge -s ours --allow-unrelated-histories master (tree unchanged; master becomes an ancestor so diffs/merge-base/PRs work)
-- [ ] Make powergit the GitHub default branch; keep master by name as the untouched upstream mirror
-- [ ] Reference worktree: document one command (git worktree add ../gitextensions-ref master); AGENTS.md points there for GitCommands/GitUI as the behavioural spec
-- [ ] Remove the /src/app/, /externals/, /tests/ ignore rules (the tests/ one hides any future root tests dir) and drop the untracked upstream tree from the working copy once the worktree exists
-- [ ] Rewrite AGENTS.md: current project-shape block (frontend, frontend/src-tauri, src/engine, website, docker, scripts, docs), delete the three 'to be created' markers, the 'do not delete WinForms' rule and the contradictory footnote, fix the two shell-mangled strings ('ode frontend/scripts', 'elease skill'), add a Branches section
-- [ ] README dev section: one line on the reference worktree; replace upstream's verbatim CONTRIBUTING.md with a short PowerGit version
+- [x] Connect histories: on powergit, git merge -s ours --allow-unrelated-histories master (tree unchanged; master becomes an ancestor so diffs/merge-base/PRs work) [agent: claude]
+- [x] Make powergit the GitHub default branch; keep master by name as the untouched upstream mirror [agent: claude]
+- [x] Reference worktree: document one command (git worktree add ../gitextensions-ref master); AGENTS.md points there for GitCommands/GitUI as the behavioural spec [agent: claude]
+- [x] Remove the /src/app/, /externals/, /tests/ ignore rules (the tests/ one hides any future root tests dir) and drop the untracked upstream tree from the working copy once the worktree exists [agent: claude]
+- [x] Rewrite AGENTS.md: current project-shape block (frontend, frontend/src-tauri, src/engine, website, docker, scripts, docs), delete the three 'to be created' markers, the 'do not delete WinForms' rule and the contradictory footnote, fix the two shell-mangled strings ('ode frontend/scripts', 'elease skill'), add a Branches section [agent: claude]
+- [x] README dev section: one line on the reference worktree; replace upstream's verbatim CONTRIBUTING.md with a short PowerGit version [agent: claude]
 
 ### v0.13.2 — PLAN.md header frozen at v0.4.7 (Ugly #3)
 **Goal:** The "Current Status" header says Active v0.4.7 (2026-08-21) and "do not start v0.5 until owner re-reviews", while twelve later versions are marked COMPLETE below it. Make the header derive from, or be updated with, the real current iteration so a reader trusting the top of the file is not misled.

@@ -11,22 +11,35 @@ Read [PRD.md](PRD.md) before inventing product behaviour.
 ## Project shape
 
 ```
-src/app/GitCommands/     # upstream git engine (keep; extract from)
-src/app/GitUI/           # upstream WinForms UI — reference only, do not "port" casually
-src/app/GitUI/.../Graph/ # lane model to reuse / expose, not rewrite blindly
-frontend/                # React + Vite (to be created)
-src-tauri/               # Tauri shell (to be created)
-src/engine/              # headless C# sidecar (to be created)
+frontend/                # React + Vite + MUI UI (src/), Playwright suites (tests/)
+frontend/src-tauri/      # Tauri shell: spawns the engine sidecar, hands it url+token
+src/engine/              # headless C# git host, net10.0, no WinForms (+ xunit tests)
+website/                 # GitHub Pages showcase + live demo build
+docker/ubuntu-check/     # Linux (WebKitGTK) harness, run via scripts/ubuntu-check.ps1
+scripts/                 # sidecar build, Windows packaging, Linux check
 docs/srs/                # ASPICE-style requirements (what)
 docs/agents/             # agent memories and context (living)
-powerspawn/              # PowerSpawn MCP + nested powerplan
+powerspawn/              # PowerSpawn MCP + nested powerplan (submodule)
+.claude/skills/ .opencode/skills/  # release skill (kept identical)
 PLAN.md                  # operational plan — powerplan is the only writer
 PRD.md                   # product requirements
 ```
 
-The WinForms app remains in-tree as the **behavioural spec** and as a Windows
-reference build. Do not delete it to "clean up" the fork. Do not add features
-to WinForms unless a task says so.
+## Branches
+
+- `powergit` (default) is the product. It carries none of the upstream tree.
+- `master` is the untouched Git Extensions mirror at the upstream pin. It is
+  an ancestor of `powergit` (connected with an "ours" merge in v0.13.1) so
+  diffs and PRs between the two work; never merge it forward for content.
+- The behavioural reference (`GitCommands`, `GitUI`, the `Graph/` lane model)
+  is read from a sibling worktree, not from this checkout:
+
+  ```bash
+  git worktree add ../gitextensions-ref master
+  ```
+
+  Read it, cite it, port from it deliberately. Never copy GE files into this
+  branch and never add features to the WinForms app.
 
 ## Commands
 
@@ -52,7 +65,6 @@ npm run tauri dev         # native window (needs engine running for health)
 ```
 
 `test:e2e:debug` exists for headed debugging while writing a test.
-```
 
 ## How we verify (token budget)
 
@@ -67,10 +79,10 @@ Default proof is **Playwright e2e assertions**, not screenshots.
 - Keep specs quiet once green: no `console.log`, no `page.pause`, no `waitForTimeout` in e2e. Use `test:e2e:debug` only while writing a test.
 - E2e is configured `retries: 0`, `maxFailures: 1`, traces/screenshots/video off. Do not turn those back on to “be thorough”.
 
-Upstream WinForms Git Extensions (reference only):
+Upstream WinForms Git Extensions (reference only, see Branches):
 
 ```bash
-dotnet build GitExtensions.slnx
+dotnet build ../gitextensions-ref/GitExtensions.slnx
 ```
 
 ## Powerplan and PowerSpawn
@@ -96,7 +108,7 @@ Workers **must not**:
 
 - Edit `PLAN.md`, `PRD.md`, or SRS files unless the task says so.
 - Commit, push, or rewrite git history.
-- Broad-refactor `GitCommands` / `GitUI` "while I'm here".
+- Edit anything under `../gitextensions-ref` (the reference is read-only).
 - Shell out to `git` from React. All git I/O goes through the C# engine.
 
 ## Recursive improvement (memories)
@@ -126,9 +138,9 @@ Do not put secrets there.
   forces `net10.0-windows` or `UseWindowsForms` into the sidecar.
 - UI is React + TypeScript. No WinForms in the new frontend.
 - Evidence or it didn't happen: before calling work complete, run the relevant
-  smoke (engine test, `npm run tauri dev` / `npm run dev` once those exist) and
+  smoke (engine test, `npm run tauri dev` / `npm run dev`) and
   put the proof in the worker report.
-- Keep diffs small. The upstream tree is large; do not reformat it.
+- Keep diffs small. Do not reformat files you are not changing.
 
 ## Reporting
 
@@ -142,10 +154,9 @@ what is still open, which memory files you added or updated.
   real frontend built with a /PowerGit/demo/ Vite base; it renders its
   built-in synthetic history when no engine is reachable.
 - Screenshots: canonical location is website/public/assets/. Regenerate with
-  
-ode frontend/scripts/capture-showcase.mjs (needs a live engine).
+  `node frontend/scripts/capture-showcase.mjs` (needs a live engine).
   Do not write screenshots anywhere else.
-- Packaging & release: see the elease skill (.opencode/skills/release/
+- Packaging & release: see the `release` skill (.opencode/skills/release/
   and .claude/skills/release/). Key scripts: scripts/build-engine-sidecar.ps1|.sh,
   scripts/package-windows.ps1, tag-triggered .github/workflows/release.yml.
 - Engine URL is overridable with VITE_ENGINE_URL for dev/demo setups
@@ -155,5 +166,3 @@ ode frontend/scripts/capture-showcase.mjs (needs a live engine).
   scripts import `tests/engine.ts`. A bare `dotnet run` must get
   `POWERGIT_ENGINE_TOKEN`. See docs/agents/memories/engine-token.md.
 - Linux smoke check: pwsh scripts/ubuntu-check.ps1 (requires Docker Desktop).
-- On this branch (powergit) the upstream GitExtensions tree is gitignored;
-  it belongs to master. Do not commit GE files here.

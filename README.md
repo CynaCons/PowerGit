@@ -67,9 +67,13 @@ npm run test:resolution   # layout at 5 viewports up to 4K fullscreen
 pwsh scripts/package-windows.ps1
 ```
 
-All git I/O goes through the engine (`http://127.0.0.1:7733`); the UI never
-shells out to git. Agent guidance lives in [AGENTS.md](AGENTS.md); requirements
-in [docs/srs](docs/srs/README.md).
+All git I/O goes through the engine (`http://127.0.0.1:7733`, bearer-token
+gated); the UI never shells out to git. Agent guidance lives in
+[AGENTS.md](AGENTS.md); requirements in [docs/srs](docs/srs/README.md).
+
+The `powergit` branch is the product. The upstream Git Extensions tree lives
+on `master` as a read-only behavioural reference; check it out beside this
+clone with `git worktree add ../gitextensions-ref master`.
 
 ## Releases
 
