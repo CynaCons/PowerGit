@@ -14,7 +14,7 @@ import { languageForPath } from "../../src/highlight"
 // switches repositories or mutates state) rather than the on-disk working
 // tree, so the assertion can't be broken by an unrelated local edit to the
 // same file and never races the UI's own fetch.
-const ENGINE_URL = "http://127.0.0.1:7733"
+import { ENGINE_URL, engineHeaders } from "../engine"
 
 async function openFileTreeForPowergitCommit(page: Page) {
   await page.goto("/")
@@ -54,6 +54,7 @@ test("blob pane highlights a TypeScript file without altering its text", async (
   expect(commitId).toMatch(/^[0-9a-f]{40}$/)
   const res = await page.request.get(
     `${ENGINE_URL}/commits/${commitId}/blob?path=${encodeURIComponent("frontend/src/graph/layout.ts")}`,
+    { headers: engineHeaders() },
   )
   expect(res.ok()).toBe(true)
   const groundTruth = (await res.json()) as { text: string }
@@ -100,6 +101,7 @@ test("blob pane still renders a file with no recognised extension as plain text"
   expect(commitId).toMatch(/^[0-9a-f]{40}$/)
   const res = await page.request.get(
     `${ENGINE_URL}/commits/${commitId}/blob?path=${encodeURIComponent(unmapped)}`,
+    { headers: engineHeaders() },
   )
   expect(res.ok()).toBe(true)
   const groundTruth = (await res.json()) as { text: string }

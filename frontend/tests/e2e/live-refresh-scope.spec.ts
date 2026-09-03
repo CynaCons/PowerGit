@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const ENGINE_URL = "http://127.0.0.1:7733"
+import { ENGINE_URL, engineHeaders } from "../engine"
 
 function git(cwd: string, ...args: string[]): void {
   execFileSync("git", args, { cwd, stdio: "pipe" })
@@ -13,7 +13,7 @@ function git(cwd: string, ...args: string[]): void {
 async function openRepoOnEngine(path: string): Promise<void> {
   const res = await fetch(`${ENGINE_URL}/repos/open`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: engineHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ path }),
   })
   if (!res.ok) throw new Error(`failed to open ${path} on the engine: http ${res.status}`)
@@ -26,7 +26,7 @@ async function openRepoOnEngine(path: string): Promise<void> {
 // the "wrong" repo silently changed what EVERY later spec saw. Specs then
 // passed or failed by run order rather than by behaviour.
 async function currentRepoPath(): Promise<string | null> {
-  const res = await fetch(`${ENGINE_URL}/repos/current`)
+  const res = await fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() })
   if (!res.ok) return null
   const info = (await res.json()) as { root?: string }
   return info.root ?? null

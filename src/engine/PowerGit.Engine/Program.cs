@@ -30,11 +30,32 @@ builder.Services.AddSingleton<GitHost>(_ =>
 
     return host;
 });
+// Browser origins allowed to call this engine. The Tauri webview origins
+// plus the Vite dev server; POWERGIT_ENGINE_ORIGINS adds more (comma
+// separated) for harnesses. Never AllowAnyOrigin: the engine runs git with
+// the user's credentials, and any web page can reach 127.0.0.1.
+string[] allowedOrigins =
+[
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+    "http://127.0.0.1:1420",
+    "http://localhost:1420",
+    .. (Environment.GetEnvironmentVariable("POWERGIT_ENGINE_ORIGINS") ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+];
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+    p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 
 WebApplication app = builder.Build();
 app.UseCors();
+
+// Per-launch shared secret. The Tauri shell generates one and hands it to the
+// sidecar via POWERGIT_ENGINE_TOKEN (dev scripts use frontend/.engine-token);
+// `--token` is the CLI equivalent. Without either, a random one is generated
+// and printed so a standalone `dotnet run` is never silently open.
+string engineToken = EngineAuth.ResolveToken(builder.Configuration["token"]);
+app.UseMiddleware<EngineAuth>(engineToken);
 
 app.MapGet("/health", (GitHost git) =>
 {

@@ -150,6 +150,10 @@ ode frontend/scripts/capture-showcase.mjs (needs a live engine).
   scripts/package-windows.ps1, tag-triggered .github/workflows/release.yml.
 - Engine URL is overridable with VITE_ENGINE_URL for dev/demo setups
   (default http://127.0.0.1:7733).
+- Engine auth (v0.13.0): every request needs `Authorization: Bearer <token>`.
+  Dev shares `frontend/.engine-token` between engine.ps1 and Vite; specs and
+  scripts import `tests/engine.ts`. A bare `dotnet run` must get
+  `POWERGIT_ENGINE_TOKEN`. See docs/agents/memories/engine-token.md.
 - Linux smoke check: pwsh scripts/ubuntu-check.ps1 (requires Docker Desktop).
 - On this branch (powergit) the upstream GitExtensions tree is gitignored;
   it belongs to master. Do not commit GE files here.

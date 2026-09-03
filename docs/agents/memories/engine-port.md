@@ -1,4 +1,11 @@
-# Engine port reuse contract (v0.12.0)
+# Engine port contract (v0.12.0; reuse removed in v0.13.0)
+
+> v0.13.0: the reuse path, `probe_health`, `looks_like_powergit_health` and
+> `dechunk` were deleted from `lib.rs`. A foreign engine cannot know this
+> launch's auth token (see engine-token.md), so the shell now only asks "is
+> 7733 free?" (bind probe) and otherwise spawns on an OS-assigned port. The
+> history below is kept for the chunked-`/health` landmine, which still
+> applies to anything that hand-parses Kestrel responses.
 
 ## The bug
 `frontend/src-tauri/src/lib.rs` used to spawn `powergit-engine` unconditionally

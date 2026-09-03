@@ -4,6 +4,9 @@ import { invoke } from "@tauri-apps/api/core"
  *  demo setups); the packaged app otherwise starts with the bundled sidecar
  *  default and `engineReady` (below) may rewrite it once resolved. */
 export let ENGINE_URL = import.meta.env.VITE_ENGINE_URL ?? "http://127.0.0.1:7733"
+/** Per-launch engine secret (EngineAuth.cs). Tauri hands it over with the
+ *  base URL; dev builds get frontend/.engine-token via vite.config.ts. */
+export let ENGINE_TOKEN: string = import.meta.env.VITE_ENGINE_TOKEN ?? ""
 
 /**
  *  Resolves once at module load. Under Tauri, `lib.rs` may reuse an already
@@ -19,11 +22,28 @@ const engineReady: Promise<void> = (async () => {
   if (import.meta.env.VITE_ENGINE_URL) return
   if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return
   try {
-    ENGINE_URL = await invoke<string>("engine_base_url")
+    const cfg = await invoke<{ baseUrl: string; token: string }>("engine_config")
+    ENGINE_URL = cfg.baseUrl
+    ENGINE_TOKEN = cfg.token
   } catch {
-    // Older host build without the command, or an IPC failure — keep the default.
+    // Older host build without the command, or an IPC failure — keep the defaults.
   }
 })()
+
+/** Every engine call goes through here: waits for the port/token decision,
+ *  prefixes the base URL and attaches the bearer token. */
+async function engineFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  await engineReady
+  const headers = new Headers(init.headers)
+  if (ENGINE_TOKEN) headers.set("Authorization", `Bearer ${ENGINE_TOKEN}`)
+  return fetch(`${ENGINE_URL}${path}`, { ...init, headers })
+}
+
+/** EventSource cannot send headers, so /events takes the token as a query. */
+export async function engineEventsUrl(): Promise<string> {
+  await engineReady
+  return `${ENGINE_URL}/events?token=${encodeURIComponent(ENGINE_TOKEN)}`
+}
 
 export type Health = {
   engine: string
@@ -131,14 +151,12 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function fetchHealth(signal?: AbortSignal): Promise<Health> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/health`, { signal })
+  const res = await engineFetch(`/health`, { signal })
   return json<Health>(res)
 }
 
 export async function openRepo(path: string): Promise<RepoInfo> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/repos/open`, {
+  const res = await engineFetch(`/repos/open`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path }),
@@ -147,64 +165,54 @@ export async function openRepo(path: string): Promise<RepoInfo> {
 }
 
 export async function fetchCurrent(): Promise<RepoInfo | null> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/repos/current`)
+  const res = await engineFetch(`/repos/current`)
   if (res.status === 404) return null
   return json<RepoInfo>(res)
 }
 
 export async function fetchRecents(): Promise<RepoInfo[]> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/repos/recents`)
+  const res = await engineFetch(`/repos/recents`)
   return json<RepoInfo[]>(res)
 }
 
 export async function fetchRevisions(max = 800, skip = 0): Promise<RevisionDto[]> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`)
+  const res = await engineFetch(`/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`)
   return json<RevisionDto[]>(res)
 }
 
 export async function fetchCommit(id: string): Promise<CommitDetail> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}`)
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}`)
   return json<CommitDetail>(res)
 }
 
 export async function fetchFiles(id: string): Promise<FileChange[]> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/files`)
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/files`)
   return json<FileChange[]>(res)
 }
 
 export async function fetchTree(id: string, path?: string): Promise<TreeEntry[]> {
   const qs = path ? `?path=${encodeURIComponent(path)}` : ""
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/tree${qs}`)
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/tree${qs}`)
   return json<TreeEntry[]>(res)
 }
 
 export async function fetchDiff(id: string, path: string, options?: Partial<DiffOptions>): Promise<DiffDto> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}${diffParams(options)}`)
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}${diffParams(options)}`)
   return json<DiffDto>(res)
 }
 
 export async function fetchBlob(id: string, path: string): Promise<DiffDto> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/blob?path=${encodeURIComponent(path)}`)
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/blob?path=${encodeURIComponent(path)}`)
   return json<DiffDto>(res)
 }
 
 export async function fetchWorkTreeDiff(path: string, staged = false, options?: Partial<DiffOptions>): Promise<DiffDto> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/diff/worktree?path=${encodeURIComponent(path)}&staged=${staged}${diffParams(options)}`)
+  const res = await engineFetch(`/diff/worktree?path=${encodeURIComponent(path)}&staged=${staged}${diffParams(options)}`)
   return json<DiffDto>(res)
 }
 
 export async function deleteFiles(paths: string[]): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/files/delete`, {
+  const res = await engineFetch(`/files/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths }),
@@ -213,8 +221,7 @@ export async function deleteFiles(paths: string[]): Promise<RepoStatus> {
 }
 
 export async function addToIgnore(pattern: string): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/ignore`, {
+  const res = await engineFetch(`/ignore`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pattern }),
@@ -223,8 +230,7 @@ export async function addToIgnore(pattern: string): Promise<RepoStatus> {
 }
 
 export async function previewIgnore(pattern: string): Promise<IgnorePreview> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/ignore/preview`, {
+  const res = await engineFetch(`/ignore/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pattern }),
@@ -233,14 +239,12 @@ export async function previewIgnore(pattern: string): Promise<IgnorePreview> {
 }
 
 export async function listRemotes(): Promise<RemoteInfo[]> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/remotes`)
+  const res = await engineFetch(`/remotes`)
   return json<RemoteInfo[]>(res)
 }
 
 export async function saveRemote(name: string, url: string): Promise<RemoteInfo> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/remotes`, {
+  const res = await engineFetch(`/remotes`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, url }),
@@ -295,8 +299,7 @@ async function parseJobResponse<T>(res: Response): Promise<T> {
 }
 
 export async function fetchRemote(name: string): Promise<{ output: string }> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/fetch`, {
+  const res = await engineFetch(`/fetch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ remote: name }),
@@ -305,8 +308,7 @@ export async function fetchRemote(name: string): Promise<{ output: string }> {
 }
 
 export async function pullBranch(rebase = false): Promise<{ output: string }> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/pull`, {
+  const res = await engineFetch(`/pull`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rebase }),
@@ -315,8 +317,7 @@ export async function pullBranch(rebase = false): Promise<{ output: string }> {
 }
 
 export async function pushBranch(forceWithLease = false): Promise<{ output: string }> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/push`, {
+  const res = await engineFetch(`/push`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ forceWithLease }),
@@ -325,8 +326,7 @@ export async function pushBranch(forceWithLease = false): Promise<{ output: stri
 }
 
 export async function createBranch(name: string, commit?: string): Promise<RefTree> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/branches/create`, {
+  const res = await engineFetch(`/branches/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, commit }),
@@ -335,8 +335,7 @@ export async function createBranch(name: string, commit?: string): Promise<RefTr
 }
 
 export async function createTag(name: string, commit?: string): Promise<RefTree> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/tags/create`, {
+  const res = await engineFetch(`/tags/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, commit }),
@@ -354,8 +353,7 @@ export type GitJob = {
 export type JobStarted = { id: string; kind: string }
 
 async function startJob(url: string, body?: unknown): Promise<JobStarted> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}${url}`, {
+  const res = await engineFetch(`${url}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -368,8 +366,7 @@ export const startPull = (rebase = false) => startJob("/pull", { rebase })
 export const startPush = (forceWithLease = false) => startJob("/push", { forceWithLease })
 
 export async function getJob(id: string): Promise<GitJob> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/jobs/${encodeURIComponent(id)}`)
+  const res = await engineFetch(`/jobs/${encodeURIComponent(id)}`)
   return parseJobResponse<GitJob>(res)
 }
 
@@ -386,8 +383,7 @@ export async function waitJob(id: string, onTick?: (job: GitJob) => void, timeou
 }
 
 export async function deleteBranch(name: string): Promise<RefTree> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/branches/delete`, {
+  const res = await engineFetch(`/branches/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -396,8 +392,7 @@ export async function deleteBranch(name: string): Promise<RefTree> {
 }
 
 export async function deleteTag(name: string): Promise<RefTree> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/tags/delete`, {
+  const res = await engineFetch(`/tags/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -408,14 +403,12 @@ export async function deleteTag(name: string): Promise<RefTree> {
 export type StashInfo = { reference: string; id: string; subject: string }
 
 export async function fetchStashes(): Promise<StashInfo[]> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/stashes`)
+  const res = await engineFetch(`/stashes`)
   return json<StashInfo[]>(res)
 }
 
 export async function stashChanges(message: string | null, keepIndex = false, includeUntracked = false): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/stash`, {
+  const res = await engineFetch(`/stash`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, keepIndex, includeUntracked }),
@@ -424,8 +417,7 @@ export async function stashChanges(message: string | null, keepIndex = false, in
 }
 
 export async function applyStash(reference: string, pop = false): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/stash/apply`, {
+  const res = await engineFetch(`/stash/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reference, pop }),
@@ -434,8 +426,7 @@ export async function applyStash(reference: string, pop = false): Promise<RepoSt
 }
 
 export async function dropStash(reference: string): Promise<void> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/stash/drop`, {
+  const res = await engineFetch(`/stash/drop`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: reference }),
@@ -444,8 +435,7 @@ export async function dropStash(reference: string): Promise<void> {
 }
 
 export async function fetchStatus(): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/status`)
+  const res = await engineFetch(`/status`)
   return json<RepoStatus>(res)
 }
 
@@ -469,20 +459,17 @@ export function changeKindOf(version: number): ChangeKind {
 }
 
 export async function fetchRefs(): Promise<RefTree> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/refs`)
+  const res = await engineFetch(`/refs`)
   return json<RefTree>(res)
 }
 
 export async function fetchConfig(): Promise<GitConfig> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/config`)
+  const res = await engineFetch(`/config`)
   return json<GitConfig>(res)
 }
 
 export async function saveConfig(patch: Partial<GitConfig> & { global?: boolean }): Promise<GitConfig> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/config`, {
+  const res = await engineFetch(`/config`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -496,20 +483,17 @@ export async function saveConfig(patch: Partial<GitConfig> & { global?: boolean 
 }
 
 export async function fetchVsCode(): Promise<VsCodeInfo> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/tools/vscode`)
+  const res = await engineFetch(`/tools/vscode`)
   return json<VsCodeInfo>(res)
 }
 
 export async function applyVsCode(): Promise<VsCodeInfo> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/tools/vscode`, { method: "POST" })
+  const res = await engineFetch(`/tools/vscode`, { method: "POST" })
   return json<VsCodeInfo>(res)
 }
 
 export async function stagePaths(paths: string[], unstage = false): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/stage`, {
+  const res = await engineFetch(`/stage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths, unstage }),
@@ -518,8 +502,7 @@ export async function stagePaths(paths: string[], unstage = false): Promise<Repo
 }
 
 export async function createCommit(message: string, amend = false): Promise<{ id: string }> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commit`, {
+  const res = await engineFetch(`/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, amend }),
@@ -528,8 +511,7 @@ export async function createCommit(message: string, amend = false): Promise<{ id
 }
 
 export async function checkoutRef(ref: string, force = false): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/checkout`, {
+  const res = await engineFetch(`/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ref, force }),
@@ -538,8 +520,7 @@ export async function checkoutRef(ref: string, force = false): Promise<RepoStatu
 }
 
 export async function resetBranch(commit: string, mode: "soft" | "mixed" | "hard"): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/reset`, {
+  const res = await engineFetch(`/reset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ commit, mode }),
@@ -548,8 +529,7 @@ export async function resetBranch(commit: string, mode: "soft" | "mixed" | "hard
 }
 
 export async function rebaseOnto(onto: string): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/rebase`, {
+  const res = await engineFetch(`/rebase`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ onto }),
@@ -558,14 +538,12 @@ export async function rebaseOnto(onto: string): Promise<RepoStatus> {
 }
 
 export async function cherryPickCommit(id: string): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/cherry-pick`, { method: "POST" })
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/cherry-pick`, { method: "POST" })
   return json<RepoStatus>(res)
 }
 
 export async function revertCommit(id: string): Promise<RepoStatus> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/revert`, { method: "POST" })
+  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/revert`, { method: "POST" })
   return json<RepoStatus>(res)
 }
 
@@ -574,8 +552,7 @@ export async function revertCommit(id: string): Promise<RepoStatus> {
  *  the tool detached and responds immediately, so this resolves as soon as
  *  the request is accepted, not when the tool window closes. */
 export async function openDifftool(commit: string, path: string): Promise<void> {
-  await engineReady
-  const res = await fetch(`${ENGINE_URL}/difftool`, {
+  const res = await engineFetch(`/difftool`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ commit, path }),

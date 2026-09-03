@@ -7,6 +7,9 @@ set -euo pipefail
 cd /repo
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
+# Engine auth (EngineAuth.cs): one token for the engine, the built UI and curl.
+export POWERGIT_ENGINE_TOKEN=ubuntu-check-token VITE_ENGINE_TOKEN=ubuntu-check-token
+AUTH=(-H "Authorization: Bearer $POWERGIT_ENGINE_TOKEN")
 
 echo "== engine tests =="
 dotnet test src/engine/PowerGit.Engine.sln
@@ -63,7 +66,7 @@ for i in $(seq 1 30); do
   git commit -qm "work item $i"
 done
 git branch feature/2
-curl -sf -X POST http://127.0.0.1:7733/repos/open \
+curl -sf -X POST http://127.0.0.1:7733/repos/open "${AUTH[@]}" \
   -H 'Content-Type: application/json' \
   -d '{"path":"/tmp/seed"}' > /dev/null
 cd /repo/frontend

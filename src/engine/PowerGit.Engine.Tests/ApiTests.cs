@@ -17,7 +17,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Health_ok()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         HttpResponseMessage response = await client.GetAsync("/health");
         response.EnsureSuccessStatusCode();
         HealthResponse? body = await response.Content.ReadFromJsonAsync<HealthResponse>();
@@ -29,7 +29,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Open_and_current_roundtrip()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         string root = FindRepoRoot();
         HttpResponseMessage opened = await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(root));
         opened.EnsureSuccessStatusCode();
@@ -47,7 +47,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Open_non_repo_is_400()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         string temp = Directory.CreateTempSubdirectory("powergit-api-not-repo-").FullName;
         try
         {
@@ -63,7 +63,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Commit_tree_lists_root_entries()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         string root = FindRepoRoot();
         await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(root));
 
@@ -93,6 +93,32 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         TreeEntryDto[] graphEntries = await deep.Content.ReadFromJsonAsync<TreeEntryDto[]>() ?? [];
         Assert.NotEmpty(graphEntries);
         Assert.All(graphEntries, e => Assert.DoesNotContain("/", e.Name));
+    }
+
+    [Fact]
+    public async Task Requests_without_token_are_401()
+    {
+        HttpClient authed = _factory.CreateAuthedClient(); // builds the host with the test token
+        HttpClient anonymous = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/repos/current")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/reset", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/events")).StatusCode);
+        // Health stays open: the Tauri shell probes it before it knows anything.
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/health")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.Unauthorized, (await authed.GetAsync("/repos/recents")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Wrong_token_is_401_and_events_accepts_query_token()
+    {
+        _ = _factory.CreateAuthedClient();
+        HttpClient wrong = _factory.CreateClient();
+        wrong.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestAuth.Token + "x");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await wrong.GetAsync("/repos/recents")).StatusCode);
+
+        HttpClient bare = _factory.CreateClient();
+        using HttpResponseMessage events = await bare.GetAsync($"/events?token={TestAuth.Token}", HttpCompletionOption.ResponseHeadersRead);
+        Assert.Equal(HttpStatusCode.OK, events.StatusCode);
     }
 
     private static string FindRepoRoot()

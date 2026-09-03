@@ -33,7 +33,7 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Push_runs_as_job_and_completes()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         string bare = Directory.CreateTempSubdirectory("powergit-jobs-bare-").FullName;
         string work = Directory.CreateTempSubdirectory("powergit-jobs-work-").FullName;
         try
@@ -80,7 +80,7 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Pull_without_upstream_fails_the_job_with_message()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(RepoRoot()));
 
         HttpResponseMessage started = await client.PostAsJsonAsync("/pull", new PullRequest(false));
@@ -101,7 +101,7 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Unknown_job_is_404()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         HttpResponseMessage response = await client.GetAsync("/jobs/does-not-exist");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -109,7 +109,7 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Second_concurrent_job_is_rejected_while_one_runs()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthedClient();
         await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(RepoRoot()));
 
         HttpResponseMessage first = await client.PostAsync("/fetch", JsonContent.Create(new FetchRequest("origin")));

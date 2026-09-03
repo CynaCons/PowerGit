@@ -44,7 +44,7 @@ import { StashDialog } from "./components/StashDialog"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import {
-  ENGINE_URL,
+  engineEventsUrl,
   changeKindOf,
   type ChangeKind,
   checkoutRef,
@@ -370,28 +370,36 @@ export default function App() {
   // always wins over an earlier "status" seen in the same debounce window.
   useEffect(() => {
     if (offline || !live) return
-    const source = new EventSource(`${ENGINE_URL}/events`)
+    // The URL carries the engine token (EventSource cannot send headers) and
+    // is only known once the Tauri port/token handshake resolved.
+    let source: EventSource | null = null
+    let cancelled = false
     let timer: number | undefined
     let last: string | null = null
     let pendingKind: ChangeKind = "none"
-    source.onmessage = (e) => {
-      if (last === e.data) return
-      const isFirst = last === null
-      last = e.data
-      if (isFirst) return // initial snapshot, nothing changed
-      if (Date.now() - lastRefreshAt.current < 2000) return // our own action
-      const kind = changeKindOf(Number(e.data))
-      if (pendingKind !== "refs") pendingKind = kind
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => {
-        const scope: RefreshScope = pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
-        pendingKind = "none"
-        void refresh(scope)
-      }, 400)
-    }
+    void engineEventsUrl().then((url) => {
+      if (cancelled) return
+      source = new EventSource(url)
+      source.onmessage = (e) => {
+        if (last === e.data) return
+        const isFirst = last === null
+        last = e.data
+        if (isFirst) return // initial snapshot, nothing changed
+        if (Date.now() - lastRefreshAt.current < 2000) return // our own action
+        const kind = changeKindOf(Number(e.data))
+        if (pendingKind !== "refs") pendingKind = kind
+        window.clearTimeout(timer)
+        timer = window.setTimeout(() => {
+          const scope: RefreshScope = pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
+          pendingKind = "none"
+          void refresh(scope)
+        }, 400)
+      }
+    })
     return () => {
+      cancelled = true
       window.clearTimeout(timer)
-      source.close()
+      source?.close()
     }
   }, [offline, live, refresh])
 

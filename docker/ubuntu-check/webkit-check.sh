@@ -4,6 +4,9 @@
 set -uo pipefail
 cd /repo
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+# Engine auth (EngineAuth.cs): one token for the engine, the built UI and curl.
+export POWERGIT_ENGINE_TOKEN=ubuntu-check-token VITE_ENGINE_TOKEN=ubuntu-check-token
+AUTH=(-H "Authorization: Bearer $POWERGIT_ENGINE_TOKEN")
 export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.email GIT_CONFIG_VALUE_0=ci@powergit.local GIT_CONFIG_KEY_1=user.name GIT_CONFIG_VALUE_1="PowerGit CI"
 
 echo "== git: $(git --version)"
@@ -32,14 +35,14 @@ for i in $(seq 1 12); do echo "l$i" >> log.txt; git add .; git commit -qm "work 
 git checkout -q -b feature && echo f > feature.txt && git add . && git commit -qm "feature commit" && git checkout -q powergit
 cd /repo
 
-curl -sf -X POST http://127.0.0.1:7733/repos/open -H 'Content-Type: application/json' -d '{"path":"/tmp/seed"}' | head -c 200; echo
+curl -sf -X POST http://127.0.0.1:7733/repos/open "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"path":"/tmp/seed"}' | head -c 200; echo
 H=$(git -C /tmp/seed rev-parse HEAD)
-echo "== tree root =="; curl -s "http://127.0.0.1:7733/commits/$H/tree" | head -c 300; echo
-echo "== tree frontend =="; curl -s "http://127.0.0.1:7733/commits/$H/tree?path=frontend" | head -c 300; echo
-echo "== tree frontend/src =="; curl -s "http://127.0.0.1:7733/commits/$H/tree?path=frontend%2Fsrc" | head -c 300; echo
-echo "== tree frontend/src/components =="; curl -s "http://127.0.0.1:7733/commits/$H/tree?path=frontend%2Fsrc%2Fcomponents" | head -c 300; echo
-echo "== blob =="; curl -s "http://127.0.0.1:7733/commits/$H/blob?path=frontend%2Fsrc%2Fcomponents%2FDiffView.tsx" | head -c 200; echo
-echo "== revisions (first 6 subjects) =="; curl -s "http://127.0.0.1:7733/revisions?max=6" | grep -o '"subject":"[^"]*"' | head -6
+echo "== tree root =="; curl -s "${AUTH[@]}" "http://127.0.0.1:7733/commits/$H/tree" | head -c 300; echo
+echo "== tree frontend =="; curl -s "${AUTH[@]}" "http://127.0.0.1:7733/commits/$H/tree?path=frontend" | head -c 300; echo
+echo "== tree frontend/src =="; curl -s "${AUTH[@]}" "http://127.0.0.1:7733/commits/$H/tree?path=frontend%2Fsrc" | head -c 300; echo
+echo "== tree frontend/src/components =="; curl -s "${AUTH[@]}" "http://127.0.0.1:7733/commits/$H/tree?path=frontend%2Fsrc%2Fcomponents" | head -c 300; echo
+echo "== blob =="; curl -s "${AUTH[@]}" "http://127.0.0.1:7733/commits/$H/blob?path=frontend%2Fsrc%2Fcomponents%2FDiffView.tsx" | head -c 200; echo
+echo "== revisions (first 6 subjects) =="; curl -s "${AUTH[@]}" "http://127.0.0.1:7733/revisions?max=6" | grep -o '"subject":"[^"]*"' | head -6
 echo "== engine log tail =="; tail -5 /tmp/engine.log
 
 # Work on a COPY, never in the bind mount. `npm ci` here used to install

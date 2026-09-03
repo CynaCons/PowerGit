@@ -12,6 +12,8 @@ import { fileURLToPath } from "node:url"
 const frontendDir = resolve(fileURLToPath(new URL(".", import.meta.url)), "..")
 const repoRoot = resolve(frontendDir, "..")
 const ENGINE_URL = "http://127.0.0.1:7799"
+const ENGINE_TOKEN = "perf-" + Math.random().toString(16).slice(2)
+process.env.VITE_ENGINE_TOKEN = ENGINE_TOKEN // the Vite server Playwright starts inherits this
 
 const { ensureHeavyRepo } = await import(new URL("../../scripts/make-heavy-repo.mjs", import.meta.url))
 const manifest = await ensureHeavyRepo({})
@@ -34,6 +36,7 @@ const engine = spawn(cmd, args, {
     ...process.env,
     DOTNET_ROOT: join(process.env.LOCALAPPDATA ?? "", "Microsoft", "dotnet"),
     POWERGIT_ENGINE_URL: ENGINE_URL,
+    POWERGIT_ENGINE_TOKEN: ENGINE_TOKEN,
   },
   stdio: ["ignore", "ignore", "inherit"],
 })
@@ -58,7 +61,7 @@ try {
 
   const open = await fetch(`${ENGINE_URL}/repos/open`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ENGINE_TOKEN}` },
     body: JSON.stringify({ path: manifest.root }),
   })
   if (!open.ok) throw new Error(`failed to open heavy repo: ${await open.text()}`)
