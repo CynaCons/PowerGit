@@ -43,6 +43,10 @@ rm -rf /tmp/seed
 mkdir /tmp/seed
 cd /tmp/seed
 git init -b main -q
+# No global git identity in the container: without this the first commit
+# aborts with exit 128 and the whole check stops before anything is tested.
+git config user.email "seed@powergit.test"
+git config user.name "Seed Author"
 echo "# Seed repo" > README.md
 git add .
 git commit -qm "initial commit"
