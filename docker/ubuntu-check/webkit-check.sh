@@ -19,6 +19,10 @@ echo
 echo "== seed repo (branch powergit, nested dirs, two authors) =="
 rm -rf /tmp/seed && mkdir -p /tmp/seed && cd /tmp/seed
 git init -b powergit -q
+# The container has no global git identity, so `git commit` aborts with
+# exit 128 before a single fixture commit exists. Set it per-repo.
+git config user.email "seed@powergit.test"
+git config user.name "Seed Author"
 cp -r /repo/frontend/src ./frontend-src-tmp && mkdir -p frontend && mv frontend-src-tmp frontend/src
 cp /repo/README.md .
 git add . && git commit -qm "seed: frontend tree"
