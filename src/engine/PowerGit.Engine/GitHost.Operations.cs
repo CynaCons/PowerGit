@@ -75,6 +75,100 @@ public sealed partial class GitHost
         return GetStatus();
     }
 
+    public RepoStatusDto CherryPick(string commitId)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(commitId))
+        {
+            throw new InvalidOperationException("commit is required");
+        }
+
+        if (IsDirty(root))
+        {
+            throw new InvalidOperationException(
+                "The working tree has uncommitted changes. Commit or stash them before cherry-picking.");
+        }
+
+        CommandResult result = Run(root, "cherry-pick", commitId);
+        if (result.ExitCode != 0)
+        {
+            // Abort a conflicted cherry-pick so the repo is not left mid-cherry-pick.
+            Run(root, "cherry-pick", "--abort");
+            throw new InvalidOperationException(
+                "Cherry-pick stopped (conflicts or errors); the cherry-pick was aborted. " +
+                (string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim()));
+        }
+
+        return GetStatus();
+    }
+
+    public RepoStatusDto Revert(string commitId)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(commitId))
+        {
+            throw new InvalidOperationException("commit is required");
+        }
+
+        if (IsDirty(root))
+        {
+            throw new InvalidOperationException(
+                "The working tree has uncommitted changes. Commit or stash them before reverting.");
+        }
+
+        CommandResult result = Run(root, "revert", "--no-edit", commitId);
+        if (result.ExitCode != 0)
+        {
+            // Abort a conflicted revert so the repo is not left mid-revert.
+            Run(root, "revert", "--abort");
+            throw new InvalidOperationException(
+                "Revert stopped (conflicts or errors); the revert was aborted. " +
+                (string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim()));
+        }
+
+        return GetStatus();
+    }
+
+    /// <summary>
+    ///  Launches the configured external diff tool (see <see cref="VsCodeLocator"/>)
+    ///  comparing <paramref name="path"/> between <paramref name="commit"/>'s
+    ///  parent and <paramref name="commit"/> itself. The process is started
+    ///  detached and not awaited: the tool (e.g. VS Code with --wait) can stay
+    ///  open indefinitely, so the caller must not block on it.
+    /// </summary>
+    public void OpenDifftool(string commit, string path)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(commit))
+        {
+            throw new InvalidOperationException("commit is required");
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new InvalidOperationException("path is required");
+        }
+
+        System.Diagnostics.ProcessStartInfo psi = new()
+        {
+            FileName = _gitPath,
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";
+        foreach (string arg in new[] { "difftool", "--no-prompt", "-y", $"{commit}^", commit, "--", path })
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
+        if (process is null)
+        {
+            throw new InvalidOperationException("Failed to start git difftool.");
+        }
+    }
+
     private bool IsDirty(string root)
     {
         CommandResult status = Run(root, "status", "--porcelain=v1");

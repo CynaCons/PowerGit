@@ -17,6 +17,11 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hovered, setHovered] = useState(-1)
+  // Last SHA the auto-scroll effect actually settled on. A --date-order
+  // refresh can reorder rows so the same commit lands at a different index
+  // with no user action; comparing SHAs (not the index) keeps that from
+  // yanking the viewport.
+  const lastScrolledSha = useRef<string | null>(null)
   const width = graphWidth(rows)
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -30,11 +35,24 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, selec
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
 
   // Jumping to a ref can select a row far outside the viewport; keep the
-  // selection visible. align:auto is a no-op for already-visible rows.
+  // selection visible. Only do this when the *commit* changed - not merely
+  // its index - and only when it truly isn't visible; align:auto alone is
+  // not enough since a same-SHA index shuffle would still re-run this
+  // effect on every render that changes `selected`.
   useEffect(() => {
-    if (selected >= 0) virtualizer.scrollToIndex(selected, { align: "auto" })
+    if (selected < 0) return
+    const sha = rows[selected]?.rev.id
+    if (!sha || sha === lastScrolledSha.current) return
+    lastScrolledSha.current = sha
+    const parent = parentRef.current
+    if (parent) {
+      const top = selected * ROW_HEIGHT
+      const bottom = top + ROW_HEIGHT
+      if (top >= parent.scrollTop && bottom <= parent.scrollTop + parent.clientHeight) return
+    }
+    virtualizer.scrollToIndex(selected, { align: "auto" })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected])
+  }, [selected, rows])
 
   // History pages in lazily: ask for more when the viewport approaches the
   // loaded tail. The parent guards re-entrancy and the ceiling.

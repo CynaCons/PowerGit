@@ -349,3 +349,115 @@ test("Ctrl+3 focuses the Diff tab", async ({ page }) => {
   await expect(page.getByTestId("file-list")).toBeVisible()
   await expect(page.getByTestId("diff-pane")).toBeVisible()
 })
+
+test("auto-scroll does not re-center the viewport on an unrelated re-render", async ({ page }) => {
+  await page.goto("/")
+  const rows = page.getByTestId("grid-row")
+  await expect(rows.first()).toBeVisible()
+
+  // Select a row in the middle, then scroll it out of view - this mirrors
+  // the reported bug: a --date-order refresh keeps the same SHA selected
+  // but at a different index, and the grid must not yank the viewport
+  // back to it (RevisionGrid.tsx auto-scroll effect).
+  await rows.nth(5).click()
+  await expect(rows.nth(5)).toHaveClass(/selected/)
+
+  const gridBody = page.getByTestId("grid-body")
+  await gridBody.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  const scrolledTop = await gridBody.evaluate((el) => el.scrollTop)
+  expect(scrolledTop).toBeGreaterThan(0)
+
+  // Resizing forces RevisionGrid's virtualizer to re-render with no user
+  // navigation involved; the still-selected row must stay wherever the
+  // user scrolled it, not get scrolled back into view.
+  const size = page.viewportSize() ?? { width: 1280, height: 720 }
+  await page.setViewportSize({ width: size.width - 60, height: size.height - 60 })
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  )
+
+  expect(await gridBody.evaluate((el) => el.scrollTop)).toBe(scrolledTop)
+})
+
+test("grid Home/End/PageUp/PageDown move the selection", async ({ page }) => {
+  await page.goto("/")
+  const rows = page.getByTestId("grid-row")
+  await expect(rows.first()).toBeVisible()
+  await rows.first().click()
+  const firstInfo = await page.getByTestId("commit-info").innerText()
+
+  const selectedRow = page.locator('[data-testid="grid-row"].selected')
+
+  await page.keyboard.press("End")
+  await expect(page.getByTestId("commit-info")).not.toHaveText(firstInfo)
+  const lastIndex = Number(await selectedRow.getAttribute("data-index"))
+  expect(lastIndex).toBeGreaterThan(1)
+
+  // "data-index" is set synchronously from RevisionGrid's own props, so
+  // it is a more robust "back on the same row" signal than re-diffing
+  // commit-info's async, multi-paragraph innerText (which can otherwise
+  // flake on whitespace during rapid navigation).
+  await page.keyboard.press("Home")
+  await expect(selectedRow).toHaveAttribute("data-index", "0")
+
+  await page.keyboard.press("PageDown")
+  const afterPageDown = Number(await selectedRow.getAttribute("data-index"))
+  expect(afterPageDown).toBeGreaterThan(1)
+  expect(afterPageDown).toBeLessThan(lastIndex)
+
+  await page.keyboard.press("PageUp")
+  await expect(selectedRow).toHaveAttribute("data-index", "0")
+})
+
+test("settings labels are never clipped by the dialog content edge", async ({ page }) => {
+  await page.goto("/")
+  await page.getByTestId("settings-button").click()
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
+
+  const content = page.locator(".MuiDialogContent-root")
+  await expect(content).toBeVisible()
+
+  // User name, Email (TextFields) and core.autocrlf (Select) - all three
+  // render an outlined floating label subject to the same top-edge clip.
+  const labels = content.locator(".MuiFormControl-root .MuiInputLabel-root")
+  await expect(labels).toHaveCount(3)
+
+  // A label is clipped when it is cut by the content edge while its own field
+  // is on screen. A label that has simply scrolled out of view is not clipped,
+  // so only labels that overlap the visible content area are checked.
+  async function assertNoLabelIsClipped() {
+    const contentBox = (await content.boundingBox())!
+    const top = contentBox.y
+    const bottom = contentBox.y + contentBox.height
+    let checked = 0
+    for (const label of await labels.all()) {
+      const box = (await label.boundingBox())!
+      const visible = box.y + box.height > top && box.y < bottom
+      if (!visible) continue
+      checked++
+      expect(box.y).toBeGreaterThanOrEqual(top)
+      expect(box.y + box.height).toBeLessThanOrEqual(bottom)
+    }
+    expect(checked).toBeGreaterThan(0)
+  }
+
+  // Unscrolled: this is the v0.4.7 regression — the first label sat under the
+  // DialogContent top padding and was cut in half.
+  await assertNoLabelIsClipped()
+
+  // Scrolled to the bottom: the last field must be fully reachable. Labels the
+  // user scrolled past sit legitimately above the box (that is scrolling, not
+  // clipping), so only the last one is asserted here — asserting all of them
+  // made this test pass or fail on whether the dialog happened to scroll.
+  await content.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  const contentBox = (await content.boundingBox())!
+  const last = (await labels.last().boundingBox())!
+  expect(last.y).toBeGreaterThanOrEqual(contentBox.y)
+  expect(last.y + last.height).toBeLessThanOrEqual(contentBox.y + contentBox.height)
+
+  await page.getByRole("button", { name: "Cancel" }).click()
+})

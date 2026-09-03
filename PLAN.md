@@ -158,6 +158,7 @@ Recent repos with diff stats, Open, Clone.
 - Security: restrict engine CORS to known origins (tauri://localhost, http://tauri.localhost, dev server) and/or add a startup-generated token the frontend must send — blocks drive-by POSTs from random websites to 127.0.0.1:7733
 - Reproduce fullscreen clipping in Tauri window: need owner screen resolution + DPI scaling %; CSS overflow hardening already in place
 - [ ] Hotkeys Slice 2–4: commit pane-focus/stage-all chords, grid parent/child/go-to, remapping UI (parked from v0.11.0) [agent: grok]
+- UI zoom: Ctrl+= / Ctrl+- to scale the whole app, persisted (audit B.15; all sizes are fixed px today).
 ## v0.5 — Release track
 - [ ] GitHub Pages showcase site: new features + visuals screenshots
 - [ ] Release skill for opencode and claude agents (.opencode/skills + .claude/skills): how to cut a release, update Pages visuals and main README
@@ -256,3 +257,15 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Ubuntu fonts look low quality and too light grey: verify self-hosted Inter/Fira Code actually load under tauri:// on WebKitGTK, darken secondary text, add font smoothing and a good Linux fallback stack.
 - [x] File Tree on Linux: cannot expand subdirectories or open files (owner report #2). Tree/blob logic and e2e are correct on Windows; subdirectory errors were silently hidden, now surfaced in the tree. Linux root cause still needs a repro.
 - [x] Linux review pass: text-first JSON parsing everywhere, engine reuse only on matching version, ls-tree timeout, AppImage bundled-GLib strip in inspect script, Docker WebKit e2e harness (25/25 webkit + chromium on Linux).
+### v0.12.2 — Owner-issue audit + Linux UI/UX pass (2026-09-02) (current) (ACTIVE)
+**Goal:** Revisit every owner-reported defect from earlier iterations and confirm each is actually fixed in the current code (not just ticked); fix the ones that are partial or regressed. Second pass on Linux UI/UX polish toward Git Extensions parity. Verify on Windows and in the Docker WebKit harness, then release.
+- [x] Layout Web Worker: onerror handler + in-thread layouter fallback so a custom-scheme worker failure on WebKitGTK cannot leave the grid empty.
+- [x] Diff view: no mid-token wrapping (white-space pre, horizontal scroll, tab-size 4, line-number gutter).
+- [x] All 12 remaining catch sites use describeThrown so WebKit DOMException text reaches the UI (BottomPanel, CommitDialog, GitOps).
+- [x] Error banner becomes a dismissable Alert with copy; status bar shows branch / ahead-behind / dirty like GE instead of engine health.
+- [x] Scoped refresh: watcher events carry a kind so a status-only change does not refetch revisions/refs; selection and scroll preserved across refresh.
+- [x] Grid auto-scroll only on user navigation (keyed by SHA), not on every refresh; focus returns to the grid after dialogs and actions.
+- [x] Settings dialog label clipping (v0.4.7) verified with an e2e geometry assertion; splitters handle pointercancel.
+- [x] Cherry-pick and revert implemented (engine + context menu), replacing the disabled placeholders from v0.7.0.
+- [ ] Reopened from v0.11.0 (ticked but absent): Alt+Up/Down parent/child navigation, Ctrl+Shift+F find, Ctrl+G go-to. Deferred to next iteration.
+- [x] Empty/failed states: when /revisions fails the grid stays blank; show an inline error with Retry, and real empty states for no-commits / no-files / no-stashes.

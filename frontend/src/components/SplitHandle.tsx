@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 
 type Props = {
   testid: string
@@ -18,10 +18,11 @@ type Props = {
 // truth for the width.
 export function SplitHandle({ testid, value, defaultValue, min, maxRatio, getContainerWidth, onChange, onCommit }: Props) {
   const drag = useRef<{ startX: number; startWidth: number } | null>(null)
-  // Mirrors `value` synchronously so pointerup can commit the latest width
+  // Mirrors `value` synchronously so release() can commit the latest width
   // even if the browser fires it before React re-renders with new props.
   const widthRef = useRef(value)
   widthRef.current = value
+  const [dragging, setDragging] = useState(false)
 
   const clamp = (width: number) => {
     const max = Math.max(min, getContainerWidth() * maxRatio)
@@ -30,6 +31,7 @@ export function SplitHandle({ testid, value, defaultValue, min, maxRatio, getCon
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     drag.current = { startX: e.clientX, startWidth: widthRef.current }
+    setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
@@ -40,9 +42,14 @@ export function SplitHandle({ testid, value, defaultValue, min, maxRatio, getCon
     onChange(next)
   }
 
-  const onPointerUp = () => {
+  // pointerup ends a normal drag, but a GTK focus steal, touch/stylus
+  // interruption, or any other capture revocation fires pointercancel /
+  // lostpointercapture instead - without handling those the same way the
+  // handle gets stuck mid-drag with an uncommitted width.
+  const release = () => {
     if (!drag.current) return
     drag.current = null
+    setDragging(false)
     onCommit(widthRef.current)
   }
 
@@ -58,14 +65,16 @@ export function SplitHandle({ testid, value, defaultValue, min, maxRatio, getCon
       data-testid={testid}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={release}
       onDoubleClick={onDoubleClick}
       sx={{
-        width: 6,
+        width: 8,
         flexShrink: 0,
         cursor: "col-resize",
-        bgcolor: "divider",
-        "&:hover": { bgcolor: "primary.main" },
+        bgcolor: dragging ? "primary.dark" : "divider",
+        "&:hover": { bgcolor: dragging ? "primary.dark" : "primary.main" },
       }}
     />
   )

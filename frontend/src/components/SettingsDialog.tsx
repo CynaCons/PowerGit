@@ -47,19 +47,21 @@ export function SettingsDialog({ open, onClose }: Props) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Settings</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 3 }}>
         {error && <Typography color="error">{error}</Typography>}
         <TextField
           label="User name"
+          margin="dense"
           value={cfg?.userName ?? ""}
           onChange={(e) => setCfg((c) => (c ? { ...c, userName: e.target.value } : c))}
         />
         <TextField
           label="Email"
+          margin="dense"
           value={cfg?.userEmail ?? ""}
           onChange={(e) => setCfg((c) => (c ? { ...c, userEmail: e.target.value } : c))}
         />
-        <FormControl>
+        <FormControl margin="dense">
           <InputLabel id="crlf-label">core.autocrlf</InputLabel>
           <Select
             labelId="crlf-label"

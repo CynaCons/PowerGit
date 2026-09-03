@@ -369,6 +369,22 @@ app.MapPost("/tools/vscode", (GitHost git) =>
     }
 });
 
+// Opens a file's diff (commit^ vs commit) in the configured external diff
+// tool (git difftool). The engine starts the tool detached and responds as
+// soon as the process is launched, not when the tool window closes.
+app.MapPost("/difftool", (DifftoolRequest body, GitHost git) =>
+{
+    try
+    {
+        git.OpenDifftool(body.Commit, body.Path);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 app.MapPost("/stage", (StageRequest body, GitHost git) =>
 {
     try
@@ -424,6 +440,30 @@ app.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
     try
     {
         return Results.Ok(git.Rebase(body.Onto));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.CherryPick(id));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+app.MapPost("/commits/{id}/revert", (string id, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.Revert(id));
     }
     catch (Exception ex)
     {

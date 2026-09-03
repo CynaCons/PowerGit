@@ -27,6 +27,7 @@ export function CompactFileList({
   onRowClick,
   onToggle,
   onRowContext,
+  onRowDoubleClick,
 }: {
   testid: string
   files: CompactFile[]
@@ -37,6 +38,7 @@ export function CompactFileList({
   onRowClick?: (f: CompactFile, index: number, e: React.MouseEvent) => void
   onToggle?: (f: CompactFile) => void
   onRowContext?: (f: CompactFile, index: number, x: number, y: number) => void
+  onRowDoubleClick?: (f: CompactFile, index: number) => void
 }) {
   const isHighlighted = (f: CompactFile) =>
     selectedSet ? selectedSet.has(f.path) : selectedPath === f.path
@@ -73,7 +75,9 @@ export function CompactFileList({
               if (onRowClick) onRowClick(f, index, e)
               else onSelect?.(f, index)
             }}
-            onDoubleClick={onToggle ? () => onToggle(f) : undefined}
+            onDoubleClick={
+              onRowDoubleClick ? () => onRowDoubleClick(f, index) : onToggle ? () => onToggle(f) : undefined
+            }
             onContextMenu={
               onRowContext
                 ? (e) => {

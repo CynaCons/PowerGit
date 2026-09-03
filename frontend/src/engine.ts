@@ -89,6 +89,9 @@ export type RepoStatus = {
   stagedCount: number
   unstaged: StatusFile[]
   staged: StatusFile[]
+  /** Null when the branch has no upstream (or HEAD is detached). */
+  ahead: number | null
+  behind: number | null
 }
 export type RefItem = { name: string; fullName: string; target: string; current: boolean }
 export type Submodule = { name: string; path: string; head: string | null }
@@ -446,6 +449,25 @@ export async function fetchStatus(): Promise<RepoStatus> {
   return json<RepoStatus>(res)
 }
 
+/** Coarse classification of a GET /events change notification: "refs"
+ *  (HEAD/branch/tag moved — the commit list, ref tree, and status may all be
+ *  stale) is the superset of "status" (only the index changed). */
+export type ChangeKind = "none" | "status" | "refs"
+
+/** Decodes the `GitChangeKind` the engine packs into the low 2 bits of the
+ *  /events SSE payload (see GitHost.Watch.cs) — still a single integer on
+ *  the wire, so this is the only place that needs to know the encoding. */
+export function changeKindOf(version: number): ChangeKind {
+  switch (version & 0b11) {
+    case 1:
+      return "status"
+    case 2:
+      return "refs"
+    default:
+      return "none"
+  }
+}
+
 export async function fetchRefs(): Promise<RefTree> {
   await engineReady
   const res = await fetch(`${ENGINE_URL}/refs`)
@@ -533,4 +555,30 @@ export async function rebaseOnto(onto: string): Promise<RepoStatus> {
     body: JSON.stringify({ onto }),
   })
   return json<RepoStatus>(res)
+}
+
+export async function cherryPickCommit(id: string): Promise<RepoStatus> {
+  await engineReady
+  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/cherry-pick`, { method: "POST" })
+  return json<RepoStatus>(res)
+}
+
+export async function revertCommit(id: string): Promise<RepoStatus> {
+  await engineReady
+  const res = await fetch(`${ENGINE_URL}/commits/${encodeURIComponent(id)}/revert`, { method: "POST" })
+  return json<RepoStatus>(res)
+}
+
+/** Opens `path` at `commit` in the user's configured external diff tool
+ *  (git difftool, e.g. VS Code — see VsCodeLocator.cs). The engine launches
+ *  the tool detached and responds immediately, so this resolves as soon as
+ *  the request is accepted, not when the tool window closes. */
+export async function openDifftool(commit: string, path: string): Promise<void> {
+  await engineReady
+  const res = await fetch(`${ENGINE_URL}/difftool`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commit, path }),
+  })
+  await json<{ ok: boolean }>(res)
 }

@@ -6,6 +6,8 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward"
 import CallMergeIcon from "@mui/icons-material/CallMerge"
 import CallSplitIcon from "@mui/icons-material/CallSplit"
 import CheckIcon from "@mui/icons-material/Check"
+import CloseIcon from "@mui/icons-material/Close"
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import HistoryIcon from "@mui/icons-material/History"
 import Inventory2Icon from "@mui/icons-material/Inventory2"
 import LowPriorityIcon from "@mui/icons-material/LowPriority"
@@ -15,6 +17,7 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
 import SyncIcon from "@mui/icons-material/Sync"
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
+import Alert from "@mui/material/Alert"
 import AppBar from "@mui/material/AppBar"
 import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
@@ -41,6 +44,8 @@ import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import {
   ENGINE_URL,
+  changeKindOf,
+  type ChangeKind,
   checkoutRef,
   createBranch,
   createCommit,
@@ -74,7 +79,7 @@ import {
   type RevisionDto,
 } from "./engine"
 import { shortcutLabel, useHotkeyLayer, type CommandId } from "./hotkeys"
-import { layoutGraph } from "./graph/layout"
+import { createLayouter, layoutGraph, type GraphLayouter } from "./graph/layout"
 import { syntheticHistory } from "./graph/synthetic"
 import type { GraphRow } from "./graph/types"
 import type { Revision } from "./graph/types"
@@ -87,6 +92,32 @@ function toRevision(dto: RevisionDto): Revision {
     author: dto.author,
     date: dto.date.replace("T", " ").slice(0, 16),
     refs: dto.refs,
+  }
+}
+
+// navigator.clipboard requires a secure context and can be missing/blocked
+// under tauri:// (no https, no permission prompt shown yet); fall back to
+// the classic hidden-textarea + execCommand trick, which works from any
+// focused document regardless of origin.
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("clipboard API unavailable")
+    await navigator.clipboard.writeText(text)
+    return
+  } catch {
+    // fall through to the textarea fallback below
+  }
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.style.position = "fixed"
+  textarea.style.opacity = "0"
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  try {
+    document.execCommand("copy")
+  } finally {
+    document.body.removeChild(textarea)
   }
 }
 
@@ -162,17 +193,39 @@ export default function App() {
   // existing layout; a refresh resets it. Replies older than the last reset
   // are dropped so a slow relayout can never clobber newer state.
   const [liveGraphRows, setLiveGraphRows] = useState<GraphRow[]>([])
+  type LayoutRequest = { seq: number; reset: boolean; revisions: Revision[] }
+  type LayoutReply = { seq: number; reset: boolean; from: number; rows: GraphRow[] }
   const layoutWorker = useRef<Worker | null>(null)
   const layoutSeq = useRef(0)
   const resetSeq = useRef(0)
   const lastSent = useRef<Revision[]>([])
 
+  // Where layout requests go: the worker, or an in-thread layouter once the
+  // worker has failed (module workers over the tauri:// custom scheme have
+  // regressed on some WebKitGTK builds; without this the grid stays empty).
+  const layoutPost = useRef<((m: LayoutRequest) => void) | null>(null)
+
   useEffect(() => {
-    const worker = new Worker(new URL("./graph/layout.worker.ts", import.meta.url), { type: "module" })
-    worker.onmessage = (e: MessageEvent<{ seq: number; reset: boolean; from: number; rows: GraphRow[] }>) => {
-      const { seq, reset, from, rows } = e.data
+    const handle = ({ seq, reset, from, rows }: LayoutReply) => {
       if (seq < resetSeq.current) return
       setLiveGraphRows((prev) => (reset ? rows : [...prev.slice(0, from), ...rows]))
+    }
+    const worker = new Worker(new URL("./graph/layout.worker.ts", import.meta.url), { type: "module" })
+    worker.onmessage = (e: MessageEvent<LayoutReply>) => handle(e.data)
+    layoutPost.current = (m) => worker.postMessage(m)
+    worker.onerror = (ev) => {
+      console.error("[powergit] layout worker failed, laying out on the main thread:", ev.message)
+      worker.terminate()
+      let inThread: GraphLayouter = createLayouter()
+      layoutPost.current = (m) => {
+        if (m.reset) inThread = createLayouter()
+        const from = inThread.rowCount()
+        handle({ seq: m.seq, reset: m.reset, from, rows: inThread.append(m.revisions) })
+      }
+      // Whatever the worker swallowed is gone; replay the last full set.
+      const seq = ++layoutSeq.current
+      resetSeq.current = seq
+      layoutPost.current({ seq, reset: true, revisions: lastSent.current })
     }
     layoutWorker.current = worker
     // A fresh worker has no layout state; force the next post to be a reset.
@@ -180,13 +233,14 @@ export default function App() {
     return () => {
       worker.terminate()
       layoutWorker.current = null
+      layoutPost.current = null
     }
   }, [])
 
   useEffect(() => {
     if (offline) return
-    const worker = layoutWorker.current
-    if (!worker) return
+    const post = layoutPost.current
+    if (!post) return
     const prev = lastSent.current
     const isAppend =
       prev.length > 0 &&
@@ -195,10 +249,10 @@ export default function App() {
       revisions[prev.length - 1] === prev[prev.length - 1]
     const seq = ++layoutSeq.current
     if (isAppend) {
-      worker.postMessage({ seq, reset: false, revisions: revisions.slice(prev.length) })
+      post({ seq, reset: false, revisions: revisions.slice(prev.length) })
     } else {
       resetSeq.current = seq
-      worker.postMessage({ seq, reset: true, revisions })
+      post({ seq, reset: true, revisions })
     }
     lastSent.current = revisions
   }, [offline, revisions])
@@ -308,19 +362,31 @@ export default function App() {
   // moves (HEAD, refs, index) — external git activity shows up on its own.
   // Debounced so an event burst (e.g. a rebase) refreshes once, and muted
   // right after our own refreshes so in-app actions don't refresh twice.
+  // The low bits of the version classify the change (see engine.ts
+  // `changeKindOf`): a status-only burst (e.g. repeated `git status` index
+  // touches) only re-fetches status instead of the full revisions+refs+
+  // status sweep. "refs" is the superset for the rare mixed burst, so it
+  // always wins over an earlier "status" seen in the same debounce window.
   useEffect(() => {
     if (offline || !live) return
     const source = new EventSource(`${ENGINE_URL}/events`)
     let timer: number | undefined
     let last: string | null = null
+    let pendingKind: ChangeKind = "none"
     source.onmessage = (e) => {
       if (last === e.data) return
       const isFirst = last === null
       last = e.data
       if (isFirst) return // initial snapshot, nothing changed
       if (Date.now() - lastRefreshAt.current < 2000) return // our own action
+      const kind = changeKindOf(Number(e.data))
+      if (pendingKind !== "refs") pendingKind = kind
       window.clearTimeout(timer)
-      timer = window.setTimeout(() => void refresh(), 400)
+      timer = window.setTimeout(() => {
+        const scope: RefreshScope = pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
+        pendingKind = "none"
+        void refresh(scope)
+      }, 400)
     }
     return () => {
       window.clearTimeout(timer)
@@ -456,6 +522,20 @@ export default function App() {
   )
   const defaultRemote = remoteNames[0] ?? "origin"
 
+  // Returns focus to the grid so arrow keys work immediately, after a dialog
+  // closes or a busy action finishes. The double rAF runs after MUI's own
+  // FocusTrap restores focus to whatever was focused before the dialog
+  // opened: that restore fires from an effect cleanup tied to the dialog's
+  // `open` prop, not to the exit transition, so a same-tick focus() call
+  // here could otherwise be undone a moment later by MUI's own restore.
+  function focusGrid() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        ;(document.querySelector('[data-testid="grid-body"]') as HTMLElement | null)?.focus()
+      })
+    })
+  }
+
   // Shows the topbar progress indicator around any mutating engine call —
   // sync ops (checkout, reset, rebase, stash) give the same feedback as jobs.
   async function withBusy(label: string, fn: () => Promise<void>) {
@@ -475,6 +555,7 @@ export default function App() {
     } finally {
       setBusy(false)
       setJobLabel(null)
+      focusGrid()
     }
   }
 
@@ -632,7 +713,7 @@ export default function App() {
         })
       },
       "browse.focusRevisionGrid": () => {
-        ;(document.querySelector('[data-testid="grid-body"]') as HTMLElement | null)?.focus()
+        focusGrid()
       },
       "browse.focusCommitInfo": () => setBottomTab(0),
       "browse.focusDiff": () => setBottomTab(1),
@@ -854,20 +935,45 @@ export default function App() {
             shortcut={shortcutLabel("browse.createTag")}
             onClick={openCreateTag}
           />
-            <Typography
+          {/* Git Extensions status strip: branch, ahead/behind vs upstream,
+              dirty count; engine build info stays muted at the far right.
+              The dirty count is always parenthesized (even "(0 changes)")
+              so `engine-status` keeps a "(" once a repo is live, which
+              several e2e specs use as a "real repo data has loaded" signal
+              regardless of upstream/dirty state. */}
+            <Box
               data-testid="engine-status"
-              variant="caption"
-              color="text.secondary"
-              noWrap
-              sx={{ ml: "auto", minWidth: 0 }}
+              sx={{ ml: "auto", minWidth: 0, display: "flex", alignItems: "baseline", gap: 0.75, overflow: "hidden" }}
             >
-              {health
-                ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
-                : offline
-                  ? "sample data · connect an engine for real repositories"
-                  : "connecting…"}
-              {repo ? ` · ${repo.name} (${repo.branch})` : ""}
-            </Typography>
+              {live && repo ? (
+                <>
+                  <Typography variant="caption" noWrap sx={{ fontWeight: 700 }}>
+                    {repo.branch}
+                  </Typography>
+                  {status?.ahead != null && status?.behind != null && (
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {`↑${status.ahead} ↓${status.behind}`}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {`(${dirty} change${dirty === 1 ? "" : "s"})`}
+                  </Typography>
+                  {health && (
+                    <Typography variant="caption" color="text.disabled" noWrap sx={{ ml: 0.5 }}>
+                      {`${health.gitVersion} · engine ${health.engine}`}
+                    </Typography>
+                  )}
+                </>
+              ) : (
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {health
+                    ? `${health.gitVersion} · engine ${health.engine}${live ? "" : " · no repository"}`
+                    : offline
+                      ? "sample data · connect an engine for real repositories"
+                      : "connecting…"}
+                </Typography>
+              )}
+            </Box>
         </Toolbar>
         {!live && !offline && health !== null && (
           <LinearProgress data-testid="boot-progress" sx={{ height: 2 }} />
@@ -875,9 +981,37 @@ export default function App() {
         {busy && jobLabel !== null && <LinearProgress sx={{ height: 2 }} />}
         </AppBar>
         {engineError && (
-          <Typography variant="caption" color="error" sx={{ px: 2, py: 0.5, display: "block" }}>
+          <Alert
+            data-testid="error-banner"
+            severity="error"
+            sx={{ borderRadius: 0, py: 0.25 }}
+            action={
+              <Box sx={{ display: "flex", gap: 0.5 }}>
+                <Tooltip title="Copy error text">
+                  <IconButton
+                    data-testid="error-banner-copy"
+                    size="small"
+                    color="inherit"
+                    aria-label="Copy error text"
+                    onClick={() => void copyToClipboard(engineError)}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <IconButton
+                  data-testid="error-banner-close"
+                  size="small"
+                  color="inherit"
+                  aria-label="Dismiss"
+                  onClick={() => setEngineError(null)}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            }
+          >
             {engineError}
-          </Typography>
+          </Alert>
         )}
 
       <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
@@ -964,7 +1098,29 @@ export default function App() {
           )}
           <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
             <Box sx={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }} component="div">
-              <Box sx={{ flex: 1, minHeight: 0, display: "flex", bgcolor: "background.paper", border: 1, borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
+              <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", bgcolor: "background.paper", border: 1, borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
+                {rows.length === 0 && !loadingTail && (
+                  <Box data-testid="grid-empty" sx={{ p: 3, display: "flex", justifyContent: "center" }}>
+                    {engineError ? (
+                      <Alert
+                        severity="error"
+                        variant="outlined"
+                        sx={{ maxWidth: 560 }}
+                        action={
+                          <Button size="small" onClick={() => void refresh()}>
+                            Retry
+                          </Button>
+                        }
+                      >
+                        Could not load history. {engineError}
+                      </Alert>
+                    ) : (
+                      <Typography color="text.secondary" variant="body2">
+                        {repo ? "This repository has no commits yet." : "Open a repository to see its history."}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
                 <RevisionGrid
                   rows={rows}
                   selected={selected}
@@ -984,6 +1140,10 @@ export default function App() {
               onPointerDown={onDividerDown}
               onPointerMove={onDividerMove}
               onPointerUp={onDividerUp}
+              // A GTK focus steal mid-drag fires pointercancel, never
+              // pointerup; without these the handle stays stuck to the cursor.
+              onPointerCancel={onDividerUp}
+              onLostPointerCapture={onDividerUp}
               sx={{
                 height: 6,
                 flexShrink: 0,
@@ -1007,6 +1167,7 @@ export default function App() {
           setCommitOpen(false)
           setAmend(false)
           setInitialMsg(undefined)
+          focusGrid()
         }}
         onStatus={setStatus}
         onCommit={async (msg) => {
@@ -1014,8 +1175,24 @@ export default function App() {
         }}
       />
 
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <RecentsDialog open={recentsOpen} onClose={() => setRecentsOpen(false)} recents={recents} onPick={(p) => { if (p) onOpenFolder(p) }} />
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false)
+          focusGrid()
+        }}
+      />
+      <RecentsDialog
+        open={recentsOpen}
+        onClose={() => {
+          setRecentsOpen(false)
+          focusGrid()
+        }}
+        recents={recents}
+        onPick={(p) => {
+          if (p) onOpenFolder(p)
+        }}
+      />
 
       <RevisionContextMenu
         target={ctxTarget}
@@ -1074,7 +1251,14 @@ export default function App() {
         />
       )}
       {remoteConfigFor !== null && (
-        <RemoteDialog open name={remoteConfigFor} onClose={() => setRemoteConfigFor(null)} />
+        <RemoteDialog
+          open
+          name={remoteConfigFor}
+          onClose={() => {
+            setRemoteConfigFor(null)
+            focusGrid()
+          }}
+        />
       )}
       <StashDialog
         open={stashOpen}
@@ -1082,6 +1266,7 @@ export default function App() {
         onClose={() => {
           setStashOpen(false)
           void refresh({ revisions: true, status: true, stashes: true })
+          focusGrid()
         }}
         onStatus={setStatus}
       />

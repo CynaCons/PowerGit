@@ -13,6 +13,7 @@ import { shortcutLabel, useHotkeyLayer } from "../hotkeys"
 import {
   addToIgnore,
   deleteFiles,
+  describeThrown,
   fetchWorkTreeDiff,
   stagePaths,
   type DiffDto,
@@ -73,7 +74,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
         if (!cancelled) setDiff(d)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setDiff({ path: selected.path, text: e instanceof Error ? e.message : "diff failed", binary: false })
+        if (!cancelled) setDiff({ path: selected.path, text: `diff failed: ${describeThrown(e)}`, binary: false })
       })
     return () => {
       cancelled = true
@@ -107,7 +108,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
       onStatus(await stagePaths([file.path], file.staged))
       setSelected((cur) => (cur?.path === file.path ? null : cur))
     } catch (e) {
-      setError(e instanceof Error ? e.message : "stage failed")
+      setError(`stage failed: ${describeThrown(e)}`)
     }
   }
 
@@ -119,7 +120,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
       setSelStaged(new Set())
       setSelUnstaged(new Set())
     } catch (e) {
-      setError(e instanceof Error ? e.message : "stage failed")
+      setError(`stage failed: ${describeThrown(e)}`)
     }
   }
 
@@ -132,7 +133,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
       setSelStaged(new Set())
       setSelUnstaged(new Set())
     } catch (e) {
-      setError(e instanceof Error ? e.message : "stage failed")
+      setError(`stage failed: ${describeThrown(e)}`)
     }
   }
 
@@ -146,7 +147,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
       setSelUnstaged(new Set())
       setSelected(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "delete failed")
+      setError(`delete failed: ${describeThrown(e)}`)
     }
   }
 

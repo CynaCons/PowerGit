@@ -113,6 +113,108 @@ public sealed class GitHostTests
         Assert.Contains(log, r => r.Subject == "main-advance");
         Assert.Equal(log[0].Parents[0], log.First(r => r.Subject == "main-advance").Id);
     }
+
+    [Fact]
+    public void CherryPick_applies_commit_onto_current_branch()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        host.Checkout("feature", force: false);
+        string featureCommitId = repo.HeadId();
+        host.Checkout("main", force: false);
+
+        RepoStatusDto after = host.CherryPick(featureCommitId);
+        Assert.Equal("main", after.Branch);
+        Assert.Equal("feature-commit", host.GetCommit(repo.HeadId()).Subject);
+        Assert.True(File.Exists(Path.Combine(repo.Dir, "b.txt")));
+    }
+
+    [Fact]
+    public void CherryPick_conflict_aborts_and_leaves_a_clean_tree()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        host.Checkout("feature", force: false);
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "feature-edit\n");
+        repo.StageAndCommit("feature-conflict");
+        string conflictCommitId = repo.HeadId();
+
+        host.Checkout("main", force: false);
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "main-edit\n");
+        repo.StageAndCommit("main-conflict");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => host.CherryPick(conflictCommitId));
+        Assert.Contains("Cherry-pick", ex.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(repo.Dir, ".git", "CHERRY_PICK_HEAD")));
+        Assert.False(repo.IsDirtyPublic());
+    }
+
+    [Fact]
+    public void CherryPick_requires_clean_tree()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+        string featureCommitId = host.ListRevisions(10).First(r => r.Subject == "feature-commit").Id;
+
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "dirty\n");
+        Assert.Throws<InvalidOperationException>(() => host.CherryPick(featureCommitId));
+    }
+
+    [Fact]
+    public void Revert_creates_an_inverse_commit()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "changed\n");
+        repo.StageAndCommit("change-a");
+        string changeId = repo.HeadId();
+
+        RepoStatusDto after = host.Revert(changeId);
+        Assert.Equal("main", after.Branch);
+        Assert.StartsWith("Revert \"change-a\"", host.GetCommit(repo.HeadId()).Subject, StringComparison.Ordinal);
+        Assert.Equal("a", File.ReadAllText(Path.Combine(repo.Dir, "a.txt")).Trim());
+    }
+
+    [Fact]
+    public void Revert_conflict_aborts_and_leaves_a_clean_tree()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "v2\n");
+        repo.StageAndCommit("a-v2");
+        string v2Id = repo.HeadId();
+
+        File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "v3\n");
+        repo.StageAndCommit("a-v3");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => host.Revert(v2Id));
+        Assert.Contains("Revert", ex.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(repo.Dir, ".git", "REVERT_HEAD")));
+        Assert.False(repo.IsDirtyPublic());
+    }
+
+    [Fact]
+    public void OpenDifftool_requires_commit_and_path()
+    {
+        // Does not exercise the actual process launch: git difftool can spawn
+        // a real GUI editor, which must never happen from an automated test.
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        Assert.Throws<InvalidOperationException>(() => host.OpenDifftool("", "a.txt"));
+        Assert.Throws<InvalidOperationException>(() => host.OpenDifftool("HEAD", ""));
+    }
+
     [Fact]
     public void Stash_lifecycle_works()
     {
@@ -265,9 +367,20 @@ public sealed class GitHostTests
         Assert.Contains(refs.Tags, t => t.Name == "v9.9");
 
         // Branch points at the requested commit, not wherever HEAD is now.
+        // (Before v0.12.2 this asserted against ListRevisions(1)[0], the newest
+        //  row across all branches, which is "feature-commit" no matter what is
+        //  checked out — so it passed without ever testing the claim.)
         string target = host.ListRevisions(10).First(r => r.Subject == "feature-commit").Id;
+        string headBefore = repo.HeadId();
+        Assert.NotEqual(target, headBefore);
+
+        host.CreateBranch("at-feature", target);
+        host.Checkout("at-feature", force: true);
+        Assert.Equal(target, repo.HeadId());
+
+        // A branch created at "HEAD" tracks where HEAD was, not the newest commit.
         host.Checkout("created-branch", force: true);
-        Assert.Equal(target, host.ListRevisions(1)[0].Id);
+        Assert.Equal(headBefore, repo.HeadId());
     }
 
     [Fact]
@@ -325,6 +438,27 @@ internal sealed partial class TempRepo : IDisposable
     {
         Git("add", "-A");
         Git("commit", "-m", message);
+    }
+
+    /// <summary>
+    ///  The tip of the checked-out branch. Tests must not assume
+    ///  <c>ListRevisions(1)[0]</c> is HEAD: since v0.12.0 the revision stream is
+    ///  date-ordered across every branch (Git Extensions parity), so the newest
+    ///  row can belong to another branch — and does whenever commits made in the
+    ///  same second tie on commit date.
+    /// </summary>
+    public string HeadId()
+    {
+        System.Diagnostics.ProcessStartInfo psi = new("git", new[] { "rev-parse", "HEAD" })
+        {
+            WorkingDirectory = Dir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        string id = p?.StandardOutput.ReadToEnd().Trim() ?? "";
+        p?.WaitForExit(30_000);
+        return id;
     }
 
     private void Git(params string[] args)

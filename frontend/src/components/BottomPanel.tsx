@@ -9,7 +9,18 @@ import { CompactFileList } from "./CompactFileList"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { SplitHandle } from "./SplitHandle"
-import { fetchBlob, fetchCommit, fetchDiff, fetchFiles, type CommitDetail, type DiffDto, type DiffOptions, type FileChange } from "../engine"
+import {
+  describeThrown,
+  fetchBlob,
+  fetchCommit,
+  fetchDiff,
+  fetchFiles,
+  openDifftool,
+  type CommitDetail,
+  type DiffDto,
+  type DiffOptions,
+  type FileChange,
+} from "../engine"
 import type { GraphRow } from "../graph/types"
 
 type Props = {
@@ -56,6 +67,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const [diffOpts, setDiffOpts] = useState<DiffOptions>(DEFAULT_DIFF_OPTIONS)
   const [treeFile, setTreeFile] = useState<string | null>(null)
   const [blob, setBlob] = useState<DiffDto | null>(null)
+  const [diffToolError, setDiffToolError] = useState<string | null>(null)
   // Shared by the Files (Diff) tab and File Tree tab so both file columns
   // resize together and remember one width across sessions.
   const [filesWidth, setFilesWidth] = useState<number>(() => readStoredFilesWidth())
@@ -69,6 +81,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
       setDiff(null)
       setTreeFile(null)
       setBlob(null)
+      setDiffToolError(null)
       return
     }
 
@@ -84,9 +97,10 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
       setDiff(null)
       setTreeFile(null)
       setBlob(null)
+      setDiffToolError(null)
       fetchCommit(id)
         .then(setDetail)
-        .catch((e: unknown) => setError(e instanceof Error ? e.message : "commit failed"))
+        .catch((e: unknown) => setError(`commit failed: ${describeThrown(e)}`))
       fetchFiles(id)
         .then((list) => {
           setFiles(list)
@@ -108,7 +122,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         if (!cancelled) setDiff(d)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setDiff({ path: file, text: e instanceof Error ? e.message : "diff failed", binary: false })
+        if (!cancelled) setDiff({ path: file, text: `diff failed: ${describeThrown(e)}`, binary: false })
       })
     return () => {
       cancelled = true
@@ -127,7 +141,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         if (!cancelled) setBlob(b)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setBlob({ path: treeFile, text: e instanceof Error ? e.message : "open failed", binary: false })
+        if (!cancelled) setBlob({ path: treeFile, text: `open failed: ${describeThrown(e)}`, binary: false })
       })
     return () => {
       cancelled = true
@@ -143,6 +157,18 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
     getContainerWidth: () => panelRef.current?.clientWidth ?? filesWidth,
     onChange: setFilesWidth,
     onCommit: writeStoredFilesWidth,
+  }
+
+  // Files tab double-click: opens the file in the configured external diff
+  // tool (git difftool, e.g. VS Code) instead of doing nothing. The engine
+  // runs the tool in the background and returns immediately, so this only
+  // surfaces a validation/startup error, not the tool's own exit status.
+  function openInDifftool(path: string) {
+    if (!current || current.rev.id.length < 16) return
+    setDiffToolError(null)
+    void openDifftool(current.rev.id, path).catch((e: unknown) =>
+      setDiffToolError(`open in diff tool failed: ${describeThrown(e)}`),
+    )
   }
 
   return (
@@ -195,7 +221,13 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
                 selectedPath={file}
                 emptyText="No files for this revision."
                 onSelect={(f) => setFile(f.path)}
+                onRowDoubleClick={(f) => openInDifftool(f.path)}
               />
+              {diffToolError && (
+                <Typography data-testid="difftool-error" variant="caption" color="error" sx={{ px: 1, py: 0.5, flexShrink: 0 }}>
+                  {diffToolError}
+                </Typography>
+              )}
             </Box>
             <SplitHandle {...splitHandleProps} />
             <DiffPane diff={diff} file={file} options={diffOpts} onOptions={setDiffOpts} />
@@ -270,8 +302,7 @@ function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | null })
           fontSize: 12,
           lineHeight: 1.5,
           bgcolor: "#ffffff",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-all",
+          whiteSpace: "pre",
         }}
       >
         {blob ? blob.text : path ? "Loading…" : ""}

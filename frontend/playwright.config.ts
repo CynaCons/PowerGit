@@ -4,8 +4,13 @@ const ci = !!process.env.CI
 
 export default defineConfig({
   testDir: "tests/e2e",
-  fullyParallel: ci,
-  workers: ci ? undefined : 1,
+  // Every spec talks to ONE engine process with ONE open repository, and some
+  // specs switch that repository (live-refresh-scope). Parallel workers there
+  // let one spec's repo swap surface as "no repository" in another — that is
+  // exactly how the Linux CI run failed while Windows (1 worker) passed. The
+  // suite is ~3 min serially; keep it serial everywhere.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: ci,
   retries: 0,
   maxFailures: ci ? 0 : 1,

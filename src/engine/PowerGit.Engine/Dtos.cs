@@ -39,7 +39,9 @@ public sealed record RepoStatusDto(
     int UnstagedCount,
     int StagedCount,
     StatusFileDto[] Unstaged,
-    StatusFileDto[] Staged);
+    StatusFileDto[] Staged,
+    int? Ahead = null,
+    int? Behind = null);
 
 public sealed record RefItemDto(string Name, string FullName, string Target, bool Current);
 
@@ -102,3 +104,5 @@ public sealed record StashDto(string Reference, string Id, string Subject);
 public sealed record StashRequest(string? Message, bool KeepIndex = false, bool IncludeUntracked = false);
 
 public sealed record StashApplyRequest(string Reference, bool Pop = false);
+
+public sealed record DifftoolRequest(string Commit, string Path);

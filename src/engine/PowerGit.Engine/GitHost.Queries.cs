@@ -330,7 +330,29 @@ public sealed partial class GitHost
             }
         }
 
-        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged]);
+        (int? ahead, int? behind) = GetAheadBehind(root);
+        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind);
+    }
+
+    // Branches without an upstream (or a detached HEAD) make `@{upstream}`
+    // fail to resolve; git's exact wording there varies by version/locale,
+    // so any non-zero exit is treated as "no upstream" rather than matching
+    // stderr text.
+    private (int? Ahead, int? Behind) GetAheadBehind(string root)
+    {
+        CommandResult result = Run(root, "rev-list", "--left-right", "--count", "HEAD...@{upstream}");
+        if (result.ExitCode != 0)
+        {
+            return (null, null);
+        }
+
+        string[] parts = result.StdOut.Trim().Split('\t', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 2 && int.TryParse(parts[0], out int ahead) && int.TryParse(parts[1], out int behind))
+        {
+            return (ahead, behind);
+        }
+
+        return (null, null);
     }
 
     public RefTreeDto GetRefs()
