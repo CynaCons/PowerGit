@@ -82,10 +82,7 @@ export function buildTheme(mode: ThemeMode, zoom = 1): Theme {
           // Compensate the layout box for CSS zoom so its visual height stays
           // exactly the viewport height (and does not enlarge document
           // scrollHeight on WebKit/Chromium).
-          "#root":
-            zoom === 1
-              ? {}
-              : { zoom, height: `calc(100% / ${zoom})`, width: `calc(100% / ${zoom})` },
+          "#root": zoom === 1 ? {} : { zoom, height: `calc(100% / ${zoom})`, width: `calc(100% / ${zoom})` },
           // sx-generated classes cannot be matched by the inline-style
           // selector, so disable ligatures globally; Inter has no
           // meaningful ligatures.
