@@ -1,0 +1,454 @@
+{
+  "$generated": "tools/ge-parity/extract.mjs — do not edit by hand",
+  "name": "UnfoldOneLaneShiftsToDiagonals_3",
+  "source": {
+    "test": "RevisionGraphTests.UnfoldOneLaneShiftsToDiagonals",
+    "verifiedFile": "UnfoldOneLaneShiftsToDiagonals.3.verified.txt",
+    "spec": "0:D,1,2,3,4,5,6,B,8,9,7 1:D 2:D 3:E 4:E 5:C 6:C 7:G 8:9 9:A A:B B:C C:F D:R E:F F:R G:H H:R R",
+    "order": "newestFirst"
+  },
+  "settings": {
+    "mergeGraphLanesHavingCommonParent": false,
+    "straightenGraphDiagonals": true
+  },
+  "revisions": [
+    {
+      "id": "0",
+      "parents": [
+        "D",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "B",
+        "8",
+        "9",
+        "7"
+      ],
+      "label": "0"
+    },
+    {
+      "id": "1",
+      "parents": [
+        "D"
+      ],
+      "label": "1"
+    },
+    {
+      "id": "2",
+      "parents": [
+        "D"
+      ],
+      "label": "2"
+    },
+    {
+      "id": "3",
+      "parents": [
+        "E"
+      ],
+      "label": "3"
+    },
+    {
+      "id": "4",
+      "parents": [
+        "E"
+      ],
+      "label": "4"
+    },
+    {
+      "id": "5",
+      "parents": [
+        "C"
+      ],
+      "label": "5"
+    },
+    {
+      "id": "6",
+      "parents": [
+        "C"
+      ],
+      "label": "6"
+    },
+    {
+      "id": "7",
+      "parents": [
+        "G"
+      ],
+      "label": "7"
+    },
+    {
+      "id": "8",
+      "parents": [
+        "9"
+      ],
+      "label": "8"
+    },
+    {
+      "id": "9",
+      "parents": [
+        "A"
+      ],
+      "label": "9"
+    },
+    {
+      "id": "A",
+      "parents": [
+        "B"
+      ],
+      "label": "A"
+    },
+    {
+      "id": "B",
+      "parents": [
+        "C"
+      ],
+      "label": "B"
+    },
+    {
+      "id": "C",
+      "parents": [
+        "F"
+      ],
+      "label": "C"
+    },
+    {
+      "id": "D",
+      "parents": [
+        "R"
+      ],
+      "label": "D"
+    },
+    {
+      "id": "E",
+      "parents": [
+        "F"
+      ],
+      "label": "E"
+    },
+    {
+      "id": "F",
+      "parents": [
+        "R"
+      ],
+      "label": "F"
+    },
+    {
+      "id": "G",
+      "parents": [
+        "H"
+      ],
+      "label": "G"
+    },
+    {
+      "id": "H",
+      "parents": [
+        "R"
+      ],
+      "label": "H"
+    },
+    {
+      "id": "R",
+      "parents": [],
+      "label": "R"
+    }
+  ],
+  "expectedRows": [
+    {
+      "id": "0",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    },
+    {
+      "id": "1",
+      "lane": 3,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "2",
+      "lane": 4,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "3",
+      "lane": 5,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "4",
+      "lane": 6,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "5",
+      "lane": 7,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "6",
+      "lane": 8,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "7",
+      "lane": 9,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10
+      ]
+    },
+    {
+      "id": "8",
+      "lane": 10,
+      "laneCount": 11,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "9",
+      "lane": 1,
+      "laneCount": 10,
+      "occupiedLanes": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "A",
+      "lane": 1,
+      "laneCount": 10,
+      "occupiedLanes": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "B",
+      "lane": 0,
+      "laneCount": 10,
+      "occupiedLanes": [
+        1,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "C",
+      "lane": 0,
+      "laneCount": 9,
+      "occupiedLanes": [
+        1,
+        2,
+        4,
+        5,
+        6,
+        8
+      ]
+    },
+    {
+      "id": "D",
+      "lane": 1,
+      "laneCount": 8,
+      "occupiedLanes": [
+        0,
+        2,
+        6,
+        7
+      ]
+    },
+    {
+      "id": "E",
+      "lane": 2,
+      "laneCount": 4,
+      "occupiedLanes": [
+        0,
+        1,
+        3
+      ]
+    },
+    {
+      "id": "F",
+      "lane": 0,
+      "laneCount": 3,
+      "occupiedLanes": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "G",
+      "lane": 2,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "H",
+      "lane": 2,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "R",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    }
+  ],
+  "expectedAscii": [
+    "0",
+    "|\\------------------ˎ",
+    "| | | 1 | | | | | | |",
+    "| | | | | | | | | | |",
+    "| | | | 2 | | | | | |",
+    "| | | | | | | | | | |",
+    "| | | | | 3 | | | | |",
+    "| | | | | | | | | | |",
+    "| | | | | | 4 | | | |",
+    "| | | | | | | | | | |",
+    "| | | | | | | 5 | | |",
+    "| | | | | | | | | | |",
+    "| | | | | | | | 6 | |",
+    "| | | | | | | | | | |",
+    "| | | | | | | | | 7 |",
+    "| | | | | | | | | | |",
+    "| | | | | | | | | | 8",
+    "| |-|-|-|-|-|-|-|-|´",
+    "| 9 | | | | | | | |",
+    "| | | | | | | | | |",
+    "| A | | | | | | | |",
+    "|/ /  | | | | | | |",
+    "B |   | | | | | | |",
+    "|-|--/--|-|-|--´ /",
+    "C | |   | | |   |",
+    "| |/,----´  |  /",
+    "| D |       | |",
+    "| | |-,------´",
+    "| | E |",
+    "|-|´ /",
+    "F | |",
+    "| | |",
+    "| | G",
+    "| | |",
+    "| | H",
+    "|/-´",
+    "R"
+  ]
+}

@@ -5,8 +5,11 @@ Codex and Copilot load `AGENTS.md` from the repo root. Claude loads
 `CLAUDE.md`, which is a shim that points here — do not duplicate guidance.
 
 You are working on **PowerGit**: a GPL-3.0 fork of Git Extensions. New UI is
-React inside Tauri. Git logic stays in C# (`PowerGit.Engine` sidecar, `net10.0`).
-Read [PRD.md](PRD.md) before inventing product behaviour.
+React inside Tauri. Git Extensions is the behavioural reference, not shared
+code: the engine is a small C# `net10.0` host around the git CLI
+(`PowerGit.Engine` sidecar), and the lane layout is a TypeScript
+reimplementation of GE's `RevisionGraph` verified by golden fixtures
+(`tools/ge-parity/`). Read [PRD.md](PRD.md) before inventing product behaviour.
 
 ## Project shape
 
@@ -133,7 +136,10 @@ Do not put secrets there.
 - GPL-3.0: this is a combined work with Git Extensions. No proprietary
   relicensing. New files belong in this tree under the same license.
 - Match Git Extensions behaviour unless an SRS says otherwise. The graph is
-  the product; a pretty-but-wrong lane layout is a defect.
+  the product; a pretty-but-wrong lane layout is a defect. Parity is proven,
+  not assumed: `frontend/src/graph/layout.ge-parity.test.ts` replays GE's own
+  `RevisionGraph` snapshots; divergences live in its `KNOWN_DIVERGENCES` map
+  with a reason each. Do not port GE code by copying files (see Branches).
 - Engine target is `net10.0` (Linux-capable). Do not take a dependency that
   forces `net10.0-windows` or `UseWindowsForms` into the sidecar.
 - UI is React + TypeScript. No WinForms in the new frontend.

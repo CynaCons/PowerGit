@@ -1,0 +1,138 @@
+{
+  "$generated": "tools/ge-parity/extract.mjs — do not edit by hand",
+  "name": "JoinMultiLaneCrossings_1",
+  "source": {
+    "test": "RevisionGraphTests.JoinMultiLaneCrossings",
+    "verifiedFile": "JoinMultiLaneCrossings.1.verified.txt",
+    "spec": "0:3,2 1:5 2:5 3:5 4:R 5:R R",
+    "order": "newestFirst"
+  },
+  "settings": {
+    "mergeGraphLanesHavingCommonParent": false,
+    "straightenGraphDiagonals": true
+  },
+  "revisions": [
+    {
+      "id": "0",
+      "parents": [
+        "3",
+        "2"
+      ],
+      "label": "0"
+    },
+    {
+      "id": "1",
+      "parents": [
+        "5"
+      ],
+      "label": "1"
+    },
+    {
+      "id": "2",
+      "parents": [
+        "5"
+      ],
+      "label": "2"
+    },
+    {
+      "id": "3",
+      "parents": [
+        "5"
+      ],
+      "label": "3"
+    },
+    {
+      "id": "4",
+      "parents": [
+        "R"
+      ],
+      "label": "4"
+    },
+    {
+      "id": "5",
+      "parents": [
+        "R"
+      ],
+      "label": "5"
+    },
+    {
+      "id": "R",
+      "parents": [],
+      "label": "R"
+    }
+  ],
+  "expectedRows": [
+    {
+      "id": "0",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    },
+    {
+      "id": "1",
+      "lane": 2,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "2",
+      "lane": 0,
+      "laneCount": 3,
+      "occupiedLanes": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "3",
+      "lane": 1,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "4",
+      "lane": 3,
+      "laneCount": 4,
+      "occupiedLanes": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "5",
+      "lane": 0,
+      "laneCount": 4,
+      "occupiedLanes": [
+        3
+      ]
+    },
+    {
+      "id": "R",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    }
+  ],
+  "expectedAscii": [
+    "0",
+    "|\\",
+    "| | 1",
+    "| | |",
+    "2 | |",
+    "| | |",
+    "| 3 |",
+    "| | |",
+    "| | | 4",
+    "|/-´  |",
+    "5     |",
+    "|----´",
+    "R"
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "$generated": "tools/ge-parity/extract.mjs — do not edit by hand",
+  "name": "SegmentsAreStraightened_merge=true",
+  "source": {
+    "test": "RevisionGraphTests.SegmentsAreStraightened",
+    "verifiedFile": "RevisionGraphTests.SegmentsAreStraightened_mergeGraphLanesHavingCommonParent=True.verified.txt",
+    "spec": " 1  2:1  3:1  4:1,3  5:4  6:5  7:5,6  8:7,2 ",
+    "order": "oldestFirst"
+  },
+  "settings": {
+    "mergeGraphLanesHavingCommonParent": true,
+    "straightenGraphDiagonals": false
+  },
+  "revisions": [
+    {
+      "id": "8",
+      "parents": [
+        "7",
+        "2"
+      ],
+      "label": "8"
+    },
+    {
+      "id": "7",
+      "parents": [
+        "5",
+        "6"
+      ],
+      "label": "7"
+    },
+    {
+      "id": "6",
+      "parents": [
+        "5"
+      ],
+      "label": "6"
+    },
+    {
+      "id": "5",
+      "parents": [
+        "4"
+      ],
+      "label": "5"
+    },
+    {
+      "id": "4",
+      "parents": [
+        "1",
+        "3"
+      ],
+      "label": "4"
+    },
+    {
+      "id": "3",
+      "parents": [
+        "1"
+      ],
+      "label": "3"
+    },
+    {
+      "id": "2",
+      "parents": [
+        "1"
+      ],
+      "label": "2"
+    },
+    {
+      "id": "1",
+      "parents": [],
+      "label": "1"
+    }
+  ],
+  "expectedRows": [
+    {
+      "id": "8",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    },
+    {
+      "id": "7",
+      "lane": 0,
+      "laneCount": 2,
+      "occupiedLanes": [
+        1
+      ]
+    },
+    {
+      "id": "6",
+      "lane": 1,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "5",
+      "lane": 0,
+      "laneCount": 3,
+      "occupiedLanes": [
+        2
+      ]
+    },
+    {
+      "id": "4",
+      "lane": 0,
+      "laneCount": 3,
+      "occupiedLanes": [
+        2
+      ]
+    },
+    {
+      "id": "3",
+      "lane": 1,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "2",
+      "lane": 1,
+      "laneCount": 2,
+      "occupiedLanes": [
+        0
+      ]
+    },
+    {
+      "id": "1",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    }
+  ],
+  "expectedAscii": [
+    "8",
+    "|\\",
+    "7 |",
+    "|\\ \\",
+    "| 6 |",
+    "|/  |",
+    "5   |",
+    "|   |",
+    "4   |",
+    "|\\  |",
+    "| 3 |",
+    "|/ /",
+    "| 2",
+    "|/",
+    "1"
+  ]
+}

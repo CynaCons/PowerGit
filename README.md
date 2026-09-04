@@ -7,10 +7,14 @@ revision graph — and rebuilds the way it looks and feels: a React + Material U
 running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 
 > **Scope of this fork:** we are building a *new frontend*, not rewriting git
-> plumbing. The proven Git Extensions engine code stays as the behavioral
-> reference; the WinForms app remains in-tree untouched for exactly that
-> reason. Today the product is the **Browse experience** (revision graph,
-> commit details, diffs, staging, branches, stashes). More surfaces follow.
+> plumbing. Git Extensions is the **behavioural reference**, not shared code:
+> the engine is a small `net10.0` host around the git CLI, and the lane
+> layout is a TypeScript reimplementation of GE's `RevisionGraph`, verified
+> against golden fixtures taken from GE's own tests (`tools/ge-parity/`).
+> The upstream WinForms app is kept as a read-only mirror on `master` for
+> exactly that reason. Today the product is the **Browse experience**
+> (revision graph, commit details, diffs, staging, branches, stashes). More
+> surfaces follow.
 
 ## Why
 
@@ -19,12 +23,13 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 | UI toolkit | Windows Forms | React + Material, Tauri shell |
 | Platform | Windows only | Windows today, Linux target |
 | Install | Heavy installer | Portable zip — one exe + one sidecar |
-| Graph | The gold standard | Same lanes & colors, virtualized |
+| Graph | The gold standard | Reimplemented lane layout, GE colours, golden-tested against GE, virtualized |
 
 ## Highlights
 
 - **The graph, always complete** — all branches, all tags, stashes as nodes;
-  Git Extensions lane colors; smooth up to thousands of commits.
+  Git Extensions lane colours and a lane layout checked against GE's own
+  graph snapshots; smooth up to thousands of commits.
 - **Everything in reach** — commit details, changed files, the full repo tree
   at any revision, unified diffs with context/full-file/whitespace options.
 - **Real staging** — FormCommit-style window: unstaged │ staged │ diff │

@@ -18,7 +18,7 @@ Captured 2026-08-20 from `master` at `7f75cee29`.
 - Lane model and row provider: `src/app/GitUI/UserControls/RevisionGrid/Graph/` (`RevisionGraph`, `Lane`, `RevisionGraphSegment`, `MaxLanes = 40`).
 - WinForms paint: `Graph/Rendering/GraphRenderer.cs`.
 - Grid chrome: `RevisionGridControl.cs`, `RevisionDataGridView.cs`.
-- Prefer exposing lane/segment data from C# and painting in React over a second lane algorithm.
+- ~~Prefer exposing lane/segment data from C# and painting in React over a second lane algorithm.~~ **SUPERSEDED (v0.13.3):** GE's `RevisionGraph` lives in the WinForms-bound `GitUI` project and cannot be referenced from the `net10.0` engine, and the layout has to run in a Web Worker next to the grid. The lane algorithm is therefore a TypeScript reimplementation (`frontend/src/graph/layout.ts` ports `BuildOrderedRowCache` + `RevisionGraphRow.BuildSegmentLanes`), and parity is proven with golden fixtures generated from GE's own `RevisionGraphTests` snapshots (`tools/ge-parity/`, `layout.ge-parity.test.ts`). Not ported: `StraightenLanes` / `StraightenDiagonals` (look-ahead post-passes that revise earlier rows) and the `ReduceGraphCrossings` ordering used when `MergeGraphLanesHavingCommonParent=false`; those are the documented divergences.
 
 ## Browse chrome (the UX spec)
 - Left tree: `src/app/GitUI/LeftPanel/` (repo objects: branches, remotes, submodules).

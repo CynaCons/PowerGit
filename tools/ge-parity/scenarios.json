@@ -1,0 +1,340 @@
+{
+  "$comment": "Hand-transcribed from tests/app/UnitTests/GitUI.Tests/UserControls/RevisionGrid/Graph/RevisionGraphTests.cs in the gitextensions-ref worktree. extract.mjs checks that every non-handWritten spec string still exists verbatim in that file. order=oldestFirst mirrors CreateGraph (spec lists commits oldest first, the graph is fed newest first); order=newestFirst mirrors CreateGraphTopDown. Settings mirror AppSettings.MergeGraphLanesHavingCommonParent / StraightenGraphDiagonals at the time the graph was built.",
+  "scenarios": [
+    {
+      "name": "DetachedSingleRevision_merge=false",
+      "method": "DetachedSingleRevision",
+      "verifiedFile": "RevisionGraphTests.DetachedSingleRevision_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": "c1:c3 c2 c3",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false,
+      "handWritten": true
+    },
+    {
+      "name": "DetachedSingleRevision_merge=true",
+      "method": "DetachedSingleRevision",
+      "verifiedFile": "RevisionGraphTests.DetachedSingleRevision_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": "c1:c3 c2 c3",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false,
+      "handWritten": true
+    },
+    {
+      "name": "SegmentsAreStraightened_merge=false",
+      "method": "SegmentsAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreStraightened_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:4  6:5  7:5,6  8:7,2 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreStraightened_merge=true",
+      "method": "SegmentsAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreStraightened_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:4  6:5  7:5,6  8:7,2 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithCommitsAreStraightened_merge=false",
+      "method": "SegmentsWithCommitsAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithCommitsAreStraightened_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:2  6:5  7:4  8:4,7  9:8,6 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithCommitsAreStraightened_merge=true",
+      "method": "SegmentsWithCommitsAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithCommitsAreStraightened_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:2  6:5  7:4  8:4,7  9:8,6 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithOutgoingSecondaryMergesAreNotStraightened_merge=false",
+      "method": "SegmentsWithOutgoingSecondaryMergesAreNotStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithOutgoingSecondaryMergesAreNotStraightened_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:2  6:4,5  7:6  8:6,7  9:8,5 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithOutgoingSecondaryMergesAreNotStraightened_merge=true",
+      "method": "SegmentsWithOutgoingSecondaryMergesAreNotStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithOutgoingSecondaryMergesAreNotStraightened_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:2  6:4,5  7:6  8:6,7  9:8,5 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithIncomingMergesAreStraightened_merge=false",
+      "method": "SegmentsWithIncomingMergesAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithIncomingMergesAreStraightened_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:2,4  6:4  7:4,6  8:7,5 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithIncomingMergesAreStraightened_merge=true",
+      "method": "SegmentsWithIncomingMergesAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithIncomingMergesAreStraightened_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  2:1  3:1  4:1,3  5:2,4  6:4  7:4,6  8:7,5 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreStraightenedAlthoughThisCausesWidthIncrease_merge=false",
+      "method": "SegmentsAreStraightenedAlthoughThisCausesWidthIncrease",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreStraightenedAlthoughThisCausesWidthIncrease_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  2:1  3:1  4:1  5:1,4  6:2  7:2,6  8:5  9:5,8,3,7 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreStraightenedAlthoughThisCausesWidthIncrease_merge=true",
+      "method": "SegmentsAreStraightenedAlthoughThisCausesWidthIncrease",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreStraightenedAlthoughThisCausesWidthIncrease_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  2:1  3:1  4:1  5:1,4  6:2  7:2,6  8:5  9:5,8,3,7 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithOutgoingPrimaryMergesAreStraightened_merge=false",
+      "method": "SegmentsWithOutgoingPrimaryMergesAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithOutgoingPrimaryMergesAreStraightened_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  2:1  3:1  6:1  7:1,6  8:3,2  9:7  10:7,9,8 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsWithOutgoingPrimaryMergesAreStraightened_merge=true",
+      "method": "SegmentsWithOutgoingPrimaryMergesAreStraightened",
+      "verifiedFile": "RevisionGraphTests.SegmentsWithOutgoingPrimaryMergesAreStraightened_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  2:1  3:1  6:1  7:1,6  8:3,2  9:7  10:7,9,8 ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreNotStraightenedIfThisCausesAShiftForPrimarySegment_merge=false",
+      "method": "SegmentsAreNotStraightenedIfThisCausesAShiftForPrimarySegment",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreNotStraightenedIfThisCausesAShiftForPrimarySegment_mergeGraphLanesHavingCommonParent=False.verified.txt",
+      "spec": " 1  a:1  b:1  2:1  3:1  4:1  5:4,1  6:3  7:5,6  8:7,2,6  c:8  d:8  e:8  9:8,e,d,c,b,a ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreNotStraightenedIfThisCausesAShiftForPrimarySegment_merge=true",
+      "method": "SegmentsAreNotStraightenedIfThisCausesAShiftForPrimarySegment",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreNotStraightenedIfThisCausesAShiftForPrimarySegment_mergeGraphLanesHavingCommonParent=True.verified.txt",
+      "spec": " 1  a:1  b:1  2:1  3:1  4:1  5:4,1  6:3  7:5,6  8:7,2,6  c:8  d:8  e:8  9:8,e,d,c,b,a ",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreNotStraightenedOverMultiLaneCrossings",
+      "method": "SegmentsAreNotStraightenedOverMultiLaneCrossings",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreNotStraightenedOverMultiLaneCrossings.verified.txt",
+      "spec": "0:C,1,2,3,4,5,6,7,8,9,A,B 1:R 2:R 3:R 4:C 5:C 6:C 7:R 8:C 9:R A:C B:R C:D D:E E:F F:G G:H,K,R H:I,R I:J,R J:R K:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": true,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreNotStraightenedOverMultiLaneCrossings_NoMergeGraphLanesHavingCommonParent",
+      "method": "SegmentsAreNotStraightenedOverMultiLaneCrossings_NoMergeGraphLanesHavingCommonParent",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreNotStraightenedOverMultiLaneCrossings_NoMergeGraphLanesHavingCommonParent.verified.txt",
+      "spec": "0:C,1,2,3,4,5,6,7,8,9,A,B 1:R 2:R 3:R 4:C 5:C 6:C 7:R 8:C 9:R A:C B:R C:D D:E E:F F:G G:H,K,R H:I,R I:J,R J:R K:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": false
+    },
+    {
+      "name": "SegmentsAreNotStraightenedOverMultiLaneCrossings_NoMergeGraphLanesHavingCommonParent_StraightenGraphDiagonals",
+      "method": "SegmentsAreNotStraightenedOverMultiLaneCrossings_NoMergeGraphLanesHavingCommonParent_StraightenGraphDiagonals",
+      "verifiedFile": "RevisionGraphTests.SegmentsAreNotStraightenedOverMultiLaneCrossings_NoMergeGraphLanesHavingCommonParent_StraightenGraphDiagonals.verified.txt",
+      "spec": "0:C,1,2,3,4,5,6,7,8,9,A,B 1:R 2:R 3:R 4:C 5:C 6:C 7:R 8:C 9:R A:C B:R C:D D:E E:F F:G G:H,K,R H:I,R I:J,R J:R K:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "TurnMultiLaneCrossingsIntoDiagonals_1",
+      "method": "TurnMultiLaneCrossingsIntoDiagonals",
+      "verifiedFile": "RevisionGraphTests.TurnMultiLaneCrossingsIntoDiagonals_commitSpecs=R 5-R 4-R 3-R 2-R,5,4 1-2 0-1,3.verified.txt",
+      "spec": "R 5:R 4:R 3:R 2:R,5,4 1:2 0:1,3",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "TurnMultiLaneCrossingsIntoDiagonals_2",
+      "method": "TurnMultiLaneCrossingsIntoDiagonals",
+      "verifiedFile": "RevisionGraphTests.TurnMultiLaneCrossingsIntoDiagonals_commitSpecs=R 7-R 6-R 5-R 4-R 3-R,7,6,5 2-3 1-2 0-1,4.verified.txt",
+      "spec": "R 7:R 6:R 5:R 4:R 3:R,7,6,5 2:3 1:2 0:1,4",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "TurnMultiLaneCrossingsIntoDiagonals_3",
+      "method": "TurnMultiLaneCrossingsIntoDiagonals",
+      "verifiedFile": "RevisionGraphTests.TurnMultiLaneCrossingsIntoDiagonals_commitSpecs=R 8-R 7-R 6-R 5-R 4-R 3-R,8,7,6,5 2-3 1-2 0-1,4.verified.txt",
+      "spec": "R 8:R 7:R 6:R 5:R 4:R 3:R,8,7,6,5 2:3 1:2 0:1,4",
+      "order": "oldestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "UnfoldOneLaneShiftsToDiagonals_1",
+      "method": "UnfoldOneLaneShiftsToDiagonals",
+      "verifiedFile": "UnfoldOneLaneShiftsToDiagonals.1.verified.txt",
+      "spec": "0:1,4 1:2 2:R,3 3:R 4:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "UnfoldOneLaneShiftsToDiagonals_2",
+      "method": "UnfoldOneLaneShiftsToDiagonals",
+      "verifiedFile": "UnfoldOneLaneShiftsToDiagonals.2.verified.txt",
+      "spec": "0:1,R 1:2,R 2:4,3 3:R 4:5,8 5:6 6:7,R 7:R,R 8:9 9:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "UnfoldOneLaneShiftsToDiagonals_3",
+      "method": "UnfoldOneLaneShiftsToDiagonals",
+      "verifiedFile": "UnfoldOneLaneShiftsToDiagonals.3.verified.txt",
+      "spec": "0:D,1,2,3,4,5,6,B,8,9,7 1:D 2:D 3:E 4:E 5:C 6:C 7:G 8:9 9:A A:B B:C C:F D:R E:F F:R G:H H:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "UnfoldOneLaneShiftsToDiagonals_4",
+      "method": "UnfoldOneLaneShiftsToDiagonals",
+      "verifiedFile": "UnfoldOneLaneShiftsToDiagonals.4.verified.txt",
+      "spec": "0:4 1:3,2 2:6 3:8,B 4:5 5:A,6 6:7 7:8 8:C,R 9:A A:B,R B:R C:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotUnfoldOneLaneShiftFollowedByDiagonal_1",
+      "method": "DoNotUnfoldOneLaneShiftFollowedByDiagonal",
+      "verifiedFile": "DoNotUnfoldOneLaneShiftFollowedByDiagonal.1.verified.txt",
+      "spec": "0:1,5 1:2   2:R,3 3:R,4 4:R   5:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotUnfoldOneLaneShiftFollowedByDiagonal_2",
+      "method": "DoNotUnfoldOneLaneShiftFollowedByDiagonal",
+      "verifiedFile": "DoNotUnfoldOneLaneShiftFollowedByDiagonal.2.verified.txt",
+      "spec": "0:1,R 1:2,R 2:4,3 3:R   4:5,R 5:6   6:7   7:8,R 8:9 9:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotUnfoldOneLaneShiftFollowedByDiagonal_3",
+      "method": "DoNotUnfoldOneLaneShiftFollowedByDiagonal",
+      "verifiedFile": "DoNotUnfoldOneLaneShiftFollowedByDiagonal.3.verified.txt",
+      "spec": "0:1,R 1:2,R 2:4,3 3:R 4:5,8 5:6,R 6:7,R 7:R,R 8:9 9:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotUnfoldOneLaneShiftFollowedByDiagonal_4",
+      "method": "DoNotUnfoldOneLaneShiftFollowedByDiagonal",
+      "verifiedFile": "DoNotUnfoldOneLaneShiftFollowedByDiagonal.4.verified.txt",
+      "spec": "0:5,1,2,3,4 1:5 2:5 3:6 4:8 5:R 6:7 7:8,B 8:9 9:R,A A:R   B:R     R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotUnfoldOneLaneShiftFollowedByDiagonal_5",
+      "method": "DoNotUnfoldOneLaneShiftFollowedByDiagonal",
+      "verifiedFile": "DoNotUnfoldOneLaneShiftFollowedByDiagonal.5.verified.txt",
+      "spec": "0:5,1,2,3,4 1:5 2:5 3:6 4:8 5:R 6:7 7:8,B 8:9 9:R,A A:R,C B:R C:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "JoinMultiLaneCrossings_1",
+      "method": "JoinMultiLaneCrossings",
+      "verifiedFile": "JoinMultiLaneCrossings.1.verified.txt",
+      "spec": "0:3,2 1:5 2:5 3:5 4:R 5:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "JoinMultiLaneCrossings_2",
+      "method": "JoinMultiLaneCrossings",
+      "verifiedFile": "JoinMultiLaneCrossings.2.verified.txt",
+      "spec": "0:3,2 1:5 2:5 3:5 4:6 5:6 6:7,8 7:R 8:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "JoinMultiLaneCrossings_3",
+      "method": "JoinMultiLaneCrossings",
+      "verifiedFile": "JoinMultiLaneCrossings.3.verified.txt",
+      "spec": "0:5,4 1:7 2:6 3:R 4:7 5:7 6:R 7:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "JoinMultiLaneCrossings_4",
+      "method": "JoinMultiLaneCrossings",
+      "verifiedFile": "JoinMultiLaneCrossings.4.verified.txt",
+      "spec": "0:R,3 1:2 2:8,7 3:4,5,6 4:R 5:R 6:R 7:8 8:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotJoinMultiLaneCrossings_1",
+      "method": "DoNotJoinMultiLaneCrossings",
+      "verifiedFile": "DoNotJoinMultiLaneCrossings.1.verified.txt",
+      "spec": "0:6 1:6 2:6 3:6 4:R 5:7 6:R 7:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    },
+    {
+      "name": "DoNotJoinMultiLaneCrossings_2",
+      "method": "DoNotJoinMultiLaneCrossings",
+      "verifiedFile": "DoNotJoinMultiLaneCrossings.2.verified.txt",
+      "spec": "0:1,4,R 1:2,R 2:3,R 3:R 4:R R",
+      "order": "newestFirst",
+      "mergeGraphLanesHavingCommonParent": false,
+      "straightenGraphDiagonals": true
+    }
+  ]
+}
