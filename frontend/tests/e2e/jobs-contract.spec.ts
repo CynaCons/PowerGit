@@ -16,6 +16,12 @@ test("Fetch posts to /repos/{id}/fetch and polls the session-qualified job", asy
     (r) => r.method() === "POST" && new URL(r.url()).pathname === `/repos/${sid}/fetch`,
     { timeout: 15_000 },
   )
+  // Arm this before the click: a failed fetch can finish quickly and the UI
+  // may issue its first poll before the POST response is inspected below.
+  const pollPromise = page.waitForRequest(
+    (r) => r.method() === "GET" && new URL(r.url()).pathname.startsWith(`/repos/${sid}/jobs/`),
+    { timeout: 15_000 },
+  )
   await page.getByTestId("fetch-button").click()
   const post = await postPromise
   const response = await post.response()
@@ -27,10 +33,8 @@ test("Fetch posts to /repos/{id}/fetch and polls the session-qualified job", asy
   if (response!.status() === 202) {
     const body = (await response!.json()) as { id: string }
     expect(response!.headers()["location"]).toBe(`/repos/${sid}/jobs/${body.id}`)
-    const poll = await page.waitForRequest(
-      (r) => r.method() === "GET" && new URL(r.url()).pathname === `/repos/${sid}/jobs/${body.id}`,
-      { timeout: 15_000 },
-    )
+    const poll = await pollPromise
+    expect(new URL(poll.url()).pathname).toBe(`/repos/${sid}/jobs/${body.id}`)
     expect((await poll.response())?.status()).toBe(200)
   }
 })

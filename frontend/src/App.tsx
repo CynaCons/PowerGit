@@ -139,7 +139,7 @@ export default function App({ base }: { base: EngineClient }) {
             onSettings={() => open({ kind: "settings" })}
           />
 
-          <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, p: 0.75, display: "flex", gap: 0.75 }}>
               {leftOpen ? (
                 <RepoTree
