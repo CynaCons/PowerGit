@@ -18,5 +18,6 @@ RUN npx -y playwright@latest install-deps chromium || true
 
 WORKDIR /repo
 COPY check.sh /usr/local/bin/check.sh
-RUN chmod +x /usr/local/bin/check.sh
+# Windows checkouts carry CRLF (core.autocrlf); a CRLF shebang cannot exec.
+RUN sed -i 's/\r$//' /usr/local/bin/check.sh && chmod +x /usr/local/bin/check.sh
 ENTRYPOINT ["/usr/local/bin/check.sh"]

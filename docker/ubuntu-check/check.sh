@@ -41,31 +41,15 @@ echo
 
 # Point the engine at a small deterministic repo — walking the huge mounted
 # worktree through Docker Desktop's slow bind mount makes /revisions crawl.
+# The shape (branch powergit, frontend/src tree, README, two authors,
+# feature branch) is shared with webkit-check.sh via seed-repo.sh; the e2e
+# specs (blob-highlight, file-tree) click the `powergit` tree row and expect
+# frontend/src/graph/layout.ts at HEAD.
 echo "== seed repository =="
-rm -rf /tmp/seed
-mkdir /tmp/seed
-cd /tmp/seed
-git init -b main -q
-# No global git identity in the container: without this the first commit
-# aborts with exit 128 and the whole check stops before anything is tested.
-git config user.email "seed@powergit.test"
-git config user.name "Seed Author"
-echo "# Seed repo" > README.md
-git add .
-git commit -qm "initial commit"
-echo "feature line" > feature.txt
-git add .
-git commit -qm "add feature.txt"
-echo "second line" >> feature.txt
-git add .
-git commit -qm "extend feature.txt"
-git tag v1.0.0
-for i in $(seq 1 30); do
-  echo "line $i" >> log.txt
-  git add .
-  git commit -qm "work item $i"
-done
-git branch feature/2
+tr -d '\r' < /repo/docker/ubuntu-check/seed-repo.sh > /tmp/seed-repo.sh
+# shellcheck source=docker/ubuntu-check/seed-repo.sh
+. /tmp/seed-repo.sh
+seed_repo /tmp/seed /repo
 curl -sf -X POST http://127.0.0.1:7733/repos/open "${AUTH[@]}" \
   -H 'Content-Type: application/json' \
   -d '{"path":"/tmp/seed"}' > /dev/null
@@ -79,9 +63,18 @@ for i in $(seq 1 60); do
 done
 curl -fsS http://127.0.0.1:1420/ >/dev/null || { echo "preview server failed:"; tail -20 /tmp/preview.log; exit 1; }
 
-echo "== e2e =="
-npx playwright test --config playwright.config.ts
-npx playwright test --config playwright.resolution.config.ts
+# Specs that talk to the engine directly (tests/engine.ts) read
+# POWERGIT_ENGINE_URL; keep it explicit so a port override in the container
+# never silently points them at nothing.
+export POWERGIT_ENGINE_URL=http://127.0.0.1:7733
+
+# The gate: EVERY functional spec, no retries, stop at the first failure so
+# the log shows the one real error instead of cascaded fallout. Without
+# --retries=0/--max-failures=1 a CI=1 environment would run maxFailures: 0
+# (all specs, all failures) and the summary buries the first cause.
+echo "== e2e (all specs, retries 0, max-failures 1) =="
+npx playwright test --config playwright.config.ts --retries=0 --max-failures=1
+npx playwright test --config playwright.resolution.config.ts --retries=0 --max-failures=1
 
 kill $ENGINE_PID 2>/dev/null || true
 echo "== ubuntu check passed =="

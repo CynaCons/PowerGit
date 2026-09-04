@@ -20,19 +20,11 @@ curl -fsS http://127.0.0.1:7733/health || { echo "engine failed"; tail -30 /tmp/
 echo
 
 echo "== seed repo (branch powergit, nested dirs, two authors) =="
-rm -rf /tmp/seed && mkdir -p /tmp/seed && cd /tmp/seed
-git init -b powergit -q
-# The container has no global git identity, so `git commit` aborts with
-# exit 128 before a single fixture commit exists. Set it per-repo.
-git config user.email "seed@powergit.test"
-git config user.name "Seed Author"
-cp -r /repo/frontend/src ./frontend-src-tmp && mkdir -p frontend && mv frontend-src-tmp frontend/src
-cp /repo/README.md .
-git add . && git commit -qm "seed: frontend tree"
-echo "a" > frontend/src/new-file.txt && git add . && git commit -qm "same author 2"
-echo "b" > other.txt && git add . && GIT_AUTHOR_NAME="Other Dev" GIT_AUTHOR_EMAIL=o@x.io git commit -qm "other author"
-for i in $(seq 1 12); do echo "l$i" >> log.txt; git add .; git commit -qm "work $i"; done
-git checkout -q -b feature && echo f > feature.txt && git add . && git commit -qm "feature commit" && git checkout -q powergit
+# Same fixture as check.sh: docker/ubuntu-check/seed-repo.sh.
+tr -d '\r' < /repo/docker/ubuntu-check/seed-repo.sh > /tmp/seed-repo.sh
+# shellcheck source=docker/ubuntu-check/seed-repo.sh
+. /tmp/seed-repo.sh
+seed_repo /tmp/seed /repo
 cd /repo
 
 SID=$(curl -sf -X POST http://127.0.0.1:7733/repos/open "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"path":"/tmp/seed"}' | grep -o '"id":"[a-f0-9]*"' | cut -d'"' -f4); echo "session $SID"
