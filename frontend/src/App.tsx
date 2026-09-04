@@ -62,13 +62,15 @@ export default function App({ base }: { base: EngineClient }) {
       } else if (event.key === "-" || event.code === "Minus") {
         event.preventDefault()
         zoomOut()
-      } else if (event.key === "0" || event.code === "Digit0") {
+      } else if (event.key === "0" || event.code === "Digit0" || event.code === "Numpad0") {
         event.preventDefault()
         zoomReset()
       }
     }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    // Capture so Chromium/WebView cannot swallow Ctrl+0 as "reset browser zoom"
+    // before the application handler runs.
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
   }, [])
 
   const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
