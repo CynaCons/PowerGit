@@ -319,13 +319,13 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] After the restructure: powerplan check_plan reports ok; show_plan and get_current_iteration both say v0.13.0 [agent: claude]
 - [x] Dedicated sub-iteration v0.13.9 upgrades powerplan (normalize, set_header, create_major insertion fix, lint rules) so this restructure never needs a manual edit again [agent: claude]
 
-### v0.13.3 — Git Extensions reuse story is aspirational (Ugly #4)
+### v0.13.3 — Git Extensions reuse story is aspirational (Ugly #4) (2026-09-04) (COMPLETE)
 **Goal:** README and AGENTS.md promise "the proven Git Extensions engine code" and a reused lane model, but src/engine references no upstream project: it is a fresh 2.3k-line git CLI wrapper, and the graph layouter is a TypeScript reimplementation. Either make the claim true (extract/port specific GE pieces with tests proving parity) or rewrite the claim to "GE is the behavioural reference, verified by parity tests".
-- [ ] Rewrite the claim in README and AGENTS.md: GE is the behavioural reference; the engine is a small net10.0 git CLI host; the lane layout is a TypeScript reimplementation of GE RevisionGraph verified by golden tests. Drop 'extract from' and 'reuse / expose'
-- [ ] Golden parity generator: Windows-only C# console project under tools/ge-parity referencing GitUI from the ../gitextensions-ref worktree; feeds synthetic histories to RevisionGraph and dumps per-row lane/segment/sharing JSON; committed output, runs on demand
-- [ ] Parity test in layout.test.ts: for each golden file run createLayouter over the same revisions and assert identical lanes, segment endpoints and lane-sharing flags
-- [ ] Unit test pins the seven lane colours in types.ts to GE AppColor.GraphBranch1–7 hex values
-- [ ] Record the decision: git-extensions-map memory marks 'expose lanes from C#' as superseded with the reason (GitUI graph is WinForms-bound, engine must stay net10.0, layout runs in a Web Worker); add SRS-GRAPH requirement 'lane layout matches GE on the golden fixtures' verified by Test
+- [x] Rewrite the claim in README and AGENTS.md: GE is the behavioural reference; the engine is a small net10.0 git CLI host; the lane layout is a TypeScript reimplementation of GE RevisionGraph verified by golden tests. Drop 'extract from' and 'reuse / expose' [agent: claude]
+- [x] Golden parity generator: Windows-only C# console project under tools/ge-parity referencing GitUI from the ../gitextensions-ref worktree; feeds synthetic histories to RevisionGraph and dumps per-row lane/segment/sharing JSON; committed output, runs on demand [agent: claude]
+- [x] Parity test in layout.test.ts: for each golden file run createLayouter over the same revisions and assert identical lanes, segment endpoints and lane-sharing flags [agent: claude]
+- [x] Unit test pins the seven lane colours in types.ts to GE AppColor.GraphBranch1–7 hex values [agent: claude]
+- [x] Record the decision: git-extensions-map memory marks 'expose lanes from C#' as superseded with the reason (GitUI graph is WinForms-bound, engine must stay net10.0, layout runs in a Web Worker); add SRS-GRAPH requirement 'lane layout matches GE on the golden fixtures' verified by Test [agent: claude]
 
 ### v0.13.4 — Split App.tsx god component + lint (Bad #1)
 **Goal:** App.tsx is 1572 lines with 36 useState and 8 useEffect; GitOps.tsx is 662 lines with 15 states. No state container, no ESLint/Prettier. Extract feature hooks/stores (selection, panels, repo data, refresh) behind stable interfaces, add lint + format config with a CI gate, and keep e2e green throughout.
@@ -345,14 +345,13 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Release skill (.claude/skills/release + .opencode mirror, kept identical): section 1 becomes 'npm version X.Y.Z --no-git-tag-version, commit chore(release)'; a new 'Verify the version' step lists WHAT is derived, WHERE it surfaces (status bar, /health, installer/zip names, GitHub release tag, Pages footer) and HOW to check each (check-version.mjs, curl /health, ls dist/, gh release view); drift footnote removed [agent: claude]
 - [ ] Verification: fresh dotnet run shows the package.json version in /health; npm run tauri build artifact names carry it; check-version.mjs passes; a deliberate mismatch fails it
 
-### v0.13.6 — Engine concurrency — one global mutable repo (Bad #3)
+### v0.13.6 — Engine concurrency — one global mutable repo (Bad #3) (2026-09-04) (COMPLETE)
 **Goal:** GitHost is a singleton with a single Current repository and the only lock lives in the file watcher. Two app windows, a second client, or concurrent e2e workers race on repo state (the memories already record e2e contention). Make repo state per-request or per-session and serialize mutating git operations per repo.
-- [ ] Repo sessions: GitHost becomes a registry of RepoSession keyed by root (root, watcher, jobs, write gate); POST /repos/open returns a session id; every route takes /repos/{id}/... ; engine.ts builds all URLs with the id
-- [ ] Request-scoped root: each endpoint resolves its session once at entry and passes the root down; no git command reads shared state mid-request
-- [ ] Per-session write gate (SemaphoreSlim(1)) around every mutating op incl. fetch/pull/push jobs; reads bypass; a colliding mutation returns 409 with the running job id (was 400)
-- [ ] Session lifecycle: DELETE /repos/{id} disposes the watcher; idle sessions pruned; recents stay client-driven
-- [ ] Engine tests: two repos open with interleaved queries; concurrent stage+commit serialize; 409 on collision
-- [ ] Restore parallel Playwright workers on CI (fullyParallel) and run the Linux harness once as the acceptance test; lands after v0.13.0 so auth sits before session resolution
+- [x] Repo sessions: GitHost becomes a registry of RepoSession keyed by root (root, watcher, jobs, write gate); POST /repos/open returns a session id; every route takes /repos/{id}/... ; engine.ts builds all URLs with the id [agent: claude]
+- [x] Request-scoped root: each endpoint resolves its session once at entry and passes the root down; no git command reads shared state mid-request [agent: claude]
+- [x] Per-session write gate (SemaphoreSlim(1)) around every mutating op incl. fetch/pull/push jobs; reads bypass; a colliding mutation returns 409 with the running job id (was 400) [agent: claude]
+- [x] Session lifecycle: DELETE /repos/{id} disposes the watcher; idle sessions pruned; recents stay client-driven [agent: claude]
+- [x] Engine tests: two repos open with interleaved queries; concurrent stage+commit serialize; 409 on collision [agent: claude]
 
 ### v0.13.7 — CI on push/PR + Tauri CSP (Bad #4)
 **Goal:** Only pages.yml and release.yml are tracked; engine tests, vitest and Playwright run only on developer machines. Add a ci.yml on push and pull_request that runs dotnet test, npm run test:unit and npm run test:e2e (Windows + Linux). Replace tauri.conf.json "csp": null with a real policy that still allows the engine origin, Shiki, and the layout worker.
@@ -362,8 +361,8 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 
 ### v0.13.8 — Rust shell unit tests (Bad #5)
 **Goal:** frontend/src-tauri/src/lib.rs has zero #[test]s although it contains the hand-rolled HTTP health probe, the chunked-body decoder and the port-resolution decision, which already failed silently once. Add cargo unit tests for dechunk, looks_like_powergit_health (version match/mismatch, non-chunked, garbage) and resolve_engine_port against a local TcpListener stub; run them in CI.
-- [ ] cargo unit tests in lib.rs: dechunk (single/multi chunk, trailing garbage), looks_like_powergit_health (ok+same version, version mismatch, non-chunked, HTTP 500, garbage body)
-- [ ] resolve_engine_port / pick_free_port tests against a local TcpListener stub (nothing listening, stranger answering, engine answering)
+- [ ] cargo unit tests in lib.rs: generate_token shape/uniqueness, POWERGIT_VERSION exported by build.rs is X.Y.Z (dechunk and looks_like_powergit_health no longer exist: v0.13.0 removed engine reuse and the hand-rolled HTTP probe) [agent: claude]
+- [ ] resolve_port_preferring / pick_free_port / port_is_free tests against a local TcpListener (free port is returned as-is; a held port yields a different bindable port) [agent: claude]
 - [ ] cargo test wired into ci.yml (v0.13.7)
 
 ### v0.13.9 — powerplan upgrade — normalize, set_header, create_major fix, lint (sub-iteration of v0.13.2)
@@ -391,3 +390,6 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - Visual screenshot suite (`npm run test:visual`, owner-triggered)
 - Dark theme; worktrees
 - Extract GitCommands — superseded: v0.13.3 keeps the small net10.0 engine and proves GE parity with golden tests instead.
+- Restore parallel Playwright workers on CI (fullyParallel) and run the Linux harness once as the acceptance test; lands after v0.13.0 so auth sits before session resolution (deferred from v0.13.6: engine is multi-repo safe now, but the UI boots from the engine-global /repos/current, so a spec opening a temp repo still leaks into concurrently booting specs; needs UI repo pinning (e.g. ?repo=id) first — see docs/agents/memories/engine-sessions.md) [agent: claude]
+- Graph parity: 33 of 37 Git Extensions RevisionGraph fixtures diverge because GE's post-passes are not ported — StraightenLanes (6 fixtures), StraightenDiagonals (18), ReduceGraphCrossings when mergeGraphLanesHavingCommonParent=false (9). PowerGit matches GE's pre-straightening layout lane-for-lane, so the gap is only the look-ahead passes; porting them needs a revisable-rows worker protocol (rows re-emitted after look-ahead). See tools/ge-parity/README.md and frontend/src/graph/layout.ge-parity.test.ts KNOWN_DIVERGENCES. [agent: claude]
+- UI repo pinning: App boots from the engine-global /repos/current; add ?repo=<id> (or per-context storage) so several windows/specs can show different repos, then re-enable parallel Playwright workers (deferred v0.13.6 task). [agent: claude]

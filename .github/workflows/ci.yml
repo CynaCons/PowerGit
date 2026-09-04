@@ -1,0 +1,104 @@
+name: ci
+
+# Every push and PR runs the three suites (engine xunit, frontend vitest +
+# Playwright e2e, Rust shell tests) plus the static guards. Until v0.13.7
+# nothing ran on push at all; release.yml only builds on tags.
+on:
+  push:
+    branches: [powergit]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+  # One token for the engine, the built UI and the specs (EngineAuth.cs).
+  POWERGIT_ENGINE_TOKEN: ci-${{ github.run_id }}
+  VITE_ENGINE_TOKEN: ci-${{ github.run_id }}
+
+jobs:
+  guards:
+    name: static guards (version, plan)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-version.mjs
+      - name: PLAN.md structure (task-line invariants, duplicate iterations)
+        run: node scripts/plan-normalize.mjs PLAN.md --dry
+
+  engine:
+    name: engine tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: git config --global user.email ci@powergit.local && git config --global user.name "PowerGit CI"
+      - run: dotnet test src/engine/PowerGit.Engine.sln --nologo
+
+  frontend:
+    name: frontend lint, unit, e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      - name: lint + format (scripts added in v0.13.4)
+        run: |
+          npm run lint --if-present
+          npm run format:check --if-present
+      - run: npm run test:unit
+      - run: npx playwright install --with-deps chromium
+      - run: git config --global user.email ci@powergit.local && git config --global user.name "PowerGit CI"
+      - name: start engine
+        shell: bash
+        run: |
+          dotnet run --project ../src/engine/PowerGit.Engine --urls http://127.0.0.1:7733 > engine.log 2>&1 &
+          for i in $(seq 1 120); do curl -fsS http://127.0.0.1:7733/health >/dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:7733/health || { echo "engine failed"; tail -30 engine.log; exit 1; }
+      - run: npm run test:e2e
+      - name: engine log on failure
+        if: failure()
+        shell: bash
+        run: tail -50 engine.log || true
+
+  shell:
+    name: rust shell tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: frontend/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+      - run: cargo test --lib

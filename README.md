@@ -1,5 +1,7 @@
 # PowerGit
 
+[![ci](https://github.com/CynaCons/PowerGit/actions/workflows/ci.yml/badge.svg?branch=powergit)](https://github.com/CynaCons/PowerGit/actions/workflows/ci.yml)
+
 **A new frontend for [Git Extensions](https://github.com/gitextensions/gitextensions) — modern, portable, cross-platform.**
 
 PowerGit keeps everything that makes Git Extensions great — especially its

@@ -71,7 +71,10 @@ npm run tauri dev         # native window (needs engine running for health)
 
 ## How we verify (token budget)
 
-Default proof is **Playwright e2e assertions**, not screenshots.
+Default proof is **Playwright e2e assertions**, not screenshots. Since
+v0.13.7 `.github/workflows/ci.yml` runs the same suites on every push and PR
+(engine xunit on Windows + Linux, tsc/lint/format/vitest/e2e on both, cargo
+tests, version + plan guards); a red CI is the gate, not a local "it works".
 
 - Run `npm run test:e2e` **once** after a UI change. If it fails, do not run it again. Read the first error, fix, then run once.
 - Do **not** call Chrome DevTools `take_screenshot` / `take_snapshot` unless the owner asked to look, or pasted a screenshot. Those images re-enter the chat and dominate the context window.
