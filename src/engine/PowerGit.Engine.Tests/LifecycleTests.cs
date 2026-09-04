@@ -277,12 +277,35 @@ public sealed class LifecycleTests : IClassFixture<WebApplicationFactory<Program
 
     private static void ForceDelete(string path)
     {
-        foreach (string f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        const int attempts = 40;
+        for (int attempt = 1; attempt <= attempts; attempt++)
         {
-            File.SetAttributes(f, FileAttributes.Normal);
-        }
+            try
+            {
+                if (!Directory.Exists(path))
+                {
+                    return;
+                }
 
-        Directory.Delete(path, recursive: true);
+                foreach (string f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(f, FileAttributes.Normal);
+                }
+
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt == attempts)
+                {
+                    Console.WriteLine($"Test cleanup left '{path}' in place after {attempts} attempts: {ex.Message}");
+                    return;
+                }
+
+                Thread.Sleep(250);
+            }
+        }
     }
 
     private static void Git(string workdir, params string[] args)
