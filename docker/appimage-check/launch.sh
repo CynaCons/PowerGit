@@ -65,6 +65,9 @@ echo "== host libs: $(dpkg-query -W -f='${Package} ${Version}\n' libglib2.0-0t64
 export NO_AT_BRIDGE=1
 export WEBKIT_DISABLE_COMPOSITING_MODE=1
 export DISPLAY=:99
+# xvfb-run generates an X auth cookie; without sharing it, xdotool (and any
+# other client we start) gets "Authorization required" and finds no window.
+export XAUTHORITY=/tmp/Xauthority.appimage-check
 chmod +x "$APPIMAGE" 2>/dev/null || true
 
 cleanup() {
@@ -77,7 +80,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== launch =="
-xvfb-run -n 99 -s "-screen 0 1280x800x24" "$APPIMAGE" --appimage-extract-and-run \
+xvfb-run -n 99 -f "$XAUTHORITY" -s "-screen 0 1280x800x24" "$APPIMAGE" --appimage-extract-and-run \
   >"$STDOUT" 2>"$ERR" &
 APP_PID=$!
 START=$(date +%s)
@@ -119,10 +122,15 @@ if [ "$LONGEVITY" -gt 0 ]; then
   echo "== longevity: ${LONGEVITY} min, RSS budget ${RSS_BUDGET_MB} MB =="
   CSV="$OUT/rss.csv"
   echo "elapsed_s,rss_mb,procs,webproc,gpuproc,engine" >"$CSV"
-  sleep 5
-  WIN=$(xdotool search --onlyvisible --name PowerGit 2>/dev/null | head -n1 || true)
-  [ -z "$WIN" ] && WIN=$(xdotool search --name PowerGit 2>/dev/null | head -n1 || true)
-  echo "window: ${WIN:-none found}"
+  WIN=""
+  for _ in $(seq 1 15); do
+    WIN=$(xdotool search --onlyvisible --name PowerGit 2>/dev/null | head -n1 || true)
+    [ -n "$WIN" ] || WIN=$(xdotool search --onlyvisible --class powergit 2>/dev/null | head -n1 || true)
+    [ -n "$WIN" ] && break
+    sleep 1
+  done
+  echo "window: ${WIN:-none found} $( [ -n "$WIN" ] && xdotool getwindowname "$WIN" 2>/dev/null )"
+  [ -n "$WIN" ] || fail "no PowerGit window visible on $DISPLAY after 15 s (nothing to drive)"
   [ -n "$WIN" ] && xdotool windowfocus "$WIN" 2>/dev/null || true
   seen_web=0; seen_gpu=0
   END=$((START + LONGEVITY * 60)); tick=0
