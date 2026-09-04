@@ -211,7 +211,7 @@ public sealed partial class GitHost
         }
     }
 
-    public string FetchRemote(string remote)
+    public string FetchRemote(string remote, CancellationToken ct = default)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(remote))
@@ -219,7 +219,7 @@ public sealed partial class GitHost
             throw new InvalidOperationException("remote is required");
         }
 
-        CommandResult result = RunTimed(root, 300_000, "fetch", "--prune", remote);
+        CommandResult result = RunTimed(root, 300_000, ct, "fetch", "--prune", remote);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
@@ -359,7 +359,7 @@ public sealed partial class GitHost
         return path => rx.IsMatch(path);
     }
 
-    public string Pull(bool rebase = false)
+    public string Pull(bool rebase = false, CancellationToken ct = default)
     {
         string root = RequireRoot();
         CommandResult upstream = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}");
@@ -373,7 +373,7 @@ public sealed partial class GitHost
             throw new InvalidOperationException("The working tree has uncommitted changes. Commit or stash before pulling.");
         }
 
-        CommandResult result = RunTimed(root, 300_000, "pull", rebase ? "--rebase" : "--ff-only");
+        CommandResult result = RunTimed(root, 300_000, ct, "pull", rebase ? "--rebase" : "--ff-only");
         if (result.ExitCode != 0)
         {
             string err = string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
@@ -386,7 +386,7 @@ public sealed partial class GitHost
         return string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
     }
 
-    public string Push(bool forceWithLease = false)
+    public string Push(bool forceWithLease = false, CancellationToken ct = default)
     {
         string root = RequireRoot();
         if (forceWithLease && IsDirty(root))
@@ -402,7 +402,7 @@ public sealed partial class GitHost
             args.Add("--force-with-lease");
         }
 
-        CommandResult result = RunTimed(root, 300_000, [.. args]);
+        CommandResult result = RunTimed(root, 300_000, ct, [.. args]);
         if (result.ExitCode != 0)
         {
             string err = string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();

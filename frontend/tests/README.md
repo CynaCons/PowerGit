@@ -20,11 +20,11 @@ Visual specs live in `tests/visual/` and use `expect(page).toHaveScreenshot(...)
 The Windows lanes above run against Chromium. Linux has two extra lanes,
 both Docker-based (`pwsh scripts/ubuntu-check.ps1` builds the image):
 
-| Lane                                       | What                                                                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `docker/ubuntu-check/check.sh`             | Engine tests + **all** e2e specs on a real Linux git, `--retries=0 --max-failures=1`, vite preview     |
-| `docker/ubuntu-check/webkit-check.sh`      | Same fixture under Playwright WebKit (closest stand-in for the WebKitGTK webview of the AppImage)      |
-| `docker/appimage-check/run-matrix.sh`      | Launches a built AppImage in stock ubuntu 22.04/24.04/26.04 and fails on runtime dependency errors     |
+| Lane                                  | What                                                                                               |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `docker/ubuntu-check/check.sh`        | Engine tests + **all** e2e specs on a real Linux git, `--retries=0 --max-failures=1`, vite preview |
+| `docker/ubuntu-check/webkit-check.sh` | Same fixture under Playwright WebKit (closest stand-in for the WebKitGTK webview of the AppImage)  |
+| `docker/appimage-check/run-matrix.sh` | Launches a built AppImage in stock ubuntu 22.04/24.04/26.04 and fails on runtime dependency errors |
 
 Both harness lanes seed the same fixture repo through
 `docker/ubuntu-check/seed-repo.sh`: branch `powergit` checked out,

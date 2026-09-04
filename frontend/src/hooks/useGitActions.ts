@@ -1,18 +1,4 @@
-import {
-  applyStash,
-  checkoutRef,
-  createBranch,
-  createCommit,
-  createTag,
-  deleteBranch,
-  deleteTag,
-  describeThrown,
-  dropStash,
-  fetchCommit,
-  rebaseOnto,
-  resetBranch,
-  startFetch,
-} from "../engine"
+import { describeThrown } from "../engine"
 import type { Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
@@ -20,7 +6,7 @@ import type { Jobs } from "./useJobs"
 import type { RepoState } from "./useRepoState"
 
 export type GitActionsDeps = {
-  session: Pick<EngineSession, "repo" | "setEngineError">
+  session: Pick<EngineSession, "client" | "view" | "setEngineError">
   history: Pick<History, "current">
   repoState: Pick<RepoState, "status" | "setStatus" | "setRefs" | "refresh" | "branchNames" | "openFolder">
   jobs: Pick<Jobs, "withBusy" | "runJob">
@@ -32,7 +18,8 @@ export type GitActions = ReturnType<typeof useGitActions>
 // Every git operation the shell can start, shared by the command bar, the
 // hotkeys, the context menu and the ref tree so all entry points agree.
 export function useGitActions({ session, history, repoState, jobs, dialogs }: GitActionsDeps) {
-  const { repo, setEngineError } = session
+  const { client: engine, view, setEngineError } = session
+  const repo = view.repo
   const { current } = history
   const { status, setStatus, setRefs, refresh, branchNames, openFolder } = repoState
   const { withBusy, runJob } = jobs
@@ -45,7 +32,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   async function openAmend() {
     let initialMsg: string | undefined
     try {
-      const d = await fetchCommit("HEAD")
+      const d = await engine.commit("HEAD")
       initialMsg = d.body ? `${d.subject}\n\n${d.body}` : d.subject
     } catch {
       initialMsg = undefined
@@ -56,21 +43,24 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   async function commit(msg: string) {
     const amend = dialog.kind === "commit" && dialog.amend
     if (!msg.trim() || (!status?.stagedCount && !amend)) return
-    await createCommit(msg.trim(), amend)
+    await engine.createCommit(msg.trim(), amend)
     close("commit")
     await refresh({ revisions: true, refs: true, status: true })
   }
 
   async function createRef(name: string) {
     if (dialog.kind !== "createRef") return
-    const tree = dialog.refKind === "branch" ? await createBranch(name, dialog.sha) : await createTag(name, dialog.sha)
+    const tree =
+      dialog.refKind === "branch"
+        ? await engine.createBranch(name, dialog.sha)
+        : await engine.createTag(name, dialog.sha)
     setRefs(tree)
     await refresh({ revisions: true })
   }
 
   async function checkout(branch: string, force: boolean) {
     await withBusy("Checking out", async () => {
-      setStatus(await checkoutRef(branch, force))
+      setStatus(await engine.checkout(branch, force))
       await refresh({ revisions: true, refs: true, status: true })
     })
   }
@@ -78,7 +68,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     if (dialog.kind !== "reset") return
     const sha = dialog.row.rev.id
     await withBusy("Resetting", async () => {
-      setStatus(await resetBranch(sha, mode))
+      setStatus(await engine.reset(sha, mode))
       await refresh({ revisions: true, refs: true, status: true })
     })
   }
@@ -86,7 +76,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     if (dialog.kind !== "rebase") return
     const sha = dialog.row.rev.id
     await withBusy("Rebasing", async () => {
-      setStatus(await rebaseOnto(sha))
+      setStatus(await engine.rebase(sha))
       await refresh({ revisions: true, refs: true, status: true })
     })
   }
@@ -94,7 +84,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   async function removeBranch(name: string) {
     if (!window.confirm(`Delete branch '${name}'?`)) return
     try {
-      setRefs(await deleteBranch(name))
+      setRefs(await engine.deleteBranch(name))
       await refresh({ revisions: true })
     } catch (e) {
       setEngineError(`Delete branch failed: ${describeThrown(e)}`)
@@ -103,14 +93,14 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   async function removeTag(name: string) {
     if (!window.confirm(`Delete tag '${name}'?`)) return
     try {
-      setRefs(await deleteTag(name))
+      setRefs(await engine.deleteTag(name))
       await refresh({ revisions: true })
     } catch (e) {
       setEngineError(`Delete tag failed: ${describeThrown(e)}`)
     }
   }
   async function fetchRemote(name: string) {
-    await runJob("Fetching", () => startFetch(name))
+    await runJob(`Fetching ${name}`, () => engine.startFetch(name))
   }
 
   // Shared by the toolbar buttons and their hotkeys so both entry points
@@ -144,14 +134,14 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   // Quick stash actions on stash@{0}; the full list lives in the dialog.
   function applyLatestStash(pop: boolean) {
     void withBusy(pop ? "Popping stash" : "Applying stash", async () => {
-      setStatus(await applyStash("stash@{0}", pop))
+      setStatus(await engine.applyStash("stash@{0}", pop))
       await refresh({ revisions: true, status: true, stashes: true })
     })
   }
   function dropLatestStash() {
     if (!window.confirm("Drop stash@{0}? This cannot be undone.")) return
     void withBusy("Dropping stash", async () => {
-      await dropStash("stash@{0}")
+      await engine.dropStash("stash@{0}")
       await refresh({ revisions: true, status: true, stashes: true })
     })
   }

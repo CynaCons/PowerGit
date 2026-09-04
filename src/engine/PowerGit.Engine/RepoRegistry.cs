@@ -44,6 +44,38 @@ public sealed class RepoRegistry(string? gitPath = null)
 
     public IReadOnlyList<RepoInfo> List() => [.. _sessions.Values.Select(h => h.Current!).OrderBy(r => r.Name)];
 
+    /// <summary>Sessions with their lifecycle facts (GET /repos, diagnostics).</summary>
+    public IReadOnlyList<SessionDto> Describe() =>
+        [.. _sessions.Values
+            .Select(h => new SessionDto(h.Current!.Id, h.Current.Name, h.Current.Root, h.Current.Branch, h.LastUsed.ToString("O"), h.IsBusy, h.ActiveWatchers))
+            .OrderBy(r => r.Name)];
+
+    /// <summary>
+    /// v0.13.11: evicts sessions nobody has used for <paramref name="idle"/>.
+    /// The most recently opened session (what the UI restores on boot) and
+    /// any session with a running job or held write gate are never evicted.
+    /// Returns the ids that were closed.
+    /// </summary>
+    public IReadOnlyList<string> PruneIdle(TimeSpan idle, DateTime? now = null)
+    {
+        DateTime cutoff = (now ?? DateTime.UtcNow) - idle;
+        List<string> closed = [];
+        foreach ((string id, GitHost host) in _sessions.ToArray())
+        {
+            if (id == _lastOpenedId || host.IsBusy || host.HasRunningJob || host.LastUsed > cutoff)
+            {
+                continue;
+            }
+
+            if (Close(id))
+            {
+                closed.Add(id);
+            }
+        }
+
+        return closed;
+    }
+
     public bool Close(string id)
     {
         if (!_sessions.TryRemove(id, out GitHost? host))

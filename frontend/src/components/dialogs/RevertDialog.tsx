@@ -1,7 +1,7 @@
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
-import { revertCommit } from "../../engine"
+import { useEngine } from "../../engine"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
 
@@ -16,10 +16,11 @@ export function RevertDialog({
   subject?: string
   onClose: () => void
 }) {
+  const engine = useEngine()
   const { busy, error, submit } = useActionDialog({
     open,
     label: "revert",
-    action: () => revertCommit(commit).then(() => undefined),
+    action: () => engine.revert(commit).then(() => undefined),
     onClose,
   })
 

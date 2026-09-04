@@ -40,7 +40,7 @@ export default tseslint.config(
     // Off-limits to v0.13.4 (engine contract and the lane model are owned by
     // their own iterations); the pre-existing findings there are recorded in
     // PLAN.md rather than patched around here.
-    files: ["src/engine.ts", "src/graph/**"],
+    files: ["src/engine/client.ts", "src/graph/**"],
     rules: { "max-lines": "off", "no-useless-assignment": "off", "preserve-caught-error": "off" },
   },
 )

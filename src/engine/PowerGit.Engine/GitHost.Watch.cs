@@ -2,7 +2,30 @@ namespace PowerGit.Engine;
 
 public sealed partial class GitHost
 {
-    private FileSystemWatcher? _watcher;
+    // v0.13.11: two narrow watchers instead of one recursive watch over the
+    // whole git dir. Recursing into objects/ registered an inotify watch per
+    // pack directory and fired on every object write during normal git
+    // activity; only the metadata paths ClassifyPath cares about are watched.
+    private readonly List<FileSystemWatcher> _watchers = [];
+
+    /// <summary>Number of live filesystem watchers (tests; 0 after Close).</summary>
+    public int ActiveWatchers
+    {
+        get { lock (_watchers) { return _watchers.Count; } }
+    }
+
+    private void StopWatching()
+    {
+        lock (_watchers)
+        {
+            foreach (FileSystemWatcher w in _watchers)
+            {
+                try { w.EnableRaisingEvents = false; w.Dispose(); } catch { /* already gone */ }
+            }
+
+            _watchers.Clear();
+        }
+    }
     private long _changeVersion;
     private long _changeSequence;
     private readonly object _changeLock = new();
@@ -41,23 +64,16 @@ public sealed partial class GitHost
 
     private void WatchRepo(string root)
     {
-        _watcher?.Dispose();
-        _watcher = null;
+        StopWatching();
 
         // Resolve the real git dir: `.git` may be a file (worktrees,
-        // submodules). Watch the whole dir but only count metadata paths, so
-        // object-pack churn during normal operations never fires refreshes.
+        // submodules).
         string gitDir = Run(root, "rev-parse", "--absolute-git-dir").StdOut.Trim().Replace('/', Path.DirectorySeparatorChar);
         if (!Directory.Exists(gitDir))
         {
             return;
         }
 
-        FileSystemWatcher watcher = new(gitDir)
-        {
-            IncludeSubdirectories = true,
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.DirectoryName,
-        };
         void Bump(string fullPath)
         {
             GitChangeKind kind = ClassifyPath(fullPath);
@@ -73,12 +89,31 @@ public sealed partial class GitHost
             }
         }
 
-        watcher.Changed += (_, e) => Bump(e.FullPath);
-        watcher.Created += (_, e) => Bump(e.FullPath);
-        watcher.Deleted += (_, e) => Bump(e.FullPath);
-        watcher.Renamed += (_, e) => Bump(e.FullPath);
-        watcher.EnableRaisingEvents = true;
-        _watcher = watcher;
+        FileSystemWatcher Make(string dir, bool recursive)
+        {
+            FileSystemWatcher watcher = new(dir)
+            {
+                IncludeSubdirectories = recursive,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.DirectoryName,
+            };
+            watcher.Changed += (_, e) => Bump(e.FullPath);
+            watcher.Created += (_, e) => Bump(e.FullPath);
+            watcher.Deleted += (_, e) => Bump(e.FullPath);
+            watcher.Renamed += (_, e) => Bump(e.FullPath);
+            watcher.EnableRaisingEvents = true;
+            return watcher;
+        }
+
+        lock (_watchers)
+        {
+            // Top level, non-recursive: HEAD, ORIG_HEAD, packed-refs, index.
+            _watchers.Add(Make(gitDir, recursive: false));
+            string refs = Path.Combine(gitDir, "refs");
+            if (Directory.Exists(refs))
+            {
+                _watchers.Add(Make(refs, recursive: true));
+            }
+        }
     }
 
     // "Refs" covers HEAD (including the reflog) and any ref move — branches,

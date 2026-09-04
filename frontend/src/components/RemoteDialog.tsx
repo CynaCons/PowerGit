@@ -6,7 +6,7 @@ import DialogTitle from "@mui/material/DialogTitle"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
-import { listRemotes, saveRemote, describeThrown } from "../engine"
+import { describeThrown, useEngine } from "../engine"
 
 type Props = {
   open: boolean
@@ -16,20 +16,22 @@ type Props = {
 
 // Minimal GE-style "configure remote": edit the fetch/push URL.
 export function RemoteDialog({ open, name, onClose }: Props) {
+  const engine = useEngine()
   const [url, setUrl] = useState("")
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setError(null)
-    listRemotes()
+    engine
+      .remotes()
       .then((rs) => setUrl(rs.find((r) => r.name === name)?.url ?? ""))
       .catch(() => setUrl(""))
-  }, [open, name])
+  }, [engine, open, name])
 
   async function save() {
     try {
-      await saveRemote(name, url.trim())
+      await engine.saveRemote(name, url.trim())
       onClose()
     } catch (e) {
       // `describeThrown` (engine.ts) reads `.message` defensively: a WebKit

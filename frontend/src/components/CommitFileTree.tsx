@@ -5,7 +5,7 @@ import Box from "@mui/material/Box"
 import CircularProgress from "@mui/material/CircularProgress"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState, type ReactNode } from "react"
-import { describeThrown, fetchTree, type TreeEntry } from "../engine"
+import { describeThrown, isAbort, useEngine, type TreeEntry } from "../engine"
 
 type Props = {
   commitId: string | null
@@ -15,6 +15,7 @@ type Props = {
 type Loaded = { entries: TreeEntry[]; error: string | null }
 
 export function CommitFileTree({ commitId, onSelectFile }: Props) {
+  const engine = useEngine()
   const [root, setRoot] = useState<Loaded | null>(null)
   const [dirs, setDirs] = useState<Map<string, Loaded>>(new Map())
 
@@ -22,18 +23,17 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
     setRoot(null)
     setDirs(new Map())
     if (!commitId) return
-    let cancelled = false
-    fetchTree(commitId)
+    const ctrl = new AbortController()
+    engine
+      .tree(commitId, undefined, ctrl.signal)
       .then((entries) => {
-        if (!cancelled) setRoot({ entries, error: null })
+        if (!ctrl.signal.aborted) setRoot({ entries, error: null })
       })
       .catch((e: unknown) => {
-        if (!cancelled) setRoot({ entries: [], error: describeThrown(e) })
+        if (!ctrl.signal.aborted && !isAbort(e)) setRoot({ entries: [], error: describeThrown(e) })
       })
-    return () => {
-      cancelled = true
-    }
-  }, [commitId])
+    return () => ctrl.abort()
+  }, [engine, commitId])
 
   function toggleDir(path: string) {
     if (!commitId) return
@@ -46,7 +46,8 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
       return
     }
     setDirs((prev) => new Map(prev).set(path, { entries: [], error: null }))
-    fetchTree(commitId, path)
+    engine
+      .tree(commitId, path)
       .then((entries) => setDirs((prev) => new Map(prev).set(path, { entries, error: null })))
       .catch((e: unknown) => setDirs((prev) => new Map(prev).set(path, { entries: [], error: describeThrown(e) })))
   }

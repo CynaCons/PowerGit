@@ -11,11 +11,9 @@ import Typography from "@mui/material/Typography"
 import { useEffect, useRef, useState } from "react"
 import { shortcutLabel, useHotkeyLayer } from "../hotkeys"
 import {
-  addToIgnore,
-  deleteFiles,
   describeThrown,
-  fetchWorkTreeDiff,
-  stagePaths,
+  isAbort,
+  useEngine,
   type DiffDto,
   type DiffOptions,
   type RepoStatus,
@@ -41,6 +39,7 @@ type Props = {
 // Selection follows GE: click selects, ctrl+click toggles, shift+click ranges,
 // double-click stages/unstages. Right-click opens the file context menu.
 export function CommitDialog({ open, status, amend, initialMessage, onClose, onStatus, onCommit }: Props) {
+  const engine = useEngine()
   const [selected, setSelected] = useState<{ path: string; staged: boolean } | null>(null)
   const [selUnstaged, setSelUnstaged] = useState<Set<string>>(new Set())
   const [selStaged, setSelStaged] = useState<Set<string>>(new Set())
@@ -68,18 +67,27 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
       setDiff(null)
       return
     }
-    let cancelled = false
-    fetchWorkTreeDiff(selected.path, selected.staged, diffOpts)
+    // Latest selection wins: the previous request is aborted (and its git
+    // process killed engine-side) instead of merely ignored.
+    const ctrl = new AbortController()
+    engine
+      .workTreeDiff(selected.path, selected.staged, diffOpts, ctrl.signal)
       .then((d) => {
-        if (!cancelled) setDiff(d)
+        if (!ctrl.signal.aborted) setDiff(d)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setDiff({ path: selected.path, text: `diff failed: ${describeThrown(e)}`, binary: false })
+        if (ctrl.signal.aborted || isAbort(e)) return
+        setDiff({
+          path: selected.path,
+          text: `diff failed: ${describeThrown(e)}`,
+          binary: false,
+          sizeBytes: 0,
+          truncated: false,
+          truncatedReason: null,
+        })
       })
-    return () => {
-      cancelled = true
-    }
-  }, [selected, diffOpts])
+    return () => ctrl.abort()
+  }, [engine, selected, diffOpts])
 
   function clickRow(list: StatusFile[], staged: boolean, index: number, e: React.MouseEvent) {
     const setter = staged ? setSelStaged : setSelUnstaged
@@ -105,7 +113,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
 
   async function toggle(file: StatusFile) {
     try {
-      onStatus(await stagePaths([file.path], file.staged))
+      onStatus(await engine.stage([file.path], file.staged))
       setSelected((cur) => (cur?.path === file.path ? null : cur))
     } catch (e) {
       setError(`stage failed: ${describeThrown(e)}`)
@@ -116,7 +124,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
     const paths = [...(staged ? selStaged : selUnstaged)]
     if (paths.length === 0) return
     try {
-      onStatus(await stagePaths(paths, staged))
+      onStatus(await engine.stage(paths, staged))
       setSelStaged(new Set())
       setSelUnstaged(new Set())
     } catch (e) {
@@ -129,7 +137,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
     const paths = (files ?? []).map((f) => f.path)
     if (paths.length === 0) return
     try {
-      onStatus(await stagePaths(paths, unstage))
+      onStatus(await engine.stage(paths, unstage))
       setSelStaged(new Set())
       setSelUnstaged(new Set())
     } catch (e) {
@@ -142,7 +150,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
     if (paths.length === 0) return
     if (!window.confirm(`Delete ${paths.length} file(s)? This cannot be undone.`)) return
     try {
-      onStatus(await deleteFiles(paths))
+      onStatus(await engine.deleteFiles(paths))
       setSelStaged(new Set())
       setSelUnstaged(new Set())
       setSelected(null)
@@ -152,7 +160,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
   }
 
   async function ignorePattern(pattern: string) {
-    onStatus(await addToIgnore(pattern))
+    onStatus(await engine.addToIgnore(pattern))
     setIgnoreFor(null)
   }
 
@@ -288,7 +296,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
               }}
             >
               {diff ? (
-                <DiffView text={diff.text} />
+                <DiffView diff={diff} />
               ) : (
                 <Typography color="text.secondary">Select a file to see its diff.</Typography>
               )}

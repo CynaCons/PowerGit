@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test"
 
 test("owner design demo — scaffold", async ({ page }) => {
   const wait = Number(process.env.DEMO_PAUSE_MS ?? "900")
-  await page.goto("/")
+  // ?demo=1 pins sample data even when the dev server was started without VITE_DEMO.
+  await page.goto("/?demo=1")
   await expect(page.getByTestId("browse-shell")).toBeVisible()
   await page.waitForTimeout(wait)
 

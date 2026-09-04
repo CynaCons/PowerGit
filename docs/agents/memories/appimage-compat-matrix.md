@@ -35,15 +35,29 @@ Plain bash: `MSYS_NO_PATHCONV=1 bash docker/appimage-check/run-matrix.sh
 `C:/Program Files/Git/app/...`. Each version takes ~60-90 s (apt + launch);
 the first run pulls the three images.
 
-## Longevity mode (`--longevity <minutes>`)
-Same launch, then keeps the app up N minutes while xdotool presses Down
-every 2 s and Ctrl+R every 60 s on the PowerGit window, samples the process
-tree every 10 s into `<out>/<ver>/rss.csv`
-(`elapsed_s,rss_mb,procs,webproc,gpuproc,engine`) and fails on:
-a WebKitWebProcess / WebKitGPUProcess exit after it was first seen, a
-powergit-engine exit, RSS of the whole tree above `RSS_BUDGET_MB` (default
-1500), or any fatal stderr pattern. Use it one version at a time
-(`--versions "24.04"`); it is NOT wired into CI.
+## Longevity mode (`--longevity <minutes>`, v0.13.11 task 7)
+Same launch, then keeps the app up N minutes and drives it two ways:
+- xdotool on X11 (Down every 2 s, Ctrl+R every 60 s on the PowerGit window);
+- the sidecar's HTTP API on every backend, with the bearer token read from
+  the engine process environment (`/proc/<pid>/environ`, we are root):
+  two seeded repos + a local bare remote under /tmp, then a rota of
+  revision reads, a 3 MB blob (must come back `truncated: true`), a diff,
+  a repo switch A→B→A, and one fetch job that must complete.
+Every 10 s it samples the process tree into `<out>/<ver>/rss.csv`
+(`elapsed_s,rss_mb,procs,webproc,gpuproc,engine,sessions,watchers,api_ms`)
+and fails on: a WebKitWebProcess / WebKitGPUProcess exit after first seen,
+a powergit-engine exit, RSS above `RSS_BUDGET_MB` (1500), an API read
+slower than `API_BUDGET_S` (5 s), more than 4 sessions, or a fatal stderr
+pattern.
+- `DISPLAY_MODE=wayland` runs under weston's headless backend
+  (`GDK_BACKEND=wayland`, no X); xdotool is skipped, the API drive is not.
+- `INJECT_FAILURE=1` kills the engine halfway and requires the supervised
+  restart: health back within 20 s and `sidecar exited` + a second
+  `sidecar started` in `$XDG_DATA_HOME/com.cynacons.powergit/logs/engine.log`.
+  Only builds from v0.13.11 on have the supervisor, so keep it off for
+  older artifacts (v0.12.3 has no restart and no log).
+Use it one version at a time (`--versions "26.04"`); it is NOT wired into
+CI. The acceptance run for v0.13.11 is 10 minutes on 26.04 in both modes.
 
 ## Repairing a downloaded artifact
 `scripts/inspect-appimage.sh --fix --strict --out <fixed.AppImage>` needs

@@ -6,18 +6,19 @@ import FormControlLabel from "@mui/material/FormControlLabel"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
-import { applyStash, dropStash, fetchStashes, stashChanges, type StashInfo } from "../engine"
+import { useEngine, type RepoStatus, type StashInfo } from "../engine"
 
 type Props = {
   open: boolean
   dirtyCount: number
   onClose: () => void
-  onStatus: (status: import("../engine").RepoStatus) => void
+  onStatus: (status: RepoStatus) => void
 }
 
 // Mirrors Git Extensions FormStash: stash form on the left (message +
 // options), stashes list with Apply / Pop / Drop actions.
 export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
+  const engine = useEngine()
   const [stashes, setStashes] = useState<StashInfo[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [message, setMessage] = useState("")
@@ -27,7 +28,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
 
   async function refresh() {
     try {
-      const list = await fetchStashes()
+      const list = await engine.stashes()
       setStashes(list)
       setSelected((cur) => (cur && list.some((s) => s.reference === cur) ? cur : (list[0]?.reference ?? null)))
     } catch (e) {
@@ -41,7 +42,9 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
       setMessage("")
       refresh()
     }
-  }, [open])
+    // refresh is recreated per render; keying on `open` is the intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, engine])
 
   async function run(action: () => Promise<unknown>) {
     try {
@@ -78,7 +81,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
             variant="contained"
             disabled={dirtyCount === 0}
             onClick={async () => {
-              await run(async () => onStatus(await stashChanges(message || null, keepIndex, includeUntracked)))
+              await run(async () => onStatus(await engine.stashChanges(message || null, keepIndex, includeUntracked)))
               setMessage("")
               onClose()
             }}
@@ -153,7 +156,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
                   sx={{ py: 0, fontSize: 11, minWidth: 0 }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    run(async () => onStatus(await applyStash(s.reference)))
+                    run(async () => onStatus(await engine.applyStash(s.reference)))
                   }}
                 >
                   Apply
@@ -163,7 +166,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
                   sx={{ py: 0, fontSize: 11, minWidth: 0 }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    run(async () => onStatus(await applyStash(s.reference, true)))
+                    run(async () => onStatus(await engine.applyStash(s.reference, true)))
                   }}
                 >
                   Pop
@@ -175,7 +178,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
                   onClick={(e) => {
                     e.stopPropagation()
                     if (window.confirm(`Drop ${s.reference}? This cannot be undone.`)) {
-                      run(() => dropStash(s.reference))
+                      run(() => engine.dropStash(s.reference))
                     }
                   }}
                 >

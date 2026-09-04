@@ -20,7 +20,7 @@ import Toolbar from "@mui/material/Toolbar"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
 import { useState, type RefObject } from "react"
-import { startFetch, startPull, startPush } from "../engine"
+import { useEngine } from "../engine"
 import { shortcutLabel } from "../hotkeys"
 import type { GitActions } from "../hooks/useGitActions"
 import type { Jobs } from "../hooks/useJobs"
@@ -64,8 +64,9 @@ export function CommandBar({
   refresh,
   openStash,
 }: CommandBarProps) {
+  const engine = useEngine()
   const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null)
-  const { busy, jobLabel, runJob, runJobSequence } = jobs
+  const { busy, jobLabel, runJob, runJobSequence, openPreview } = jobs
   const iconsOnly = tier !== "full"
   const overflowed = tier === "overflow"
   const secondaryDivider = <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center", my: 0 }} />
@@ -149,10 +150,13 @@ export function CommandBar({
           compact={iconsOnly}
           disabled={!live || busy}
           shortcut={shortcutLabel("browse.pull")}
-          onMainClick={() => runJob("Pulling", () => startPull(false))}
+          onMainClick={() => openPreview("pull")}
         >
-          <MenuItem data-testid="pull-rebase" onClick={() => runJob("Pulling (rebase)", () => startPull(true))}>
+          <MenuItem data-testid="pull-rebase" onClick={() => runJob("Pulling (rebase)", () => engine.startPull(true))}>
             Pull (rebase onto upstream)
+          </MenuItem>
+          <MenuItem data-testid="pull-ff" onClick={() => runJob("Pulling", () => engine.startPull(false))}>
+            Pull (fast-forward only, no preview)
           </MenuItem>
         </SplitButton>
         <SplitButton
@@ -162,13 +166,13 @@ export function CommandBar({
           compact={iconsOnly}
           disabled={!live || busy}
           shortcut={shortcutLabel("browse.push")}
-          onMainClick={() => runJob("Pushing", () => startPush(false))}
+          onMainClick={() => openPreview("push")}
         >
-          <MenuItem
-            data-testid="push-force-lease"
-            onClick={() => runJob("Pushing (force with lease)", () => startPush(true))}
-          >
-            Push (force with lease)
+          <MenuItem data-testid="push-force-lease" onClick={() => openPreview("push-force")}>
+            Push (force with lease)…
+          </MenuItem>
+          <MenuItem data-testid="push-plain" onClick={() => runJob("Pushing", () => engine.startPush(false))}>
+            Push (no preview)
           </MenuItem>
         </SplitButton>
         <SplitButton
@@ -178,7 +182,7 @@ export function CommandBar({
           compact={iconsOnly}
           disabled={!live || busy}
           shortcut={shortcutLabel("browse.quickFetch")}
-          onMainClick={() => runJob("Fetching", () => startFetch(defaultRemote))}
+          onMainClick={() => runJob(`Fetching ${defaultRemote}`, () => engine.startFetch(defaultRemote))}
         >
           {/* "Fetch all" is a first-class Git Extensions action, so it is
               always listed (disabled with no remotes) rather than appearing
@@ -189,7 +193,7 @@ export function CommandBar({
             onClick={() =>
               runJobSequence(
                 "Fetching all remotes",
-                remoteNames.map((r) => () => startFetch(r)),
+                remoteNames.map((r) => () => engine.startFetch(r)),
               )
             }
           >
@@ -197,7 +201,11 @@ export function CommandBar({
           </MenuItem>
           <Divider />
           {remoteNames.map((r) => (
-            <MenuItem key={r} data-testid={`fetch-${r}`} onClick={() => runJob("Fetching", () => startFetch(r))}>
+            <MenuItem
+              key={r}
+              data-testid={`fetch-${r}`}
+              onClick={() => runJob(`Fetching ${r}`, () => engine.startFetch(r))}
+            >
               {`Fetch ${r}`}
             </MenuItem>
           ))}

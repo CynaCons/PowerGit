@@ -30,7 +30,20 @@ public sealed record FileChangeDto(string Path, string Status, bool Binary);
 
 public sealed record TreeEntryDto(string Name, string Type, string Sha);
 
-public sealed record DiffDto(string Path, string Text, bool Binary);
+/// <summary>
+/// Text content (a diff or a blob). v0.13.11: <paramref name="SizeBytes"/> is
+/// the object's real size, and when the text was cut <paramref name="Truncated"/>
+/// says so explicitly with a machine-readable <paramref name="TruncatedReason"/>
+/// ("size" past MaxBlobBytes/MaxDiffChars, "lines" past MaxLines) instead of a
+/// sentinel string appended to the content.
+/// </summary>
+public sealed record DiffDto(
+    string Path,
+    string Text,
+    bool Binary,
+    long SizeBytes = 0,
+    bool Truncated = false,
+    string? TruncatedReason = null);
 
 public sealed record StatusFileDto(string Path, string Status, bool Staged);
 
@@ -41,7 +54,8 @@ public sealed record RepoStatusDto(
     StatusFileDto[] Unstaged,
     StatusFileDto[] Staged,
     int? Ahead = null,
-    int? Behind = null);
+    int? Behind = null,
+    string? Upstream = null);
 
 public sealed record RefItemDto(string Name, string FullName, string Target, bool Current);
 
@@ -109,3 +123,6 @@ public sealed record DifftoolRequest(string Commit, string Path);
 
 /// <summary>409 body: a mutation collided with a running operation on the same session (v0.13.6).</summary>
 public sealed record BusyResponse(string Error, string Running);
+
+/// <summary>GET /repos entry (v0.13.11): session plus lifecycle facts for diagnostics.</summary>
+public sealed record SessionDto(string Id, string Name, string Root, string Branch, string LastUsed, bool Busy, int Watchers);

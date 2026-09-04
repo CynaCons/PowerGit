@@ -10,11 +10,12 @@ import Select from "@mui/material/Select"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
-import { applyVsCode, fetchConfig, fetchVsCode, saveConfig, type GitConfig, type VsCodeInfo } from "../engine"
+import { useEngine, type GitConfig, type VsCodeInfo } from "../engine"
 
 type Props = { open: boolean; onClose: () => void }
 
 export function SettingsDialog({ open, onClose }: Props) {
+  const engine = useEngine()
   const [cfg, setCfg] = useState<GitConfig | null>(null)
   const [vs, setVs] = useState<VsCodeInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -22,18 +23,20 @@ export function SettingsDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return
     setError(null)
-    fetchConfig()
+    engine
+      .config()
       .then(setCfg)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "config failed"))
-    fetchVsCode()
+    engine
+      .vsCode()
       .then(setVs)
       .catch(() => setVs({ found: false, path: null, applied: false }))
-  }, [open])
+  }, [engine, open])
 
   async function onSave() {
     if (!cfg) return
     try {
-      setCfg(await saveConfig(cfg))
+      setCfg(await engine.saveConfig(cfg))
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : "save failed")
@@ -42,7 +45,7 @@ export function SettingsDialog({ open, onClose }: Props) {
 
   async function onApplyVsCode() {
     try {
-      setVs(await applyVsCode())
+      setVs(await engine.applyVsCode())
     } catch (e) {
       setError(e instanceof Error ? e.message : "vscode apply failed")
     }

@@ -13,6 +13,18 @@ public sealed partial class GitHost
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private string? _writeHolder;
 
+    // v0.13.11 lifecycle: when the session last served a request, so the
+    // registry can evict idle ones (sessions with a running job are never
+    // evicted; see RepoRegistry.PruneIdle).
+    private long _lastUsedTicks = DateTime.UtcNow.Ticks;
+
+    public DateTime LastUsed => new(Interlocked.Read(ref _lastUsedTicks), DateTimeKind.Utc);
+
+    public void Touch() => Interlocked.Exchange(ref _lastUsedTicks, DateTime.UtcNow.Ticks);
+
+    /// <summary>True while the write gate is held (a mutation or a network job is running).</summary>
+    public bool IsBusy => _writeGate.CurrentCount == 0;
+
     public GitHost(string? gitPath = null)
     {
         _gitPath = gitPath ?? ResolveGitPath();
@@ -62,11 +74,11 @@ public sealed partial class GitHost
 
     public void Mutate(string what, Action work) => Mutate(what, () => { work(); return 0; });
 
-    /// <summary>Stops the watcher; the session is finished.</summary>
+    /// <summary>Stops the watchers and cancels running jobs; the session is finished.</summary>
     public void Close()
     {
-        _watcher?.Dispose();
-        _watcher = null;
+        StopWatching();
+        CancelAllJobs();
     }
 
     public static string ResolveGitPath()
@@ -148,42 +160,31 @@ public sealed partial class GitHost
         => RunTimed(workingDirectory, 30_000, args);
 
     internal CommandResult RunTimed(string? workingDirectory, int timeoutMs, params string[] args)
+        => RunTimed(workingDirectory, timeoutMs, CancellationToken.None, args);
+
+    /// <summary>
+    /// v0.13.10/11: every git invocation goes through <see cref="GitProcess"/>
+    /// (concurrent pipe draining, timeout armed up front, tree kill). The
+    /// token is the HTTP request's abort (latest-request-wins reads) or a
+    /// job's cancel: either one terminates the git process instead of
+    /// letting it finish for nobody.
+    /// </summary>
+    internal CommandResult RunTimed(string? workingDirectory, int timeoutMs, CancellationToken ct, params string[] args)
     {
-        System.Diagnostics.ProcessStartInfo psi = new()
-        {
-            FileName = _gitPath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = System.Text.Encoding.UTF8,
-            StandardErrorEncoding = System.Text.Encoding.UTF8,
-        };
-        psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";
-
-        foreach (string arg in args)
-        {
-            psi.ArgumentList.Add(arg);
-        }
-
-        if (!string.IsNullOrWhiteSpace(workingDirectory))
-        {
-            psi.WorkingDirectory = workingDirectory;
-        }
-
-        using System.Diagnostics.Process process = System.Diagnostics.Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to start git.");
-
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
-        if (!process.WaitForExit(timeoutMs))
-        {
-            try { process.Kill(entireProcessTree: true); } catch { /* ignore */ }
-            throw new TimeoutException($"git timed out: {string.Join(' ', args)}");
-        }
-
-        return new CommandResult(process.ExitCode, stdout, stderr);
+        GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, int.MaxValue, GitEnvironment);
+        return new CommandResult(r.ExitCode, r.StdOut, r.StdErr);
     }
+
+    /// <summary>Like <see cref="RunTimed(string?, int, CancellationToken, string[])"/> but stops reading (and kills git) past <paramref name="maxStdOutChars"/>.</summary>
+    internal GitProcess.Result RunCapped(string? workingDirectory, int timeoutMs, CancellationToken ct, int maxStdOutChars, params string[] args)
+        => GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, GitEnvironment);
+
+    private static readonly IReadOnlyDictionary<string, string> GitEnvironment = new Dictionary<string, string>
+    {
+        ["GIT_OPTIONAL_LOCKS"] = "0",
+        // Never block on a credential or editor prompt inside a headless engine.
+        ["GIT_TERMINAL_PROMPT"] = "0",
+    };
 
     private static string? FindOnPath(string fileName)
     {

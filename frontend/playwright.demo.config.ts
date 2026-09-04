@@ -18,9 +18,13 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
+    // The walkthrough runs on synthetic data. VITE_DEMO must reach the dev
+    // server: a dev server already running without it shows real data or
+    // "connecting…" instead (v0.13.12: demo is never inferred).
     command: "npm run dev",
     url: "http://127.0.0.1:1420",
     reuseExistingServer: true,
     timeout: 60_000,
+    env: { VITE_DEMO: "1" },
   },
 })

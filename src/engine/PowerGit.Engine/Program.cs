@@ -115,6 +115,10 @@ app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
 
 app.MapGet("/repos", (RepoRegistry repos) => Results.Ok(repos.List()));
 
+// Lifecycle facts per session (last use, busy, watcher count): what the
+// recovery panel and the longevity gate look at.
+app.MapGet("/repos/sessions", (RepoRegistry repos) => Results.Ok(repos.Describe()));
+
 app.MapDelete("/repos/{repo}", (string repo, RepoRegistry repos) =>
     repos.Close(repo) ? Results.NoContent() : Results.NotFound(new ErrorResponse($"unknown repository session '{repo}'")));
 
@@ -134,11 +138,13 @@ repo.AddEndpointFilter(async (ctx, next) =>
         return Results.Json(new ErrorResponse($"unknown repository session '{id}'"), statusCode: StatusCodes.Status404NotFound);
     }
 
+    session.Touch();
     string method = ctx.HttpContext.Request.Method;
     string path = ctx.HttpContext.Request.Path.Value ?? "";
     bool isJob = path.EndsWith("/fetch", StringComparison.Ordinal)
         || path.EndsWith("/pull", StringComparison.Ordinal)
-        || path.EndsWith("/push", StringComparison.Ordinal);
+        || path.EndsWith("/push", StringComparison.Ordinal)
+        || path.EndsWith("/cancel", StringComparison.Ordinal);
     try
     {
         if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob)
@@ -156,11 +162,18 @@ repo.AddEndpointFilter(async (ctx, next) =>
     }
 });
 
-repo.MapGet("/revisions", (GitHost git, int? max, int? skip) =>
+// Read routes hand HttpContext.RequestAborted down to the git process:
+// when the UI abandons a request (latest selection wins) the git child is
+// killed instead of finishing for nobody (v0.13.11).
+repo.MapGet("/revisions", (GitHost git, int? max, int? skip, HttpContext ctx) =>
 {
     try
     {
-        return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0));
+        return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -168,11 +181,15 @@ repo.MapGet("/revisions", (GitHost git, int? max, int? skip) =>
     }
 });
 
-repo.MapGet("/commits/{id}", (string id, GitHost git) =>
+repo.MapGet("/commits/{id}", (string id, GitHost git, HttpContext ctx) =>
 {
     try
     {
-        return Results.Ok(git.GetCommit(id));
+        return Results.Ok(git.GetCommit(id, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -180,11 +197,15 @@ repo.MapGet("/commits/{id}", (string id, GitHost git) =>
     }
 });
 
-repo.MapGet("/commits/{id}/files", (string id, GitHost git) =>
+repo.MapGet("/commits/{id}/files", (string id, GitHost git, HttpContext ctx) =>
 {
     try
     {
-        return Results.Ok(git.ListFiles(id));
+        return Results.Ok(git.ListFiles(id, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -192,11 +213,15 @@ repo.MapGet("/commits/{id}/files", (string id, GitHost git) =>
     }
 });
 
-repo.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git) =>
+repo.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git, HttpContext ctx) =>
 {
     try
     {
-        return Results.Ok(git.ListTree(id, path));
+        return Results.Ok(git.ListTree(id, path, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -204,7 +229,7 @@ repo.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git) =>
     }
 });
 
-repo.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? context, bool? ws, bool? full) =>
+repo.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? context, bool? ws, bool? full, HttpContext ctx) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -213,7 +238,11 @@ repo.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? con
 
     try
     {
-        return Results.Ok(git.GetDiff(id, path, context ?? 3, ws ?? false, full ?? false));
+        return Results.Ok(git.GetDiff(id, path, context ?? 3, ws ?? false, full ?? false, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -221,7 +250,7 @@ repo.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? con
     }
 });
 
-repo.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
+repo.MapGet("/commits/{id}/blob", (string id, string path, GitHost git, HttpContext ctx) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -230,7 +259,11 @@ repo.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
 
     try
     {
-        return Results.Ok(git.GetBlob(id, path));
+        return Results.Ok(git.GetBlob(id, path, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -238,7 +271,7 @@ repo.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
     }
 });
 
-repo.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? context, bool? ws, bool? full) =>
+repo.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? context, bool? ws, bool? full, HttpContext ctx) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -247,7 +280,11 @@ repo.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? conte
 
     try
     {
-        return Results.Ok(git.GetWorkTreeDiff(path, staged, context ?? 3, ws ?? false, full ?? false));
+        return Results.Ok(git.GetWorkTreeDiff(path, staged, context ?? 3, ws ?? false, full ?? false, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
     }
     catch (Exception ex)
     {
@@ -317,7 +354,9 @@ repo.MapPut("/remotes", (RemoteUpdate body, GitHost git) =>
     }
 });
 
-repo.MapPost("/fetch", (FetchRequest body, GitHost git) =>
+// Job routes answer 202 with a session-qualified Location (v0.13.10: the
+// old "/jobs/{id}" pointed outside the /repos/{repo} group).
+repo.MapPost("/fetch", (FetchRequest body, GitHost git, string repo) =>
 {
     if (string.IsNullOrWhiteSpace(body.Remote))
     {
@@ -326,8 +365,8 @@ repo.MapPost("/fetch", (FetchRequest body, GitHost git) =>
 
     try
     {
-        string id = git.StartJob("fetch", () => git.FetchRemote(body.Remote));
-        return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "fetch"));
+        string id = git.StartJob("fetch", ct => git.FetchRemote(body.Remote, ct), $"git fetch --prune {body.Remote}");
+        return Results.Accepted($"/repos/{repo}/jobs/{id}", new JobStartedDto(id, "fetch"));
     }
     catch (RepoBusyException busy)
     {
@@ -606,13 +645,13 @@ repo.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
     }
 });
 
-repo.MapPost("/pull", (PullRequest? body, GitHost git) =>
+repo.MapPost("/pull", (PullRequest? body, GitHost git, string repo) =>
 {
     try
     {
         bool rebase = body?.Rebase ?? false;
-        string id = git.StartJob("pull", () => git.Pull(rebase));
-        return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "pull"));
+        string id = git.StartJob("pull", ct => git.Pull(rebase, ct), rebase ? "git pull --rebase" : "git pull --ff-only");
+        return Results.Accepted($"/repos/{repo}/jobs/{id}", new JobStartedDto(id, "pull"));
     }
     catch (RepoBusyException busy)
     {
@@ -624,13 +663,13 @@ repo.MapPost("/pull", (PullRequest? body, GitHost git) =>
     }
 });
 
-repo.MapPost("/push", (PushRequest? body, GitHost git) =>
+repo.MapPost("/push", (PushRequest? body, GitHost git, string repo) =>
 {
     try
     {
         bool forceWithLease = body?.ForceWithLease ?? false;
-        string id = git.StartJob("push", () => git.Push(forceWithLease));
-        return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "push"));
+        string id = git.StartJob("push", ct => git.Push(forceWithLease, ct), forceWithLease ? "git push --force-with-lease" : "git push");
+        return Results.Accepted($"/repos/{repo}/jobs/{id}", new JobStartedDto(id, "push"));
     }
     catch (RepoBusyException busy)
     {
@@ -646,6 +685,14 @@ repo.MapGet("/jobs/{id}", (string id, GitHost git) =>
     git.GetJob(id) is { } job ? Results.Ok(job) : Results.Json(new ErrorResponse("no such job"), statusCode: StatusCodes.Status404NotFound));
 
 repo.MapGet("/jobs", (GitHost git) => Results.Ok(git.ListJobs()));
+
+// Cancels a running job: the git process tree is killed and the job ends
+// "failed" with cancelled=true. Listed with the job routes in the group
+// filter so it does not queue behind the job's own write gate.
+repo.MapPost("/jobs/{id}/cancel", (string id, GitHost git) =>
+    git.CancelJob(id)
+        ? Results.Ok(new { ok = true })
+        : Results.Json(new ErrorResponse("no running job with that id"), statusCode: StatusCodes.Status404NotFound));
 
 // Server-sent events: streams the repo's ChangeVersion whenever git metadata
 // (HEAD, refs, packed-refs, index) changes on disk, so the UI live-refreshes
@@ -703,6 +750,34 @@ if (int.TryParse(parentPidArg, out int parentPid))
         }
 
         lifetime.StopApplication();
+    });
+}
+
+// v0.13.11: idle-session eviction. POWERGIT_SESSION_IDLE_MINUTES (default
+// 30, 0 disables) — sessions with a running job and the last opened one are
+// never evicted (RepoRegistry.PruneIdle).
+int idleMinutes = int.TryParse(Environment.GetEnvironmentVariable("POWERGIT_SESSION_IDLE_MINUTES"), out int parsedIdle) ? parsedIdle : 30;
+if (idleMinutes > 0)
+{
+    RepoRegistry registry = app.Services.GetRequiredService<RepoRegistry>();
+    IHostApplicationLifetime pruneLifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    _ = Task.Run(async () =>
+    {
+        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(pruneLifetime.ApplicationStopping))
+            {
+                foreach (string closed in registry.PruneIdle(TimeSpan.FromMinutes(idleMinutes)))
+                {
+                    Console.Error.WriteLine($"[engine] evicted idle session {closed}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // shutting down
+        }
     });
 }
 

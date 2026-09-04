@@ -1,5 +1,9 @@
 import Box from "@mui/material/Box"
+import { useMemo } from "react"
+import type { DiffDto } from "../engine"
 import { codeSx } from "../theme"
+import { ContentNotice } from "./ContentNotice"
+import { VirtualLines } from "./VirtualLines"
 
 // Git Extensions palette (git-coloring mode).
 // Source: src/app/GitExtUtils/GitUI/Theming/AppColorDefaults.cs,
@@ -89,53 +93,93 @@ function parseGutterLines(text: string): GutterLine[] {
 
 const GUTTER_COL_WIDTH = 40
 
-export function DiffView({ text }: { text: string }) {
-  const lines = parseGutterLines(text)
+/** Diffs up to this many lines render every row (exact DOM text, whole-diff
+ *  selection); longer ones are virtualized (v0.13.11). */
+export const VIRTUALIZE_MIN_LINES = 2_000
+
+/** Unified diff with a sticky two-column line-number gutter. v0.13.11:
+ *  rows are virtualized (only the visible window is in the DOM), and a
+ *  truncated or binary diff carries an explicit notice on top. */
+export function DiffView({
+  diff,
+  onOpenDifftool,
+  onRetry,
+}: {
+  diff: DiffDto
+  onOpenDifftool?: () => void
+  onRetry?: () => void
+}) {
+  const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
+  const renderLine = (i: number) => {
+    const line = lines[i]
+    return (
+      <Box sx={{ display: "flex", width: "max-content", minWidth: "100%" }}>
+        <Box
+          data-testid="diff-gutter"
+          aria-hidden="true"
+          sx={{
+            flexShrink: 0,
+            position: "sticky",
+            left: 0,
+            display: "flex",
+            bgcolor: "#ffffff",
+            color: COLORS.gutter,
+            userSelect: "none",
+            borderRight: "1px solid #e0e0e0",
+          }}
+        >
+          <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.5 }}>
+            {line.oldNum ?? ""}
+          </Box>
+          <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.75 }}>
+            {line.newNum ?? ""}
+          </Box>
+        </Box>
+        <Box component="span" sx={{ pl: 1 }}>
+          {line.segments.map((s, j) => (
+            <span key={j} style={{ color: s.color, fontWeight: s.bold ? 700 : 400 }}>
+              {s.text || " "}
+            </span>
+          ))}
+        </Box>
+      </Box>
+    )
+  }
   return (
     <Box
       data-testid="diff-view"
       sx={{
         ...codeSx,
         fontSize: 12,
-        lineHeight: 1.5,
+        lineHeight: "18px",
         whiteSpace: "pre",
         tabSize: 4,
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+        minWidth: 0,
         overflowX: "auto",
         maxWidth: "100%",
       }}
     >
-      {lines.map((line, i) => (
-        <Box key={i} sx={{ display: "flex", width: "max-content", minWidth: "100%" }}>
-          <Box
-            data-testid="diff-gutter"
-            aria-hidden="true"
-            sx={{
-              flexShrink: 0,
-              position: "sticky",
-              left: 0,
-              display: "flex",
-              bgcolor: "#ffffff",
-              color: COLORS.gutter,
-              userSelect: "none",
-              borderRight: "1px solid #e0e0e0",
-            }}
-          >
-            <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.5 }}>
-              {line.oldNum ?? ""}
-            </Box>
-            <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.75 }}>
-              {line.newNum ?? ""}
-            </Box>
-          </Box>
-          <Box component="span" sx={{ pl: 1 }}>
-            {line.segments.map((s, j) => (
-              <span key={j} style={{ color: s.color, fontWeight: s.bold ? 700 : 400 }}>
-                {s.text || " "}
-              </span>
-            ))}
-          </Box>
+      <ContentNotice dto={diff} onOpenDifftool={onOpenDifftool} onRetry={onRetry} />
+      {lines.length <= VIRTUALIZE_MIN_LINES ? (
+        <Box data-testid="diff-lines" sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          {lines.map((_, i) => (
+            <div key={i} data-index={i}>
+              {renderLine(i)}
+            </div>
+          ))}
         </Box>
-      ))}
+      ) : (
+        <VirtualLines
+          count={lines.length}
+          ariaLabel={`Diff of ${diff.path}`}
+          testid="diff-lines"
+          renderLine={renderLine}
+        />
+      )}
     </Box>
   )
 }

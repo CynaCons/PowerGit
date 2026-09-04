@@ -18,9 +18,25 @@
   `StartJob` takes the gate itself for the job's lifetime. A collision
   answers **409** `{ error, running }` (never queues). Reads bypass the gate
   (GIT_OPTIONAL_LOCKS=0).
-- Frontend: `engine.ts` remembers `REPO_ID` from `openRepo` / `fetchCurrent`
-  and prefixes every helper via `repoBase()`; `engineEventsUrl()` rejects
-  when no repo is open. Specs use `repoBase()` from `tests/engine.ts`.
+- Frontend (v0.13.12): `src/engine/client.ts` is an immutable
+  `EngineClient { baseUrl, token, repoId }`; `withRepo(id)` returns a new
+  one, nothing is module-global. Components take the window's client from
+  `useEngine()`; hooks receive it explicitly. `?repo=<id>` pins a window
+  to a session (`pinnedRepoId` / `rememberPinnedRepo` in bootstrap.ts);
+  `/repos/current` is only consulted when no pin exists. Specs use
+  `repoBase()` from `tests/engine.ts`.
+- Lifecycle (v0.13.11): the group filter `Touch()`es the session on every
+  request; a background timer evicts sessions idle for
+  `POWERGIT_SESSION_IDLE_MINUTES` (default 30, 0 disables), never the last
+  opened one nor one with a running job / held gate. `GET /repos/sessions`
+  lists `{ id, name, root, branch, lastUsed, busy, watchers }`. The UI
+  closes the previous session after opening another (best effort). Two
+  narrow watchers per session (git dir top level + `refs/` recursive), 0
+  after `Close()` (`GitHost.ActiveWatchers`).
+- Jobs (v0.13.10/12): `POST /fetch|/pull|/push` answer 202 with
+  `Location: /repos/{id}/jobs/{job}`; `POST /jobs/{job}/cancel` kills the
+  git process tree (job ends `failed` with `cancelled: true`). `GitJobDto`
+  carries `command`, `startedAt`, `finishedAt`, `cancelled`.
 
 ## Landmines
 - Route parameter names must not repeat inside a group: the group is
@@ -35,7 +51,8 @@
   mutating handlers sync or take the gate inside the handler instead.
 
 ## Why e2e is still serial
-The engine is now concurrency-safe, but the UI boots from `/repos/current`
-(the LAST opened repo, engine-global). A spec that opens a temp repo changes
-what a concurrently booting spec sees. Parallel e2e needs the UI to pin its
-repo (e.g. `?repo=<id>` or per-context storage) — tracked in the backlog.
+Specs that open a temp repo still change the engine-global `/repos/current`
+that a booting spec without a `?repo=` pin resolves. The UI can be pinned
+now (v0.13.12, `session-states.spec.ts` proves two pages stay isolated), so
+parallel e2e is a matter of giving every spec its own pinned repo; until
+then the suite stays serial (Vite 1420 is strictPort anyway).

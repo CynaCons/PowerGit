@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  changeKindOf,
-  engineEventsUrl,
-  fetchCurrent,
-  fetchHealth,
-  fetchRecents,
-  fetchRefs,
-  fetchStashes,
-  fetchStatus,
-  openRepo,
-  type ChangeKind,
-  type RefTree,
-  type RepoStatus,
-  type StashInfo,
-} from "../engine"
+import { report } from "../diagnostics"
+import { changeKindOf, describeThrown, type ChangeKind, type RefTree, type RepoStatus, type StashInfo } from "../engine"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
 
@@ -28,13 +15,16 @@ export type RepoState = ReturnType<typeof useRepoState>
 
 // Refs, working-tree status and stashes, plus the scoped refresh every
 // action funnels through — including the engine's change stream and the
-// boot sequence (the very first refresh).
+// repository load that follows a session becoming "ready".
 export function useRepoState({ session, history }: RepoStateDeps) {
-  const { offline, live, setLive, setOffline, setHealth, setRepo, setEngineError, setRecents } = session
+  const { client, view, setEngineError, setRecents, handleFailure, openRepo } = session
+  const { live } = view
   const { reloadHistory, resetHistory } = history
   const [refs, setRefs] = useState<RefTree | null>(null)
   const [status, setStatus] = useState<RepoStatus | null>(null)
   const [stashes, setStashes] = useState<StashInfo[]>([])
+  /** A refresh is running while previous data stays on screen. */
+  const [refreshing, setRefreshing] = useState(false)
 
   // Per-panel refresh: callers name what an action could have changed so a
   // stage/commit never re-runs the full 4-call sweep. Every piece updates
@@ -42,117 +32,128 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   const lastRefreshAt = useRef(0)
   const refresh = useCallback(
     async (scope?: RefreshScope) => {
+      if (!client.hasRepo) return
       lastRefreshAt.current = Date.now()
+      setRefreshing(true)
       const s = scope ?? { revisions: true, refs: true, status: true, stashes: true }
       const jobs: Promise<unknown>[] = []
-      if (s.revisions) jobs.push(reloadHistory().catch(() => undefined))
-      if (s.refs)
-        jobs.push(
-          fetchRefs()
-            .then(setRefs)
-            .catch(() => undefined),
-        )
-      if (s.status)
-        jobs.push(
-          fetchStatus()
-            .then(setStatus)
-            .catch(() => undefined),
-        )
+      let firstError: string | null = null
+      const fail = (what: string) => (e: unknown) => {
+        const msg = handleFailure(e, what)
+        if (!firstError) firstError = `${what}: ${msg}`
+      }
+      if (s.revisions) jobs.push(reloadHistory().catch(fail("history")))
+      if (s.refs) jobs.push(client.refs().then(setRefs).catch(fail("refs")))
+      if (s.status) jobs.push(client.status().then(setStatus).catch(fail("status")))
       if (s.stashes)
         jobs.push(
-          fetchStashes()
+          client
+            .stashes()
             .then(setStashes)
             .catch(() => setStashes([])),
         )
-      await Promise.all(jobs)
-      lastRefreshAt.current = Date.now()
+      try {
+        await Promise.all(jobs)
+      } finally {
+        setRefreshing(false)
+        lastRefreshAt.current = Date.now()
+      }
+      if (firstError) throw new Error(firstError)
     },
-    [reloadHistory],
+    [client, reloadHistory, handleFailure],
   )
+
+  // Repository load: whenever this window's session changes (boot resolved
+  // it, or the user opened another one) drop the old history and load.
+  const loadedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!client.repoId) {
+      // No session at all (closed, evicted): drop the data. A mere loss of
+      // the engine (recovering) keeps repoId and therefore the last graph.
+      if (loadedFor.current !== null) {
+        resetHistory()
+        setRefs(null)
+        setStatus(null)
+        setStashes([])
+      }
+      loadedFor.current = null
+      return
+    }
+    if (!live) return
+    if (loadedFor.current === client.repoId) return
+    loadedFor.current = client.repoId
+    resetHistory()
+    let cancelled = false
+    // Note: a successful load never clears engineError here — an action
+    // that failed while this load was still in flight (the user is fast)
+    // would have its banner wiped by an unrelated success.
+    void (async () => {
+      try {
+        await refresh()
+      } catch (e) {
+        // One transient failure right after open (cold engine/git) shouldn't
+        // leave the app dataless — retry once before surfacing it.
+        await new Promise((r) => setTimeout(r, 1500))
+        if (cancelled) return
+        try {
+          await refresh()
+        } catch (e2) {
+          setEngineError(describeThrown(e2 ?? e))
+        }
+      }
+      if (cancelled) return
+      try {
+        setRecents(await client.recents())
+      } catch (e) {
+        report("warn", "recents", describeThrown(e))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [live, client, refresh, resetHistory, setEngineError, setRecents])
 
   // Live refresh: the engine streams a change version whenever .git metadata
   // moves (HEAD, refs, index) — external git activity shows up on its own.
   // Debounced so an event burst (e.g. a rebase) refreshes once, and muted
   // right after our own refreshes so in-app actions don't refresh twice.
-  // The low bits of the version classify the change (see engine.ts
-  // `changeKindOf`): a status-only burst (e.g. repeated `git status` index
-  // touches) only re-fetches status instead of the full revisions+refs+
-  // status sweep. "refs" is the superset for the rare mixed burst, so it
-  // always wins over an earlier "status" seen in the same debounce window.
+  // The low bits of the version classify the change (see engine
+  // `changeKindOf`): a status-only burst only re-fetches status instead of
+  // the full revisions+refs+status sweep. "refs" is the superset for the
+  // rare mixed burst, so it always wins over an earlier "status".
   useEffect(() => {
-    if (offline || !live) return
-    // The URL carries the engine token (EventSource cannot send headers) and
-    // is only known once the Tauri port/token handshake resolved.
+    if (!live || !client.hasRepo) return
     let source: EventSource | null = null
-    let cancelled = false
     let timer: number | undefined
     let last: string | null = null
     let pendingKind: ChangeKind = "none"
-    // engineEventsUrl rejects while no repository is open (v0.13.6 sessions):
-    // nothing to watch yet, the next repo change re-runs this effect.
-    void engineEventsUrl()
-      .catch(() => null)
-      .then((url) => {
-        if (cancelled || !url) return
-        source = new EventSource(url)
-        source.onmessage = (e) => {
-          if (last === e.data) return
-          const isFirst = last === null
-          last = e.data
-          if (isFirst) return // initial snapshot, nothing changed
-          if (Date.now() - lastRefreshAt.current < 2000) return // our own action
-          const kind = changeKindOf(Number(e.data))
-          if (pendingKind !== "refs") pendingKind = kind
-          window.clearTimeout(timer)
-          timer = window.setTimeout(() => {
-            const scope: RefreshScope =
-              pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
-            pendingKind = "none"
-            void refresh(scope)
-          }, 400)
-        }
-      })
+    try {
+      source = new EventSource(client.eventsUrl())
+    } catch (e) {
+      report("warn", "events", describeThrown(e))
+      return
+    }
+    source.onmessage = (e) => {
+      if (last === e.data) return
+      const isFirst = last === null
+      last = e.data
+      if (isFirst) return // initial snapshot, nothing changed
+      if (Date.now() - lastRefreshAt.current < 2000) return // our own action
+      const kind = changeKindOf(Number(e.data))
+      if (pendingKind !== "refs") pendingKind = kind
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        const scope: RefreshScope =
+          pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
+        pendingKind = "none"
+        void refresh(scope).catch(() => undefined)
+      }, 400)
+    }
     return () => {
-      cancelled = true
       window.clearTimeout(timer)
       source?.close()
     }
-  }, [offline, live, refresh])
-
-  // Boot: health probe, then the first full refresh (retried once).
-  useEffect(() => {
-    const ctrl = new AbortController()
-    fetchHealth(ctrl.signal)
-      .then(async (h) => {
-        setHealth(h)
-        setEngineError(null)
-        setOffline(false)
-        const currentRepo = await fetchCurrent()
-        if (currentRepo) setRepo(currentRepo)
-        try {
-          await refresh()
-          setRecents(await fetchRecents())
-        } catch {
-          // One transient failure at boot (cold engine/git) shouldn't leave
-          // the app dataless — retry once before giving up.
-          await new Promise((r) => setTimeout(r, 1500))
-          try {
-            await refresh()
-            setRecents(await fetchRecents())
-          } catch {
-            setLive(false)
-          }
-        }
-      })
-      .catch(() => {
-        // StrictMode remounts abort the first run; that is not "engine down".
-        if (ctrl.signal.aborted) return
-        setHealth(null)
-        setEngineError(null)
-        setOffline(true)
-      })
-    return () => ctrl.abort()
-  }, [refresh, setHealth, setEngineError, setOffline, setRepo, setRecents, setLive])
+  }, [live, client, refresh])
 
   async function openFolder(path?: string) {
     let target = path
@@ -170,13 +171,11 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     }
     try {
       const info = await openRepo(target)
-      setRepo(info)
       setEngineError(null)
-      resetHistory()
-      await refresh()
-      setRecents(await fetchRecents())
+      // Same session reopened: the load effect will not fire, refresh here.
+      if (loadedFor.current === info.id) await refresh()
     } catch (err) {
-      setEngineError(err instanceof Error ? err.message : "open failed")
+      setEngineError(`Open repository: ${handleFailure(err, "open")}`)
     }
   }
 
@@ -194,6 +193,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     status,
     setStatus,
     stashes,
+    refreshing,
     refresh,
     openFolder,
     branchNames,

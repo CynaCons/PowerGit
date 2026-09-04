@@ -3,20 +3,18 @@ import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
 import Tabs from "@mui/material/Tabs"
 import Typography from "@mui/material/Typography"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { CompactFileList } from "./CompactFileList"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { SplitHandle } from "./SplitHandle"
 import { BlobPane } from "./BlobPane"
+import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import {
   describeThrown,
-  fetchBlob,
-  fetchCommit,
-  fetchDiff,
-  fetchFiles,
-  openDifftool,
+  isAbort,
+  useEngine,
   type CommitDetail,
   type DiffDto,
   type DiffOptions,
@@ -56,98 +54,119 @@ function writeStoredFilesWidth(width: number): void {
   }
 }
 
+type Loadable<T> =
+  { kind: "idle" } | { kind: "loading" } | { kind: "ready"; value: T } | { kind: "error"; message: string }
+
 export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
+  const engine = useEngine()
   const [tabState, setTabState] = useState(0)
   const tab = tabProp ?? tabState
   const setTab = onTab ?? setTabState
-  const [detail, setDetail] = useState<CommitDetail | null>(null)
+  const [detail, setDetail] = useState<Loadable<CommitDetail>>({ kind: "idle" })
   const [files, setFiles] = useState<FileChange[]>([])
   const [file, setFile] = useState<string | null>(null)
-  const [diff, setDiff] = useState<DiffDto | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [diff, setDiff] = useState<Loadable<DiffDto>>({ kind: "idle" })
   const [diffOpts, setDiffOpts] = useState<DiffOptions>(DEFAULT_DIFF_OPTIONS)
   const [treeFile, setTreeFile] = useState<string | null>(null)
-  const [blob, setBlob] = useState<DiffDto | null>(null)
+  const [blob, setBlob] = useState<Loadable<DiffDto>>({ kind: "idle" })
   const [diffToolError, setDiffToolError] = useState<string | null>(null)
+  const [reloadTick, setReloadTick] = useState(0)
   // Shared by the Files (Diff) tab and File Tree tab so both file columns
   // resize together and remember one width across sessions.
   const [filesWidth, setFilesWidth] = useState<number>(() => readStoredFilesWidth())
   const panelRef = useRef<HTMLDivElement | null>(null)
 
+  const commitId = current && current.rev.id.length >= 16 ? current.rev.id : null
+
+  // Latest selection wins (v0.13.11): every request below is tied to an
+  // AbortController the cleanup aborts, so arrow-keying through rows never
+  // leaves stale git children running or stale responses applied.
   useEffect(() => {
-    if (!current) {
-      setDetail(null)
+    if (!commitId) {
+      setDetail({ kind: "idle" })
       setFiles([])
       setFile(null)
-      setDiff(null)
+      setDiff({ kind: "idle" })
       setTreeFile(null)
-      setBlob(null)
+      setBlob({ kind: "idle" })
       setDiffToolError(null)
       return
     }
-
-    const id = current.rev.id
-    if (id.length < 16) {
-      return
-    }
+    const ctrl = new AbortController()
     // Debounced: arrow-keying or click-scrubbing through rows must not fire
     // two engine requests per intermediate row.
     const timer = setTimeout(() => {
-      setError(null)
+      setDetail({ kind: "loading" })
       setFile(null)
-      setDiff(null)
+      setDiff({ kind: "idle" })
       setTreeFile(null)
-      setBlob(null)
+      setBlob({ kind: "idle" })
       setDiffToolError(null)
-      fetchCommit(id)
-        .then(setDetail)
-        .catch((e: unknown) => setError(`commit failed: ${describeThrown(e)}`))
-      fetchFiles(id)
+      engine
+        .commit(commitId, ctrl.signal)
+        .then((d) => {
+          if (!ctrl.signal.aborted) setDetail({ kind: "ready", value: d })
+        })
+        .catch((e: unknown) => {
+          if (!ctrl.signal.aborted && !isAbort(e))
+            setDetail({ kind: "error", message: `commit failed: ${describeThrown(e)}` })
+        })
+      engine
+        .files(commitId, ctrl.signal)
         .then((list) => {
+          if (ctrl.signal.aborted) return
           setFiles(list)
           if (list[0]) setFile(list[0].path)
         })
-        .catch(() => setFiles([]))
+        .catch(() => {
+          if (!ctrl.signal.aborted) setFiles([])
+        })
     }, 150)
-    return () => clearTimeout(timer)
-  }, [current])
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  }, [engine, commitId, reloadTick])
 
   useEffect(() => {
-    if (!current || !file || current.rev.id.length < 16 || tab === 2) {
-      if (tab !== 1) setDiff(null)
+    if (!commitId || !file || tab === 2) {
+      if (tab !== 1) setDiff({ kind: "idle" })
       return
     }
-    let cancelled = false
-    fetchDiff(current.rev.id, file, diffOpts)
+    const ctrl = new AbortController()
+    setDiff((d) => (d.kind === "ready" && d.value.path === file ? d : { kind: "loading" }))
+    engine
+      .diff(commitId, file, diffOpts, ctrl.signal)
       .then((d) => {
-        if (!cancelled) setDiff(d)
+        if (!ctrl.signal.aborted) setDiff({ kind: "ready", value: d })
       })
       .catch((e: unknown) => {
-        if (!cancelled) setDiff({ path: file, text: `diff failed: ${describeThrown(e)}`, binary: false })
+        if (!ctrl.signal.aborted && !isAbort(e))
+          setDiff({ kind: "error", message: `diff failed: ${describeThrown(e)}` })
       })
-    return () => {
-      cancelled = true
-    }
-  }, [current, file, diffOpts, tab])
+    return () => ctrl.abort()
+  }, [engine, commitId, file, diffOpts, tab, reloadTick])
 
   useEffect(() => {
-    if (!current || !treeFile || current.rev.id.length < 16) {
-      setBlob(null)
+    if (!commitId || !treeFile) {
+      setBlob({ kind: "idle" })
       return
     }
-    let cancelled = false
-    setBlob(null)
-    fetchBlob(current.rev.id, treeFile)
+    const ctrl = new AbortController()
+    setBlob({ kind: "loading" })
+    engine
+      .blob(commitId, treeFile, ctrl.signal)
       .then((b) => {
-        if (!cancelled) setBlob(b)
+        if (!ctrl.signal.aborted) setBlob({ kind: "ready", value: b })
       })
       .catch((e: unknown) => {
-        if (!cancelled) setBlob({ path: treeFile, text: `open failed: ${describeThrown(e)}`, binary: false })
+        if (!ctrl.signal.aborted && !isAbort(e))
+          setBlob({ kind: "error", message: `open failed: ${describeThrown(e)}` })
       })
-    return () => {
-      cancelled = true
-    }
-  }, [current, treeFile])
+    return () => ctrl.abort()
+  }, [engine, commitId, treeFile, reloadTick])
+
+  const reload = useCallback(() => setReloadTick((t) => t + 1), [])
 
   const splitHandleProps = {
     testid: "bottom-split-handle",
@@ -165,11 +184,11 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   // runs the tool in the background and returns immediately, so this only
   // surfaces a validation/startup error, not the tool's own exit status.
   function openInDifftool(path: string) {
-    if (!current || current.rev.id.length < 16) return
+    if (!commitId) return
     setDiffToolError(null)
-    void openDifftool(current.rev.id, path).catch((e: unknown) =>
-      setDiffToolError(`open in diff tool failed: ${describeThrown(e)}`),
-    )
+    void engine
+      .openDifftool(commitId, path)
+      .catch((e: unknown) => setDiffToolError(`open in diff tool failed: ${describeThrown(e)}`))
   }
 
   return (
@@ -193,46 +212,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         <Tab label="File Tree" />
       </Tabs>
       <Box ref={panelRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-        {tab === 0 && (
-          <Box data-testid="commit-info" sx={{ flex: 1, overflow: "auto", p: 2 }}>
-            {error && <Typography color="error">{error}</Typography>}
-            {detail ? (
-              <>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {detail.subject}
-                </Typography>
-                {detail.body ? (
-                  <Typography variant="body2" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
-                    {detail.body}
-                  </Typography>
-                ) : null}
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Author: {detail.author} &lt;{detail.authorEmail}&gt; · {formatWhen(detail.authorDate)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Committer: {detail.committer} &lt;{detail.committerEmail}&gt; · {formatWhen(detail.commitDate)}
-                </Typography>
-                {detail.parents.length > 0 && (
-                  <Typography
-                    variant="caption"
-                    sx={{ display: "block", mt: 1, fontFamily: "Fira Code, ui-monospace, monospace" }}
-                  >
-                    Parents: {detail.parents.map((p) => p.slice(0, 7)).join(" ")}
-                  </Typography>
-                )}
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 1, display: "block", fontFamily: "Fira Code, ui-monospace, monospace" }}
-                >
-                  {detail.id}
-                </Typography>
-              </>
-            ) : (
-              <Typography color="text.secondary">{current ? "Loading…" : "Select a revision"}</Typography>
-            )}
-          </Box>
-        )}
+        {tab === 0 && <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} />}
         {tab === 1 && (
           <>
             <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
@@ -256,23 +236,95 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
               )}
             </Box>
             <SplitHandle {...splitHandleProps} />
-            <DiffPane diff={diff} file={file} options={diffOpts} onOptions={setDiffOpts} />
+            <DiffPane
+              diff={diff}
+              file={file}
+              options={diffOpts}
+              onOptions={setDiffOpts}
+              onRetry={reload}
+              onOpenDifftool={file ? () => openInDifftool(file) : undefined}
+            />
           </>
         )}
         {tab === 2 && (
           <>
             <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto" }} data-testid="commit-file-tree-wrap">
-              <CommitFileTree
-                commitId={current && current.rev.id.length >= 16 ? current.rev.id : null}
-                onSelectFile={(path) => setTreeFile(path)}
-              />
+              <CommitFileTree commitId={commitId} onSelectFile={(path) => setTreeFile(path)} />
             </Box>
             <SplitHandle {...splitHandleProps} />
-            <BlobPane blob={blob} path={treeFile} />
+            {blob.kind === "error" ? (
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <ErrorState message={blob.message} onRetry={reload} testid="blob-error" />
+              </Box>
+            ) : (
+              <BlobPane
+                blob={blob.kind === "ready" ? blob.value : null}
+                path={treeFile}
+                onRetry={reload}
+                onOpenDifftool={treeFile ? () => openInDifftool(treeFile) : undefined}
+              />
+            )}
           </>
         )}
       </Box>
     </Paper>
+  )
+}
+
+function CommitInfo({
+  detail,
+  hasCurrent,
+  onRetry,
+}: {
+  detail: Loadable<CommitDetail>
+  hasCurrent: boolean
+  onRetry: () => void
+}) {
+  return (
+    <Box data-testid="commit-info" sx={{ flex: 1, overflow: "auto", p: detail.kind === "ready" ? 2 : 0 }}>
+      {detail.kind === "error" && <ErrorState message={detail.message} onRetry={onRetry} testid="commit-error" />}
+      {detail.kind === "loading" && <LoadingState label="Loading commit…" testid="commit-loading" />}
+      {detail.kind === "idle" && (
+        <EmptyState text={hasCurrent ? "Loading commit…" : "Select a revision"} testid="commit-empty" />
+      )}
+      {detail.kind === "ready" && <CommitDetailView detail={detail.value} />}
+    </Box>
+  )
+}
+
+function CommitDetailView({ detail }: { detail: CommitDetail }) {
+  return (
+    <>
+      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+        {detail.subject}
+      </Typography>
+      {detail.body ? (
+        <Typography variant="body2" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
+          {detail.body}
+        </Typography>
+      ) : null}
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        Author: {detail.author} &lt;{detail.authorEmail}&gt; · {formatWhen(detail.authorDate)}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Committer: {detail.committer} &lt;{detail.committerEmail}&gt; · {formatWhen(detail.commitDate)}
+      </Typography>
+      {detail.parents.length > 0 && (
+        <Typography
+          variant="caption"
+          sx={{ display: "block", mt: 1, fontFamily: "Fira Code, ui-monospace, monospace" }}
+        >
+          Parents: {detail.parents.map((p) => p.slice(0, 7)).join(" ")}
+        </Typography>
+      )}
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ mt: 1, display: "block", fontFamily: "Fira Code, ui-monospace, monospace" }}
+      >
+        {detail.id}
+      </Typography>
+    </>
   )
 }
 
@@ -281,26 +333,31 @@ function DiffPane({
   file,
   options,
   onOptions,
+  onRetry,
+  onOpenDifftool,
 }: {
-  diff: DiffDto | null
+  diff: Loadable<DiffDto>
   file: string | null
   options: DiffOptions
   onOptions: (o: DiffOptions) => void
+  onRetry: () => void
+  onOpenDifftool?: () => void
 }) {
   return (
     <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box
         data-testid="diff-pane"
-        sx={{
-          m: 0,
-          p: 2,
-          flex: 1,
-          minWidth: 0,
-          overflow: "auto",
-          bgcolor: "#ffffff",
-        }}
+        sx={{ m: 0, flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", bgcolor: "#ffffff" }}
       >
-        {diff ? <DiffView text={diff.text} /> : file ? "Loading diff…" : "Select a file."}
+        {diff.kind === "ready" ? (
+          <DiffView diff={diff.value} onRetry={onRetry} onOpenDifftool={onOpenDifftool} />
+        ) : diff.kind === "error" ? (
+          <ErrorState message={diff.message} onRetry={onRetry} testid="diff-error" />
+        ) : diff.kind === "loading" || file ? (
+          <LoadingState label="Loading diff…" testid="diff-loading" />
+        ) : (
+          <EmptyState text="Select a file." testid="diff-empty" />
+        )}
       </Box>
       <DiffOptionsBar options={options} onChange={onOptions} />
     </Box>

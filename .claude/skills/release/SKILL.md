@@ -85,6 +85,17 @@ and a Linux job (AppImage + deb, engine sidecar via
 Watch the Actions run; if it fails, fix forward and re-tag (`vX.Y.Z+1` or
 delete/re-push the tag only if the release has no downloads yet).
 
+The Linux job is gated (v0.13.10): `scripts/inspect-appimage.sh --self-test`,
+then `--fix --strict` (strips the host-provided families: GLib/GIO,
+libmount/libblkid, Wayland client libs, GStreamer, curl/nghttp2), then
+`docker/appimage-check/run-matrix.sh` launches the repaired artifact in
+stock ubuntu:22.04 / 24.04 / 26.04 and fails on a missing first paint or a
+fatal stderr pattern. A red matrix means the AppImage must not ship; see
+docs/agents/memories/appimage-compat-matrix.md to reproduce locally.
+Before a minor release also run the 10-minute longevity gate once on 26.04
+(`scripts/appimage-matrix.ps1 <file> -Versions "26.04" -Longevity 10`, and
+again with `DISPLAY_MODE=wayland`).
+
 ## 4. GitHub release notes
 
 Use `gh release view vX.Y.Z --web` / `gh release edit` to add notes:

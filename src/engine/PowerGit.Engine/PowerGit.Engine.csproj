@@ -15,4 +15,7 @@
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PowerGit.Engine.Tests" />
+  </ItemGroup>
 </Project>

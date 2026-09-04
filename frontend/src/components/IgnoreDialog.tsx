@@ -7,7 +7,7 @@ import DialogTitle from "@mui/material/DialogTitle"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
-import { previewIgnore, type IgnorePreview } from "../engine"
+import { useEngine, type IgnorePreview } from "../engine"
 
 type Props = {
   open: boolean
@@ -19,6 +19,7 @@ type Props = {
 // Mirrors Git Extensions' "Add to .gitignore" dialog: pattern edit plus a
 // live preview of the files that would be ignored, with a match count.
 export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props) {
+  const engine = useEngine()
   const [pattern, setPattern] = useState(initialPattern)
   const [preview, setPreview] = useState<IgnorePreview | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +38,8 @@ export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props
     }
     let cancelled = false
     const t = setTimeout(() => {
-      previewIgnore(pattern)
+      engine
+        .previewIgnore(pattern)
         .then((p) => {
           if (!cancelled) setPreview(p)
         })
@@ -49,7 +51,7 @@ export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props
       cancelled = true
       clearTimeout(t)
     }
-  }, [open, pattern])
+  }, [engine, open, pattern])
 
   async function confirm() {
     try {

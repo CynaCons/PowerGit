@@ -1,7 +1,7 @@
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
-import { cherryPickCommit } from "../../engine"
+import { useEngine } from "../../engine"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
 
@@ -20,10 +20,11 @@ export function CherryPickDialog({
   subject?: string
   onClose: () => void
 }) {
+  const engine = useEngine()
   const { busy, error, submit } = useActionDialog({
     open,
     label: "cherry-pick",
-    action: () => cherryPickCommit(commit).then(() => undefined),
+    action: () => engine.cherryPick(commit).then(() => undefined),
     onClose,
   })
 

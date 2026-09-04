@@ -2,6 +2,7 @@ import type { RepoInfo } from "../../engine"
 import { focusGrid } from "../../hooks/focusGrid"
 import type { Dialogs } from "../../hooks/useDialogs"
 import type { GitActions } from "../../hooks/useGitActions"
+import type { Jobs } from "../../hooks/useJobs"
 import type { RepoState } from "../../hooks/useRepoState"
 import { CommitDialog } from "../CommitDialog"
 import { RecentsDialog } from "../RecentsDialog"
@@ -12,6 +13,7 @@ import { CheckoutBranchDialog } from "./CheckoutBranchDialog"
 import { CreateRefDialog } from "./CreateRefDialog"
 import { RebaseDialog } from "./RebaseDialog"
 import { ResetBranchDialog } from "./ResetBranchDialog"
+import { PullPushPreview } from "./PullPushPreview"
 import { RevisionContextMenu } from "./RevisionContextMenu"
 
 export type AppDialogsProps = {
@@ -20,12 +22,13 @@ export type AppDialogsProps = {
   repo: RepoInfo | null
   recents: RepoInfo[]
   repoState: Pick<RepoState, "status" | "setStatus" | "refs" | "branchNames" | "dirty" | "refresh" | "openFolder">
+  jobs: Jobs
 }
 
 // Every modal surface of the shell, driven by the single DialogState. The
 // always-mounted MUI dialogs (commit, settings, recents, stash) get an
 // `open` flag so their exit transitions play; the rest mount on demand.
-export function AppDialogs({ dialogs, actions, repo, recents, repoState }: AppDialogsProps) {
+export function AppDialogs({ dialogs, actions, repo, recents, repoState, jobs }: AppDialogsProps) {
   const { dialog, open, close } = dialogs
   const { status, setStatus, refs, branchNames, dirty, refresh, openFolder } = repoState
   const ctxTarget = dialog.kind === "context" ? dialog.target : null
@@ -139,11 +142,23 @@ export function AppDialogs({ dialogs, actions, repo, recents, repoState }: AppDi
         dirtyCount={dirty}
         onClose={() => {
           close("stash")
-          void refresh({ revisions: true, status: true, stashes: true })
+          void refresh({ revisions: true, status: true, stashes: true }).catch(() => undefined)
           focusGrid()
         }}
         onStatus={setStatus}
       />
+      {jobs.preview && (
+        <PullPushPreview
+          kind={jobs.preview}
+          repo={repo}
+          status={status}
+          jobs={jobs}
+          onClose={() => {
+            jobs.closePreview()
+            focusGrid()
+          }}
+        />
+      )}
     </>
   )
 }

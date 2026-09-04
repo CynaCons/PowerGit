@@ -5,7 +5,7 @@ public sealed partial class GitHost
     private const char Field = '\u001f';
     private const char Record = '\u001e';
 
-    public IReadOnlyList<RevisionDto> ListRevisions(int max = 800, int skip = 0)
+    public IReadOnlyList<RevisionDto> ListRevisions(int max = 800, int skip = 0, CancellationToken ct = default)
     {
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
@@ -53,7 +53,7 @@ public sealed partial class GitHost
             logArgs.Add("refs/stash");
         }
 
-        CommandResult log = RunTimed(root, 120_000, [.. logArgs]);
+        CommandResult log = RunTimed(root, 120_000, ct, [.. logArgs]);
 
         if (log.ExitCode != 0)
         {
@@ -94,11 +94,13 @@ public sealed partial class GitHost
         return rows;
     }
 
-    public CommitDetailDto GetCommit(string id)
+    public CommitDetailDto GetCommit(string id, CancellationToken ct = default)
     {
         string root = RequireRoot();
-        CommandResult show = Run(
+        CommandResult show = RunTimed(
             root,
+            30_000,
+            ct,
             "-c", "core.quotepath=false",
             "show", "-s",
             $"--format=%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%cI{Field}%s{Field}%D{Field}%b",
@@ -122,11 +124,13 @@ public sealed partial class GitHost
             ParseDecorations(f[9]));
     }
 
-    public IReadOnlyList<FileChangeDto> ListFiles(string id)
+    public IReadOnlyList<FileChangeDto> ListFiles(string id, CancellationToken ct = default)
     {
         string root = RequireRoot();
-        CommandResult diff = Run(
+        CommandResult diff = RunTimed(
             root,
+            30_000,
+            ct,
             "-c", "core.quotepath=false",
             "diff-tree", "--root", "-r", "--no-commit-id", "--name-status", "-M", id);
         if (diff.ExitCode != 0)
@@ -151,7 +155,7 @@ public sealed partial class GitHost
         return files;
     }
 
-    public DiffDto GetDiff(string id, string path, int context = 3, bool ignoreWhitespace = false, bool fullFile = false)
+    public DiffDto GetDiff(string id, string path, int context = 3, bool ignoreWhitespace = false, bool fullFile = false, CancellationToken ct = default)
     {
         string root = RequireRoot();
         int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
@@ -166,28 +170,63 @@ public sealed partial class GitHost
         }
 
         args.AddRange(["--", path]);
-        CommandResult show = RunTimed(root, 30_000, [.. args]);
+        GitProcess.Result show = RunCapped(root, 30_000, ct, MaxDiffChars, [.. args]);
         if (show.ExitCode != 0)
         {
             throw new InvalidOperationException(show.StdErr.Trim());
         }
 
-        string text = show.StdOut;
-        bool binary = text.Contains("Binary files ", StringComparison.Ordinal) || text.Contains("\0", StringComparison.Ordinal);
-        if (binary)
-        {
-            return new DiffDto(path, "Binary file (not shown)", true);
-        }
-
-        if (text.Length > 1_000_000)
-        {
-            text = text[..1_000_000] + "\n… truncated …";
-        }
-
-        return new DiffDto(path, string.IsNullOrWhiteSpace(text) ? "(no textual diff)" : text, false);
+        return BoundDiffText(path, show.StdOut, show.StdOutTruncated, "(no textual diff)");
     }
 
-    public IReadOnlyList<TreeEntryDto> ListTree(string id, string? path)
+    /// <summary>Largest diff text handed to the UI, in UTF-16 chars (~1 MB).</summary>
+    public const int MaxDiffChars = 1_000_000;
+
+    /// <summary>Largest blob loaded for preview; bigger objects come back truncated to this.</summary>
+    public const long MaxBlobBytes = 2 * 1024 * 1024;
+
+    /// <summary>Line ceiling for any text handed to the UI, independent of byte size.</summary>
+    public const int MaxLines = 50_000;
+
+    private static DiffDto BoundDiffText(string path, string text, bool capped, string emptyText)
+    {
+        bool binary = text.Contains("Binary files ", StringComparison.Ordinal) || text.Contains('\0');
+        if (binary)
+        {
+            return new DiffDto(path, "Binary file (not shown)", true, text.Length);
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return new DiffDto(path, emptyText, false, 0);
+        }
+
+        return BoundLines(path, text, text.Length, capped ? "size" : null);
+    }
+
+    /// <summary>Applies <see cref="MaxLines"/> and stamps the truncation metadata.</summary>
+    private static DiffDto BoundLines(string path, string text, long sizeBytes, string? reason)
+    {
+        int lines = 0;
+        int cut = -1;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\n' && ++lines >= MaxLines)
+            {
+                cut = i;
+                break;
+            }
+        }
+
+        if (cut >= 0)
+        {
+            return new DiffDto(path, text[..cut], false, sizeBytes, true, reason ?? "lines");
+        }
+
+        return new DiffDto(path, text, false, sizeBytes, reason is not null, reason);
+    }
+
+    public IReadOnlyList<TreeEntryDto> ListTree(string id, string? path, CancellationToken ct = default)
     {
         string root = RequireRoot();
         // With a pathspec git ls-tree emits repo-root-relative paths; the DTO
@@ -203,7 +242,7 @@ public sealed partial class GitHost
 
         // Timed: a hung ls-tree must surface as an error in the UI, not as
         // an expansion that silently stays empty.
-        CommandResult result = RunTimed(root, 30_000, [.. args]);
+        CommandResult result = RunTimed(root, 30_000, ct, [.. args]);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(result.StdErr.Trim());
@@ -236,24 +275,36 @@ public sealed partial class GitHost
         return [.. entries.OrderBy(e => e.Type != "tree").ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
-    public DiffDto GetBlob(string id, string path)
+    public DiffDto GetBlob(string id, string path, CancellationToken ct = default)
     {
         string root = RequireRoot();
-        CommandResult result = RunTimed(root, 30_000, "-c", "core.quotepath=false", "show", $"{id}:{path.Replace('\\', '/')}");
-        if (result.ExitCode != 0)
+        string spec = $"{id}:{path.Replace('\\', '/')}";
+
+        // Probe the size before allocating anything: `git show` of a 500 MB
+        // asset used to be read into one string and handed to WebKit.
+        CommandResult size = RunTimed(root, 30_000, ct, "cat-file", "-s", spec);
+        if (size.ExitCode != 0)
+        {
+            throw new InvalidOperationException(size.StdErr.Trim());
+        }
+
+        long bytes = long.TryParse(size.StdOut.Trim(), out long parsed) ? parsed : 0;
+        int cap = bytes > MaxBlobBytes ? (int)MaxBlobBytes : int.MaxValue;
+        GitProcess.Result result = RunCapped(root, 30_000, ct, cap, "-c", "core.quotepath=false", "show", spec);
+        if (!result.StdOutTruncated && result.ExitCode != 0)
         {
             throw new InvalidOperationException(result.StdErr.Trim());
         }
 
         if (result.StdOut.Contains('\0'))
         {
-            return new DiffDto(path, "Binary file (not shown)", true);
+            return new DiffDto(path, "Binary file (not shown)", true, bytes);
         }
 
-        return new DiffDto(path, result.StdOut, false);
+        return BoundLines(path, result.StdOut, bytes, result.StdOutTruncated || bytes > MaxBlobBytes ? "size" : null);
     }
 
-    public DiffDto GetWorkTreeDiff(string path, bool staged, int context = 3, bool ignoreWhitespace = false, bool fullFile = false)
+    public DiffDto GetWorkTreeDiff(string path, bool staged, int context = 3, bool ignoreWhitespace = false, bool fullFile = false, CancellationToken ct = default)
     {
         string root = RequireRoot();
         int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
@@ -282,19 +333,13 @@ public sealed partial class GitHost
         }
 
         args.AddRange(["--", path]);
-        CommandResult result = Run(root, [.. args]);
+        GitProcess.Result result = RunCapped(root, 30_000, ct, MaxDiffChars, [.. args]);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(result.StdErr.Trim());
         }
 
-        string text = result.StdOut;
-        if (text.Length > 1_000_000)
-        {
-            text = text[..1_000_000] + "\n… truncated …";
-        }
-
-        return new DiffDto(path, string.IsNullOrWhiteSpace(text) ? "(no diff)" : text, false);
+        return BoundDiffText(path, result.StdOut, result.StdOutTruncated, "(no diff)");
     }
 
     public RepoStatusDto GetStatus()
@@ -331,7 +376,10 @@ public sealed partial class GitHost
         }
 
         (int? ahead, int? behind) = GetAheadBehind(root);
-        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind);
+        // v0.13.12: the Pull/Push previews name the upstream explicitly.
+        CommandResult up = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}");
+        string? upstream = up.ExitCode == 0 && !string.IsNullOrWhiteSpace(up.StdOut) ? up.StdOut.Trim() : null;
+        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind, upstream);
     }
 
     // Branches without an upstream (or a detached HEAD) make `@{upstream}`

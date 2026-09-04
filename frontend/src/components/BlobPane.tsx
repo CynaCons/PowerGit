@@ -1,9 +1,12 @@
 import Box from "@mui/material/Box"
 import Typography from "@mui/material/Typography"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { DiffDto } from "../engine"
 import { highlightToHtml, languageForPath } from "../highlight"
 import { codeSx, MONO_FONT } from "../theme"
+import { ContentNotice } from "./ContentNotice"
+import { LoadingState } from "./AsyncState"
+import { VirtualLines } from "./VirtualLines"
 
 // Shared by both the plain-text and Shiki-highlighted render paths so
 // toggling between them (highlighting resolves after the plain text is
@@ -16,7 +19,7 @@ const BLOB_PANE_SX = {
   overflow: "auto",
   ...codeSx,
   fontSize: 12,
-  lineHeight: 1.5,
+  lineHeight: "18px",
   bgcolor: "#ffffff",
   whiteSpace: "pre",
 } as const
@@ -44,11 +47,31 @@ const BLOB_PANE_HTML_SX = {
   },
 } as const
 
-export function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | null }) {
+/** Above this many characters Shiki is skipped and the plain virtualized
+ *  path is used: tokenizing a multi-megabyte file blocks the UI thread and
+ *  its HTML would be a million-element tree. */
+export const HIGHLIGHT_MAX_CHARS = 200_000
+
+/** Files up to this many lines render as one plain <pre> (exact text, whole-
+ *  file selection/copy); longer ones are virtualized. */
+export const VIRTUALIZE_MIN_LINES = 2_000
+
+export function BlobPane({
+  blob,
+  path,
+  onOpenDifftool,
+  onRetry,
+}: {
+  blob: DiffDto | null
+  path: string | null
+  onOpenDifftool?: () => void
+  onRetry?: () => void
+}) {
   const [html, setHtml] = useState<string | null>(null)
   // The effect keys on the text, not the DTO: a refetch that yields the same
   // bytes must not re-run the highlighter.
   const text = blob?.text ?? null
+  const highlightable = text !== null && text.length <= HIGHLIGHT_MAX_CHARS && !blob?.binary
 
   useEffect(() => {
     // Reset synchronously (not just on failure) so a fast file switch never
@@ -56,7 +79,7 @@ export function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | 
     // correct in the interim, until (and unless) this file's own highlight
     // resolves.
     setHtml(null)
-    if (text === null) return
+    if (text === null || !highlightable) return
     const lang = path ? languageForPath(path) : null
     if (!lang) return
     let cancelled = false
@@ -66,7 +89,9 @@ export function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | 
     return () => {
       cancelled = true
     }
-  }, [text, path])
+  }, [text, path, highlightable])
+
+  const lines = useMemo(() => (text === null ? [] : text.split("\n")), [text])
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -75,6 +100,7 @@ export function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | 
           {path ?? "Select a file in the tree."}
         </Typography>
       </Box>
+      {blob && <ContentNotice dto={blob} onOpenDifftool={onOpenDifftool} onRetry={onRetry} />}
       {html ? (
         <Box
           data-testid="blob-pane"
@@ -84,10 +110,24 @@ export function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | 
           // itself, so nothing here interpolates raw file text into HTML.
           dangerouslySetInnerHTML={{ __html: html }}
         />
-      ) : (
+      ) : blob && lines.length <= VIRTUALIZE_MIN_LINES ? (
         <Box data-testid="blob-pane" component="pre" sx={BLOB_PANE_SX}>
-          {blob ? blob.text : path ? "Loading…" : ""}
+          {blob.text}
         </Box>
+      ) : blob ? (
+        <Box data-testid="blob-pane" sx={{ ...BLOB_PANE_SX, p: 0, display: "flex", flexDirection: "column" }}>
+          <VirtualLines
+            count={lines.length}
+            ariaLabel={path ? `Contents of ${path}` : "File contents"}
+            testid="blob-lines"
+            sx={{ padding: "16px" }}
+            renderLine={(i) => <span>{lines[i] || " "}</span>}
+          />
+        </Box>
+      ) : path ? (
+        <LoadingState label="Loading file…" testid="blob-loading" />
+      ) : (
+        <Box data-testid="blob-pane" component="pre" sx={BLOB_PANE_SX} />
       )}
     </Box>
   )

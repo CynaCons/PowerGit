@@ -160,8 +160,9 @@ what is still open, which memory files you added or updated.
 
 - website/ — React showcase site deployed to GitHub Pages (workflow:
   .github/workflows/pages.yml). The live demo at /PowerGit/demo/ is the
-  real frontend built with a /PowerGit/demo/ Vite base; it renders its
-  built-in synthetic history when no engine is reachable.
+  real frontend built with a /PowerGit/demo/ Vite base and `VITE_DEMO=1`.
+  Sample data is only ever shown in explicit demo mode (`VITE_DEMO=1` or
+  `?demo=1`, v0.13.12); an unreachable engine shows the recovery states.
 - Screenshots: canonical location is website/public/assets/. Regenerate with
   `node frontend/scripts/capture-showcase.mjs` (needs a live engine).
   Do not write screenshots anywhere else.
@@ -177,3 +178,14 @@ what is still open, which memory files you added or updated.
 - Linux smoke check: pwsh scripts/ubuntu-check.ps1 (requires Docker Desktop).
 - Engine sessions (v0.13.6): every repo route is `/repos/{id}/...`; a colliding
   mutation answers 409. See docs/agents/memories/engine-sessions.md.
+- Engine client (v0.13.12): `frontend/src/engine/` — immutable
+  `EngineClient` per `{baseUrl, token, repoId}`, `useEngine()` in components,
+  `?repo=<id>` pins a window. Session phases are one state machine
+  (`src/session/state.ts`); see docs/agents/memories/frontend-session-state.md.
+- Every git child runs through `GitProcess` (v0.13.10): concurrent pipe
+  draining, timeout armed up front, tree kill, stdout cap. Read routes pass
+  `HttpContext.RequestAborted`; the UI aborts superseded requests. See
+  docs/agents/memories/engine-process-runner.md.
+- AppImage/Linux: supported Ubuntu 22.04/24.04/26.04, guarded by
+  `docker/appimage-check/run-matrix.sh` in release.yml; see
+  docs/agents/memories/appimage-compat-matrix.md.

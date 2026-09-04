@@ -21,7 +21,10 @@
 #   10 s into <out-dir>/<version>/rss.csv and fails on a WebKitWebProcess /
 #   WebKitGPUProcess / powergit-engine exit or RSS > RSS_BUDGET_MB (1500).
 #
-# Env: SMOKE_SECONDS, RSS_BUDGET_MB, HEALTH_TIMEOUT, DOCKER (binary name).
+# Env: SMOKE_SECONDS, RSS_BUDGET_MB, HEALTH_TIMEOUT, DOCKER (binary name),
+#      DISPLAY_MODE=x11|wayland (longevity; weston headless), INJECT_FAILURE=1
+#      (longevity; kills the engine halfway and requires the supervised
+#      restart, >= v0.13.11 builds), API_BUDGET_S (max seconds per API read).
 # Windows/Git Bash: run through scripts/appimage-matrix.ps1, or export
 # MSYS_NO_PATHCONV=1 so "/app/..." mount targets are not rewritten.
 set -uo pipefail
@@ -71,6 +74,9 @@ for v in $VERSIONS; do
     -e SMOKE_SECONDS="${SMOKE_SECONDS:-20}" \
     -e RSS_BUDGET_MB="${RSS_BUDGET_MB:-1500}" \
     -e HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-30}" \
+    -e DISPLAY_MODE="${DISPLAY_MODE:-x11}" \
+    -e INJECT_FAILURE="${INJECT_FAILURE:-0}" \
+    -e API_BUDGET_S="${API_BUDGET_S:-5}" \
     -v "$APP_ABS:/app/PowerGit.AppImage:ro" \
     -v "$OUT_ABS/launch.sh:/launch.sh:ro" \
     -v "$OUT_ABS/$v:/out" \
