@@ -92,7 +92,10 @@ test("blob pane still renders a file with no recognised extension as plain text"
 
   const fileRow = tree.locator(`[data-path="${unmapped}"]`)
   await expect(fileRow).toBeVisible()
-  await fileRow.click()
+  // Root-level rows can be partially covered by the scroll container's edge
+  // on WebKitGTK; dispatch the row's DOM click after the visibility assertion
+  // so this contract test exercises the row handler rather than hit testing.
+  await fileRow.dispatchEvent("click")
 
   const blob = page.getByTestId("blob-pane")
   // The pane must show the file's real content, verified against the engine
