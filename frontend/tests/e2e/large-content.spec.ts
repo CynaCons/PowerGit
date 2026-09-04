@@ -47,6 +47,9 @@ test("a truncated blob shows the notice with size, reason and actions", async ({
   )
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
+  // Stabilize the selected revision before opening the tree; the first graph
+  // row can settle asynchronously from a branch tip while the tree mounts.
+  await selectRevisionWithChangedFiles(page, base)
   await page.getByRole("tab", { name: "File Tree" }).click()
   const firstFile = page.locator('[data-testid="commit-file-tree-row"][data-type="blob"]').first()
   await expect(firstFile).toBeVisible({ timeout: 15_000 })
