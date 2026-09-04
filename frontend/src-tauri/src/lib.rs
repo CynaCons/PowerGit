@@ -43,8 +43,14 @@ fn engine_config(state: tauri::State<EngineState>) -> EngineConfig {
 /// never reuse a foreign engine: it would not know this launch's token, and
 /// the parent-pid watchdog already guarantees no engine of ours outlives us.
 fn resolve_engine_port() -> u16 {
-    if port_is_free(ENGINE_DEFAULT_PORT) {
-        ENGINE_DEFAULT_PORT
+    resolve_port_preferring(ENGINE_DEFAULT_PORT)
+}
+
+/// `preferred` when it is free, otherwise an OS-assigned free port.
+/// Split out so tests can drive it with a port they control.
+fn resolve_port_preferring(preferred: u16) -> u16 {
+    if port_is_free(preferred) {
+        preferred
     } else {
         pick_free_port()
     }
@@ -175,6 +181,21 @@ mod tests {
         assert_eq!(a.len(), 64);
         assert!(a.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn preferred_port_is_used_when_free_and_replaced_when_held() {
+        // Free: reserve an ephemeral port, drop it, expect it back.
+        let free = pick_free_port();
+        assert_eq!(resolve_port_preferring(free), free);
+
+        // Held by a "stranger" (any listener counts; we never reuse engines):
+        // expect a different, bindable port.
+        let stranger = TcpListener::bind((ENGINE_HOST, 0)).expect("bind");
+        let held = stranger.local_addr().unwrap().port();
+        let chosen = resolve_port_preferring(held);
+        assert_ne!(chosen, held);
+        assert!(port_is_free(chosen));
     }
 
     #[test]
