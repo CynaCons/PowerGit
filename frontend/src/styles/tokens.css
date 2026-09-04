@@ -75,19 +75,8 @@
   src: url("/fonts/firacode-latin-700.woff2") format("woff2");
 }
 
-:root {
-  --pg-row-height: 28px;
-  /* Keep these as literal hex/rgba only (comma syntax) — no color-mix(),
-     oklch(), relative colour syntax, or light-dark(). See
-     docs/agents/memories/webkitgtk-css.md for why (WebKitGTK/AppImage
-     target). */
-  --pg-grid-hover: rgba(37, 99, 235, 0.08);
-  --pg-grid-sel: #dbeafe;
-  --pg-grid-sel-border: #2563eb;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+/* Colour and density tokens are NOT declared here. They are written into
+   `:root` at runtime by the MUI CssBaseline in src/theme/index.ts from the
+   single literal source src/theme/tokens.ts (light + dark), so a hex value
+   lives in exactly one file. app.css consumes them as var(--pg-*). See
+   docs/agents/memories/visual-tokens.md. */

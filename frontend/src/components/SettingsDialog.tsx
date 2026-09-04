@@ -11,6 +11,16 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import { useEngine, type GitConfig, type VsCodeInfo } from "../engine"
+import {
+  setThemePreference,
+  useThemePreference,
+  useZoom,
+  zoomIn,
+  zoomOut,
+  zoomPercent,
+  zoomReset,
+  type ThemePreference,
+} from "../theme"
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -19,6 +29,8 @@ export function SettingsDialog({ open, onClose }: Props) {
   const [cfg, setCfg] = useState<GitConfig | null>(null)
   const [vs, setVs] = useState<VsCodeInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const themePreference = useThemePreference()
+  const zoom = useZoom()
 
   useEffect(() => {
     if (!open) return
@@ -82,6 +94,32 @@ export function SettingsDialog({ open, onClose }: Props) {
             <MenuItem value="false">false</MenuItem>
           </Select>
         </FormControl>
+        <FormControl margin="dense">
+          <InputLabel id="appearance-label">Appearance</InputLabel>
+          <Select
+            labelId="appearance-label"
+            label="Appearance"
+            value={themePreference}
+            onChange={(e) => setThemePreference(e.target.value as ThemePreference)}
+            inputProps={{ "aria-label": "Appearance" }}
+          >
+            <MenuItem value="system">System</MenuItem>
+            <MenuItem value="light">Light</MenuItem>
+            <MenuItem value="dark">Dark</MenuItem>
+          </Select>
+        </FormControl>
+        <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          Zoom: {zoomPercent(zoom)}
+          <Button size="small" onClick={zoomOut} aria-label="Zoom out">
+            −
+          </Button>
+          <Button size="small" onClick={zoomReset} aria-label="Reset zoom">
+            Reset
+          </Button>
+          <Button size="small" onClick={zoomIn} aria-label="Zoom in">
+            +
+          </Button>
+        </Typography>
         <Typography variant="body2" color="text.secondary">
           VS Code: {vs?.found ? vs.path : "not found"}
         </Typography>

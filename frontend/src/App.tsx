@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BottomPanel } from "./components/BottomPanel"
 import { CommandBar } from "./components/CommandBar"
 import { AppDialogs } from "./components/dialogs/AppDialogs"
@@ -20,6 +20,7 @@ import { useHistory } from "./hooks/useHistory"
 import { useJobs } from "./hooks/useJobs"
 import { useRepoState } from "./hooks/useRepoState"
 import { useHotkeyLayer, type CommandId } from "./hotkeys"
+import { zoomIn, zoomOut, zoomReset } from "./theme"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together plus the browse-scope hotkeys. `base`
@@ -48,6 +49,27 @@ export default function App({ base }: { base: EngineClient }) {
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
+
+  // Browser/WebView zoom is deliberately app-scoped so it never changes the
+  // surrounding Tauri page or breaks portal anchoring. Handle all common
+  // keyboard layouts (Ctrl+= emits '+' on some and '=' on others).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+      if (event.key === "+" || event.key === "=" || event.code === "Equal") {
+        event.preventDefault()
+        zoomIn()
+      } else if (event.key === "-" || event.code === "Minus") {
+        event.preventDefault()
+        zoomOut()
+      } else if (event.key === "0" || event.code === "Digit0") {
+        event.preventDefault()
+        zoomReset()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
 
   const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
 

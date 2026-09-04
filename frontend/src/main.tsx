@@ -1,5 +1,3 @@
-import CssBaseline from "@mui/material/CssBaseline"
-import { ThemeProvider } from "@mui/material/styles"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import App from "./App"
@@ -9,7 +7,7 @@ import { bootstrapEngine } from "./engine"
 import { HotkeyHost } from "./hotkeys"
 import "./styles/app.css"
 import "./styles/tokens.css"
-import theme from "./theme"
+import { AppThemeProvider } from "./theme/AppThemeProvider"
 
 installDiagnostics()
 
@@ -18,14 +16,13 @@ installDiagnostics()
 void bootstrapEngine().then((base) => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <AppThemeProvider>
         <ErrorBoundary>
           <HotkeyHost>
             <App base={base} />
           </HotkeyHost>
         </ErrorBoundary>
-      </ThemeProvider>
+      </AppThemeProvider>
     </StrictMode>,
   )
 })

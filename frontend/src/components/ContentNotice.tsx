@@ -42,7 +42,7 @@ export function ContentNotice({
         py: 0.5,
         borderBottom: 1,
         borderColor: "divider",
-        bgcolor: "#fffbeb",
+        bgcolor: "var(--pg-notice-bg, #fffbeb)",
         fontSize: 12,
         flexWrap: "wrap",
       }}

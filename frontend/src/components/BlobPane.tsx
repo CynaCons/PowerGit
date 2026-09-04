@@ -20,7 +20,7 @@ const BLOB_PANE_SX = {
   ...codeSx,
   fontSize: 12,
   lineHeight: "18px",
-  bgcolor: "#ffffff",
+  bgcolor: "background.paper",
   whiteSpace: "pre",
 } as const
 

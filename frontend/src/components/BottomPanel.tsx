@@ -347,7 +347,15 @@ function DiffPane({
     <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box
         data-testid="diff-pane"
-        sx={{ m: 0, flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", bgcolor: "#ffffff" }}
+        sx={{
+          m: 0,
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          bgcolor: "background.paper",
+        }}
       >
         {diff.kind === "ready" ? (
           <DiffView diff={diff.value} onRetry={onRetry} onOpenDifftool={onOpenDifftool} />
