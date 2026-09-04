@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # engine tests and e2e specs read this repo's real history
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -42,6 +44,8 @@ jobs:
         os: [windows-latest, ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # engine tests and e2e specs read this repo's real history
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -60,6 +64,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # engine tests and e2e specs read this repo's real history
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -97,8 +103,13 @@ jobs:
         working-directory: frontend/src-tauri
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # engine tests and e2e specs read this repo's real history
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: frontend/src-tauri
+      - name: placeholder sidecar (tauri-build resolves externalBin paths even for --lib tests)
+        shell: bash
+        run: mkdir -p binaries && touch binaries/powergit-engine-x86_64-pc-windows-msvc.exe
       - run: cargo test --lib
