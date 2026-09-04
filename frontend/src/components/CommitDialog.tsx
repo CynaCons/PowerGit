@@ -21,10 +21,10 @@ import {
   type RepoStatus,
   type StatusFile,
 } from "../engine"
-import { CompactFileList } from "./CompactFileList"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { IgnoreDialog } from "./IgnoreDialog"
+import { FileListBox, ListHeader } from "./CommitFileLists"
 
 type Props = {
   open: boolean
@@ -192,7 +192,17 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
       }}
     >
       <DialogContent sx={{ display: "flex", gap: 2, p: 2, flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <Box sx={{ width: 340, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1, userSelect: "none", minHeight: 0 }}>
+        <Box
+          sx={{
+            width: 340,
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+            userSelect: "none",
+            minHeight: 0,
+          }}
+        >
           <ListHeader label={`Unstaged (${status?.unstagedCount ?? 0})`} />
           <FileListBox
             testid="unstaged-list"
@@ -204,7 +214,10 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
             onToggle={toggle}
             onContext={(f, x, y) => setMenu({ x, y, staged: false, path: f.path })}
           />
-          <Box data-testid="commit-stage-bar" sx={{ display: "flex", justifyContent: "space-between", gap: 0.5, flexShrink: 0 }}>
+          <Box
+            data-testid="commit-stage-bar"
+            sx={{ display: "flex", justifyContent: "space-between", gap: 0.5, flexShrink: 0 }}
+          >
             <Box sx={{ display: "flex", gap: 0.5 }}>
               <Button
                 size="small"
@@ -264,7 +277,15 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
           <Box sx={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box
               data-testid="commit-diff"
-              sx={{ flex: 1, minHeight: 0, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1, p: 1.5 }}
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflow: "auto",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                p: 1.5,
+              }}
             >
               {diff ? (
                 <DiffView text={diff.text} />
@@ -349,57 +370,5 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
         <IgnoreDialog open initialPattern={ignoreFor} onClose={() => setIgnoreFor(null)} onConfirm={ignorePattern} />
       )}
     </Dialog>
-  )
-}
-
-function ListHeader({ label }: { label: string }) {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", px: 0.5, flexShrink: 0 }}>
-      <Typography variant="subtitle2" sx={{ flex: 1 }}>
-        {label}
-      </Typography>
-    </Box>
-  )
-}
-
-function FileListBox({
-  files,
-  staged,
-  selected,
-  emptyText,
-  onClick,
-  onToggle,
-  onContext,
-  testid,
-}: {
-  files: StatusFile[]
-  staged: boolean
-  selected: Set<string>
-  emptyText: string
-  onClick: (f: StatusFile, index: number, e: React.MouseEvent) => void
-  onToggle: (f: StatusFile) => void
-  onContext: (f: StatusFile, x: number, y: number) => void
-  testid: string
-}) {
-  return (
-    <CompactFileList
-      testid={testid}
-      files={files}
-      selectedSet={selected}
-      emptyText={emptyText}
-      onRowClick={(f, index, e) => {
-        const full = files[index]
-        if (full) onClick(full, index, e)
-        else onClick({ ...f, staged }, index, e)
-      }}
-      onToggle={(f) => {
-        const full = files.find((x) => x.path === f.path)
-        onToggle(full ?? { ...f, staged })
-      }}
-      onRowContext={(f, _index, x, y) => {
-        const full = files.find((x) => x.path === f.path)
-        onContext(full ?? { ...f, staged }, x, y)
-      }}
-    />
   )
 }

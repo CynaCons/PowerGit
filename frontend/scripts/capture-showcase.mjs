@@ -15,7 +15,9 @@ try {
   let up = false
   for (let i = 0; i < 60 && !up; i++) {
     await new Promise((r) => setTimeout(r, 1000))
-    up = await fetch("http://127.0.0.1:1420").then(() => true).catch(() => false)
+    up = await fetch("http://127.0.0.1:1420")
+      .then(() => true)
+      .catch(() => false)
   }
   if (!up) throw new Error("vite did not start")
 

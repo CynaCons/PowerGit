@@ -80,11 +80,11 @@ test("blob pane still renders a file with no recognised extension as plain text"
   // Blobs only: `data-path` is on directories too, and picking one of those
   // opens nothing (the first attempt selected ".github" and compared the
   // pane against a tree listing).
-  const candidates = await tree.locator('[data-type="blob"][data-path]').evaluateAll((els) =>
-    els
-      .map((el) => el.getAttribute("data-path") ?? "")
-      .filter((p) => p.length > 0 && !p.includes("/")),
-  )
+  const candidates = await tree
+    .locator('[data-type="blob"][data-path]')
+    .evaluateAll((els) =>
+      els.map((el) => el.getAttribute("data-path") ?? "").filter((p) => p.length > 0 && !p.includes("/")),
+    )
   const unmapped = candidates.find((p) => languageForPath(p) === null)
   if (!unmapped) {
     throw new Error(`no root-level file without a mapped grammar in: ${candidates.join(", ")}`)

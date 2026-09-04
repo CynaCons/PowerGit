@@ -22,8 +22,12 @@ export function SettingsDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return
     setError(null)
-    fetchConfig().then(setCfg).catch((e: unknown) => setError(e instanceof Error ? e.message : "config failed"))
-    fetchVsCode().then(setVs).catch(() => setVs({ found: false, path: null, applied: false }))
+    fetchConfig()
+      .then(setCfg)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "config failed"))
+    fetchVsCode()
+      .then(setVs)
+      .catch(() => setVs({ found: false, path: null, applied: false }))
   }, [open])
 
   async function onSave() {

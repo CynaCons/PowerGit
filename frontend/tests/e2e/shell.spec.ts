@@ -48,13 +48,14 @@ test("only the selected row is highlighted", async ({ page }) => {
   await expect(target).toHaveCSS("border-left-width", "2px")
 
   const selectedBackground = await target.evaluate((el) => getComputedStyle(el).backgroundColor)
-  const others = await rows.evaluateAll((els, sel: string) =>
-    els
-      .filter((el) => !el.classList.contains("selected"))
-      // The hovered row legitimately differs; the pointer sits on the row we
-      // just clicked, so anything else tinted like the selection is a bug.
-      .map((el) => getComputedStyle(el).backgroundColor)
-      .filter((bg) => bg === sel).length,
+  const others = await rows.evaluateAll(
+    (els, sel: string) =>
+      els
+        .filter((el) => !el.classList.contains("selected"))
+        // The hovered row legitimately differs; the pointer sits on the row we
+        // just clicked, so anything else tinted like the selection is a bug.
+        .map((el) => getComputedStyle(el).backgroundColor)
+        .filter((bg) => bg === sel).length,
     selectedBackground,
   )
   expect(others, "rows other than the selected one share its highlight").toBe(0)

@@ -7,11 +7,21 @@ import { ENGINE_URL, engineHeaders, repoBase } from "../engine"
 // branch/status straight from the engine instead of hardcoding a branch name
 // — see docs/agents/memories/engine-exe-lock.md: TryDiscover exposes
 // whatever is actually checked out.
-test("status bar shows the branch in bold, ahead/behind when tracked, dirty count, and a muted engine version", async ({ page }) => {
+test("status bar shows the branch in bold, ahead/behind when tracked, dirty count, and a muted engine version", async ({
+  page,
+}) => {
   const [repo, status] = await Promise.all([
-    fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() }).then((r) => r.json() as Promise<{ branch: string }>),
+    fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() }).then(
+      (r) => r.json() as Promise<{ branch: string }>,
+    ),
     fetch(`${await repoBase()}/status`, { headers: engineHeaders() }).then(
-      (r) => r.json() as Promise<{ ahead: number | null; behind: number | null; unstagedCount: number; stagedCount: number }>,
+      (r) =>
+        r.json() as Promise<{
+          ahead: number | null
+          behind: number | null
+          unstagedCount: number
+          stagedCount: number
+        }>,
     ),
   ])
 

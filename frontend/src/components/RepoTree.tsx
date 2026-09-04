@@ -1,11 +1,5 @@
-import CallSplitIcon from "@mui/icons-material/CallSplit"
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft"
-import ChevronRightIcon from "@mui/icons-material/ChevronRight"
-import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
-import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined"
 import SearchIcon from "@mui/icons-material/Search"
-import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
 import InputBase from "@mui/material/InputBase"
@@ -14,8 +8,9 @@ import MenuItem from "@mui/material/MenuItem"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { RefItem, RefTree } from "../engine"
+import { ROW_HEIGHT, SECTION_HEIGHT, SectionHeader, TreeRow, type Item } from "./RepoTreeRows"
 
 type Props = {
   tree: RefTree | null
@@ -43,14 +38,6 @@ type CtxMenu =
   | { kind: "tag"; name: string; x: number; y: number }
   | { kind: "remote"; name: string; x: number; y: number }
   | { kind: "submodule"; path: string; x: number; y: number }
-
-// Uniform row geometry for every node in the tree:
-// [padding-left 6 + 16*depth][16px chevron slot][16px icon slot][label]
-export const TREE_ROW_INDENT = 6
-export const TREE_ROW_LEVEL = 16
-
-const ROW_HEIGHT = 22
-const SECTION_HEIGHT = 28
 
 // Above this many refs a section/group starts collapsed: a monorepo can hold
 // thousands of remote branches, and expanding them all by default buries the
@@ -95,21 +82,6 @@ function sortNodes(nodes: TreeNode[]) {
   for (const node of nodes) sortNodes(node.children)
 }
 
-type Item = {
-  key: string
-  section?: string
-  depth: number
-  label: string
-  count?: number
-  icon?: "branch" | "remote" | "tag" | "submodule"
-  expandable?: boolean
-  open?: boolean
-  current?: boolean
-  muted?: boolean
-  onClick: () => void
-  onContext?: (x: number, y: number) => void
-}
-
 export function RepoTree({
   tree,
   onSelectTarget,
@@ -140,7 +112,10 @@ export function RepoTree({
     }
     return [...groups.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([remote, items]) => ({ node: { name: remote, children: buildTree(items, 1) } as TreeNode, count: items.length }))
+      .map(([remote, items]) => ({
+        node: { name: remote, children: buildTree(items, 1) } as TreeNode,
+        count: items.length,
+      }))
   }, [tree])
 
   const remoteTotal = tree?.remotes.length ?? 0
@@ -191,7 +166,14 @@ export function RepoTree({
       }
     }
 
-    const walk = (nodes: TreeNode[], pathPrefix: string, depth: number, icon: Item["icon"], dirDefaultOpen: boolean, dirCtx?: (x: number, y: number) => void) => {
+    const walk = (
+      nodes: TreeNode[],
+      pathPrefix: string,
+      depth: number,
+      icon: Item["icon"],
+      dirDefaultOpen: boolean,
+      dirCtx?: (x: number, y: number) => void,
+    ) => {
       for (const node of nodes) {
         const path = `${pathPrefix}/${node.name}`
         const isDir = node.children.length > 0
@@ -220,7 +202,11 @@ export function RepoTree({
             onClick: () => {
               if (node.target) onSelectTarget?.(node.target)
             },
-            onContext: node.current ? undefined : (dirCtx && icon === "remote" ? dirCtx : (leafCtx(icon, full) ?? dirCtx)),
+            onContext: node.current
+              ? undefined
+              : dirCtx && icon === "remote"
+                ? dirCtx
+                : (leafCtx(icon, full) ?? dirCtx),
           })
         }
       }
@@ -313,7 +299,10 @@ export function RepoTree({
   }, [items])
 
   return (
-    <Paper data-testid="left-panel" sx={{ width: 232, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Paper
+      data-testid="left-panel"
+      sx={{ width: 232, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
       <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center" }}>
         <Typography variant="subtitle2" sx={{ flex: 1, pl: 1 }}>
           Repository
@@ -324,7 +313,17 @@ export function RepoTree({
           </IconButton>
         )}
       </Box>
-      <Box sx={{ px: 1, py: 0.5, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center", gap: 0.5 }}>
+      <Box
+        sx={{
+          px: 1,
+          py: 0.5,
+          borderBottom: 1,
+          borderColor: "divider",
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+        }}
+      >
         <SearchIcon sx={{ fontSize: 14, color: "text.secondary" }} />
         <InputBase
           value={filter}
@@ -354,9 +353,21 @@ export function RepoTree({
         </Box>
       </Box>
 
-      <Menu open={ctx !== null} onClose={() => setCtx(null)} anchorReference="anchorPosition" anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}>
+      <Menu
+        open={ctx !== null}
+        onClose={() => setCtx(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}
+      >
         {itemsFor(ctx).map((item) => (
-          <MenuItem key={item.testid} data-testid={item.testid} onClick={() => { item.action(); setCtx(null) }}>
+          <MenuItem
+            key={item.testid}
+            data-testid={item.testid}
+            onClick={() => {
+              item.action()
+              setCtx(null)
+            }}
+          >
             {item.label}
           </MenuItem>
         ))}
@@ -386,97 +397,4 @@ export function RepoTree({
         return [{ label: "Open Submodule", testid: "tree-open-submodule", action: () => onOpenSubmodule?.(c.path) }]
     }
   }
-}
-
-const ICONS: Record<NonNullable<Item["icon"]>, ReactNode> = {
-  branch: <CallSplitIcon sx={{ fontSize: 13 }} />,
-  remote: <CloudOutlinedIcon sx={{ fontSize: 13 }} />,
-  tag: <SellOutlinedIcon sx={{ fontSize: 12 }} />,
-  submodule: <FolderOutlinedIcon sx={{ fontSize: 13 }} />,
-}
-
-function SectionHeader({ item, style }: { item: Item; style: React.CSSProperties }) {
-  return (
-    <Box
-      data-testid={`tree-section-${item.label.toLowerCase()}`}
-      onClick={item.onClick}
-      style={style}
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        cursor: "pointer",
-        userSelect: "none",
-        height: `${SECTION_HEIGHT}px`,
-        lineHeight: `${SECTION_HEIGHT}px`,
-        pl: `${TREE_ROW_INDENT}px`,
-        fontSize: 12,
-        fontWeight: 500,
-        color: "text.secondary",
-        bgcolor: "background.paper",
-        "&:hover": { color: "text.primary" },
-      }}
-    >
-      <Box component="span" sx={{ display: "inline-flex", width: 16, justifyContent: "center", mr: 0.5 }}>
-        {item.open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />}
-      </Box>
-      {item.label}
-      {item.count !== undefined && (
-        <Box component="span" sx={{ ml: 0.5, fontWeight: 400 }}>
-          ({item.count})
-        </Box>
-      )}
-    </Box>
-  )
-}
-
-function TreeRow({ item, style }: { item: Item; style: React.CSSProperties }) {
-  return (
-    <Box
-      data-testid="tree-row"
-      data-depth={item.depth}
-      data-label={item.label}
-      onClick={item.onClick}
-      onContextMenu={
-        item.onContext
-          ? (e) => {
-              e.preventDefault()
-              item.onContext!(e.clientX, e.clientY)
-            }
-          : undefined
-      }
-      style={style}
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        height: `${ROW_HEIGHT}px`,
-        pl: `${TREE_ROW_INDENT + item.depth * TREE_ROW_LEVEL}px`,
-        pr: 1,
-        cursor: "default",
-        bgcolor: item.current ? "action.selected" : "transparent",
-        "&:hover": { bgcolor: "action.hover" },
-      }}
-    >
-      <Box component="span" sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center" }}>
-        {item.expandable ? (item.open ? <ExpandMoreIcon sx={{ fontSize: 15 }} /> : <ChevronRightIcon sx={{ fontSize: 15 }} />) : null}
-      </Box>
-      <Box
-        component="span"
-        sx={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center", mr: 0.5, color: item.current ? "primary.main" : "text.secondary" }}
-      >
-        {item.icon ? ICONS[item.icon] : null}
-      </Box>
-      <Typography
-        variant="body2"
-        noWrap
-        sx={{
-          fontSize: 12.5,
-          fontWeight: item.current ? 700 : 400,
-          color: item.current ? "primary.main" : item.muted ? "text.secondary" : "text.primary",
-        }}
-      >
-        {item.label}
-        {item.count !== undefined ? ` (${item.count})` : ""}
-      </Typography>
-    </Box>
-  )
 }

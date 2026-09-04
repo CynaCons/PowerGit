@@ -9,7 +9,7 @@ const STATUS_COLORS: Record<string, string> = {
   U: "#e6a700",
 }
 
-export function statusColor(status: string): string {
+function statusColor(status: string): string {
   return STATUS_COLORS[status.toUpperCase()] ?? "#737373"
 }
 
@@ -40,8 +40,7 @@ export function CompactFileList({
   onRowContext?: (f: CompactFile, index: number, x: number, y: number) => void
   onRowDoubleClick?: (f: CompactFile, index: number) => void
 }) {
-  const isHighlighted = (f: CompactFile) =>
-    selectedSet ? selectedSet.has(f.path) : selectedPath === f.path
+  const isHighlighted = (f: CompactFile) => (selectedSet ? selectedSet.has(f.path) : selectedPath === f.path)
 
   return (
     <Box
@@ -102,7 +101,10 @@ export function CompactFileList({
               userSelect: "none",
             }}
           >
-            <Box component="span" sx={{ width: 12, flexShrink: 0, fontWeight: 700, textAlign: "center", color: statusColor(f.status) }}>
+            <Box
+              component="span"
+              sx={{ width: 12, flexShrink: 0, fontWeight: 700, textAlign: "center", color: statusColor(f.status) }}
+            >
               {f.status}
             </Box>
             <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }} title={f.path}>

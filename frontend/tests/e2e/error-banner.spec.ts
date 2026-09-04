@@ -32,9 +32,7 @@ test("error banner is dismissable and copies its text to the clipboard", async (
 
   await page.getByTestId("error-banner-copy").click()
   if (canReadClipboard) {
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toContain("synthetic fetch failure")
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("synthetic fetch failure")
   } else {
     // The click must not tear the banner down or throw into the page.
     await expect(banner).toContainText("synthetic fetch failure")

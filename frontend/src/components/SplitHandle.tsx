@@ -16,7 +16,16 @@ type Props = {
 // detail pane. Width state and persistence stay with the caller so multiple
 // call sites (e.g. the Files and File Tree tabs) can share one source of
 // truth for the width.
-export function SplitHandle({ testid, value, defaultValue, min, maxRatio, getContainerWidth, onChange, onCommit }: Props) {
+export function SplitHandle({
+  testid,
+  value,
+  defaultValue,
+  min,
+  maxRatio,
+  getContainerWidth,
+  onChange,
+  onCommit,
+}: Props) {
   const drag = useRef<{ startX: number; startWidth: number } | null>(null)
   // Mirrors `value` synchronously so release() can commit the latest width
   // even if the browser fires it before React re-renders with new props.

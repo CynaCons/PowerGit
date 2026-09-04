@@ -15,10 +15,7 @@ async function boot(page: Page) {
 function overlaps(a: { x: number; y: number; width: number; height: number }, b: typeof a): boolean {
   const eps = 0.5
   return (
-    a.x < b.x + b.width - eps &&
-    b.x < a.x + a.width - eps &&
-    a.y < b.y + b.height - eps &&
-    b.y < a.y + a.height - eps
+    a.x < b.x + b.width - eps && b.x < a.x + a.width - eps && a.y < b.y + b.height - eps && b.y < a.y + a.height - eps
   )
 }
 
@@ -60,14 +57,20 @@ test.describe("toolbar at narrow widths", () => {
     for (const width of [1440, 1100, 900, 780, 700, 620]) {
       await page.setViewportSize({ width, height: 900 })
       const bar = (await toolbar.boundingBox())!
-      const strays = await page.getByTestId("toolbar").locator("button:visible").evaluateAll(
-        (els, right: number) =>
-          els
-            .map((el) => ({ label: el.getAttribute("aria-label") ?? el.textContent, r: el.getBoundingClientRect().right }))
-            .filter((b) => b.r > right + 1)
-            .map((b) => b.label),
-        bar.x + bar.width,
-      )
+      const strays = await page
+        .getByTestId("toolbar")
+        .locator("button:visible")
+        .evaluateAll(
+          (els, right: number) =>
+            els
+              .map((el) => ({
+                label: el.getAttribute("aria-label") ?? el.textContent,
+                r: el.getBoundingClientRect().right,
+              }))
+              .filter((b) => b.r > right + 1)
+              .map((b) => b.label),
+          bar.x + bar.width,
+        )
       expect(strays, `controls clipped off the toolbar at ${width}px`).toEqual([])
     }
   })
@@ -97,14 +100,23 @@ test("the busy indicator sits beside the toolbar controls, never on top of them"
     .evaluateAll((els) =>
       els.map((el) => {
         const r = el.getBoundingClientRect()
-        return { label: el.getAttribute("aria-label") ?? el.textContent, x: r.x, y: r.y, width: r.width, height: r.height }
+        return {
+          label: el.getAttribute("aria-label") ?? el.textContent,
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+        }
       }),
     )
   const collisions = buttonBoxes.filter((b) => overlaps(progressBox, b)).map((b) => b.label)
   expect(collisions, "busy indicator painted over toolbar buttons").toEqual([])
 
   release()
-  await page.getByTestId("error-banner-close").click().catch(() => {})
+  await page
+    .getByTestId("error-banner-close")
+    .click()
+    .catch(() => {})
 })
 
 test("Fetch all remotes is always offered", async ({ page }) => {
