@@ -40,8 +40,11 @@ test("row selection stays responsive while scrolling a long history", async ({ p
   // on row churn while reporting a performance regression.
   const sha = await target.locator('[data-testid="sha-cell"]').getAttribute("title")
   expect(sha).toMatch(/^[0-9a-f]{40}$/)
-  await target.click()
-  await expect(page.locator(`.grid-row.selected [data-testid="sha-cell"][title="${sha}"]`)).toBeVisible({
+  // `nth(5)` is a live locator; pin the click as well as the assertion to
+  // the SHA so a recycled fifth DOM row cannot select a different commit.
+  const pinned = page.locator(`.grid-row:has([data-testid="sha-cell"][title="${sha}"])`)
+  await pinned.click()
+  await expect(pinned).toHaveClass(/selected/, {
     timeout: 2_000,
   })
 
