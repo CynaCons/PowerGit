@@ -34,3 +34,10 @@ AllowAnyOrigin and nothing identified the caller.
 `frontend/src/engine.ts` routes every call through `engineFetch`. A new
 endpoint helper that calls `fetch` directly will work in dev with the old
 engine on your machine and fail with 401 in the packaged app.
+
+## Landmine: a fresh worktree gets a fresh token
+`frontend/.engine-token` is gitignored, so a second checkout/worktree creates
+its own random token and every UI request 401s against an engine started
+from the main checkout (seen on 2026-09-04 by a worktree worker). Copy the
+main checkout's `.engine-token` into the worktree, or start the engine with
+`POWERGIT_ENGINE_TOKEN` set to the worktree's token.
