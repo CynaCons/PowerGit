@@ -125,12 +125,12 @@ test("[laptop] application zoom scales #root without overflowing", async ({ page
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto("/")
   await expect(page.getByTestId("browse-shell")).toBeVisible()
+  // Selection must survive zoom changes; the live engine serves this repo,
+  // so three rows are always there and the assertion is never skipped.
   const rows = page.getByTestId("grid-row")
-  const hasRows = (await rows.count()) >= 3
-  if (hasRows) {
-    await rows.nth(2).click()
-    await expect(rows.nth(2)).toHaveClass(/selected/)
-  }
+  await expect(rows.nth(2)).toBeVisible({ timeout: 30_000 })
+  await rows.nth(2).click()
+  await expect(rows.nth(2)).toHaveClass(/selected/)
 
   const zoomOf = () => page.locator("#root").evaluate((el) => getComputedStyle(el).zoom)
   expect(await zoomOf()).toMatch(/^(1|100%)$/)
@@ -150,12 +150,12 @@ test("[laptop] application zoom scales #root without overflowing", async ({ page
 
   await chord("=", "Equal")
   await expect.poll(zoomOf).toMatch(/^(1\.1|110%)$/)
-  if (hasRows) await expect(rows.nth(2)).toHaveClass(/selected/)
+  await expect(rows.nth(2)).toHaveClass(/selected/)
   await noDocumentOverflow(page)
 
   await chord("0", "Digit0")
   await expect.poll(zoomOf).toMatch(/^(1|100%)$/)
-  if (hasRows) await expect(rows.nth(2)).toHaveClass(/selected/)
+  await expect(rows.nth(2)).toHaveClass(/selected/)
   await noDocumentOverflow(page)
 })
 

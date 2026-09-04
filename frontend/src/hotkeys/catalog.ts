@@ -122,7 +122,9 @@ export const CATALOG: CommandDef[] = [
     id: "browse.focusLeftPanel",
     ge: "FocusLeftPanel",
     scope: "browse",
-    chord: chord("0", { ctrl: true }),
+    // GE binds Ctrl+0, but PowerGit reserves Ctrl+0 for zoom reset
+    // (v0.13.13); Ctrl+Alt+L sits beside Ctrl+Alt+C (toggle left panel).
+    chord: chord("L", { ctrl: true, alt: true }),
     available: true,
   },
   {

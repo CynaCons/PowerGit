@@ -64,6 +64,9 @@ export default function App({ base }: { base: EngineClient }) {
         zoomOut()
       } else if (event.key === "0" || event.code === "Digit0" || event.code === "Numpad0") {
         event.preventDefault()
+        // Zoom owns Ctrl+0; stop the hotkey layer (also on window/capture)
+        // from running a second action on the same keystroke.
+        event.stopImmediatePropagation()
         zoomReset()
       }
     }

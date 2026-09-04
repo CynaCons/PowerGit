@@ -13,7 +13,7 @@ const FEATURES = [
   },
   {
     title: "Keyboard muscle memory",
-    body: "Git Extensions defaults: Ctrl+Space commit, Ctrl+, settings, arrows on the graph, F5 refresh, panel focus Ctrl+0–4. Letter keys never steal from the commit message.",
+    body: "Git Extensions defaults: Ctrl+Space commit, Ctrl+, settings, arrows on the graph, F5 refresh, panel focus Ctrl+1–4, Ctrl+0 resets zoom. Letter keys never steal from the commit message.",
   },
   {
     title: "Heavy repos stay fluid",

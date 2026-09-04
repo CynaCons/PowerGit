@@ -22,3 +22,6 @@ Thumbs.db
 /.vscode/
 /.gitattributes
 /frontend/.engine-token
+
+# AppImage matrix / longevity outputs (docker/appimage-check/run-matrix.sh --out)
+/docker/appimage-check/out*/

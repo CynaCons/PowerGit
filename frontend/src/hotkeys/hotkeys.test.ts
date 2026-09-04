@@ -101,7 +101,7 @@ test("GE default chords we claim", () => {
     "browse.stash": chord("ArrowUp", { ctrl: true, alt: true }),
     "browse.stashPop": chord("ArrowDown", { ctrl: true, alt: true }),
     "browse.toggleLeftPanel": chord("C", { ctrl: true, alt: true }),
-    "browse.focusLeftPanel": chord("0", { ctrl: true }),
+    "browse.focusLeftPanel": chord("L", { ctrl: true, alt: true }),
     "browse.focusRevisionGrid": chord("1", { ctrl: true }),
     "browse.focusCommitInfo": chord("2", { ctrl: true }),
     "browse.focusDiff": chord("3", { ctrl: true }),
