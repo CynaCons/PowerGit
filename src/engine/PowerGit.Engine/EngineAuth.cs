@@ -50,7 +50,7 @@ public sealed class EngineAuth(RequestDelegate next, string token)
         {
             presented = auth["Bearer ".Length..].Trim();
         }
-        else if (ctx.Request.Path == "/events")
+        else if (ctx.Request.Path.Value?.EndsWith("/events", StringComparison.Ordinal) == true) // /repos/{id}/events
         {
             presented = ctx.Request.Query["token"];
         }

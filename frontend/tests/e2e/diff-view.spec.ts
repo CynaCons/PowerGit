@@ -58,7 +58,7 @@ test("double-click a file in the Files tab requests the external diff tool", asy
 
   let captured: { commit?: string; path?: string } | null = null
   await page.route(
-    (url) => url.pathname === "/difftool",
+    (url) => url.pathname.endsWith("/difftool"),
     async (route) => {
       captured = route.request().postDataJSON()
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) })

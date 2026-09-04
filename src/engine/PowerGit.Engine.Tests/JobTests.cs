@@ -48,16 +48,15 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
             Run(work, "add", "-A");
             Run(work, "commit", "-m", "init");
 
-            HttpResponseMessage opened = await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(work));
-            opened.EnsureSuccessStatusCode();
+            string sid = await client.OpenSessionAsync(work);
 
-            HttpResponseMessage started = await client.PostAsync("/push", null);
+            HttpResponseMessage started = await client.PostAsync($"/repos/{sid}/push", null);
             Assert.Equal(HttpStatusCode.Accepted, started.StatusCode);
             JobStartedDto? job = await started.Content.ReadFromJsonAsync<JobStartedDto>();
             Assert.NotNull(job);
             Assert.Equal("push", job.Kind);
 
-            GitJobDto done = await PollUntilFinished(client, job.Id);
+            GitJobDto done = await PollUntilFinished(client, sid, job.Id);
             Assert.Equal("completed", done.Status);
         }
         finally
@@ -81,14 +80,14 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task Pull_without_upstream_fails_the_job_with_message()
     {
         HttpClient client = _factory.CreateAuthedClient();
-        await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(RepoRoot()));
+        string sid = await client.OpenSessionAsync(RepoRoot());
 
-        HttpResponseMessage started = await client.PostAsJsonAsync("/pull", new PullRequest(false));
+        HttpResponseMessage started = await client.PostAsJsonAsync($"/repos/{sid}/pull", new PullRequest(false));
         Assert.Equal(HttpStatusCode.Accepted, started.StatusCode);
         JobStartedDto? job = await started.Content.ReadFromJsonAsync<JobStartedDto>();
         Assert.NotNull(job);
 
-        GitJobDto done = await PollUntilFinished(client, job.Id);
+        GitJobDto done = await PollUntilFinished(client, sid, job.Id);
         // The fork repo has an upstream; either outcome is valid as long as the
         // job model reports a terminal state with captured output/error.
         Assert.Contains(done.Status, new[] { "completed", "failed" });
@@ -102,7 +101,7 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task Unknown_job_is_404()
     {
         HttpClient client = _factory.CreateAuthedClient();
-        HttpResponseMessage response = await client.GetAsync("/jobs/does-not-exist");
+        HttpResponseMessage response = await client.GetAsync($"/repos/{await client.OpenSessionAsync(RepoRoot())}/jobs/does-not-exist");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -110,24 +109,24 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task Second_concurrent_job_is_rejected_while_one_runs()
     {
         HttpClient client = _factory.CreateAuthedClient();
-        await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(RepoRoot()));
+        string sid = await client.OpenSessionAsync(RepoRoot());
 
-        HttpResponseMessage first = await client.PostAsync("/fetch", JsonContent.Create(new FetchRequest("origin")));
+        HttpResponseMessage first = await client.PostAsync($"/repos/{sid}/fetch", JsonContent.Create(new FetchRequest("origin")));
         first.EnsureSuccessStatusCode();
 
         // The first fetch on the real repo finishes quickly; this asserts the
         // guard only via API contract — a 400/409 or Accepted are both fine
         // depending on timing, but a malformed request must never be accepted.
-        HttpResponseMessage bad = await client.PostAsJsonAsync("/fetch", new FetchRequest(""));
+        HttpResponseMessage bad = await client.PostAsJsonAsync($"/repos/{sid}/fetch", new FetchRequest(""));
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
     }
 
-    private static async Task<GitJobDto> PollUntilFinished(HttpClient client, string id, int timeoutMs = 60_000)
+    private static async Task<GitJobDto> PollUntilFinished(HttpClient client, string sid, string id, int timeoutMs = 60_000)
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMs);
         while (DateTimeOffset.UtcNow < deadline)
         {
-            HttpResponseMessage res = await client.GetAsync($"/jobs/{id}");
+            HttpResponseMessage res = await client.GetAsync($"/repos/{sid}/jobs/{id}");
             res.EnsureSuccessStatusCode();
             GitJobDto? job = await res.Content.ReadFromJsonAsync<GitJobDto>();
             Assert.NotNull(job);

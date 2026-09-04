@@ -7,6 +7,12 @@ public sealed partial class GitHost
     private readonly string _gitPath;
     private RepoInfo? _current;
 
+    // v0.13.6: one GitHost per open repository ("session"). Mutations are
+    // serialized per session through this gate; reads bypass it (git itself
+    // is safe for concurrent reads with GIT_OPTIONAL_LOCKS=0).
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private string? _writeHolder;
+
     public GitHost(string? gitPath = null)
     {
         _gitPath = gitPath ?? ResolveGitPath();
@@ -15,6 +21,53 @@ public sealed partial class GitHost
     public string GitPath => _gitPath;
 
     public RepoInfo? Current => _current;
+
+    /// <summary>Stable session id for a repository root (12 hex chars of its SHA-1).</summary>
+    public static string IdFor(string root)
+    {
+        string normalized = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, '/');
+        if (OperatingSystem.IsWindows())
+        {
+            normalized = normalized.ToLowerInvariant();
+        }
+
+        byte[] hash = System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(normalized));
+        return Convert.ToHexStringLower(hash)[..12];
+    }
+
+    /// <summary>
+    /// Runs a mutating operation under the per-session write gate. A second
+    /// mutation (or a running network job) while the gate is held does not
+    /// queue; it fails fast with <see cref="RepoBusyException"/> so the
+    /// caller can answer 409 and the UI can show what is in progress.
+    /// </summary>
+    public T Mutate<T>(string what, Func<T> work)
+    {
+        if (!_writeGate.Wait(0))
+        {
+            throw new RepoBusyException(_writeHolder ?? "another operation");
+        }
+
+        _writeHolder = what;
+        try
+        {
+            return work();
+        }
+        finally
+        {
+            _writeHolder = null;
+            _writeGate.Release();
+        }
+    }
+
+    public void Mutate(string what, Action work) => Mutate(what, () => { work(); return 0; });
+
+    /// <summary>Stops the watcher; the session is finished.</summary>
+    public void Close()
+    {
+        _watcher?.Dispose();
+        _watcher = null;
+    }
 
     public static string ResolveGitPath()
     {
@@ -58,7 +111,7 @@ public sealed partial class GitHost
         string branch = Run(root, "rev-parse", "--abbrev-ref", "HEAD").StdOut.Trim();
         string name = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
 
-        _current = new RepoInfo(name, root, branch);
+        _current = new RepoInfo(name, root, branch, IdFor(root));
         RecentsStore.Remember(_current);
         try
         {
@@ -160,7 +213,13 @@ public sealed partial class GitHost
 
 public sealed record GitVersion(string Raw);
 
-public sealed record RepoInfo(string Name, string Root, string Branch);
+public sealed record RepoInfo(string Name, string Root, string Branch, string Id);
+
+/// <summary>A mutation collided with one already running on the same session (HTTP 409).</summary>
+public sealed class RepoBusyException(string running) : InvalidOperationException($"Repository is busy: {running} is in progress.")
+{
+    public string Running { get; } = running;
+}
 
 public sealed record HealthResponse(
     string Engine,

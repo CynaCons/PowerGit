@@ -15,16 +15,18 @@ if (!string.IsNullOrWhiteSpace(url))
     builder.WebHost.UseUrls(url);
 }
 
-builder.Services.AddSingleton<GitHost>(_ =>
+// v0.13.6: sessions. One RepoRegistry per process; one GitHost per open
+// repository. Routes under /repos/{repo} get their GitHost injected by the
+// scoped factory below, which resolves the {id} route value exactly once.
+builder.Services.AddSingleton<RepoRegistry>(_ =>
 {
     string? git = Environment.GetEnvironmentVariable("GIT_EXECUTABLE");
-    GitHost host = string.IsNullOrWhiteSpace(git) ? new GitHost() : new GitHost(git);
+    RepoRegistry repos = new(string.IsNullOrWhiteSpace(git) ? null : git);
     try
     {
-        host.TryDiscover(Directory.GetCurrentDirectory());
-        if (host.Current is null)
+        if (repos.TryDiscover(Directory.GetCurrentDirectory()) is null)
         {
-            host.TryDiscover(AppContext.BaseDirectory);
+            repos.TryDiscover(AppContext.BaseDirectory);
         }
     }
     catch
@@ -32,7 +34,16 @@ builder.Services.AddSingleton<GitHost>(_ =>
         // Discovery is best-effort.
     }
 
-    return host;
+    return repos;
+});
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<GitHost>(sp =>
+{
+    HttpContext ctx = sp.GetRequiredService<IHttpContextAccessor>().HttpContext
+        ?? throw new InvalidOperationException("GitHost is only available inside a request");
+    string id = ctx.Request.RouteValues["repo"]?.ToString() ?? "";
+    return sp.GetRequiredService<RepoRegistry>().Get(id)
+        ?? sp.GetRequiredService<RepoRegistry>().Tool; // never used: the group filter answers 404 first
 });
 // Browser origins allowed to call this engine. The Tauri webview origins
 // plus the Vite dev server; POWERGIT_ENGINE_ORIGINS adds more (comma
@@ -61,12 +72,12 @@ app.UseCors();
 string engineToken = EngineAuth.ResolveToken(builder.Configuration["token"]);
 app.UseMiddleware<EngineAuth>(engineToken);
 
-app.MapGet("/health", (GitHost git) =>
+app.MapGet("/health", (RepoRegistry repos) =>
 {
     try
     {
-        GitVersion version = git.Version();
-        return Results.Ok(new HealthResponse(engineVersion, "ok", git.GitPath, version.Raw));
+        GitVersion version = repos.Tool.Version();
+        return Results.Ok(new HealthResponse(engineVersion, "ok", repos.GitPath, version.Raw));
     }
     catch (Exception ex)
     {
@@ -74,7 +85,7 @@ app.MapGet("/health", (GitHost git) =>
     }
 });
 
-app.MapPost("/repos/open", (OpenRepoRequest body, GitHost git) =>
+app.MapPost("/repos/open", (OpenRepoRequest body, RepoRegistry repos) =>
 {
     if (string.IsNullOrWhiteSpace(body.Path))
     {
@@ -83,7 +94,7 @@ app.MapPost("/repos/open", (OpenRepoRequest body, GitHost git) =>
 
     try
     {
-        return Results.Ok(git.Open(body.Path));
+        return Results.Ok(repos.Open(body.Path));
     }
     catch (DirectoryNotFoundException ex)
     {
@@ -95,14 +106,57 @@ app.MapPost("/repos/open", (OpenRepoRequest body, GitHost git) =>
     }
 });
 
-app.MapGet("/repos/current", (GitHost git) =>
-    git.Current is null
+app.MapGet("/repos/current", (RepoRegistry repos) =>
+    repos.Current is null
         ? Results.Json(new ErrorResponse("no repository open"), statusCode: StatusCodes.Status404NotFound)
-        : Results.Ok(git.Current));
+        : Results.Ok(repos.Current));
 
 app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
 
-app.MapGet("/revisions", (GitHost git, int? max, int? skip) =>
+app.MapGet("/repos", (RepoRegistry repos) => Results.Ok(repos.List()));
+
+app.MapDelete("/repos/{repo}", (string repo, RepoRegistry repos) =>
+    repos.Close(repo) ? Results.NoContent() : Results.NotFound(new ErrorResponse($"unknown repository session '{repo}'")));
+
+// Every per-repository route lives here. The filter resolves the session
+// once (404 when unknown) and serializes mutations through the session's
+// write gate: a colliding mutation answers 409 with what is running instead
+// of interleaving git processes. Network ops (/fetch, /pull, /push) are
+// jobs that take the gate themselves for their whole lifetime, so the
+// filter must not hold it around their POST.
+RouteGroupBuilder repo = app.MapGroup("/repos/{repo}");
+repo.AddEndpointFilter(async (ctx, next) =>
+{
+    string id = ctx.HttpContext.Request.RouteValues["repo"]?.ToString() ?? "";
+    GitHost? session = ctx.HttpContext.RequestServices.GetRequiredService<RepoRegistry>().Get(id);
+    if (session is null)
+    {
+        return Results.Json(new ErrorResponse($"unknown repository session '{id}'"), statusCode: StatusCodes.Status404NotFound);
+    }
+
+    string method = ctx.HttpContext.Request.Method;
+    string path = ctx.HttpContext.Request.Path.Value ?? "";
+    bool isJob = path.EndsWith("/fetch", StringComparison.Ordinal)
+        || path.EndsWith("/pull", StringComparison.Ordinal)
+        || path.EndsWith("/push", StringComparison.Ordinal);
+    try
+    {
+        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob)
+        {
+            return await next(ctx);
+        }
+
+        // Handlers in this group are synchronous, so waiting here does not
+        // block on anything but the git process itself.
+        return session.Mutate($"{method} {path}", () => next(ctx).GetAwaiter().GetResult());
+    }
+    catch (RepoBusyException busy)
+    {
+        return Results.Json(new BusyResponse(busy.Message, busy.Running), statusCode: StatusCodes.Status409Conflict);
+    }
+});
+
+repo.MapGet("/revisions", (GitHost git, int? max, int? skip) =>
 {
     try
     {
@@ -114,7 +168,7 @@ app.MapGet("/revisions", (GitHost git, int? max, int? skip) =>
     }
 });
 
-app.MapGet("/commits/{id}", (string id, GitHost git) =>
+repo.MapGet("/commits/{id}", (string id, GitHost git) =>
 {
     try
     {
@@ -126,7 +180,7 @@ app.MapGet("/commits/{id}", (string id, GitHost git) =>
     }
 });
 
-app.MapGet("/commits/{id}/files", (string id, GitHost git) =>
+repo.MapGet("/commits/{id}/files", (string id, GitHost git) =>
 {
     try
     {
@@ -138,7 +192,7 @@ app.MapGet("/commits/{id}/files", (string id, GitHost git) =>
     }
 });
 
-app.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git) =>
+repo.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git) =>
 {
     try
     {
@@ -150,7 +204,7 @@ app.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git) =>
     }
 });
 
-app.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? context, bool? ws, bool? full) =>
+repo.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? context, bool? ws, bool? full) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -167,7 +221,7 @@ app.MapGet("/commits/{id}/diff", (string id, string path, GitHost git, int? cont
     }
 });
 
-app.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
+repo.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -184,7 +238,7 @@ app.MapGet("/commits/{id}/blob", (string id, string path, GitHost git) =>
     }
 });
 
-app.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? context, bool? ws, bool? full) =>
+repo.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? context, bool? ws, bool? full) =>
 {
     if (string.IsNullOrWhiteSpace(path))
     {
@@ -201,7 +255,7 @@ app.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? contex
     }
 });
 
-app.MapPost("/files/delete", (FilesDeleteRequest body, GitHost git) =>
+repo.MapPost("/files/delete", (FilesDeleteRequest body, GitHost git) =>
 {
     try
     {
@@ -214,7 +268,7 @@ app.MapPost("/files/delete", (FilesDeleteRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
+repo.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
 {
     try
     {
@@ -227,7 +281,7 @@ app.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/ignore/preview", (IgnoreRequest body, GitHost git) =>
+repo.MapPost("/ignore/preview", (IgnoreRequest body, GitHost git) =>
 {
     try
     {
@@ -239,7 +293,7 @@ app.MapPost("/ignore/preview", (IgnoreRequest body, GitHost git) =>
     }
 });
 
-app.MapGet("/remotes", (GitHost git) =>
+repo.MapGet("/remotes", (GitHost git) =>
 {
     try
     {
@@ -251,7 +305,7 @@ app.MapGet("/remotes", (GitHost git) =>
     }
 });
 
-app.MapPut("/remotes", (RemoteUpdate body, GitHost git) =>
+repo.MapPut("/remotes", (RemoteUpdate body, GitHost git) =>
 {
     try
     {
@@ -263,7 +317,7 @@ app.MapPut("/remotes", (RemoteUpdate body, GitHost git) =>
     }
 });
 
-app.MapPost("/fetch", (FetchRequest body, GitHost git) =>
+repo.MapPost("/fetch", (FetchRequest body, GitHost git) =>
 {
     if (string.IsNullOrWhiteSpace(body.Remote))
     {
@@ -275,13 +329,17 @@ app.MapPost("/fetch", (FetchRequest body, GitHost git) =>
         string id = git.StartJob("fetch", () => git.FetchRemote(body.Remote));
         return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "fetch"));
     }
+    catch (RepoBusyException busy)
+    {
+        return Results.Json(new BusyResponse(busy.Message, busy.Running), statusCode: StatusCodes.Status409Conflict);
+    }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
-app.MapPost("/branches/create", (CreateRefRequest body, GitHost git) =>
+repo.MapPost("/branches/create", (CreateRefRequest body, GitHost git) =>
 {
     try
     {
@@ -294,7 +352,7 @@ app.MapPost("/branches/create", (CreateRefRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/tags/create", (CreateRefRequest body, GitHost git) =>
+repo.MapPost("/tags/create", (CreateRefRequest body, GitHost git) =>
 {
     try
     {
@@ -307,7 +365,7 @@ app.MapPost("/tags/create", (CreateRefRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/branches/delete", (NameRequest body, GitHost git) =>
+repo.MapPost("/branches/delete", (NameRequest body, GitHost git) =>
 {
     try
     {
@@ -320,7 +378,7 @@ app.MapPost("/branches/delete", (NameRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/tags/delete", (NameRequest body, GitHost git) =>
+repo.MapPost("/tags/delete", (NameRequest body, GitHost git) =>
 {
     try
     {
@@ -333,7 +391,7 @@ app.MapPost("/tags/delete", (NameRequest body, GitHost git) =>
     }
 });
 
-app.MapGet("/status", (GitHost git) =>
+repo.MapGet("/status", (GitHost git) =>
 {
     try
     {
@@ -345,7 +403,7 @@ app.MapGet("/status", (GitHost git) =>
     }
 });
 
-app.MapGet("/refs", (GitHost git) =>
+repo.MapGet("/refs", (GitHost git) =>
 {
     try
     {
@@ -357,7 +415,7 @@ app.MapGet("/refs", (GitHost git) =>
     }
 });
 
-app.MapGet("/config", (GitHost git) =>
+repo.MapGet("/config", (GitHost git) =>
 {
     try
     {
@@ -369,7 +427,7 @@ app.MapGet("/config", (GitHost git) =>
     }
 });
 
-app.MapPut("/config", (GitConfigUpdate body, GitHost git) =>
+repo.MapPut("/config", (GitConfigUpdate body, GitHost git) =>
 {
     try
     {
@@ -381,9 +439,9 @@ app.MapPut("/config", (GitConfigUpdate body, GitHost git) =>
     }
 });
 
-app.MapGet("/tools/vscode", () => Results.Ok(VsCodeLocator.Detect()));
+repo.MapGet("/tools/vscode", () => Results.Ok(VsCodeLocator.Detect()));
 
-app.MapPost("/tools/vscode", (GitHost git) =>
+repo.MapPost("/tools/vscode", (GitHost git) =>
 {
     try
     {
@@ -398,7 +456,7 @@ app.MapPost("/tools/vscode", (GitHost git) =>
 // Opens a file's diff (commit^ vs commit) in the configured external diff
 // tool (git difftool). The engine starts the tool detached and responds as
 // soon as the process is launched, not when the tool window closes.
-app.MapPost("/difftool", (DifftoolRequest body, GitHost git) =>
+repo.MapPost("/difftool", (DifftoolRequest body, GitHost git) =>
 {
     try
     {
@@ -411,7 +469,7 @@ app.MapPost("/difftool", (DifftoolRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/stage", (StageRequest body, GitHost git) =>
+repo.MapPost("/stage", (StageRequest body, GitHost git) =>
 {
     try
     {
@@ -424,7 +482,7 @@ app.MapPost("/stage", (StageRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/commit", (CommitRequest body, GitHost git) =>
+repo.MapPost("/commit", (CommitRequest body, GitHost git) =>
 {
     try
     {
@@ -437,7 +495,7 @@ app.MapPost("/commit", (CommitRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/checkout", (CheckoutRequest body, GitHost git) =>
+repo.MapPost("/checkout", (CheckoutRequest body, GitHost git) =>
 {
     try
     {
@@ -449,7 +507,7 @@ app.MapPost("/checkout", (CheckoutRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/reset", (ResetRequest body, GitHost git) =>
+repo.MapPost("/reset", (ResetRequest body, GitHost git) =>
 {
     try
     {
@@ -461,7 +519,7 @@ app.MapPost("/reset", (ResetRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
+repo.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
 {
     try
     {
@@ -473,7 +531,7 @@ app.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
+repo.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
 {
     try
     {
@@ -485,7 +543,7 @@ app.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
     }
 });
 
-app.MapPost("/commits/{id}/revert", (string id, GitHost git) =>
+repo.MapPost("/commits/{id}/revert", (string id, GitHost git) =>
 {
     try
     {
@@ -497,7 +555,7 @@ app.MapPost("/commits/{id}/revert", (string id, GitHost git) =>
     }
 });
 
-app.MapGet("/stashes", (GitHost git) =>
+repo.MapGet("/stashes", (GitHost git) =>
 {
     try
     {
@@ -509,7 +567,7 @@ app.MapGet("/stashes", (GitHost git) =>
     }
 });
 
-app.MapPost("/stash", (StashRequest body, GitHost git) =>
+repo.MapPost("/stash", (StashRequest body, GitHost git) =>
 {
     try
     {
@@ -522,7 +580,7 @@ app.MapPost("/stash", (StashRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/stash/apply", (StashApplyRequest body, GitHost git) =>
+repo.MapPost("/stash/apply", (StashApplyRequest body, GitHost git) =>
 {
     try
     {
@@ -535,7 +593,7 @@ app.MapPost("/stash/apply", (StashApplyRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
+repo.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
 {
     try
     {
@@ -548,7 +606,7 @@ app.MapPost("/stash/drop", (NameRequest body, GitHost git) =>
     }
 });
 
-app.MapPost("/pull", (PullRequest? body, GitHost git) =>
+repo.MapPost("/pull", (PullRequest? body, GitHost git) =>
 {
     try
     {
@@ -556,13 +614,17 @@ app.MapPost("/pull", (PullRequest? body, GitHost git) =>
         string id = git.StartJob("pull", () => git.Pull(rebase));
         return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "pull"));
     }
+    catch (RepoBusyException busy)
+    {
+        return Results.Json(new BusyResponse(busy.Message, busy.Running), statusCode: StatusCodes.Status409Conflict);
+    }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
-app.MapPost("/push", (PushRequest? body, GitHost git) =>
+repo.MapPost("/push", (PushRequest? body, GitHost git) =>
 {
     try
     {
@@ -570,21 +632,25 @@ app.MapPost("/push", (PushRequest? body, GitHost git) =>
         string id = git.StartJob("push", () => git.Push(forceWithLease));
         return Results.Accepted($"/jobs/{id}", new JobStartedDto(id, "push"));
     }
+    catch (RepoBusyException busy)
+    {
+        return Results.Json(new BusyResponse(busy.Message, busy.Running), statusCode: StatusCodes.Status409Conflict);
+    }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
-app.MapGet("/jobs/{id}", (string id, GitHost git) =>
+repo.MapGet("/jobs/{id}", (string id, GitHost git) =>
     git.GetJob(id) is { } job ? Results.Ok(job) : Results.Json(new ErrorResponse("no such job"), statusCode: StatusCodes.Status404NotFound));
 
-app.MapGet("/jobs", (GitHost git) => Results.Ok(git.ListJobs()));
+repo.MapGet("/jobs", (GitHost git) => Results.Ok(git.ListJobs()));
 
 // Server-sent events: streams the repo's ChangeVersion whenever git metadata
 // (HEAD, refs, packed-refs, index) changes on disk, so the UI live-refreshes
 // on external git activity without polling the data endpoints.
-app.MapGet("/events", async (GitHost git, HttpContext ctx) =>
+repo.MapGet("/events", async (GitHost git, HttpContext ctx) =>
 {
     ctx.Response.Headers.ContentType = "text/event-stream";
     ctx.Response.Headers.CacheControl = "no-cache";

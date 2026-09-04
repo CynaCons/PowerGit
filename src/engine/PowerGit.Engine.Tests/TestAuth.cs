@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -16,5 +17,14 @@ internal static class TestAuth
         HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
         return client;
+    }
+
+    /// <summary>Opens a repo on the engine and returns its session id (routes live under /repos/{id}, v0.13.6).</summary>
+    public static async Task<string> OpenSessionAsync(this HttpClient client, string root)
+    {
+        HttpResponseMessage opened = await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(root));
+        opened.EnsureSuccessStatusCode();
+        RepoInfo info = await opened.Content.ReadFromJsonAsync<RepoInfo>() ?? throw new InvalidOperationException("no repo info");
+        return info.Id;
     }
 }

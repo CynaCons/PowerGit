@@ -69,21 +69,21 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     {
         HttpClient client = _factory.CreateAuthedClient();
         string root = FindRepoRoot();
-        await client.PostAsJsonAsync("/repos/open", new OpenRepoRequest(root));
+        string sid = await client.OpenSessionAsync(root);
 
         // Newest graph row may be an upstream GE tip; tree-of-HEAD is what Browse shows.
-        HttpResponseMessage refsRes = await client.GetAsync("/refs");
+        HttpResponseMessage refsRes = await client.GetAsync($"/repos/{sid}/refs");
         refsRes.EnsureSuccessStatusCode();
         RefTreeDto? refs = await refsRes.Content.ReadFromJsonAsync<RefTreeDto>();
         string sha = refs?.Branches.FirstOrDefault(b => b.Current)?.Target
             ?? throw new InvalidOperationException("no current branch");
 
-        HttpResponseMessage tree = await client.GetAsync($"/commits/{sha}/tree");
+        HttpResponseMessage tree = await client.GetAsync($"/repos/{sid}/commits/{sha}/tree");
         tree.EnsureSuccessStatusCode();
         TreeEntryDto[] entries = await tree.Content.ReadFromJsonAsync<TreeEntryDto[]>() ?? [];
         Assert.Contains(entries, e => e.Name == "frontend" && e.Type == "tree");
 
-        HttpResponseMessage nested = await client.GetAsync($"/commits/{sha}/tree?path=frontend/src");
+        HttpResponseMessage nested = await client.GetAsync($"/repos/{sid}/commits/{sha}/tree?path=frontend/src");
         nested.EnsureSuccessStatusCode();
         TreeEntryDto[] srcEntries = await nested.Content.ReadFromJsonAsync<TreeEntryDto[]>() ?? [];
         Assert.Contains(srcEntries, e => e.Type == "tree" || e.Type == "blob");
@@ -92,7 +92,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         // blob lookups fail with "path does not exist in <sha>".
         Assert.All(srcEntries, e => Assert.DoesNotContain("/", e.Name));
 
-        HttpResponseMessage deep = await client.GetAsync($"/commits/{sha}/tree?path=frontend/src/graph");
+        HttpResponseMessage deep = await client.GetAsync($"/repos/{sid}/commits/{sha}/tree?path=frontend/src/graph");
         deep.EnsureSuccessStatusCode();
         TreeEntryDto[] graphEntries = await deep.Content.ReadFromJsonAsync<TreeEntryDto[]>() ?? [];
         Assert.NotEmpty(graphEntries);
@@ -105,8 +105,8 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         HttpClient authed = _factory.CreateAuthedClient(); // builds the host with the test token
         HttpClient anonymous = _factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/repos/current")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/reset", new { })).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/events")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/repos/x/reset", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/repos/x/events")).StatusCode);
         // Health stays open: the Tauri shell probes it before it knows anything.
         Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/health")).StatusCode);
         Assert.NotEqual(HttpStatusCode.Unauthorized, (await authed.GetAsync("/repos/recents")).StatusCode);
@@ -120,8 +120,9 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         wrong.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestAuth.Token + "x");
         Assert.Equal(HttpStatusCode.Unauthorized, (await wrong.GetAsync("/repos/recents")).StatusCode);
 
+        string sid = await _factory.CreateAuthedClient().OpenSessionAsync(FindRepoRoot());
         HttpClient bare = _factory.CreateClient();
-        using HttpResponseMessage events = await bare.GetAsync($"/events?token={TestAuth.Token}", HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage events = await bare.GetAsync($"/repos/{sid}/events?token={TestAuth.Token}", HttpCompletionOption.ResponseHeadersRead);
         Assert.Equal(HttpStatusCode.OK, events.StatusCode);
     }
 

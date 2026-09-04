@@ -39,10 +39,20 @@ async function engineFetch(path: string, init: RequestInit = {}): Promise<Respon
   return fetch(`${ENGINE_URL}${path}`, { ...init, headers })
 }
 
+/** v0.13.6: the engine serves many repositories; every repo route lives under
+ *  /repos/<id>. The id comes back from openRepo / fetchCurrent and is kept
+ *  here so the 40-odd helpers below stay one-liners. */
+let REPO_ID: string | null = null
+export const currentRepoId = (): string | null => REPO_ID
+const repoBase = (): string => {
+  if (!REPO_ID) throw new Error("no repository open")
+  return `/repos/${REPO_ID}`
+}
+
 /** EventSource cannot send headers, so /events takes the token as a query. */
 export async function engineEventsUrl(): Promise<string> {
   await engineReady
-  return `${ENGINE_URL}/events?token=${encodeURIComponent(ENGINE_TOKEN)}`
+  return `${ENGINE_URL}${repoBase()}/events?token=${encodeURIComponent(ENGINE_TOKEN)}`
 }
 
 export type Health = {
@@ -56,6 +66,8 @@ export type RepoInfo = {
   name: string
   root: string
   branch: string
+  /** Session id; repo routes live under /repos/<id> (v0.13.6). */
+  id: string
 }
 
 export type RevisionDto = {
@@ -161,13 +173,17 @@ export async function openRepo(path: string): Promise<RepoInfo> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path }),
   })
-  return json<RepoInfo>(res)
+  const info = await json<RepoInfo>(res)
+  REPO_ID = info.id
+  return info
 }
 
 export async function fetchCurrent(): Promise<RepoInfo | null> {
   const res = await engineFetch(`/repos/current`)
   if (res.status === 404) return null
-  return json<RepoInfo>(res)
+  const info = await json<RepoInfo>(res)
+  REPO_ID = info.id
+  return info
 }
 
 export async function fetchRecents(): Promise<RepoInfo[]> {
@@ -176,43 +192,43 @@ export async function fetchRecents(): Promise<RepoInfo[]> {
 }
 
 export async function fetchRevisions(max = 800, skip = 0): Promise<RevisionDto[]> {
-  const res = await engineFetch(`/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`)
+  const res = await engineFetch(`${repoBase()}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`)
   return json<RevisionDto[]>(res)
 }
 
 export async function fetchCommit(id: string): Promise<CommitDetail> {
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}`)
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}`)
   return json<CommitDetail>(res)
 }
 
 export async function fetchFiles(id: string): Promise<FileChange[]> {
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/files`)
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}/files`)
   return json<FileChange[]>(res)
 }
 
 export async function fetchTree(id: string, path?: string): Promise<TreeEntry[]> {
   const qs = path ? `?path=${encodeURIComponent(path)}` : ""
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/tree${qs}`)
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}/tree${qs}`)
   return json<TreeEntry[]>(res)
 }
 
 export async function fetchDiff(id: string, path: string, options?: Partial<DiffOptions>): Promise<DiffDto> {
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}${diffParams(options)}`)
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}${diffParams(options)}`)
   return json<DiffDto>(res)
 }
 
 export async function fetchBlob(id: string, path: string): Promise<DiffDto> {
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/blob?path=${encodeURIComponent(path)}`)
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}/blob?path=${encodeURIComponent(path)}`)
   return json<DiffDto>(res)
 }
 
 export async function fetchWorkTreeDiff(path: string, staged = false, options?: Partial<DiffOptions>): Promise<DiffDto> {
-  const res = await engineFetch(`/diff/worktree?path=${encodeURIComponent(path)}&staged=${staged}${diffParams(options)}`)
+  const res = await engineFetch(`${repoBase()}/diff/worktree?path=${encodeURIComponent(path)}&staged=${staged}${diffParams(options)}`)
   return json<DiffDto>(res)
 }
 
 export async function deleteFiles(paths: string[]): Promise<RepoStatus> {
-  const res = await engineFetch(`/files/delete`, {
+  const res = await engineFetch(`${repoBase()}/files/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths }),
@@ -221,7 +237,7 @@ export async function deleteFiles(paths: string[]): Promise<RepoStatus> {
 }
 
 export async function addToIgnore(pattern: string): Promise<RepoStatus> {
-  const res = await engineFetch(`/ignore`, {
+  const res = await engineFetch(`${repoBase()}/ignore`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pattern }),
@@ -230,7 +246,7 @@ export async function addToIgnore(pattern: string): Promise<RepoStatus> {
 }
 
 export async function previewIgnore(pattern: string): Promise<IgnorePreview> {
-  const res = await engineFetch(`/ignore/preview`, {
+  const res = await engineFetch(`${repoBase()}/ignore/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pattern }),
@@ -239,12 +255,12 @@ export async function previewIgnore(pattern: string): Promise<IgnorePreview> {
 }
 
 export async function listRemotes(): Promise<RemoteInfo[]> {
-  const res = await engineFetch(`/remotes`)
+  const res = await engineFetch(`${repoBase()}/remotes`)
   return json<RemoteInfo[]>(res)
 }
 
 export async function saveRemote(name: string, url: string): Promise<RemoteInfo> {
-  const res = await engineFetch(`/remotes`, {
+  const res = await engineFetch(`${repoBase()}/remotes`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, url }),
@@ -299,7 +315,7 @@ async function parseJobResponse<T>(res: Response): Promise<T> {
 }
 
 export async function fetchRemote(name: string): Promise<{ output: string }> {
-  const res = await engineFetch(`/fetch`, {
+  const res = await engineFetch(`${repoBase()}/fetch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ remote: name }),
@@ -308,7 +324,7 @@ export async function fetchRemote(name: string): Promise<{ output: string }> {
 }
 
 export async function pullBranch(rebase = false): Promise<{ output: string }> {
-  const res = await engineFetch(`/pull`, {
+  const res = await engineFetch(`${repoBase()}/pull`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rebase }),
@@ -317,7 +333,7 @@ export async function pullBranch(rebase = false): Promise<{ output: string }> {
 }
 
 export async function pushBranch(forceWithLease = false): Promise<{ output: string }> {
-  const res = await engineFetch(`/push`, {
+  const res = await engineFetch(`${repoBase()}/push`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ forceWithLease }),
@@ -326,7 +342,7 @@ export async function pushBranch(forceWithLease = false): Promise<{ output: stri
 }
 
 export async function createBranch(name: string, commit?: string): Promise<RefTree> {
-  const res = await engineFetch(`/branches/create`, {
+  const res = await engineFetch(`${repoBase()}/branches/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, commit }),
@@ -335,7 +351,7 @@ export async function createBranch(name: string, commit?: string): Promise<RefTr
 }
 
 export async function createTag(name: string, commit?: string): Promise<RefTree> {
-  const res = await engineFetch(`/tags/create`, {
+  const res = await engineFetch(`${repoBase()}/tags/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, commit }),
@@ -366,7 +382,7 @@ export const startPull = (rebase = false) => startJob("/pull", { rebase })
 export const startPush = (forceWithLease = false) => startJob("/push", { forceWithLease })
 
 export async function getJob(id: string): Promise<GitJob> {
-  const res = await engineFetch(`/jobs/${encodeURIComponent(id)}`)
+  const res = await engineFetch(`${repoBase()}/jobs/${encodeURIComponent(id)}`)
   return parseJobResponse<GitJob>(res)
 }
 
@@ -383,7 +399,7 @@ export async function waitJob(id: string, onTick?: (job: GitJob) => void, timeou
 }
 
 export async function deleteBranch(name: string): Promise<RefTree> {
-  const res = await engineFetch(`/branches/delete`, {
+  const res = await engineFetch(`${repoBase()}/branches/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -392,7 +408,7 @@ export async function deleteBranch(name: string): Promise<RefTree> {
 }
 
 export async function deleteTag(name: string): Promise<RefTree> {
-  const res = await engineFetch(`/tags/delete`, {
+  const res = await engineFetch(`${repoBase()}/tags/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -403,12 +419,12 @@ export async function deleteTag(name: string): Promise<RefTree> {
 export type StashInfo = { reference: string; id: string; subject: string }
 
 export async function fetchStashes(): Promise<StashInfo[]> {
-  const res = await engineFetch(`/stashes`)
+  const res = await engineFetch(`${repoBase()}/stashes`)
   return json<StashInfo[]>(res)
 }
 
 export async function stashChanges(message: string | null, keepIndex = false, includeUntracked = false): Promise<RepoStatus> {
-  const res = await engineFetch(`/stash`, {
+  const res = await engineFetch(`${repoBase()}/stash`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, keepIndex, includeUntracked }),
@@ -417,7 +433,7 @@ export async function stashChanges(message: string | null, keepIndex = false, in
 }
 
 export async function applyStash(reference: string, pop = false): Promise<RepoStatus> {
-  const res = await engineFetch(`/stash/apply`, {
+  const res = await engineFetch(`${repoBase()}/stash/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reference, pop }),
@@ -426,7 +442,7 @@ export async function applyStash(reference: string, pop = false): Promise<RepoSt
 }
 
 export async function dropStash(reference: string): Promise<void> {
-  const res = await engineFetch(`/stash/drop`, {
+  const res = await engineFetch(`${repoBase()}/stash/drop`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: reference }),
@@ -435,7 +451,7 @@ export async function dropStash(reference: string): Promise<void> {
 }
 
 export async function fetchStatus(): Promise<RepoStatus> {
-  const res = await engineFetch(`/status`)
+  const res = await engineFetch(`${repoBase()}/status`)
   return json<RepoStatus>(res)
 }
 
@@ -459,17 +475,17 @@ export function changeKindOf(version: number): ChangeKind {
 }
 
 export async function fetchRefs(): Promise<RefTree> {
-  const res = await engineFetch(`/refs`)
+  const res = await engineFetch(`${repoBase()}/refs`)
   return json<RefTree>(res)
 }
 
 export async function fetchConfig(): Promise<GitConfig> {
-  const res = await engineFetch(`/config`)
+  const res = await engineFetch(`${repoBase()}/config`)
   return json<GitConfig>(res)
 }
 
 export async function saveConfig(patch: Partial<GitConfig> & { global?: boolean }): Promise<GitConfig> {
-  const res = await engineFetch(`/config`, {
+  const res = await engineFetch(`${repoBase()}/config`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -483,17 +499,17 @@ export async function saveConfig(patch: Partial<GitConfig> & { global?: boolean 
 }
 
 export async function fetchVsCode(): Promise<VsCodeInfo> {
-  const res = await engineFetch(`/tools/vscode`)
+  const res = await engineFetch(`${repoBase()}/tools/vscode`)
   return json<VsCodeInfo>(res)
 }
 
 export async function applyVsCode(): Promise<VsCodeInfo> {
-  const res = await engineFetch(`/tools/vscode`, { method: "POST" })
+  const res = await engineFetch(`${repoBase()}/tools/vscode`, { method: "POST" })
   return json<VsCodeInfo>(res)
 }
 
 export async function stagePaths(paths: string[], unstage = false): Promise<RepoStatus> {
-  const res = await engineFetch(`/stage`, {
+  const res = await engineFetch(`${repoBase()}/stage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths, unstage }),
@@ -502,7 +518,7 @@ export async function stagePaths(paths: string[], unstage = false): Promise<Repo
 }
 
 export async function createCommit(message: string, amend = false): Promise<{ id: string }> {
-  const res = await engineFetch(`/commit`, {
+  const res = await engineFetch(`${repoBase()}/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, amend }),
@@ -511,7 +527,7 @@ export async function createCommit(message: string, amend = false): Promise<{ id
 }
 
 export async function checkoutRef(ref: string, force = false): Promise<RepoStatus> {
-  const res = await engineFetch(`/checkout`, {
+  const res = await engineFetch(`${repoBase()}/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ref, force }),
@@ -520,7 +536,7 @@ export async function checkoutRef(ref: string, force = false): Promise<RepoStatu
 }
 
 export async function resetBranch(commit: string, mode: "soft" | "mixed" | "hard"): Promise<RepoStatus> {
-  const res = await engineFetch(`/reset`, {
+  const res = await engineFetch(`${repoBase()}/reset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ commit, mode }),
@@ -529,7 +545,7 @@ export async function resetBranch(commit: string, mode: "soft" | "mixed" | "hard
 }
 
 export async function rebaseOnto(onto: string): Promise<RepoStatus> {
-  const res = await engineFetch(`/rebase`, {
+  const res = await engineFetch(`${repoBase()}/rebase`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ onto }),
@@ -538,12 +554,12 @@ export async function rebaseOnto(onto: string): Promise<RepoStatus> {
 }
 
 export async function cherryPickCommit(id: string): Promise<RepoStatus> {
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/cherry-pick`, { method: "POST" })
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}/cherry-pick`, { method: "POST" })
   return json<RepoStatus>(res)
 }
 
 export async function revertCommit(id: string): Promise<RepoStatus> {
-  const res = await engineFetch(`/commits/${encodeURIComponent(id)}/revert`, { method: "POST" })
+  const res = await engineFetch(`${repoBase()}/commits/${encodeURIComponent(id)}/revert`, { method: "POST" })
   return json<RepoStatus>(res)
 }
 
@@ -552,7 +568,7 @@ export async function revertCommit(id: string): Promise<RepoStatus> {
  *  the tool detached and responds immediately, so this resolves as soon as
  *  the request is accepted, not when the tool window closes. */
 export async function openDifftool(commit: string, path: string): Promise<void> {
-  const res = await engineFetch(`/difftool`, {
+  const res = await engineFetch(`${repoBase()}/difftool`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ commit, path }),

@@ -8,7 +8,10 @@ export default defineConfig({
   // specs switch that repository (live-refresh-scope). Parallel workers there
   // let one spec's repo swap surface as "no repository" in another — that is
   // exactly how the Linux CI run failed while Windows (1 worker) passed. The
-  // suite is ~3 min serially; keep it serial everywhere.
+  // suite is ~3 min serially; keep it serial everywhere. v0.13.6 made the ENGINE
+  // multi-repo safe, but the UI still boots from /repos/current (engine-global
+  // "last opened"), so a spec that opens a temp repo still leaks into others;
+  // see docs/agents/memories/engine-sessions.md.
   fullyParallel: false,
   workers: 1,
   forbidOnly: ci,

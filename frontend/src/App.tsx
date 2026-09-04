@@ -377,8 +377,8 @@ export default function App() {
     let timer: number | undefined
     let last: string | null = null
     let pendingKind: ChangeKind = "none"
-    void engineEventsUrl().then((url) => {
-      if (cancelled) return
+    void engineEventsUrl().catch(() => null).then((url) => {
+      if (cancelled || !url) return // no repository open yet: nothing to watch
       source = new EventSource(url)
       source.onmessage = (e) => {
         if (last === e.data) return

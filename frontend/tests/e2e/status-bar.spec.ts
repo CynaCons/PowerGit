@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { ENGINE_URL, engineHeaders } from "../engine"
+import { ENGINE_URL, engineHeaders, repoBase } from "../engine"
 
 // Covers audit item 9 (section B): the status strip shows repo state (branch,
 // ahead/behind, dirty count) instead of just engine health. Fetches the
@@ -10,7 +10,7 @@ import { ENGINE_URL, engineHeaders } from "../engine"
 test("status bar shows the branch in bold, ahead/behind when tracked, dirty count, and a muted engine version", async ({ page }) => {
   const [repo, status] = await Promise.all([
     fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() }).then((r) => r.json() as Promise<{ branch: string }>),
-    fetch(`${ENGINE_URL}/status`, { headers: engineHeaders() }).then(
+    fetch(`${await repoBase()}/status`, { headers: engineHeaders() }).then(
       (r) => r.json() as Promise<{ ahead: number | null; behind: number | null; unstagedCount: number; stagedCount: number }>,
     ),
   ])

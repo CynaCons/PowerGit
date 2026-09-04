@@ -17,12 +17,15 @@ public sealed partial class GitHost
     /// </summary>
     public string StartJob(string kind, Func<string> work)
     {
-        if (_jobs.Values.Any(j => j.Dto.Status == "running"))
+        // v0.13.6: a job holds the session write gate until it finishes, so a
+        // checkout during a fetch (or a second fetch) fails fast with 409.
+        if (!_writeGate.Wait(0))
         {
-            throw new InvalidOperationException("Another git operation is already in progress.");
+            throw new RepoBusyException(_writeHolder ?? "another operation");
         }
 
         string id = Guid.NewGuid().ToString("N")[..12];
+        _writeHolder = $"{kind} (job {id})";
         JobEntry entry = new(new GitJobDto(id, kind, "running", null, null), new TaskCompletionSource<GitJobDto>(TaskCreationOptions.RunContinuationsAsynchronously));
         _jobs[id] = entry;
 
@@ -40,6 +43,8 @@ public sealed partial class GitHost
             }
 
             _jobs[id] = entry with { Dto = done };
+            _writeHolder = null;
+            _writeGate.Release();
             entry.Done.TrySetResult(done);
             PruneJobs();
         });

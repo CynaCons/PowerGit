@@ -166,3 +166,5 @@ what is still open, which memory files you added or updated.
   scripts import `tests/engine.ts`. A bare `dotnet run` must get
   `POWERGIT_ENGINE_TOKEN`. See docs/agents/memories/engine-token.md.
 - Linux smoke check: pwsh scripts/ubuntu-check.ps1 (requires Docker Desktop).
+- Engine sessions (v0.13.6): every repo route is `/repos/{id}/...`; a colliding
+  mutation answers 409. See docs/agents/memories/engine-sessions.md.
