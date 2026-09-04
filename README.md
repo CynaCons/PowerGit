@@ -50,10 +50,12 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.12.3 (command bar that
-collapses to an overflow menu, a real bottom status bar, VS Code font stack
-and Shiki syntax highlighting in the file viewer, and an engine that exits
-with its parent). Parked: dark theme, worktrees, hotkey remapping UI.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.13.13 (Ubuntu 26.04
+AppImage fixed and gated on 22.04/24.04/26.04, bounded git execution with
+capped and virtualized blobs/diffs, supervised engine with a recovery panel,
+an explicit session state machine with repository-scoped clients, pull/push
+previews with cancellation, System/Light/Dark themes and Ctrl+0/+/- zoom).
+Parked: worktrees, hotkey remapping UI, fetch/pull/push dialogs.
 
 ## Development
 
