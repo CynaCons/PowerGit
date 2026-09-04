@@ -353,17 +353,17 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Session lifecycle: DELETE /repos/{id} disposes the watcher; idle sessions pruned; recents stay client-driven [agent: claude]
 - [x] Engine tests: two repos open with interleaved queries; concurrent stage+commit serialize; 409 on collision [agent: claude]
 
-### v0.13.7 — CI on push/PR + Tauri CSP (Bad #4)
+### v0.13.7 — CI on push/PR + Tauri CSP (Bad #4) (2026-09-04) (COMPLETE)
 **Goal:** Only pages.yml and release.yml are tracked; engine tests, vitest and Playwright run only on developer machines. Add a ci.yml on push and pull_request that runs dotnet test, npm run test:unit and npm run test:e2e (Windows + Linux). Replace tauri.conf.json "csp": null with a real policy that still allows the engine origin, Shiki, and the layout worker.
-- [ ] .github/workflows/ci.yml on push + pull_request: dotnet test (engine), npm run lint + format:check, test:unit, test:e2e on windows-latest and ubuntu-22.04; check-version.mjs; powerplan check_plan
-- [ ] tauri.conf.json csp: real policy (default-src 'self'; connect-src to the engine loopback origin; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' for MUI/emotion); verify Shiki, the layout worker and engine fetches still work in npm run tauri dev
-- [ ] README CI badge; AGENTS.md 'How we verify' mentions CI as the gate
+- [x] .github/workflows/ci.yml on push + pull_request: dotnet test (engine), npm run lint + format:check, test:unit, test:e2e on windows-latest and ubuntu-22.04; check-version.mjs; powerplan check_plan [agent: claude]
+- [x] tauri.conf.json csp: real policy (default-src 'self'; connect-src to the engine loopback origin; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' for MUI/emotion); verify Shiki, the layout worker and engine fetches still work in npm run tauri dev [agent: claude]
+- [x] README CI badge; AGENTS.md 'How we verify' mentions CI as the gate [agent: claude]
 
-### v0.13.8 — Rust shell unit tests (Bad #5)
+### v0.13.8 — Rust shell unit tests (Bad #5) (2026-09-04) (COMPLETE)
 **Goal:** frontend/src-tauri/src/lib.rs has zero #[test]s although it contains the hand-rolled HTTP health probe, the chunked-body decoder and the port-resolution decision, which already failed silently once. Add cargo unit tests for dechunk, looks_like_powergit_health (version match/mismatch, non-chunked, garbage) and resolve_engine_port against a local TcpListener stub; run them in CI.
-- [ ] cargo unit tests in lib.rs: generate_token shape/uniqueness, POWERGIT_VERSION exported by build.rs is X.Y.Z (dechunk and looks_like_powergit_health no longer exist: v0.13.0 removed engine reuse and the hand-rolled HTTP probe) [agent: claude]
-- [ ] resolve_port_preferring / pick_free_port / port_is_free tests against a local TcpListener (free port is returned as-is; a held port yields a different bindable port) [agent: claude]
-- [ ] cargo test wired into ci.yml (v0.13.7)
+- [x] cargo unit tests in lib.rs: generate_token shape/uniqueness, POWERGIT_VERSION exported by build.rs is X.Y.Z (dechunk and looks_like_powergit_health no longer exist: v0.13.0 removed engine reuse and the hand-rolled HTTP probe) [agent: claude]
+- [x] resolve_port_preferring / pick_free_port / port_is_free tests against a local TcpListener (free port is returned as-is; a held port yields a different bindable port) [agent: claude]
+- [x] cargo test wired into ci.yml (v0.13.7) [agent: claude]
 
 ### v0.13.9 — powerplan upgrade — normalize, set_header, create_major fix, lint (sub-iteration of v0.13.2)
 **Goal:** powerplan has 22 iteration/task-scoped tools and nothing that touches majors, prose, the header block, or file order, which is why PLAN.md drifted and the fix needed a manual edit. Add the missing operations and lint rules in the powerspawn/powerplan submodule, release, and bump the pin here.
