@@ -83,7 +83,7 @@ for v in $VERSIONS; do
     "$image" bash /launch.sh "${args[@]}"
   rc=$?
   if [ $rc -eq 0 ]; then RESULT[$v]=PASS; else RESULT[$v]=FAIL; overall=1; fi
-  NOTE[$v]=$(grep -E '^(PASS|FAIL):' "$vout/result.txt" 2>/dev/null | tail -n1 | cut -c1-90)
+  NOTE[$v]=$(grep -E '^(SKIP|PASS|FAIL):' "$vout/result.txt" 2>/dev/null | paste -sd';' - | cut -c1-160)
   [ -n "${NOTE[$v]}" ] || NOTE[$v]="no result written (docker rc=$rc)"
 done
 

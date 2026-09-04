@@ -49,3 +49,10 @@ Never inferred from a dead engine: that path shows the recovery states.
 back, evicted session, two pinned windows, previews), `jobs-contract.spec.ts`
 (session-qualified job routes with no route stubs), `large-content.spec.ts`
 (truncated blob/diff notice, virtualized rows).
+
+## Reset selection before debounced commit reads
+`BottomPanel` debounces commit/detail requests by 150 ms, but its file,
+tree-file, diff and blob selection reset must happen immediately when
+`commitId` changes. Delaying the reset with the requests lets a fast local
+tree become clickable first and then erases the user's new selection when
+the timer fires; the Ubuntu seed repository exposed this race reliably.

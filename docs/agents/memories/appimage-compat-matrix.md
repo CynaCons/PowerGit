@@ -54,10 +54,21 @@ pattern.
 - `INJECT_FAILURE=1` kills the engine halfway and requires the supervised
   restart: health back within 20 s and `sidecar exited` + a second
   `sidecar started` in `$XDG_DATA_HOME/com.cynacons.powergit/logs/engine.log`.
-  Only builds from v0.13.11 on have the supervisor, so keep it off for
-  older artifacts (v0.12.3 has no restart and no log).
+  Only builds from v0.13.11 on have the supervisor. Older artifacts are
+  capability-detected and record an explicit SKIP (v0.12.3 also lacks
+  session/watcher diagnostics and blob-truncation metadata) while the
+  longevity rota still drives their global repository routes.
 Use it one version at a time (`--versions "26.04"`); it is NOT wired into
 CI. The acceptance run for v0.13.11 is 10 minutes on 26.04 in both modes.
+
+## linuxdeploy's GTK hook must preserve an explicit backend
+The GTK hook generated into `apprun-hooks/linuxdeploy-plugin-gtk.sh` by the
+v0.12.3 toolchain contains `export GDK_BACKEND=x11`. That assignment
+overrides `DISPLAY_MODE=wayland` even when Weston, its socket and host GTK
+are healthy, so GTK initialization fails before the engine starts.
+`scripts/inspect-appimage.sh --fix` rewrites it to an environment-respecting
+X11 default. This keeps the compatibility default while allowing the
+Wayland matrix to set `GDK_BACKEND=wayland` explicitly.
 
 ## Repairing a downloaded artifact
 `scripts/inspect-appimage.sh --fix --strict --out <fixed.AppImage>` needs

@@ -17,9 +17,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repo = (Resolve-Path "$PSScriptRoot\..").Path
-$bash = (Get-Command bash -ErrorAction SilentlyContinue).Source
-if (-not $bash) { $bash = "C:\Program Files\Git\bin\bash.exe" }
-if (-not (Test-Path $bash)) { throw "Git Bash not found; install Git for Windows." }
+$git = Get-Command git.exe -ErrorAction SilentlyContinue
+$gitBash = if ($git) { Join-Path (Split-Path (Split-Path $git.Source -Parent) -Parent) "bin\bash.exe" }
+$bash = @(
+  $gitBash
+  "$env:ProgramFiles\Git\bin\bash.exe"
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $bash) { throw "Git Bash not found; install Git for Windows." }
 
 $app = (Resolve-Path $AppImage).Path -replace '\\', '/'
 if ($Out -eq "") { $Out = Join-Path $repo "docker\appimage-check\out" }

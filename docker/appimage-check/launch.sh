@@ -64,6 +64,7 @@ STDOUT="$OUT/app.stdout.txt"
 
 fail() { echo "FAIL: $*" | tee -a "$OUT/result.txt" >&2; cleanup; exit 1; }
 pass() { echo "PASS: $*" | tee -a "$OUT/result.txt"; }
+skip() { echo "SKIP: $*" | tee -a "$OUT/result.txt"; }
 
 if [ "$SKIP_INSTALL" != 1 ]; then
   echo "== apt: $(. /etc/os-release; echo "$PRETTY_NAME") =="
@@ -208,9 +209,22 @@ if [ "$LONGEVITY" -gt 0 ]; then
 
   TOKEN=$(engine_token || true); echo "engine token: ${TOKEN:+present}${TOKEN:-none}"
   seed_repos
-  SID_A=$(api POST /repos/open '{"path":"/tmp/seed-a"}' | json_field id); echo "session A: $SID_A"
-  SID_B=$(api POST /repos/open '{"path":"/tmp/seed-b"}' | json_field id); echo "session B: $SID_B"
-  [ -n "$SID_A" ] || fail "could not open the seed repository through the API (${API_MS}ms)"
+  API_MS=0
+  OPEN_A=$(api POST /repos/open '{"path":"/tmp/seed-a"}') || fail "could not open seed repository A through the API (${API_MS}ms)"
+  SID_A=$(printf '%s' "$OPEN_A" | json_field id)
+  OPEN_B=$(api POST /repos/open '{"path":"/tmp/seed-b"}') || fail "could not open seed repository B through the API (${API_MS}ms)"
+  SID_B=$(printf '%s' "$OPEN_B" | json_field id)
+  if [ -n "$SID_A" ] && [ -n "$SID_B" ]; then
+    API_MODE=session
+    echo "session A: $SID_A"
+    echo "session B: $SID_B"
+  else
+    API_MODE=legacy
+    echo "API mode: legacy global repository (artifact predates engine sessions)"
+    skip "session/watcher bounds and blob-cap metadata unavailable in this artifact"
+    [ "$INJECT_FAILURE" = 1 ] && skip "injected engine recovery requires a v0.13.11+ supervised-sidecar build"
+  fi
+  legacy_open() { api POST /repos/open "{\"path\":\"$1\"}" >/dev/null || fail "legacy repository switch to $1 failed/slow (${API_MS}ms)"; }
   HEAD_A=$(git -C /tmp/seed-a rev-parse HEAD)
   api_ms=0; drive_n=0; job_done=0; injected=0; injected_at=0
   seen_web=0; seen_gpu=0
@@ -223,23 +237,40 @@ if [ "$LONGEVITY" -gt 0 ]; then
     fi
     # API drive every 2 s: rapid reads + one expensive item on a rota.
     drive_n=$((drive_n + 1))
-    case $((drive_n % 8)) in
-      1) api GET "/repos/$SID_A/revisions?max=200&skip=$((drive_n % 30))" >/dev/null || fail "revisions read failed/slow (${API_MS}ms)";;
-      2) api GET "/repos/$SID_A/commits/$HEAD_A/blob?path=huge.txt" | grep -q '"truncated":true' || fail "capped blob did not come back truncated (${API_MS}ms)";;
-      3) api GET "/repos/$SID_A/commits/$HEAD_A/diff?path=big1.txt&context=3" >/dev/null || fail "diff read failed/slow (${API_MS}ms)";;
-      4) api GET "/repos/$SID_B/status" >/dev/null || fail "repo switch (B) failed (${API_MS}ms)";;
-      5) api GET "/repos/$SID_A/status" >/dev/null || fail "repo switch (A) failed (${API_MS}ms)";;
-      6) if [ "$job_done" = 0 ]; then
-           jid=$(api POST "/repos/$SID_A/fetch" '{"remote":"origin"}' | json_field id)
-           for _ in $(seq 1 30); do st=$(api GET "/repos/$SID_A/jobs/$jid" | json_field status); [ "$st" != running ] && break; sleep 1; done
-           [ "$st" = completed ] && job_done=1 || echo "  note: fetch job status '$st' (bare remote at /tmp/seed-bare)"
-         fi;;
-      *) api GET "/repos/$SID_A/commits/$HEAD_A" >/dev/null || fail "commit read failed/slow (${API_MS}ms)";;
-    esac
+    if [ "$API_MODE" = session ]; then
+      case $((drive_n % 8)) in
+        1) api GET "/repos/$SID_A/revisions?max=200&skip=$((drive_n % 30))" >/dev/null || fail "revisions read failed/slow (${API_MS}ms)";;
+        2) api GET "/repos/$SID_A/commits/$HEAD_A/blob?path=huge.txt" | grep -q '"truncated":true' || fail "capped blob did not come back truncated (${API_MS}ms)";;
+        3) api GET "/repos/$SID_A/commits/$HEAD_A/diff?path=big1.txt&context=3" >/dev/null || fail "diff read failed/slow (${API_MS}ms)";;
+        4) api GET "/repos/$SID_B/status" >/dev/null || fail "repo switch (B) failed (${API_MS}ms)";;
+        5) api GET "/repos/$SID_A/status" >/dev/null || fail "repo switch (A) failed (${API_MS}ms)";;
+        6) if [ "$job_done" = 0 ]; then
+             jid=$(api POST "/repos/$SID_A/fetch" '{"remote":"origin"}' | json_field id)
+             for _ in $(seq 1 30); do st=$(api GET "/repos/$SID_A/jobs/$jid" | json_field status); [ "$st" != running ] && break; sleep 1; done
+             [ "$st" = completed ] && job_done=1 || echo "  note: fetch job status '$st' (bare remote at /tmp/seed-bare)"
+           fi;;
+        *) api GET "/repos/$SID_A/commits/$HEAD_A" >/dev/null || fail "commit read failed/slow (${API_MS}ms)";;
+      esac
+    else
+      case $((drive_n % 8)) in
+        1) legacy_open /tmp/seed-a; api GET "/revisions?max=200&skip=$((drive_n % 30))" >/dev/null || fail "legacy revisions read failed/slow (${API_MS}ms)";;
+        2) legacy_open /tmp/seed-a; api GET "/commits/$HEAD_A/blob?path=huge.txt" >/dev/null || fail "legacy blob read failed/slow (${API_MS}ms)";;
+        3) legacy_open /tmp/seed-a; api GET "/commits/$HEAD_A/diff?path=big1.txt&context=3" >/dev/null || fail "legacy diff read failed/slow (${API_MS}ms)";;
+        4) legacy_open /tmp/seed-b; api GET /status >/dev/null || fail "legacy repo switch (B) failed (${API_MS}ms)";;
+        5) legacy_open /tmp/seed-a; api GET /status >/dev/null || fail "legacy repo switch (A) failed (${API_MS}ms)";;
+        6) if [ "$job_done" = 0 ]; then
+             legacy_open /tmp/seed-a
+             jid=$(api POST /fetch '{"remote":"origin"}' | json_field id)
+             for _ in $(seq 1 30); do st=$(api GET "/jobs/$jid" | json_field status); [ "$st" != running ] && break; sleep 1; done
+             [ "$st" = completed ] && job_done=1 || echo "  note: legacy fetch job status '$st' (bare remote at /tmp/seed-bare)"
+           fi;;
+        *) legacy_open /tmp/seed-a; api GET "/commits/$HEAD_A" >/dev/null || fail "legacy commit read failed/slow (${API_MS}ms)";;
+      esac
+    fi
     api_ms=$API_MS
     # Injected failure halfway: kill the engine, demand the supervised restart.
     now=$(date +%s)
-    if [ "$INJECT_FAILURE" = 1 ] && [ "$injected" = 0 ] && [ "$now" -ge $((START + LONGEVITY * 30)) ]; then
+    if [ "$API_MODE" = session ] && [ "$INJECT_FAILURE" = 1 ] && [ "$injected" = 0 ] && [ "$now" -ge $((START + LONGEVITY * 30)) ]; then
       echo "  injecting engine failure at $((now - START)) s"
       pkill -9 -f powergit-engine; injected=1; injected_at=$now
       for _ in $(seq 1 20); do sleep 1; curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1 && break; done
@@ -259,8 +290,13 @@ if [ "$LONGEVITY" -gt 0 ]; then
       rss_mb=$(( $(tree_rss_kb) / 1024 ))
       n=$(tree_count)
       el=$(( $(date +%s) - START ))
-      sess=$(api GET /repos/sessions | grep -o '"id"' | wc -l)
-      watchers=$(api GET /repos/sessions | grep -o '"watchers":[0-9]*' | cut -d: -f2 | paste -sd+ | bc 2>/dev/null || echo 0)
+      if [ "$API_MODE" = session ]; then
+        SESSIONS=$(api GET /repos/sessions) || fail "session metrics read failed/slow (${API_MS}ms)"
+        sess=$(printf '%s' "$SESSIONS" | grep -o '"id"' | wc -l)
+        watchers=$(printf '%s' "$SESSIONS" | awk 'BEGIN { total=0 } { while (match($0, /"watchers":[0-9]+/)) { total += substr($0, RSTART + 11, RLENGTH - 11); $0=substr($0, RSTART + RLENGTH) } } END { print total }')
+      else
+        sess=na; watchers=na
+      fi
       echo "$el,$rss_mb,$n,$web,$gpu,$eng,$sess,$watchers,$api_ms" >>"$CSV"
       echo "  t=${el}s rss=${rss_mb}MB procs=$n web=$web gpu=$gpu engine=$eng sessions=$sess watchers=$watchers api=${api_ms}ms"
       [ "$web" = 1 ] && seen_web=1
@@ -269,12 +305,12 @@ if [ "$LONGEVITY" -gt 0 ]; then
       [ "$seen_gpu" = 1 ] && [ "$gpu" = 0 ] && fail "WebKitGPUProcess exited at ${el} s"
       [ "$eng" = 0 ] && [ "$injected" = 0 ] && fail "powergit-engine exited at ${el} s"
       [ "$rss_mb" -gt "$RSS_BUDGET_MB" ] && fail "RSS ${rss_mb} MB exceeds budget ${RSS_BUDGET_MB} MB at ${el} s"
-      [ "$sess" -gt 4 ] && fail "session count grew to $sess (expected the two seeds + the app's own)"
+      [ "$API_MODE" = session ] && [ "$sess" -gt 4 ] && fail "session count grew to $sess (expected the two seeds + the app's own)"
       if grep -Eq "$FATAL_RE" "$ERR"; then echo "== app stderr =="; grep -E "$FATAL_RE" "$ERR"; fail "fatal pattern on stderr at ${el} s"; fi
     fi
     sleep 2; tick=$((tick + 1))
   done
-  [ "$job_done" = 1 ] || echo "note: the fetch job never completed (pre-v0.13.10 builds send jobs to unprefixed routes)"
+  [ "$job_done" = 1 ] || echo "note: the fetch job never completed"
   echo "$(( $(date +%s) - START )),$(( $(tree_rss_kb) / 1024 )),$(tree_count),-,-,-,-,-,$api_ms" >>"$CSV"
 else
   sleep "$SMOKE_SECONDS"
