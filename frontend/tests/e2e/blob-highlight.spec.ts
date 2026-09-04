@@ -80,11 +80,11 @@ test("blob pane still renders a file with no recognised extension as plain text"
   // Blobs only: `data-path` is on directories too, and picking one of those
   // opens nothing (the first attempt selected ".github" and compared the
   // pane against a tree listing).
-  const candidates = await tree.locator('[data-type="blob"][data-path]').evaluateAll((els) =>
-    els
-      .map((el) => el.getAttribute("data-path") ?? "")
-      .filter((p) => p.length > 0 && !p.includes("/")),
-  )
+  const candidates = await tree
+    .locator('[data-type="blob"][data-path]')
+    .evaluateAll((els) =>
+      els.map((el) => el.getAttribute("data-path") ?? "").filter((p) => p.length > 0 && !p.includes("/")),
+    )
   const unmapped = candidates.find((p) => languageForPath(p) === null)
   if (!unmapped) {
     throw new Error(`no root-level file without a mapped grammar in: ${candidates.join(", ")}`)
@@ -99,10 +99,9 @@ test("blob pane still renders a file with no recognised extension as plain text"
   // rather than against a string that happens to be in one repo's copy.
   const commitId = await page.locator(".grid-row.selected [data-testid='sha-cell']").getAttribute("title")
   expect(commitId).toMatch(/^[0-9a-f]{40}$/)
-  const res = await page.request.get(
-    `${ENGINE_URL}/commits/${commitId}/blob?path=${encodeURIComponent(unmapped)}`,
-    { headers: engineHeaders() },
-  )
+  const res = await page.request.get(`${ENGINE_URL}/commits/${commitId}/blob?path=${encodeURIComponent(unmapped)}`, {
+    headers: engineHeaders(),
+  })
   expect(res.ok()).toBe(true)
   const groundTruth = (await res.json()) as { text: string }
   await expect.poll(() => blob.textContent()).toBe(groundTruth.text)

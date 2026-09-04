@@ -38,9 +38,18 @@ export function fromEvent(e: KeyboardEvent): Chord {
 }
 
 export function isModifierOnly(c: Chord): boolean {
-  return ["CONTROL", "SHIFT", "ALT", "META", "CONTROLLEFT", "CONTROLRIGHT", "SHIFTLEFT", "SHIFTRIGHT", "ALTLEFT", "ALTRIGHT"].includes(
-    c.key.toUpperCase(),
-  )
+  return [
+    "CONTROL",
+    "SHIFT",
+    "ALT",
+    "META",
+    "CONTROLLEFT",
+    "CONTROLRIGHT",
+    "SHIFTLEFT",
+    "SHIFTRIGHT",
+    "ALTLEFT",
+    "ALTRIGHT",
+  ].includes(c.key.toUpperCase())
 }
 
 export function isBareLetter(c: Chord): boolean {

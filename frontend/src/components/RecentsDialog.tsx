@@ -19,30 +19,32 @@ export function RecentsDialog({ open, onClose, recents, onPick }: Props) {
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Recent repositories</DialogTitle>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2, p: 2 }}>
-        {recents.length === 0 && (
-          <Typography color="text.secondary">No recent repositories yet.</Typography>
-        )}
+        {recents.length === 0 && <Typography color="text.secondary">No recent repositories yet.</Typography>}
         {recents.map((r) => (
-            <Card key={r.root} variant="outlined">
-              <CardActionArea
-                onClick={() => {
-                  onPick(r.root)
-                  onClose()
-                }}
-              >
-                <CardContent>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    {r.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {r.branch}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, wordBreak: "break-all" }}>
-                    {r.root}
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
+          <Card key={r.root} variant="outlined">
+            <CardActionArea
+              onClick={() => {
+                onPick(r.root)
+                onClose()
+              }}
+            >
+              <CardContent>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  {r.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {r.branch}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 0.5, wordBreak: "break-all" }}
+                >
+                  {r.root}
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
         ))}
       </Box>
     </Dialog>

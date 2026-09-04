@@ -32,8 +32,7 @@ async function currentRepoPath(): Promise<string | null> {
   return info.root ?? null
 }
 
-const selectedShaLocator = (page: Page) =>
-  page.locator('.grid-row.selected [data-testid="sha-cell"]')
+const selectedShaLocator = (page: Page) => page.locator('.grid-row.selected [data-testid="sha-cell"]')
 
 // Covers audit item 26/28 (selection keyed by SHA; live refresh scope) and
 // TASK 2: a refresh (of any kind) must not lose the selected commit.
@@ -99,7 +98,9 @@ test.describe("GET /events change classification", () => {
     }
   })
 
-  test("a status-only change refetches status only; a ref move refreshes revisions and keeps the selection", async ({ page }) => {
+  test("a status-only change refetches status only; a ref move refreshes revisions and keeps the selection", async ({
+    page,
+  }) => {
     await openRepoOnEngine(repoDir)
     await page.goto("/")
 

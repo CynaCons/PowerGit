@@ -59,13 +59,19 @@ test("unavailable commands stay unbound (GitBash)", () => {
 
 test("browse Ctrl+Space opens commit", () => {
   expect(
-    resolveHotkey("browse", chord("Space", { ctrl: true }), { editing: false, multiLine: false, fileListFocused: false }),
+    resolveHotkey("browse", chord("Space", { ctrl: true }), {
+      editing: false,
+      multiLine: false,
+      fileListFocused: false,
+    }),
   ).toBe("browse.commit")
 })
 
 test("S stages only when a file list is focused", () => {
   const s = chord("S")
-  expect(resolveHotkey("commit", s, { editing: false, multiLine: false, fileListFocused: true })).toBe("diff.stageSelected")
+  expect(resolveHotkey("commit", s, { editing: false, multiLine: false, fileListFocused: true })).toBe(
+    "diff.stageSelected",
+  )
   expect(resolveHotkey("commit", s, { editing: true, multiLine: true, fileListFocused: false })).toBeNull()
   expect(resolveHotkey("commit", s, { editing: false, multiLine: false, fileListFocused: false })).toBeNull()
 })

@@ -1,0 +1,13 @@
+dist
+node_modules
+src-tauri/target
+src-tauri/gen
+test-results
+playwright-report
+package-lock.json
+# Tauri shell config: not frontend code, formatted by the shell's own tooling.
+src-tauri
+# Engine contract and lane model are owned by their own iterations (v0.13.4
+# formatted everything else); drop these two lines when they are next touched.
+src/engine.ts
+src/graph

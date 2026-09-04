@@ -48,9 +48,7 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
     setDirs((prev) => new Map(prev).set(path, { entries: [], error: null }))
     fetchTree(commitId, path)
       .then((entries) => setDirs((prev) => new Map(prev).set(path, { entries, error: null })))
-      .catch((e: unknown) =>
-        setDirs((prev) => new Map(prev).set(path, { entries: [], error: describeThrown(e) })),
-      )
+      .catch((e: unknown) => setDirs((prev) => new Map(prev).set(path, { entries: [], error: describeThrown(e) })))
   }
 
   if (!commitId) {
@@ -77,7 +75,15 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
 
   return (
     <Box data-testid="commit-file-tree" sx={{ overflow: "auto", py: 0.5 }}>
-      <Level commitId={commitId} entries={root.entries} depth={0} prefix="" dirs={dirs} onToggle={toggleDir} onSelectFile={onSelectFile} />
+      <Level
+        commitId={commitId}
+        entries={root.entries}
+        depth={0}
+        prefix=""
+        dirs={dirs}
+        onToggle={toggleDir}
+        onSelectFile={onSelectFile}
+      />
     </Box>
   )
 }
@@ -117,7 +123,12 @@ function Level({
                 onClick={() => onToggle(path)}
               />
               {open && child && child.error && (
-                <Typography color="error" variant="body2" sx={{ pl: 2 + (depth + 1) * 1.5, fontSize: 12 }} data-testid="commit-file-tree-error">
+                <Typography
+                  color="error"
+                  variant="body2"
+                  sx={{ pl: 2 + (depth + 1) * 1.5, fontSize: 12 }}
+                  data-testid="commit-file-tree-error"
+                >
                   {child.error}
                 </Typography>
               )}

@@ -111,7 +111,7 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, loadi
           const last = rows.length - 1
           const cur = selected < 0 ? 0 : selected
           const page = Math.max(1, Math.floor((parentRef.current?.clientHeight ?? ROW_HEIGHT) / ROW_HEIGHT) - 1)
-          let next = cur
+          let next: number
           switch (e.key) {
             case "ArrowDown":
               next = Math.min(cur + 1, last)
@@ -164,9 +164,22 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, loadi
                   onSelect(item.index)
                   parentRef.current?.focus()
                 }}
-                onContextMenu={onRowContextMenu ? (e) => { onSelect(item.index); onRowContextMenu(e, item.index) } : undefined}
+                onContextMenu={
+                  onRowContextMenu
+                    ? (e) => {
+                        onSelect(item.index)
+                        onRowContextMenu(e, item.index)
+                      }
+                    : undefined
+                }
                 onMouseEnter={() => setHovered(item.index)}
-                style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${item.start}px)` }}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${item.start}px)`,
+                }}
               >
                 <div className="graph-cell" />
                 <div className="msg">

@@ -1,12 +1,5 @@
 import { CATALOG, type CommandId, type Scope } from "./catalog"
-import {
-  chordsEqual,
-  fromEvent,
-  isBareLetter,
-  isModifierOnly,
-  isTextEditKey,
-  type Chord,
-} from "./parse"
+import { chordsEqual, fromEvent, isBareLetter, isModifierOnly, isTextEditKey, type Chord } from "./parse"
 
 export type HandlerMap = Partial<Record<CommandId, () => void | boolean>>
 

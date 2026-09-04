@@ -9,6 +9,7 @@ import { CompactFileList } from "./CompactFileList"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { SplitHandle } from "./SplitHandle"
+import { BlobPane } from "./BlobPane"
 import {
   describeThrown,
   fetchBlob,
@@ -22,8 +23,6 @@ import {
   type FileChange,
 } from "../engine"
 import type { GraphRow } from "../graph/types"
-import { highlightToHtml, languageForPath } from "../highlight"
-import { codeSx, MONO_FONT } from "../theme"
 
 type Props = {
   current: GraphRow | undefined
@@ -174,8 +173,21 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   }
 
   return (
-    <Paper data-testid="bottom-panel" sx={{ height, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <Tabs value={tab} onChange={(_, v: number) => setTab(v)} sx={{ px: 0.5, minHeight: 34, "& .MuiTab-root": { minHeight: 34, py: 0.5 }, borderBottom: 1, borderColor: "divider" }}>
+    <Paper
+      data-testid="bottom-panel"
+      sx={{ height, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
+      <Tabs
+        value={tab}
+        onChange={(_, v: number) => setTab(v)}
+        sx={{
+          px: 0.5,
+          minHeight: 34,
+          "& .MuiTab-root": { minHeight: 34, py: 0.5 },
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
         <Tab label="Commit" />
         <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
         <Tab label="File Tree" />
@@ -201,11 +213,18 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
                   Committer: {detail.committer} &lt;{detail.committerEmail}&gt; · {formatWhen(detail.commitDate)}
                 </Typography>
                 {detail.parents.length > 0 && (
-                  <Typography variant="caption" sx={{ display: "block", mt: 1, fontFamily: "Fira Code, ui-monospace, monospace" }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ display: "block", mt: 1, fontFamily: "Fira Code, ui-monospace, monospace" }}
+                  >
                     Parents: {detail.parents.map((p) => p.slice(0, 7)).join(" ")}
                   </Typography>
                 )}
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block", fontFamily: "Fira Code, ui-monospace, monospace" }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: "block", fontFamily: "Fira Code, ui-monospace, monospace" }}
+                >
                   {detail.id}
                 </Typography>
               </>
@@ -226,7 +245,12 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
                 onRowDoubleClick={(f) => openInDifftool(f.path)}
               />
               {diffToolError && (
-                <Typography data-testid="difftool-error" variant="caption" color="error" sx={{ px: 1, py: 0.5, flexShrink: 0 }}>
+                <Typography
+                  data-testid="difftool-error"
+                  variant="caption"
+                  color="error"
+                  sx={{ px: 1, py: 0.5, flexShrink: 0 }}
+                >
                   {diffToolError}
                 </Typography>
               )}
@@ -279,91 +303,6 @@ function DiffPane({
         {diff ? <DiffView text={diff.text} /> : file ? "Loading diff…" : "Select a file."}
       </Box>
       <DiffOptionsBar options={options} onChange={onOptions} />
-    </Box>
-  )
-}
-
-// Shared by both the plain-text and Shiki-highlighted render paths so
-// toggling between them (highlighting resolves after the plain text is
-// already showing) never changes font size, line height, or scrolling.
-const BLOB_PANE_SX = {
-  m: 0,
-  p: 2,
-  flex: 1,
-  minWidth: 0,
-  overflow: "auto",
-  ...codeSx,
-  fontSize: 12,
-  lineHeight: 1.5,
-  bgcolor: "#ffffff",
-  whiteSpace: "pre",
-} as const
-
-// Shiki's HTML nests its own <pre><code>. Force both onto our mono stack
-// with ligatures off (Shiki sets its own font-family on the <pre> in some
-// configurations, and the "->" ligature the owner rejected must stay off
-// regardless) with !important, since that's an inline style Shiki may set.
-// `color` is deliberately never touched here — that inline style *is* the
-// per-token highlighting produced by Shiki.
-const BLOB_PANE_HTML_SX = {
-  ...BLOB_PANE_SX,
-  "& pre": {
-    margin: 0,
-    fontFamily: `${MONO_FONT} !important`,
-    fontSize: "inherit",
-    lineHeight: "inherit",
-    fontVariantLigatures: "none !important",
-    fontFeatureSettings: '\'"liga" 0, "calt" 0\' !important',
-  },
-  "& code": {
-    fontFamily: `${MONO_FONT} !important`,
-    fontVariantLigatures: "none !important",
-    fontFeatureSettings: '\'"liga" 0, "calt" 0\' !important',
-  },
-} as const
-
-function BlobPane({ blob, path }: { blob: DiffDto | null; path: string | null }) {
-  const [html, setHtml] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Reset synchronously (not just on failure) so a fast file switch never
-    // paints a stale highlight: the plain-text branch below is always
-    // correct in the interim, until (and unless) this file's own highlight
-    // resolves.
-    setHtml(null)
-    if (!blob) return
-    const lang = path ? languageForPath(path) : null
-    if (!lang) return
-    let cancelled = false
-    highlightToHtml(blob.text, lang).then((result) => {
-      if (!cancelled) setHtml(result)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [blob?.text, path])
-
-  return (
-    <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-      <Box sx={{ px: 1.5, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
-        <Typography variant="caption" sx={{ fontFamily: "Fira Code, ui-monospace, monospace" }}>
-          {path ?? "Select a file in the tree."}
-        </Typography>
-      </Box>
-      {html ? (
-        <Box
-          data-testid="blob-pane"
-          sx={BLOB_PANE_HTML_SX}
-          // Safe: this is Shiki's own HTML, produced by tokenizing
-          // `blob.text` against a TextMate grammar — Shiki escapes the text
-          // itself, so nothing here interpolates raw file text into HTML.
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <Box data-testid="blob-pane" component="pre" sx={BLOB_PANE_SX}>
-          {blob ? blob.text : path ? "Loading…" : ""}
-        </Box>
-      )}
     </Box>
   )
 }

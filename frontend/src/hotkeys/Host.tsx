@@ -1,15 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react"
-import type { Scope } from "./catalog"
-import { handleHotkey, type HandlerMap } from "./dispatch"
+import { useEffect, useMemo, useRef, type ReactNode } from "react"
+import { HotkeyContext, type HotkeyApi, type Layer } from "./context"
+import { handleHotkey } from "./dispatch"
 import { fromEvent } from "./parse"
-
-type Layer = { scope: Scope; handlers: { current: HandlerMap } }
-
-type Api = {
-  pushLayer: (scope: Scope, handlers: { current: HandlerMap }) => () => void
-}
-
-const HotkeyApi = createContext<Api | null>(null)
 
 export function HotkeyHost({ children }: { children: ReactNode }) {
   const stack = useRef<Layer[]>([])
@@ -31,7 +23,7 @@ export function HotkeyHost({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey, true)
   }, [])
 
-  const api = useMemo<Api>(
+  const api = useMemo<HotkeyApi>(
     () => ({
       pushLayer: (scope, handlers) => {
         const layer: Layer = { scope, handlers }
@@ -44,15 +36,5 @@ export function HotkeyHost({ children }: { children: ReactNode }) {
     [],
   )
 
-  return <HotkeyApi.Provider value={api}>{children}</HotkeyApi.Provider>
-}
-
-export function useHotkeyLayer(scope: Scope, handlers: HandlerMap, enabled = true) {
-  const api = useContext(HotkeyApi)
-  const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
-  useEffect(() => {
-    if (!api || !enabled) return
-    return api.pushLayer(scope, handlersRef)
-  }, [api, scope, enabled])
+  return <HotkeyContext.Provider value={api}>{children}</HotkeyContext.Provider>
 }

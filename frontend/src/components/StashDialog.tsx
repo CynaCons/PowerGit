@@ -29,7 +29,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
     try {
       const list = await fetchStashes()
       setStashes(list)
-      setSelected((cur) => (cur && list.some((s) => s.reference === cur) ? cur : list[0]?.reference ?? null))
+      setSelected((cur) => (cur && list.some((s) => s.reference === cur) ? cur : (list[0]?.reference ?? null)))
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed to load stashes")
     }
@@ -41,7 +41,6 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
       setMessage("")
       refresh()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   async function run(action: () => Promise<unknown>) {
@@ -61,7 +60,9 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
       </Box>
       <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
         <Typography variant="body2" color="text.secondary">
-          {dirtyCount > 0 ? `${dirtyCount} local change(s) can be stashed.` : "Working tree is clean — nothing to stash."}
+          {dirtyCount > 0
+            ? `${dirtyCount} local change(s) can be stashed.`
+            : "Working tree is clean — nothing to stash."}
         </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
           <TextField
@@ -92,7 +93,13 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
             label="Keep staged changes staged"
           />
           <FormControlLabel
-            control={<Checkbox size="small" checked={includeUntracked} onChange={(e) => setIncludeUntracked(e.target.checked)} />}
+            control={
+              <Checkbox
+                size="small"
+                checked={includeUntracked}
+                onChange={(e) => setIncludeUntracked(e.target.checked)}
+              />
+            }
             slotProps={{ typography: { variant: "body2" } }}
             label="Include untracked files"
           />
@@ -101,7 +108,10 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
         <Typography variant="subtitle2" sx={{ mt: 1 }}>
           Stashes ({stashes.length})
         </Typography>
-        <Box data-testid="stash-list" sx={{ maxHeight: 220, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+        <Box
+          data-testid="stash-list"
+          sx={{ maxHeight: 220, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}
+        >
           {stashes.length === 0 ? (
             <Box sx={{ p: 1.5 }}>
               <Typography variant="caption" color="text.secondary">
@@ -124,16 +134,38 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
                   "&:hover": { bgcolor: "action.hover" },
                 }}
               >
-                <Typography variant="body2" sx={{ fontFamily: "Fira Code, ui-monospace, monospace", fontSize: 11.5, flexShrink: 0, color: "primary.main" }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontFamily: "Fira Code, ui-monospace, monospace",
+                    fontSize: 11.5,
+                    flexShrink: 0,
+                    color: "primary.main",
+                  }}
+                >
                   {s.reference}
                 </Typography>
                 <Typography variant="body2" noWrap sx={{ fontSize: 12, flex: 1 }} title={s.subject}>
                   {s.subject}
                 </Typography>
-                <Button size="small" sx={{ py: 0, fontSize: 11, minWidth: 0 }} onClick={(e) => { e.stopPropagation(); run(async () => onStatus(await applyStash(s.reference))) }}>
+                <Button
+                  size="small"
+                  sx={{ py: 0, fontSize: 11, minWidth: 0 }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    run(async () => onStatus(await applyStash(s.reference)))
+                  }}
+                >
                   Apply
                 </Button>
-                <Button size="small" sx={{ py: 0, fontSize: 11, minWidth: 0 }} onClick={(e) => { e.stopPropagation(); run(async () => onStatus(await applyStash(s.reference, true))) }}>
+                <Button
+                  size="small"
+                  sx={{ py: 0, fontSize: 11, minWidth: 0 }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    run(async () => onStatus(await applyStash(s.reference, true)))
+                  }}
+                >
                   Pop
                 </Button>
                 <Button
