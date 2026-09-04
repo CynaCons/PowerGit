@@ -3,6 +3,16 @@ body {
   overflow: hidden;
 }
 
+/* Keep absolutely positioned virtualized children from contributing a second
+   document scroll area. Pane-local scrollers remain responsible for content. */
+html {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
 .main {
   flex: 1;
   min-width: 0;
