@@ -2,15 +2,15 @@ import Box from "@mui/material/Box"
 import Typography from "@mui/material/Typography"
 
 const STATUS_COLORS: Record<string, string> = {
-  A: "#189100",
-  M: "#946cd4",
-  D: "#d3000B",
-  R: "#00a89a",
-  U: "#e6a700",
+  A: "var(--pg-file-a, #189100)",
+  M: "var(--pg-file-m, #946cd4)",
+  D: "var(--pg-file-d, #d3000B)",
+  R: "var(--pg-file-r, #00a89a)",
+  U: "var(--pg-file-u, #e6a700)",
 }
 
 function statusColor(status: string): string {
-  return STATUS_COLORS[status.toUpperCase()] ?? "#737373"
+  return STATUS_COLORS[status.toUpperCase()] ?? "var(--pg-file-other, #737373)"
 }
 
 export type CompactFile = { path: string; status: string }

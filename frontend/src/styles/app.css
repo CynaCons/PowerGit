@@ -1,10 +1,25 @@
+html,
+body {
+  overflow: hidden;
+}
+
+/* Keep absolutely positioned virtualized children from contributing a second
+   document scroll area. Pane-local scrollers remain responsible for content. */
+html {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
 .main {
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--pg-surface, #fff);
 }
 
 .grid-header,
@@ -35,8 +50,8 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #475569;
-  border-bottom: 1px solid #e5e5e5;
+  color: var(--pg-text-meta, #475569);
+  border-bottom: 1px solid var(--pg-border-soft, #e5e5e5);
 }
 
 .grid-body {
@@ -47,7 +62,7 @@
   outline: none;
 }
 .grid-body:focus-visible {
-  box-shadow: inset 0 0 0 1px #2563eb;
+  box-shadow: inset 0 0 0 1px var(--pg-focus-ring, #2563eb);
 }
 
 .grid-row {
@@ -104,14 +119,14 @@
    change on the row itself to trigger a repaint of the text run). See
    docs/agents/memories/webkitgtk-css.md. */
 .grid-row.selected .msg-text {
-  color: #0f172a;
+  color: var(--pg-text, #0f172a);
   opacity: 1;
 }
 
 .grid-row.selected .author,
 .grid-row.selected .date,
 .grid-row.selected .sha {
-  color: #475569;
+  color: var(--pg-text-meta, #475569);
   opacity: 1;
 }
 
@@ -119,9 +134,9 @@
   flex-shrink: 0;
   padding: 3px 16px;
   font-size: 11px;
-  color: #475569;
-  border-top: 1px solid #e5e5e5;
-  background: #fafafa;
+  color: var(--pg-text-meta, #475569);
+  border-top: 1px solid var(--pg-border-soft, #e5e5e5);
+  background: var(--pg-surface-sunken, #fafafa);
 }
 
 .graph-cell {
@@ -175,29 +190,29 @@
   border-radius: 999px;
   font-size: 10px;
   font-weight: 600;
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--pg-ref-local-bg, #eff6ff);
+  color: var(--pg-ref-local-fg, #2563eb);
   white-space: nowrap;
 }
 
 .ref.extra {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--pg-ref-extra-bg, #f3f4f6);
+  color: var(--pg-ref-extra-fg, #6b7280);
 }
 
 .ref.remote {
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--pg-ref-remote-bg, #ecfdf5);
+  color: var(--pg-ref-remote-fg, #059669);
 }
 
 .ref.head {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--pg-ref-head-bg, #fef2f2);
+  color: var(--pg-ref-head-fg, #dc2626);
 }
 
 .ref.stash {
-  background: #fef9c3;
-  color: #a16207;
+  background: var(--pg-ref-stash-bg, #fef9c3);
+  color: var(--pg-ref-stash-fg, #a16207);
 }
 
 .author,
@@ -206,7 +221,7 @@
   /* Gap between adjacent metadata columns: without it the ellipsis of a long
      author name butts straight up against the date ("Constantin Chabira2026-09-03"). */
   padding-right: 10px;
-  color: #475569;
+  color: var(--pg-text-meta, #475569);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   overflow: hidden;

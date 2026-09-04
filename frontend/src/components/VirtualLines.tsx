@@ -69,7 +69,7 @@ export function VirtualLines({
         minWidth: 0,
         overflow: "auto",
         outline: "none",
-        "&:focus-visible": { boxShadow: "inset 0 0 0 1px #2563eb" },
+        "&:focus-visible": { boxShadow: "inset 0 0 0 1px var(--pg-focus-ring, #2563eb)" },
       }}
       style={sx}
     >

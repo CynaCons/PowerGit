@@ -36,7 +36,12 @@ export function NavRail({ repoName, onOpenRepo, onRecents, onSettings }: NavRail
       <Tooltip title={repoName ?? "PowerGit"} placement="right">
         <IconButton
           color="primary"
-          sx={{ borderRadius: 2, bgcolor: "primary.main", color: "#fff", "&:hover": { bgcolor: "primary.dark" } }}
+          sx={{
+            borderRadius: 2,
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            "&:hover": { bgcolor: "primary.dark" },
+          }}
         >
           <AccountTreeOutlinedIcon fontSize="small" />
         </IconButton>

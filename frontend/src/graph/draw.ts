@@ -67,6 +67,8 @@ export function drawRows(
   const selectedFill = rootStyle.getPropertyValue("--pg-grid-sel").trim() || "#dbeafe"
   const selectedBorder = rootStyle.getPropertyValue("--pg-grid-sel-border").trim() || "#2563eb"
   const hoverFill = rootStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
+  const laneColors = LANE_COLORS.map((fallback, i) => rootStyle.getPropertyValue(`--pg-lane-${i + 1}`).trim() || fallback)
+  const headOutline = rootStyle.getPropertyValue("--pg-lane-head").trim() || "#1a1a1a"
 
   for (let i = start; i < end; i++) {
     const row = rows[i]
@@ -106,7 +108,7 @@ export function drawRows(
       const startX = xFor(lanes.startLane)
       const centerX = xFor(lanes.centerLane)
       const endX = xFor(lanes.endLane)
-      const color = LANE_COLORS[segment.color % LANE_COLORS.length]
+      const color = laneColors[segment.color % laneColors.length]
       const diag = diagonalInfo(lanes)
 
       const drawer = new SegmentDrawer(ctx, color, LANE_WIDTH, rowHeight)
@@ -123,7 +125,7 @@ export function drawRows(
     }
 
     if (row.lane < MAX_LANES) {
-      drawNode(ctx, xFor(row.lane), centerY, row)
+    drawNode(ctx, xFor(row.lane), centerY, row, laneColors, headOutline)
     }
 
     ctx.restore()
@@ -379,11 +381,11 @@ function bezier(ctx: CanvasRenderingContext2D, e0: Point, c0: Point, c1: Point, 
   ctx.stroke()
 }
 
-function drawNode(ctx: CanvasRenderingContext2D, x: number, y: number, row: GraphRow): void {
+function drawNode(ctx: CanvasRenderingContext2D, x: number, y: number, row: GraphRow, laneColors = LANE_COLORS, headOutline = "#1a1a1a"): void {
   const d = NODE_DIMENSION
   const left = x - d / 2
   const top = y - d / 2
-  ctx.fillStyle = LANE_COLORS[row.color % LANE_COLORS.length]
+  ctx.fillStyle = laneColors[row.color % laneColors.length]
 
   if (row.hasRefs) {
     ctx.fillRect(Math.round(left), Math.round(top), d, d)
@@ -394,7 +396,7 @@ function drawNode(ctx: CanvasRenderingContext2D, x: number, y: number, row: Grap
   }
 
   if (row.isHead) {
-    ctx.strokeStyle = "#1a1a1a"
+    ctx.strokeStyle = headOutline
     ctx.lineWidth = 2
     if (row.hasRefs) {
       ctx.strokeRect(Math.round(left) - 1, Math.round(top) - 1, d + 2, d + 2)

@@ -166,7 +166,7 @@ function JobRow({
             fontSize: 11,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
-            bgcolor: "#f8fafc",
+            bgcolor: "var(--pg-code-bg, #f8fafc)",
             p: 1,
             borderRadius: 1,
           }}
