@@ -1,0 +1,1 @@
+powergit: /tmp/appimage_extracted_c2152920a2952b6ff85b99b2cd3589a8/usr/lib/libmount.so.1: version `MOUNT_2_40' not found (required by /usr/lib/x86_64-linux-gnu/libgio-2.0.so.0)
