@@ -9,6 +9,9 @@
 // by the canvas fillStyle parser, neither of which can be trusted with
 // color-mix(), oklch() or light-dark(). See
 // docs/agents/memories/webkitgtk-css.md and visual-tokens.md.
+// `graph/types.ts` intentionally retains exported Git Extensions fixture
+// constants for parity tests. Canvas fallback literals likewise exist only
+// for the no-DOM/early-paint path and are overridden by these variables.
 
 export type ThemeMode = "light" | "dark"
 
@@ -229,6 +232,12 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-diff-context": t.diff.context,
     "--pg-diff-gutter": t.diff.gutter,
     "--pg-diff-gutter-border": t.diff.gutterBorder,
+    "--pg-file-a": t.fileStatus.A,
+    "--pg-file-m": t.fileStatus.M,
+    "--pg-file-d": t.fileStatus.D,
+    "--pg-file-r": t.fileStatus.R,
+    "--pg-file-u": t.fileStatus.U,
+    "--pg-file-other": t.fileStatus.other,
     "--pg-status-ok": t.status.ok,
     "--pg-status-warn": t.status.warn,
     "--pg-status-error": t.status.error,

@@ -9,12 +9,12 @@ import { VirtualLines } from "./VirtualLines"
 // Source: src/app/GitExtUtils/GitUI/Theming/AppColorDefaults.cs,
 // src/app/GitUI/Editor/Diff/DiffHighlightService.cs (forces color.diff.old=red / new=green).
 const COLORS = {
-  added: "#189100", // AnsiTerminalGreenForeNormal
-  removed: "#d3000B", // AnsiTerminalRedForeNormal
-  hunk: "#00a89a", // AnsiTerminalCyanForeNormal (color.diff.hunk)
-  meta: "#404040", // black fore bold
-  context: "#000000",
-  gutter: "#8a8a8a", // muted line-number margin, matches GE's FileViewer gutter
+  added: "var(--pg-diff-added, #189100)", // AnsiTerminalGreenForeNormal
+  removed: "var(--pg-diff-removed, #d3000B)", // AnsiTerminalRedForeNormal
+  hunk: "var(--pg-diff-hunk, #00a89a)", // AnsiTerminalCyanForeNormal (color.diff.hunk)
+  meta: "var(--pg-diff-meta, #404040)", // black fore bold
+  context: "var(--pg-diff-context, #000000)",
+  gutter: "var(--pg-diff-gutter, #8a8a8a)", // muted line-number margin, matches GE's FileViewer gutter
 } as const
 
 type Segment = { text: string; color?: string; bold?: boolean }
@@ -122,10 +122,10 @@ export function DiffView({
             position: "sticky",
             left: 0,
             display: "flex",
-            bgcolor: "#ffffff",
+            bgcolor: "background.paper",
             color: COLORS.gutter,
             userSelect: "none",
-            borderRight: "1px solid #e0e0e0",
+            borderRight: "1px solid var(--pg-diff-gutter-border, #e0e0e0)",
           }}
         >
           <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.5 }}>
