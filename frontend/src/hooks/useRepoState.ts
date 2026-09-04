@@ -88,26 +88,30 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     let timer: number | undefined
     let last: string | null = null
     let pendingKind: ChangeKind = "none"
-    void engineEventsUrl().then((url) => {
-      if (cancelled) return
-      source = new EventSource(url)
-      source.onmessage = (e) => {
-        if (last === e.data) return
-        const isFirst = last === null
-        last = e.data
-        if (isFirst) return // initial snapshot, nothing changed
-        if (Date.now() - lastRefreshAt.current < 2000) return // our own action
-        const kind = changeKindOf(Number(e.data))
-        if (pendingKind !== "refs") pendingKind = kind
-        window.clearTimeout(timer)
-        timer = window.setTimeout(() => {
-          const scope: RefreshScope =
-            pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
-          pendingKind = "none"
-          void refresh(scope)
-        }, 400)
-      }
-    })
+    // engineEventsUrl rejects while no repository is open (v0.13.6 sessions):
+    // nothing to watch yet, the next repo change re-runs this effect.
+    void engineEventsUrl()
+      .catch(() => null)
+      .then((url) => {
+        if (cancelled || !url) return
+        source = new EventSource(url)
+        source.onmessage = (e) => {
+          if (last === e.data) return
+          const isFirst = last === null
+          last = e.data
+          if (isFirst) return // initial snapshot, nothing changed
+          if (Date.now() - lastRefreshAt.current < 2000) return // our own action
+          const kind = changeKindOf(Number(e.data))
+          if (pendingKind !== "refs") pendingKind = kind
+          window.clearTimeout(timer)
+          timer = window.setTimeout(() => {
+            const scope: RefreshScope =
+              pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
+            pendingKind = "none"
+            void refresh(scope)
+          }, 400)
+        }
+      })
     return () => {
       cancelled = true
       window.clearTimeout(timer)

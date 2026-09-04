@@ -7,6 +7,24 @@ test("row selection stays responsive while scrolling a long history", async ({ p
   await expect(page.getByTestId("engine-status")).toContainText("(", { timeout: 30_000 })
   await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
 
+  // The budget below is about selection while SCROLLING a long history, not
+  // while the first pages are still streaming in right after boot (or right
+  // after the previous spec swapped the engine's repo). On a 17k-commit
+  // checkout the layout worker is still appending rows for a few seconds;
+  // wait until the virtualized row count stops changing before measuring.
+  await expect
+    .poll(
+      async () => {
+        const grid = page.getByTestId("grid-body")
+        const before = await grid.evaluate((el) => el.scrollHeight)
+        await new Promise((r) => setTimeout(r, 400))
+        const after = await grid.evaluate((el) => el.scrollHeight)
+        return before === after
+      },
+      { timeout: 30_000, message: "history kept growing for 30 s" },
+    )
+    .toBe(true)
+
   // Jump into the middle of the history, then select whatever rendered there.
   await page.getByTestId("grid-body").evaluate((el) => {
     el.scrollTop = el.scrollHeight / 2

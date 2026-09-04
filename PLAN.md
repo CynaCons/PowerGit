@@ -327,14 +327,14 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Unit test pins the seven lane colours in types.ts to GE AppColor.GraphBranch1–7 hex values [agent: claude]
 - [x] Record the decision: git-extensions-map memory marks 'expose lanes from C#' as superseded with the reason (GitUI graph is WinForms-bound, engine must stay net10.0, layout runs in a Web Worker); add SRS-GRAPH requirement 'lane layout matches GE on the golden fixtures' verified by Test [agent: claude]
 
-### v0.13.4 — Split App.tsx god component + lint (Bad #1)
+### v0.13.4 — Split App.tsx god component + lint (Bad #1) (2026-09-04) (COMPLETE)
 **Goal:** App.tsx is 1572 lines with 36 useState and 8 useEffect; GitOps.tsx is 662 lines with 15 states. No state container, no ESLint/Prettier. Extract feature hooks/stores (selection, panels, repo data, refresh) behind stable interfaces, add lint + format config with a CI gate, and keep e2e green throughout.
-- [ ] Six hooks, no store library: useEngineSession (offline/health/repo/recents/live), useHistory (revisions, paging, live graph rows, selected SHA), useRepoState (refs/status/stashes + watcher-scoped refresh), useJobs (busy/jobLabel), useDialogs (one discriminated union replaces 11 open flags/targets), useChromeLayout (bottom height, left open, bottom tab)
-- [ ] Extract the command bar into components/CommandBar.tsx (toolbar tiers, overflow menu, anchors) taking session/jobs/dialog APIs as props
-- [ ] App.tsx becomes composition only (<300 lines): call the hooks, render the shell, wire HotkeyHost
-- [ ] Split GitOps.tsx into one file per dialog under components/dialogs/ with a shared useActionDialog hook for the busy/error pattern
-- [ ] ESLint flat config (typescript-eslint, react-hooks, react-refresh, max-lines 400) + Prettier with lint and format:check scripts; fix any react-hooks/exhaustive-deps findings rather than disabling them; CI wiring lands in v0.13.7
-- [ ] Guard rails: no testid or behaviour change; one commit per extraction; npm run test:e2e once after each; test:unit green; smoke npm run dev
+- [x] Six hooks, no store library: useEngineSession (offline/health/repo/recents/live), useHistory (revisions, paging, live graph rows, selected SHA), useRepoState (refs/status/stashes + watcher-scoped refresh), useJobs (busy/jobLabel), useDialogs (one discriminated union replaces 11 open flags/targets), useChromeLayout (bottom height, left open, bottom tab) [agent: claude]
+- [x] Extract the command bar into components/CommandBar.tsx (toolbar tiers, overflow menu, anchors) taking session/jobs/dialog APIs as props [agent: claude]
+- [x] App.tsx becomes composition only (<300 lines): call the hooks, render the shell, wire HotkeyHost [agent: claude]
+- [x] Split GitOps.tsx into one file per dialog under components/dialogs/ with a shared useActionDialog hook for the busy/error pattern [agent: claude]
+- [x] ESLint flat config (typescript-eslint, react-hooks, react-refresh, max-lines 400) + Prettier with lint and format:check scripts; fix any react-hooks/exhaustive-deps findings rather than disabling them; CI wiring lands in v0.13.7 [agent: claude]
+- [x] Guard rails: no testid or behaviour change; one commit per extraction; npm run test:e2e once after each; test:unit green; smoke npm run dev [agent: claude]
 
 ### v0.13.5 — Single source of truth for the version (Bad #2)
 **Goal:** The version is hand-copied in package.json, tauri.conf.json, Cargo.toml and a const in Program.cs. A mismatch silently makes the Tauri shell refuse to reuse its own engine. Derive all four from one place at build time and add a check that fails the build when they diverge.
@@ -365,15 +365,15 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] resolve_port_preferring / pick_free_port / port_is_free tests against a local TcpListener (free port is returned as-is; a held port yields a different bindable port) [agent: claude]
 - [x] cargo test wired into ci.yml (v0.13.7) [agent: claude]
 
-### v0.13.9 — powerplan upgrade — normalize, set_header, create_major fix, lint (sub-iteration of v0.13.2)
+### v0.13.9 — powerplan upgrade — normalize, set_header, create_major fix, lint (sub-iteration of v0.13.2) (2026-09-04) (COMPLETE)
 **Goal:** powerplan has 22 iteration/task-scoped tools and nothing that touches majors, prose, the header block, or file order, which is why PLAN.md drifted and the fix needed a manual edit. Add the missing operations and lint rules in the powerspawn/powerplan submodule, release, and bump the pin here.
-- [ ] sort_plan / normalize: reorder majors and their iterations by version number; task text, checkboxes and prose blocks byte-identical; dry-run flag that reports the moves without writing
-- [ ] set_header: read/replace the block between the H1 and the first major (goal, philosophy, verify, upstream pin, current-iteration pointer)
-- [ ] create_major insertion fix: insert before the trailing Later/Backlog sections (or after the highest major by version), never mid-file; regression test with an out-of-order fixture
-- [ ] check_plan lint rules: duplicate major headings, majors/iterations out of version order, iteration nested under a major with a different version prefix
-- [ ] show_plan and check_plan agree on 'current' (today show_plan says v0.12.2, check_plan says v0.13.0); one definition, one code path
-- [ ] Nice-to-have once sorted: move_iteration(version, major), update_major / merge_major, remove_prose / move_prose
-- [ ] Release powerplan, bump the powerspawn/powerplan submodule pin in PowerGit, run normalize + check_plan on this PLAN.md as the acceptance test
+- [x] sort_plan / normalize: reorder majors and their iterations by version number; task text, checkboxes and prose blocks byte-identical; dry-run flag that reports the moves without writing [agent: claude]
+- [x] set_header: read/replace the block between the H1 and the first major (goal, philosophy, verify, upstream pin, current-iteration pointer) [agent: claude]
+- [x] create_major insertion fix: insert before the trailing Later/Backlog sections (or after the highest major by version), never mid-file; regression test with an out-of-order fixture [agent: claude]
+- [x] check_plan lint rules: duplicate major headings, majors/iterations out of version order, iteration nested under a major with a different version prefix [agent: claude]
+- [x] show_plan and check_plan agree on 'current' (today show_plan says v0.12.2, check_plan says v0.13.0); one definition, one code path [agent: claude]
+- [x] Nice-to-have once sorted: move_iteration(version, major), update_major / merge_major, remove_prose / move_prose [agent: claude]
+- [x] Release powerplan, bump the powerspawn/powerplan submodule pin in PowerGit, run normalize + check_plan on this PLAN.md as the acceptance test [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches

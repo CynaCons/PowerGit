@@ -14,7 +14,7 @@ import { languageForPath } from "../../src/highlight"
 // switches repositories or mutates state) rather than the on-disk working
 // tree, so the assertion can't be broken by an unrelated local edit to the
 // same file and never races the UI's own fetch.
-import { ENGINE_URL, engineHeaders, repoBase } from "../engine"
+import { engineHeaders, repoBase } from "../engine"
 
 async function openFileTreeForPowergitCommit(page: Page) {
   await page.goto("/")
