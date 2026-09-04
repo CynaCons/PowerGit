@@ -83,17 +83,19 @@ jobs:
       - run: npm run test:unit
       - run: npx playwright install --with-deps chromium
       - run: git config --global user.email ci@powergit.local && git config --global user.name "PowerGit CI"
+      # The log lives outside the checkout: shell.spec stages the first dirty
+      # file, and a live engine log inside the tree is not a stable fixture.
       - name: start engine
         shell: bash
         run: |
-          dotnet run --project ../src/engine/PowerGit.Engine --urls http://127.0.0.1:7733 > engine.log 2>&1 &
+          dotnet run --project ../src/engine/PowerGit.Engine --urls http://127.0.0.1:7733 > "$RUNNER_TEMP/engine.log" 2>&1 &
           for i in $(seq 1 120); do curl -fsS http://127.0.0.1:7733/health >/dev/null 2>&1 && break; sleep 1; done
-          curl -fsS http://127.0.0.1:7733/health || { echo "engine failed"; tail -30 engine.log; exit 1; }
+          curl -fsS http://127.0.0.1:7733/health || { echo "engine failed"; tail -30 "$RUNNER_TEMP/engine.log"; exit 1; }
       - run: npm run test:e2e
       - name: engine log on failure
         if: failure()
         shell: bash
-        run: tail -50 engine.log || true
+        run: tail -50 "$RUNNER_TEMP/engine.log" || true
 
   shell:
     name: rust shell tests
