@@ -1,0 +1,183 @@
+{
+  "$generated": "tools/ge-parity/extract.mjs — do not edit by hand",
+  "name": "JoinMultiLaneCrossings_3",
+  "source": {
+    "test": "RevisionGraphTests.JoinMultiLaneCrossings",
+    "verifiedFile": "JoinMultiLaneCrossings.3.verified.txt",
+    "spec": "0:5,4 1:7 2:6 3:R 4:7 5:7 6:R 7:R R",
+    "order": "newestFirst"
+  },
+  "settings": {
+    "mergeGraphLanesHavingCommonParent": false,
+    "straightenGraphDiagonals": true
+  },
+  "revisions": [
+    {
+      "id": "0",
+      "parents": [
+        "5",
+        "4"
+      ],
+      "label": "0"
+    },
+    {
+      "id": "1",
+      "parents": [
+        "7"
+      ],
+      "label": "1"
+    },
+    {
+      "id": "2",
+      "parents": [
+        "6"
+      ],
+      "label": "2"
+    },
+    {
+      "id": "3",
+      "parents": [
+        "R"
+      ],
+      "label": "3"
+    },
+    {
+      "id": "4",
+      "parents": [
+        "7"
+      ],
+      "label": "4"
+    },
+    {
+      "id": "5",
+      "parents": [
+        "7"
+      ],
+      "label": "5"
+    },
+    {
+      "id": "6",
+      "parents": [
+        "R"
+      ],
+      "label": "6"
+    },
+    {
+      "id": "7",
+      "parents": [
+        "R"
+      ],
+      "label": "7"
+    },
+    {
+      "id": "R",
+      "parents": [],
+      "label": "R"
+    }
+  ],
+  "expectedRows": [
+    {
+      "id": "0",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    },
+    {
+      "id": "1",
+      "lane": 2,
+      "laneCount": 3,
+      "occupiedLanes": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "2",
+      "lane": 3,
+      "laneCount": 4,
+      "occupiedLanes": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "3",
+      "lane": 4,
+      "laneCount": 5,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "4",
+      "lane": 0,
+      "laneCount": 5,
+      "occupiedLanes": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "5",
+      "lane": 1,
+      "laneCount": 5,
+      "occupiedLanes": [
+        0,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "6",
+      "lane": 3,
+      "laneCount": 5,
+      "occupiedLanes": [
+        0,
+        1,
+        2,
+        4
+      ]
+    },
+    {
+      "id": "7",
+      "lane": 0,
+      "laneCount": 5,
+      "occupiedLanes": [
+        3,
+        4
+      ]
+    },
+    {
+      "id": "R",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    }
+  ],
+  "expectedAscii": [
+    "0",
+    "|\\",
+    "| | 1",
+    "| | |",
+    "| | | 2",
+    "| | | |",
+    "| | | | 3",
+    "| | | | |",
+    "4 | | | |",
+    "| | | | |",
+    "| 5 | | |",
+    "| | | | |",
+    "| | | 6 |",
+    "|/-´  | |",
+    "7     | |",
+    "|------´",
+    "R"
+  ]
+}

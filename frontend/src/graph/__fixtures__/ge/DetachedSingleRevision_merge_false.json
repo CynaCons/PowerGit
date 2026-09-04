@@ -1,0 +1,62 @@
+{
+  "$generated": "tools/ge-parity/extract.mjs — do not edit by hand",
+  "name": "DetachedSingleRevision_merge=false",
+  "source": {
+    "test": "RevisionGraphTests.DetachedSingleRevision",
+    "verifiedFile": "RevisionGraphTests.DetachedSingleRevision_mergeGraphLanesHavingCommonParent=False.verified.txt",
+    "spec": "c1:c3 c2 c3",
+    "order": "newestFirst"
+  },
+  "settings": {
+    "mergeGraphLanesHavingCommonParent": false,
+    "straightenGraphDiagonals": false
+  },
+  "revisions": [
+    {
+      "id": "c1",
+      "parents": [
+        "c3"
+      ],
+      "label": "*"
+    },
+    {
+      "id": "c2",
+      "parents": [],
+      "label": "*"
+    },
+    {
+      "id": "c3",
+      "parents": [],
+      "label": "*"
+    }
+  ],
+  "expectedRows": [
+    {
+      "id": "c1",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    },
+    {
+      "id": "c2",
+      "lane": 1,
+      "laneCount": 2,
+      "occupiedLanes": [
+        0
+      ]
+    },
+    {
+      "id": "c3",
+      "lane": 0,
+      "laneCount": 1,
+      "occupiedLanes": []
+    }
+  ],
+  "expectedAscii": [
+    "*",
+    "|",
+    "| *",
+    "|",
+    "*"
+  ]
+}
