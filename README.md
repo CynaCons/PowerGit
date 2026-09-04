@@ -88,6 +88,21 @@ Tags trigger CI builds for Windows (portable zip + installer) and Linux
 (AppImage + deb): see the
 [releases page](https://github.com/CynaCons/PowerGit/releases).
 
+### Linux install notes
+
+Download the `.AppImage`, `chmod +x` it and run it; the `.deb` installs the
+same binaries under `/usr`. Both need the distro's WebKitGTK stack
+(`libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`,
+`librsvg2-2`) and `git` on `PATH`.
+
+Supported Ubuntu versions: **22.04, 24.04 and 26.04**. Every release
+AppImage is launched in stock containers of all three before it is
+published (`docker/appimage-check/run-matrix.sh`), so a version-skew crash
+like v0.12.3's `libmount.so.1: version MOUNT_2_40 not found` on 26.04 fails
+the release instead of the user. Other distros with WebKitGTK 2.40+ should
+work but are untested. To check an artifact yourself:
+`pwsh scripts/appimage-matrix.ps1 <file.AppImage>` (Docker Desktop required).
+
 ## License
 
 GPL-3.0 — PowerGit is a combined work with Git Extensions.
