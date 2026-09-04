@@ -34,9 +34,16 @@ test("losing the engine keeps the last graph, shows recovering, and comes back",
 
   // Every engine request fails at the transport level: that is "engine lost".
   await page.route(`${ENGINE_URL}/**`, (route) => route.abort("connectionrefused"))
-  await page.getByTestId("refresh-button").click()
 
   const bar = page.getByTestId("engine-status")
+  // A background request can hit the route first and move the session into
+  // recovery, which correctly disables Refresh before Playwright dispatches
+  // its click. Try the explicit trigger briefly, then assert the state change
+  // caused by either request instead of racing the disabled button.
+  await page
+    .getByTestId("refresh-button")
+    .click({ timeout: 2_000 })
+    .catch(() => undefined)
   await expect(bar).toHaveAttribute("data-phase", "offline", { timeout: 10_000 })
   await expect(page.getByTestId("status-session")).toContainText(/reconnecting/i)
   // The last valid data stays on screen instead of being replaced by samples.
@@ -133,7 +140,9 @@ test("two windows pinned to different repositories do not switch each other", as
       body: JSON.stringify({ path: current.root }),
     })
     expect(await (await fetch(`${base}/status`, { headers: engineHeaders() })).status).toBe(200)
-    fs.rmSync(dir, { recursive: true, force: true })
+    // Windows can retain a just-disposed FileSystemWatcher handle briefly.
+    // Match the engine lifecycle fixture's bounded cleanup tolerance.
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
   }
 })
 

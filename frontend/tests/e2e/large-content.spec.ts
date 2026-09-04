@@ -56,10 +56,7 @@ test("a truncated blob shows the notice with size, reason and actions", async ({
   const blobResponse = page.waitForResponse(
     (response) => response.request().method() === "GET" && new URL(response.url()).pathname.endsWith("/blob"),
   )
-  // Root-level rows can be partially covered by the scroll container edge
-  // under WebKitGTK; dispatch the visible row's DOM click so the test reaches
-  // the blob request handler deterministically.
-  await firstFile.dispatchEvent("click")
+  await firstFile.click()
   const blobDto = (await (await blobResponse).json()) as { truncated: boolean; truncatedReason: string | null }
   expect(blobDto).toMatchObject({ truncated: true, truncatedReason: "lines" })
 

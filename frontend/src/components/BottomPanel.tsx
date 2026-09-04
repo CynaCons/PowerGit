@@ -93,15 +93,19 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
       return
     }
     const ctrl = new AbortController()
+    // Reset selection state as soon as the commit changes. Keeping these
+    // inside the debounced request allowed a fast tree response to become
+    // interactive first, then erased the user's new file selection when the
+    // 150 ms timer fired (especially visible on Linux's local fixture repo).
+    setDetail({ kind: "loading" })
+    setFile(null)
+    setDiff({ kind: "idle" })
+    setTreeFile(null)
+    setBlob({ kind: "idle" })
+    setDiffToolError(null)
     // Debounced: arrow-keying or click-scrubbing through rows must not fire
     // two engine requests per intermediate row.
     const timer = setTimeout(() => {
-      setDetail({ kind: "loading" })
-      setFile(null)
-      setDiff({ kind: "idle" })
-      setTreeFile(null)
-      setBlob({ kind: "idle" })
-      setDiffToolError(null)
       engine
         .commit(commitId, ctrl.signal)
         .then((d) => {
