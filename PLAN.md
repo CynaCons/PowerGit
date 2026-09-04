@@ -336,14 +336,14 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] ESLint flat config (typescript-eslint, react-hooks, react-refresh, max-lines 400) + Prettier with lint and format:check scripts; fix any react-hooks/exhaustive-deps findings rather than disabling them; CI wiring lands in v0.13.7 [agent: claude]
 - [x] Guard rails: no testid or behaviour change; one commit per extraction; npm run test:e2e once after each; test:unit green; smoke npm run dev [agent: claude]
 
-### v0.13.5 — Single source of truth for the version (Bad #2)
+### v0.13.5 — Single source of truth for the version (Bad #2) (2026-09-04) (COMPLETE)
 **Goal:** The version is hand-copied in package.json, tauri.conf.json, Cargo.toml and a const in Program.cs. A mismatch silently makes the Tauri shell refuse to reuse its own engine. Derive all four from one place at build time and add a check that fails the build when they diverge.
 - [x] package.json is the single source of the version; tauri.conf.json 'version' becomes the path '../package.json' (Tauri 2 reads it), so the config holds no copy [agent: claude]
 - [x] build.rs reads package.json and exports POWERGIT_VERSION as a compile-time env; lib.rs uses it instead of CARGO_PKG_VERSION; Cargo.toml keeps a placeholder nothing consumes (no more Cargo.lock churn per release) [agent: claude]
 - [x] Engine csproj sets Version from package.json via an MSBuild property function (regex on the file); Program.cs replaces the engineVersion const with the assembly informational version, so dotnet run and the packaged sidecar report the same number [agent: claude]
 - [x] scripts/check-version.mjs asserts package.json, engine /health, Tauri package info and the packaged artifact names agree; fails non-zero; runs in CI (v0.13.7) and as release preflight [agent: claude]
 - [x] Release skill (.claude/skills/release + .opencode mirror, kept identical): section 1 becomes 'npm version X.Y.Z --no-git-tag-version, commit chore(release)'; a new 'Verify the version' step lists WHAT is derived, WHERE it surfaces (status bar, /health, installer/zip names, GitHub release tag, Pages footer) and HOW to check each (check-version.mjs, curl /health, ls dist/, gh release view); drift footnote removed [agent: claude]
-- [ ] Verification: fresh dotnet run shows the package.json version in /health; npm run tauri build artifact names carry it; check-version.mjs passes; a deliberate mismatch fails it
+- [x] Verification: fresh dotnet run shows the package.json version in /health; npm run tauri build artifact names carry it; check-version.mjs passes; a deliberate mismatch fails it [agent: claude]
 
 ### v0.13.6 — Engine concurrency — one global mutable repo (Bad #3) (2026-09-04) (COMPLETE)
 **Goal:** GitHost is a singleton with a single Current repository and the only lock lives in the file watcher. Two app windows, a second client, or concurrent e2e workers race on repo state (the memories already record e2e contention). Make repo state per-request or per-session and serialize mutating git operations per repo.
