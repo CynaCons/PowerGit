@@ -1,9 +1,30 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 import { engineHeaders, repoBase } from "../engine"
 
 // v0.13.11 tasks 2-3: oversized content arrives truncated with metadata and
 // the UI shows an intentional notice instead of a million-line tree; diffs
 // and blobs are virtualized so only the visible window is in the DOM.
+
+async function firstRevisionWithChangedFiles(base: string): Promise<{ id: string; path: string }> {
+  const revisions = (await (await fetch(`${base}/revisions?max=25`, { headers: engineHeaders() })).json()) as Array<{
+    id: string
+  }>
+  for (const revision of revisions) {
+    const files = (await (
+      await fetch(`${base}/commits/${revision.id}/files`, { headers: engineHeaders() })
+    ).json()) as Array<{ path: string }>
+    if (files.length === 0) continue
+    return { id: revision.id, path: files[0].path }
+  }
+  throw new Error("the first 25 revisions contain no commit with changed files")
+}
+
+async function selectRevisionWithChangedFiles(page: Page, base: string) {
+  const revision = await firstRevisionWithChangedFiles(base)
+  const row = page.locator(`[data-testid="grid-row"]:has([data-testid="sha-cell"][title="${revision.id}"])`)
+  await expect(row).toBeVisible()
+  await row.click()
+}
 
 test("a truncated blob shows the notice with size, reason and actions", async ({ page }) => {
   const base = await repoBase()
@@ -29,7 +50,12 @@ test("a truncated blob shows the notice with size, reason and actions", async ({
   await page.getByRole("tab", { name: "File Tree" }).click()
   const firstFile = page.locator('[data-testid="commit-file-tree-row"][data-type="blob"]').first()
   await expect(firstFile).toBeVisible({ timeout: 15_000 })
+  const blobResponse = page.waitForResponse(
+    (response) => response.request().method() === "GET" && new URL(response.url()).pathname.endsWith("/blob"),
+  )
   await firstFile.click()
+  const blobDto = (await (await blobResponse).json()) as { truncated: boolean; truncatedReason: string | null }
+  expect(blobDto).toMatchObject({ truncated: true, truncatedReason: "lines" })
 
   const notice = page.getByTestId("content-notice")
   await expect(notice).toBeVisible({ timeout: 15_000 })
@@ -72,6 +98,11 @@ test("the diff view is virtualized and keeps its gutter", async ({ page }) => {
   )
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
+  // A merge commit may legitimately have no single-parent diff. Pick the
+  // first recent revision whose engine file list is non-empty instead of
+  // assuming whichever commit happens to be HEAD changed a file.
+  await selectRevisionWithChangedFiles(page, base)
+  await expect(page.getByRole("tab", { name: /^Diff \([1-9]/ })).toBeVisible({ timeout: 15_000 })
   await page.getByRole("tab", { name: /^Diff/ }).click()
   await expect(page.getByTestId("diff-view")).toBeVisible({ timeout: 15_000 })
   const rows = await page.getByTestId("diff-lines").locator("[data-index]").count()
@@ -102,15 +133,9 @@ test("the diff view is virtualized and keeps its gutter", async ({ page }) => {
 test("the engine really truncates an oversized blob (contract)", async () => {
   // Contract with GitHost.MaxBlobBytes / MaxLines: the DTO carries the metadata.
   const base = await repoBase()
-  const rev = (await (await fetch(`${base}/revisions?max=1`, { headers: engineHeaders() })).json()) as Array<{
-    id: string
-  }>
-  const files = (await (
-    await fetch(`${base}/commits/${rev[0].id}/files`, { headers: engineHeaders() })
-  ).json()) as Array<{ path: string }>
-  test.skip(files.length === 0, "no files in HEAD")
+  const revision = await firstRevisionWithChangedFiles(base)
   const dto = (await (
-    await fetch(`${base}/commits/${rev[0].id}/blob?path=${encodeURIComponent(files[0].path)}`, {
+    await fetch(`${base}/commits/${revision.id}/blob?path=${encodeURIComponent(revision.path)}`, {
       headers: engineHeaders(),
     })
   ).json()) as {
