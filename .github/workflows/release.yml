@@ -55,40 +55,39 @@ jobs:
         run: |
           npm ci
           npm run tauri build
-      - name: Inspect AppImage for GLib/GIO/curl bundling mismatches
+      - name: Inspect AppImage for host-provided library families (strict) and repack
+        # Host-vs-bundle policy lives in scripts/inspect-appimage.sh: GLib/GIO,
+        # util-linux (libmount/libblkid/libuuid), Wayland client libs,
+        # GStreamer and curl/nghttp2 must never ship — the host webkit2gtk
+        # stack provides them and a bundled older copy breaks at load on a
+        # newer distro (v0.12.3: `MOUNT_2_40' not found on Ubuntu 26.04).
+        # --strict fails on presence even when symbols resolve on this runner.
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends squashfs-tools binutils libfuse2
+          sudo apt-get install -y --no-install-recommends squashfs-tools binutils libfuse2 python3
           chmod +x scripts/inspect-appimage.sh
+          scripts/inspect-appimage.sh --self-test
           APP=$(ls frontend/src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)
-          scripts/inspect-appimage.sh "$APP" --fix
-      - name: Launch AppImage in stock Ubuntu container (runtime dependency guard)
-        # Static inspection can only catch known mismatch classes; this
-        # actually RUNS the shipped AppImage on a stock ubuntu:22.04 image
-        # (package versions a real user has, not the runner's updated stack)
-        # and fails on any runtime dependency error on stderr.
+          scripts/inspect-appimage.sh "$APP" --fix --strict
+      - name: Launch AppImage in stock Ubuntu 22.04 / 24.04 / 26.04 containers (runtime guard)
+        # Static inspection only catches known mismatch classes; this RUNS
+        # the exact artifact that gets uploaded on the package versions a
+        # real user has (not the runner's updated stack), on every supported
+        # Ubuntu LTS, and fails unless the engine answers /health, the process
+        # survives the smoke interval and stderr carries no dependency error.
+        # See docker/appimage-check/run-matrix.sh and
+        # docs/agents/memories/appimage-compat-matrix.md.
         run: |
+          chmod +x docker/appimage-check/run-matrix.sh docker/appimage-check/launch.sh
           APP=$(ls frontend/src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)
-          cp "$APP" /tmp/PowerGit.AppImage
-          docker run --rm -v /tmp/PowerGit.AppImage:/app/PowerGit.AppImage ubuntu:22.04 bash -ec '
-            apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-              libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 librsvg2-2 \
-              xvfb ca-certificates xdg-utils >/dev/null
-            export NO_AT_BRIDGE=1
-            chmod +x /app/PowerGit.AppImage
-            set +e
-            timeout 30 xvfb-run -a /app/PowerGit.AppImage --appimage-extract-and-run \
-              >/tmp/app.out 2>/tmp/app.err
-            set -e
-            echo "== app stderr =="
-            cat /tmp/app.err
-            if grep -E "undefined symbol|Failed to load module" /tmp/app.err; then
-              echo "AppImage emitted runtime dependency errors" >&2
-              exit 1
-            fi
-            echo "runtime guard OK"
-          '
+          docker/appimage-check/run-matrix.sh "$APP" --out /tmp/appimage-matrix
+      - name: Upload matrix logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-matrix-logs
+          path: /tmp/appimage-matrix/**/app.std*.txt
+          if-no-files-found: ignore
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
