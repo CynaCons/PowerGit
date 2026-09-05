@@ -36,6 +36,9 @@ for the current window lifetime in this iteration.
   Windows, resolution and visual baseline acceptance remain unverified.
 - Settled captures: `website/public/assets/commit-fixed-browser-*.png`.
   These are audit evidence from disposable repositories, not showcase art.
+- Final reviewed refresh adjustment passed typecheck. A separate vision
+  reviewer found no clipped dialog controls in the four captures. Release
+  source commit: `778641d1c`, tag `v0.13.17`.
 
 ## Owner release override
 
