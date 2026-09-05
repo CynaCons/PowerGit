@@ -383,10 +383,16 @@ function CommitDetailView({ detail }: { detail: CommitDetail }) {
         </Typography>
       ) : null}
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        Author: {detail.author} &lt;{detail.authorEmail}&gt; · {formatWhen(detail.authorDate)}
+        Author: {detail.author} &lt;{detail.authorEmail}&gt;
+        <Box component="span" sx={{ ml: 2, color: "text.disabled" }}>
+          {formatWhen(detail.authorDate)}
+        </Box>
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Committer: {detail.committer} &lt;{detail.committerEmail}&gt; · {formatWhen(detail.commitDate)}
+        Committer: {detail.committer} &lt;{detail.committerEmail}&gt;
+        <Box component="span" sx={{ ml: 2, color: "text.disabled" }}>
+          {formatWhen(detail.commitDate)}
+        </Box>
       </Typography>
       {detail.parents.length > 0 && (
         <Typography

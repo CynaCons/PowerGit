@@ -16,6 +16,8 @@ const TOOLBAR_BUTTON_SX = {
   px: 1,
   py: 0,
   fontSize: 12,
+  fontWeight: 500,
+  borderRadius: 4,
   "& .MuiSvgIcon-root": { fontSize: 18 },
 } as const
 
@@ -51,7 +53,7 @@ export function SplitButton({
   label,
   icon,
   testid,
-  variant = "outlined",
+  variant = "text",
   disabled,
   shortcut,
   compact = false,
@@ -61,7 +63,7 @@ export function SplitButton({
   label: string
   icon?: ReactNode
   testid: string
-  variant?: "outlined" | "contained"
+  variant?: "text" | "outlined" | "contained"
   disabled?: boolean
   shortcut?: string
   compact?: boolean
@@ -76,7 +78,12 @@ export function SplitButton({
   const iconOnly = compact && icon !== undefined
   return (
     <>
-      <ButtonGroup size="small" variant={variant} disabled={disabled}>
+      <ButtonGroup
+        size="small"
+        variant={variant}
+        color={variant === "contained" ? "primary" : "inherit"}
+        disabled={disabled}
+      >
         <Button
           data-testid={testid}
           startIcon={iconOnly ? undefined : icon}
@@ -126,7 +133,8 @@ export function ToolbarButton({
   return (
     <Button
       size="small"
-      variant="outlined"
+      variant="text"
+      color="inherit"
       data-testid={testid}
       startIcon={compact ? undefined : icon}
       disabled={disabled}

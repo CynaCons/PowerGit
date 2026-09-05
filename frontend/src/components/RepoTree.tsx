@@ -301,7 +301,15 @@ function RepoTreeImpl({
   return (
     <Paper
       data-testid="left-panel"
-      sx={{ width: 232, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
+      sx={{
+        width: 240,
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        borderRight: 1,
+        borderColor: "divider",
+      }}
     >
       <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center" }}>
         <Typography variant="subtitle2" sx={{ flex: 1, pl: 1 }}>

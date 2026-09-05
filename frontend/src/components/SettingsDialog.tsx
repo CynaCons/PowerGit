@@ -11,6 +11,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import { useEngine, type GitConfig, type VsCodeInfo } from "../engine"
+import { setBarLayout, useBarLayout, type BarLayout } from "../theme/barLayout"
 import {
   setThemePreference,
   useThemePreference,
@@ -30,6 +31,7 @@ export function SettingsDialog({ open, onClose }: Props) {
   const [vs, setVs] = useState<VsCodeInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const themePreference = useThemePreference()
+  const barLayout = useBarLayout()
   const zoom = useZoom()
 
   useEffect(() => {
@@ -106,6 +108,19 @@ export function SettingsDialog({ open, onClose }: Props) {
             <MenuItem value="system">System</MenuItem>
             <MenuItem value="light">Light</MenuItem>
             <MenuItem value="dark">Dark</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl margin="dense">
+          <InputLabel id="bar-layout-label">Command bar</InputLabel>
+          <Select
+            labelId="bar-layout-label"
+            label="Command bar"
+            value={barLayout}
+            onChange={(e) => setBarLayout(e.target.value as BarLayout)}
+            inputProps={{ "aria-label": "Command bar" }}
+          >
+            <MenuItem value="top">In the title bar</MenuItem>
+            <MenuItem value="floating">Floating at the bottom</MenuItem>
           </Select>
         </FormControl>
         <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 1 }}>

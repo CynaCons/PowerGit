@@ -438,10 +438,10 @@ test("settings labels are never clipped by the dialog content edge", async ({ pa
   const content = page.locator(".MuiDialogContent-root")
   await expect(content).toBeVisible()
 
-  // User name, Email (TextFields), core.autocrlf and Appearance (Selects)
-  // render outlined floating labels subject to the same top-edge clip.
+  // User name, Email (TextFields), core.autocrlf, Appearance and Command bar
+  // (Selects) render outlined floating labels subject to the same top-edge clip.
   const labels = content.locator(".MuiFormControl-root .MuiInputLabel-root")
-  await expect(labels).toHaveCount(4)
+  await expect(labels).toHaveCount(5)
 
   // A label is clipped when it is cut by the content edge while its own field
   // is on screen. A label that has simply scrolled out of view is not clipped,

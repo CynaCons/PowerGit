@@ -23,6 +23,8 @@ import { useStable } from "./hooks/useStable"
 import { prefetchCommit } from "./engine/commitCache"
 import { useHotkeyLayer, type CommandId } from "./hotkeys"
 import { zoomIn, zoomOut, zoomReset } from "./theme"
+import { useBarLayout } from "./theme/barLayout"
+import { TitleStrip } from "./components/TitleStrip"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together plus the browse-scope hotkeys. `base`
@@ -54,6 +56,7 @@ export default function App({ base }: { base: EngineClient }) {
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const floatingBar = useBarLayout() === "floating"
   // The highlight must land in the click's own frame; commit details, files
   // and diff follow in a deferred render and load asynchronously.
   const deferredCurrent = useDeferredValue(current)
@@ -169,21 +172,24 @@ export default function App({ base }: { base: EngineClient }) {
         data-testid="browse-shell"
         sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}
       >
-        <CommandBar
-          toolbarRef={layout.toolbarRef}
-          tier={layout.toolbarTier}
-          live={live}
-          dirty={dirty}
-          stashCount={stashes.length}
-          hasCurrent={current !== undefined}
-          remoteNames={remoteNames}
-          defaultRemote={defaultRemote}
-          booting={view.booting || (live && !demo && !loaded && !offline)}
-          jobs={jobs}
-          actions={actions}
-          refresh={chrome.refresh}
-          openStash={chrome.openStash}
-        />
+        {floatingBar && <TitleStrip repoName={repo?.name} />}
+        {!floatingBar && (
+          <CommandBar
+            toolbarRef={layout.toolbarRef}
+            tier={layout.toolbarTier}
+            live={live}
+            dirty={dirty}
+            stashCount={stashes.length}
+            hasCurrent={current !== undefined}
+            remoteNames={remoteNames}
+            defaultRemote={defaultRemote}
+            booting={view.booting || (live && !demo && !loaded && !offline)}
+            jobs={jobs}
+            actions={actions}
+            refresh={chrome.refresh}
+            openStash={chrome.openStash}
+          />
+        )}
         {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
 
         <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
@@ -195,7 +201,7 @@ export default function App({ base }: { base: EngineClient }) {
           />
 
           <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, p: 0.75, display: "flex", gap: 0.75 }}>
+            <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>
               {leftOpen ? (
                 <RepoTree
                   tree={refs}
@@ -211,7 +217,25 @@ export default function App({ base }: { base: EngineClient }) {
               ) : (
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
-              <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
+              <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+                {floatingBar && (
+                  <CommandBar
+                    floating
+                    toolbarRef={layout.toolbarRef}
+                    tier={layout.toolbarTier}
+                    live={live}
+                    dirty={dirty}
+                    stashCount={stashes.length}
+                    hasCurrent={current !== undefined}
+                    remoteNames={remoteNames}
+                    defaultRemote={defaultRemote}
+                    booting={view.booting || (live && !demo && !loaded && !offline)}
+                    jobs={jobs}
+                    actions={actions}
+                    refresh={chrome.refresh}
+                    openStash={chrome.openStash}
+                  />
+                )}
                 <HistoryPane
                   rows={rows}
                   selected={selected}
@@ -242,10 +266,13 @@ export default function App({ base }: { base: EngineClient }) {
                   aria-orientation="horizontal"
                   aria-label="Resize bottom panel"
                   sx={{
-                    height: 6,
+                    height: 5,
                     flexShrink: 0,
                     cursor: "row-resize",
-                    bgcolor: "divider",
+                    bgcolor: "background.default",
+                    borderTop: 1,
+                    borderColor: "divider",
+                    transition: "background-color 120ms",
                     "&:hover": { bgcolor: "primary.main" },
                   }}
                 />

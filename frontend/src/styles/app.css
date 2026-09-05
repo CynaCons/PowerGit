@@ -47,11 +47,10 @@ html {
 
 .grid-header {
   padding: 0 16px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--pg-text-meta, #475569);
-  border-bottom: 1px solid var(--pg-border-soft, #e5e5e5);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pg-text-meta, #5b6778);
+  border-bottom: 1px solid var(--pg-border-soft, #e6eaf0);
 }
 
 .grid-body {

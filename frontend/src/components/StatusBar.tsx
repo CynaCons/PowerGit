@@ -52,7 +52,7 @@ export function StatusBar({
         alignItems: "center",
         gap: 1,
         px: 1.5,
-        height: 24,
+        height: 22,
         borderTop: 1,
         borderColor: "divider",
         bgcolor: "background.paper",
@@ -61,7 +61,12 @@ export function StatusBar({
     >
       {showRepo ? (
         <>
-          <Typography data-testid="status-branch" variant="caption" noWrap sx={{ fontWeight: 700, flexShrink: 0 }}>
+          <Typography
+            data-testid="status-branch"
+            variant="caption"
+            noWrap
+            sx={{ fontWeight: 600, flexShrink: 0, color: "primary.main" }}
+          >
             {repo.branch}
           </Typography>
           {status?.ahead != null && status?.behind != null && (
@@ -148,9 +153,9 @@ export function StatusBar({
           variant="caption"
           color="text.disabled"
           noWrap
-          sx={{ ml: "auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+          sx={{ ml: "auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "pre" }}
         >
-          {`${health.gitVersion} · engine ${health.engine}`}
+          {`${health.gitVersion.replace(/^git version /, "git ")}   engine ${health.engine}`}
         </Typography>
       )}
     </Box>

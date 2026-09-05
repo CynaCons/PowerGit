@@ -112,11 +112,13 @@ export function buildTheme(mode: ThemeMode, zoom = 1): Theme {
           },
         },
       },
+      // v0.13.15 visual overhaul: surfaces are flat regions that meet at
+      // hairlines drawn by the region that owns the edge; no boxed cards.
       MuiPaper: {
         defaultProps: { elevation: 0 },
         styleOverrides: {
           root: {
-            border: `1px solid ${t.border}`,
+            border: 0,
             backgroundImage: "none",
           },
         },
@@ -153,7 +155,7 @@ export function buildTheme(mode: ThemeMode, zoom = 1): Theme {
           // flex centring happens in the unzoomed container, so it stays
           // centred). Never zoom a Popover/Menu *paper* — its left/top come
           // from an anchor rect in visual px and would be re-zoomed.
-          paper: { borderRadius: 8, zoom },
+          paper: { borderRadius: 6, zoom, border: `1px solid ${t.border}` },
         },
       },
       MuiOutlinedInput: {
@@ -168,7 +170,7 @@ export function buildTheme(mode: ThemeMode, zoom = 1): Theme {
       },
       MuiMenu: {
         styleOverrides: {
-          paper: { borderRadius: 8 },
+          paper: { borderRadius: 6, border: `1px solid ${t.border}` },
           list: { zoom },
         },
       },
@@ -191,8 +193,19 @@ export function buildTheme(mode: ThemeMode, zoom = 1): Theme {
       MuiTab: {
         styleOverrides: {
           root: {
+            textTransform: "none",
+            fontSize: 12.5,
+            fontWeight: 500,
+            minWidth: 0,
+            paddingLeft: 12,
+            paddingRight: 12,
             "&.Mui-focusVisible": { boxShadow: `inset 0 0 0 ${metrics.focusRingWidth}px ${t.focusRing}` },
           },
+        },
+      },
+      MuiTabs: {
+        styleOverrides: {
+          indicator: { height: 2 },
         },
       },
     },

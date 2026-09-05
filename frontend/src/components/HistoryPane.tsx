@@ -51,9 +51,6 @@ export function HistoryPane({
           display: "flex",
           flexDirection: "column",
           bgcolor: "background.paper",
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
           overflow: "hidden",
         }}
       >
@@ -114,9 +111,8 @@ export function CollapsedLeftPanel({ onExpand }: { onExpand: () => void }) {
         alignItems: "center",
         py: 1,
         bgcolor: "background.paper",
-        border: 1,
+        borderRight: 1,
         borderColor: "divider",
-        borderRadius: 1,
       }}
     >
       <IconButton size="small" data-testid="left-panel-expand" onClick={onExpand} aria-label="Expand panel">
