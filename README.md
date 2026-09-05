@@ -50,11 +50,11 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.13.14 (selected commit
-stays visible in the graph, immediate selection and faster diffs, commit
-dialog with a Git Extensions-style file menu and stage/reset of selected
-lines, frameless window with integrated controls, new mark). Parked:
-worktrees, hotkey remapping UI, fetch/pull/push dialogs.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.13.16 (commands in a
+collapsible left rail, flat instrument-panel chrome in light and dark, HD
+app icon, instant context menus, directory-tree mode for the diff's file
+list, platform monospace font). Parked: worktrees, hotkey remapping UI,
+fetch/pull/push dialogs.
 
 ## Development
 
