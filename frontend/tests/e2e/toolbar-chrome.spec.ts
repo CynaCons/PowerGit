@@ -139,18 +139,22 @@ test("right-clicking a second commit re-targets our menu instead of the browser'
   const rows = page.getByTestId("grid-row")
   const menu = page.locator("#revision-context-menu")
 
-  await rows.nth(1).click({ button: "right" })
+  // Open on a lower row first: the menu paper extends downward from the
+  // pointer, so the second target (a row above) is never under the paper.
+  // Menus open instantly since v0.13.16; the earlier version of this spec
+  // only passed because its second click landed during the grow animation.
+  await rows.nth(8).click({ button: "right" })
   await expect(menu).toBeVisible()
   const firstBox = (await menu.boundingBox())!
 
   // The regression: the MUI Menu's modal root covered the viewport, so this
   // second right-click landed on the backdrop rather than the row, closing
   // our menu and letting the WebView show its own.
-  await rows.nth(5).click({ button: "right" })
+  await rows.nth(1).click({ button: "right" })
   await expect(menu).toBeVisible()
   const secondBox = (await menu.boundingBox())!
   expect(secondBox.y).not.toBe(firstBox.y)
-  await expect(rows.nth(5)).toHaveClass(/selected/)
+  await expect(rows.nth(1)).toHaveClass(/selected/)
 
   // And a right-click away from any row simply dismisses it.
   await page.getByTestId("toolbar").click({ button: "right" })
