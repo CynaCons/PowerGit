@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box"
+import LinearProgress from "@mui/material/LinearProgress"
 import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
 import Tabs from "@mui/material/Tabs"
@@ -55,7 +56,28 @@ function writeStoredFilesWidth(width: number): void {
 }
 
 type Loadable<T> =
-  { kind: "idle" } | { kind: "loading" } | { kind: "ready"; value: T } | { kind: "error"; message: string }
+  | { kind: "idle" }
+  | { kind: "loading" }
+  // `stale`: the previous selection's value, kept on screen while the next
+  // one loads (v0.13.14, owner: the white "Loading commit…" swap between
+  // selections "creates a visual break and flicker").
+  | { kind: "ready"; value: T; stale?: boolean }
+  | { kind: "error"; message: string }
+
+/** True once `pending` has been continuously true for `delayMs`; a short
+ *  load never shows an indicator, a long one shows it without flicker. */
+function useDelayed(pending: boolean, delayMs: number): boolean {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (!pending) {
+      setShown(false)
+      return
+    }
+    const t = setTimeout(() => setShown(true), delayMs)
+    return () => clearTimeout(t)
+  }, [pending, delayMs])
+  return shown && pending
+}
 
 export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const engine = useEngine()
@@ -108,9 +130,12 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
     // inside the debounced request allowed a fast tree response to become
     // interactive first, then erased the user's new file selection when the
     // 150 ms timer fired (especially visible on Linux's local fixture repo).
-    setDetail({ kind: "loading" })
-    setFile(null)
-    setDiff({ kind: "idle" })
+    // Keep the previous commit's details, file list and diff on screen,
+    // marked stale, until the new ones arrive: no blank "Loading…" swap
+    // between selections. The diff effect will not request the stale file
+    // against the new commit (filesFor guard below).
+    setDetail((d) => (d.kind === "ready" ? { ...d, stale: true } : { kind: "loading" }))
+    setDiff((d) => (d.kind === "ready" ? { ...d, stale: true } : d.kind === "error" ? { kind: "idle" } : d))
     setTreeFile(null)
     setBlob({ kind: "idle" })
     setDiffToolError(null)
@@ -204,6 +229,14 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   }, [engine, commitId, treeFile, reloadTick])
 
   const reload = useCallback(() => setReloadTick((t) => t + 1), [])
+  // One thin bar for the whole panel once a load has run for 200 ms; short
+  // loads (the common case after v0.13.14) show nothing at all.
+  const pending =
+    detail.kind === "loading" ||
+    (detail.kind === "ready" && detail.stale === true) ||
+    diff.kind === "loading" ||
+    (diff.kind === "ready" && diff.stale === true)
+  const busy = useDelayed(pending, 200)
 
   const splitHandleProps = {
     testid: "bottom-split-handle",
@@ -248,8 +281,14 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
         <Tab label="File Tree" />
       </Tabs>
-      <Box ref={panelRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-        {tab === 0 && <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} />}
+      <Box sx={{ height: 2, flexShrink: 0 }}>
+        {busy && <LinearProgress data-testid="panel-busy" sx={{ height: 2 }} />}
+      </Box>
+      <Box
+        ref={panelRef}
+        sx={{ flex: 1, minHeight: 0, display: "flex", opacity: busy ? 0.6 : 1, transition: "opacity 120ms" }}
+      >
+        {tab === 0 && <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} busy={busy} />}
         {tab === 1 && (
           <>
             <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
@@ -275,6 +314,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
             <SplitHandle {...splitHandleProps} />
             <DiffPane
               diff={diff}
+              busy={busy}
               file={file}
               options={diffOpts}
               onOptions={setDiffOpts}
@@ -312,15 +352,17 @@ function CommitInfo({
   detail,
   hasCurrent,
   onRetry,
+  busy,
 }: {
   detail: Loadable<CommitDetail>
   hasCurrent: boolean
   onRetry: () => void
+  busy: boolean
 }) {
   return (
     <Box data-testid="commit-info" sx={{ flex: 1, overflow: "auto", p: detail.kind === "ready" ? 2 : 0 }}>
       {detail.kind === "error" && <ErrorState message={detail.message} onRetry={onRetry} testid="commit-error" />}
-      {detail.kind === "loading" && <LoadingState label="Loading commit…" testid="commit-loading" />}
+      {detail.kind === "loading" && busy && <LoadingState label="Loading commit…" testid="commit-loading" />}
       {detail.kind === "idle" && (
         <EmptyState text={hasCurrent ? "Loading commit…" : "Select a revision"} testid="commit-empty" />
       )}
@@ -367,6 +409,7 @@ function CommitDetailView({ detail }: { detail: CommitDetail }) {
 
 function DiffPane({
   diff,
+  busy,
   file,
   options,
   onOptions,
@@ -374,6 +417,7 @@ function DiffPane({
   onOpenDifftool,
 }: {
   diff: Loadable<DiffDto>
+  busy: boolean
   file: string | null
   options: DiffOptions
   onOptions: (o: DiffOptions) => void
@@ -398,9 +442,9 @@ function DiffPane({
           <DiffView diff={diff.value} onRetry={onRetry} onOpenDifftool={onOpenDifftool} />
         ) : diff.kind === "error" ? (
           <ErrorState message={diff.message} onRetry={onRetry} testid="diff-error" />
-        ) : diff.kind === "loading" || file ? (
+        ) : (diff.kind === "loading" || file) && busy ? (
           <LoadingState label="Loading diff…" testid="diff-loading" />
-        ) : (
+        ) : diff.kind === "loading" || file ? null : (
           <EmptyState text="Select a file." testid="diff-empty" />
         )}
       </Box>

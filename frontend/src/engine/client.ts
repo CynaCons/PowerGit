@@ -281,16 +281,22 @@ export class EngineClient {
   }
 
   /** Files of a commit plus the diff of its first file in one request, so
-   *  the Diff tab needs one round trip after a selection, not two. */
+   *  the Diff tab needs one round trip after a selection, not two. Engines
+   *  before v0.13.14 have no /changes route (404): compose the same answer
+   *  from /files and /diff so a stale sidecar still shows diffs. */
   async changes(id: string, options?: Partial<DiffOptions>, signal?: AbortSignal): Promise<CommitChanges> {
-    return json<CommitChanges>(
-      await this.get(
-        `${this.repoPath()}/commits/${encodeURIComponent(id)}/changes?${diffParams(options).replace(/^&/, "")}`,
-        {
-          signal,
-        },
-      ),
-    )
+    const query = diffParams(options).replace(/^&/, "")
+    try {
+      return json<CommitChanges>(
+        await this.get(`${this.repoPath()}/commits/${encodeURIComponent(id)}/changes?${query}`, { signal }),
+      )
+    } catch (e) {
+      if (!(e instanceof EngineError) || e.status !== 404) throw e
+      const files = await this.files(id, signal)
+      const first = files[0]
+      const firstDiff = first ? await this.diff(id, first.path, options, signal) : null
+      return { files, firstDiff }
+    }
   }
 
   async diff(id: string, path: string, options?: Partial<DiffOptions>, signal?: AbortSignal): Promise<DiffDto> {
