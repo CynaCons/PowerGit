@@ -11,7 +11,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Out,
   [string]$ProcessName = "powergit",
-  [int[]]$Crop
+  [string]$Crop
 )
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
@@ -37,9 +37,11 @@ $dc = $g.GetHdc()
 $g.ReleaseHdc($dc); $g.Dispose()
 $dir = Split-Path -Parent $Out
 if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force $dir | Out-Null }
-if ($Crop -and $Crop.Count -eq 4) {
-  $src = New-Object System.Drawing.Rectangle $Crop[0], $Crop[1], $Crop[2], $Crop[3]
-  $zoomed = New-Object System.Drawing.Bitmap ($Crop[2] * 2), ($Crop[3] * 2)
+# -Crop arrives as one "x,y,w,h" string when invoked with -File from a shell.
+$box = if ($Crop) { @($Crop -split "[, ]+" | Where-Object { $_ -ne "" } | ForEach-Object { [int]$_ }) } else { @() }
+if ($box.Count -eq 4) {
+  $src = New-Object System.Drawing.Rectangle $box[0], $box[1], $box[2], $box[3]
+  $zoomed = New-Object System.Drawing.Bitmap ($box[2] * 2), ($box[3] * 2)
   $g2 = [System.Drawing.Graphics]::FromImage($zoomed)
   $g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
   $g2.DrawImage($bmp, (New-Object System.Drawing.Rectangle 0, 0, $zoomed.Width, $zoomed.Height), $src, [System.Drawing.GraphicsUnit]::Pixel)
