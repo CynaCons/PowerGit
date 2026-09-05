@@ -121,6 +121,7 @@ export function SettingsDialog({ open, onClose }: Props) {
           >
             <MenuItem value="top">In the title bar</MenuItem>
             <MenuItem value="floating">Floating at the bottom</MenuItem>
+            <MenuItem value="rail">In the left rail</MenuItem>
           </Select>
         </FormControl>
         <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 1 }}>

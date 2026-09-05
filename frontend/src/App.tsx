@@ -25,6 +25,7 @@ import { useHotkeyLayer, type CommandId } from "./hotkeys"
 import { zoomIn, zoomOut, zoomReset } from "./theme"
 import { useBarLayout } from "./theme/barLayout"
 import { TitleStrip } from "./components/TitleStrip"
+import { CommandRail } from "./components/CommandRail"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together plus the browse-scope hotkeys. `base`
@@ -56,7 +57,9 @@ export default function App({ base }: { base: EngineClient }) {
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
-  const floatingBar = useBarLayout() === "floating"
+  const barLayout = useBarLayout()
+  const floatingBar = barLayout === "floating"
+  const railBar = barLayout === "rail"
   // The highlight must land in the click's own frame; commit details, files
   // and diff follow in a deferred render and load asynchronously.
   const deferredCurrent = useDeferredValue(current)
@@ -172,8 +175,8 @@ export default function App({ base }: { base: EngineClient }) {
         data-testid="browse-shell"
         sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}
       >
-        {floatingBar && <TitleStrip repoName={repo?.name} />}
-        {!floatingBar && (
+        {(floatingBar || railBar) && <TitleStrip repoName={repo?.name} />}
+        {!floatingBar && !railBar && (
           <CommandBar
             toolbarRef={layout.toolbarRef}
             tier={layout.toolbarTier}
@@ -193,12 +196,31 @@ export default function App({ base }: { base: EngineClient }) {
         {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
 
         <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-          <NavRail
-            repoName={repo?.name}
-            onOpenRepo={chrome.openRepo}
-            onRecents={chrome.openRecents}
-            onSettings={chrome.openSettings}
-          />
+          {railBar ? (
+            <CommandRail
+              repoName={repo?.name}
+              onOpenRepo={chrome.openRepo}
+              onRecents={chrome.openRecents}
+              onSettings={chrome.openSettings}
+              live={live}
+              dirty={dirty}
+              stashCount={stashes.length}
+              hasCurrent={current !== undefined}
+              remoteNames={remoteNames}
+              defaultRemote={defaultRemote}
+              jobs={jobs}
+              actions={actions}
+              refresh={chrome.refresh}
+              openStash={chrome.openStash}
+            />
+          ) : (
+            <NavRail
+              repoName={repo?.name}
+              onOpenRepo={chrome.openRepo}
+              onRecents={chrome.openRecents}
+              onSettings={chrome.openSettings}
+            />
+          )}
 
           <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>

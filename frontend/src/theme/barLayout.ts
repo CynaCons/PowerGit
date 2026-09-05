@@ -6,11 +6,14 @@ import { useSyncExternalStore } from "react"
 //   "top"      the bar is the frameless window's title bar (default)
 //   "floating" a slim title strip stays at the top; the commands float in a
 //              rounded bar over the bottom of the workspace
+//   "rail"     the commands live in the left rail, which expands to show
+//              labels (owner: "integrate the menu options in the leftside
+//              navrail instead, with a collapsable leftside menu")
 // Persisted under `pg.bar`.
 
-export type BarLayout = "top" | "floating"
+export type BarLayout = "top" | "floating" | "rail"
 export const BAR_STORAGE_KEY = "pg.bar"
-const LAYOUTS: readonly BarLayout[] = ["top", "floating"]
+const LAYOUTS: readonly BarLayout[] = ["top", "floating", "rail"]
 
 function readStored(): BarLayout {
   try {
