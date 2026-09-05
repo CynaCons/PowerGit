@@ -114,6 +114,12 @@ public sealed record FetchRequest(string Remote);
 
 public sealed record FilesDeleteRequest(string[] Paths);
 
+/// <summary>v0.13.14: discard working-tree and index changes of the given paths (Git Extensions "Reset file(s) to HEAD").</summary>
+public sealed record FilesResetRequest(string[] Paths);
+
+/// <summary>v0.13.14: open the external difftool on a working-tree file (index vs HEAD when <paramref name="Staged"/>).</summary>
+public sealed record WorkTreeDifftoolRequest(string Path, bool Staged = false);
+
 public sealed record IgnoreRequest(string Pattern);
 
 public sealed record IgnorePreviewDto(string Pattern, string[] Files, int Count);

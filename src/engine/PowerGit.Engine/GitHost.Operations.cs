@@ -265,6 +265,81 @@ public sealed partial class GitHost
         return new RemoteInfoDto(name, url);
     }
 
+    /// <summary>
+    /// Git Extensions FormCommit "Reset file(s) to HEAD" (v0.13.14): the index
+    /// entry and the working-tree file go back to HEAD. A path HEAD does not
+    /// know (untracked, or added only in the index) has nothing to go back to
+    /// and is deleted, which is what GE does after its confirmation prompt.
+    /// </summary>
+    public void ResetFiles(IReadOnlyList<string> paths)
+    {
+        string root = RequireRoot();
+        foreach (string path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            string full = Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar));
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            CommandResult inHead = Run(root, "cat-file", "-e", $"HEAD:{path}");
+            if (inHead.ExitCode == 0)
+            {
+                CommandResult unstage = Run(root, "reset", "-q", "HEAD", "--", path);
+                CommandResult restore = Run(root, "checkout", "-q", "HEAD", "--", path);
+                if (restore.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(restore.StdErr) ? unstage.StdErr.Trim() : restore.StdErr.Trim());
+                }
+            }
+            else
+            {
+                Run(root, "rm", "-f", "-q", "--cached", "--", path);
+                if (File.Exists(full))
+                {
+                    File.Delete(full);
+                }
+            }
+        }
+    }
+
+    /// <summary>Open the difftool on a working-tree path: index vs HEAD when staged, worktree vs index otherwise.</summary>
+    public void OpenWorkTreeDifftool(string path, bool staged)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new InvalidOperationException("path is required");
+        }
+
+        System.Diagnostics.ProcessStartInfo psi = new()
+        {
+            FileName = _gitPath,
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";
+        string[] args = staged
+            ? ["difftool", "--no-prompt", "-y", "--cached", "--", path]
+            : ["difftool", "--no-prompt", "-y", "--", path];
+        foreach (string arg in args)
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
+        if (process is null)
+        {
+            throw new InvalidOperationException("Failed to start git difftool.");
+        }
+    }
+
     public void DeleteFiles(IReadOnlyList<string> paths)
     {
         string root = RequireRoot();

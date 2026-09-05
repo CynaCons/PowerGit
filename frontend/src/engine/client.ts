@@ -356,6 +356,16 @@ export class EngineClient {
 
   // ---- mutations --------------------------------------------------------
 
+  /** Discard index + working-tree changes of `paths` (GE "Reset file(s) to HEAD"); untracked ones are deleted. */
+  async resetFiles(paths: string[]): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/files/reset`, { paths }))
+  }
+
+  /** External difftool on a working-tree file (index vs HEAD when staged). */
+  async openWorkTreeDifftool(path: string, staged: boolean): Promise<void> {
+    await this.post(`${this.repoPath()}/difftool/worktree`, { path, staged })
+  }
+
   async deleteFiles(paths: string[]): Promise<RepoStatus> {
     return json<RepoStatus>(await this.post(`${this.repoPath()}/files/delete`, { paths }))
   }

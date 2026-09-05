@@ -95,6 +95,29 @@ public sealed class SessionTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.NotEqual(HttpStatusCode.Conflict, after.StatusCode);
     }
 
+    [Fact]
+    public async Task Files_reset_restores_tracked_files_and_deletes_untracked_ones()
+    {
+        // v0.13.14 commit-dialog context menu "Reset file(s) to HEAD".
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = TempRepo.Create("main");
+        string tracked = Path.Combine(repo.Dir, "a.txt");
+        string added = Path.Combine(repo.Dir, "new.txt");
+        string untouched = Path.Combine(repo.Dir, "keep.txt");
+        File.WriteAllText(tracked, "changed\n");
+        File.WriteAllText(added, "new\n");
+        File.WriteAllText(untouched, "keep\n");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        HttpResponseMessage res = await client.PostAsJsonAsync($"/repos/{sid}/files/reset", new { paths = new[] { "a.txt", "new.txt" } });
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        // core.autocrlf may check the file out with CRLF on Windows; compare content, not line endings.
+        Assert.Equal("a", File.ReadAllText(tracked).TrimEnd('\r', '\n'));
+        Assert.False(File.Exists(added));
+        Assert.True(File.Exists(untouched), "a path not in the request is left alone");
+        await client.DeleteAsync($"/repos/{sid}");
+    }
+
     private sealed class TempRepo : IDisposable
     {
         public string Dir { get; }

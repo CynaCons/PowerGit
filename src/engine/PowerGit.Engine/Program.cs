@@ -321,6 +321,32 @@ repo.MapPost("/files/delete", (FilesDeleteRequest body, GitHost git) =>
     }
 });
 
+repo.MapPost("/files/reset", (FilesResetRequest body, GitHost git) =>
+{
+    try
+    {
+        git.ResetFiles(body.Paths);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/difftool/worktree", (WorkTreeDifftoolRequest body, GitHost git) =>
+{
+    try
+    {
+        git.OpenWorkTreeDifftool(body.Path, body.Staged);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
 {
     try

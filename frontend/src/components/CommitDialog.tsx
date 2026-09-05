@@ -2,10 +2,6 @@ import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Dialog from "@mui/material/Dialog"
 import DialogContent from "@mui/material/DialogContent"
-import ListItemIcon from "@mui/material/ListItemIcon"
-import ListItemText from "@mui/material/ListItemText"
-import Menu from "@mui/material/Menu"
-import MenuItem from "@mui/material/MenuItem"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useRef, useState } from "react"
@@ -23,6 +19,9 @@ import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { IgnoreDialog } from "./IgnoreDialog"
 import { FileListBox, ListHeader } from "./CommitFileLists"
+import { CommitFileContextMenu, type CommitFileMenuTarget } from "./CommitFileContextMenu"
+import { copyToClipboard } from "./clipboard"
+import { ConfirmDialog } from "./dialogs/ConfirmDialog"
 
 type Props = {
   open: boolean
@@ -47,7 +46,8 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
   const [diffOpts, setDiffOpts] = useState<DiffOptions>({ context: 3, ws: false, full: false })
   const [message, setMessage] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number; staged: boolean; path: string } | null>(null)
+  const [menu, setMenu] = useState<CommitFileMenuTarget | null>(null)
+  const [confirm, setConfirm] = useState<{ kind: "reset" | "delete"; staged: boolean; paths: string[] } | null>(null)
   const [ignoreFor, setIgnoreFor] = useState<string | null>(null)
   const anchorRef = useRef<{ unstaged: number; staged: number }>({ unstaged: -1, staged: -1 })
 
@@ -145,18 +145,36 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
     }
   }
 
-  async function deleteSelection(staged: boolean) {
+  function askConfirm(kind: "reset" | "delete", staged: boolean) {
     const paths = [...(staged ? selStaged : selUnstaged)]
-    if (paths.length === 0) return
-    if (!window.confirm(`Delete ${paths.length} file(s)? This cannot be undone.`)) return
+    if (paths.length > 0) setConfirm({ kind, staged, paths })
+  }
+
+  async function runConfirmed() {
+    if (!confirm) return
+    const { kind, paths } = confirm
+    setConfirm(null)
     try {
-      onStatus(await engine.deleteFiles(paths))
+      onStatus(kind === "delete" ? await engine.deleteFiles(paths) : await engine.resetFiles(paths))
       setSelStaged(new Set())
       setSelUnstaged(new Set())
       setSelected(null)
     } catch (e) {
-      setError(`delete failed: ${describeThrown(e)}`)
+      setError(`${kind} failed: ${describeThrown(e)}`)
     }
+  }
+
+  // Right-click targets the row under the pointer: an unselected row becomes
+  // the selection (Git Extensions behaviour), a selected one keeps the group.
+  function openMenu(f: StatusFile, staged: boolean, x: number, y: number) {
+    const current = staged ? selStaged : selUnstaged
+    let count = current.size
+    if (!current.has(f.path)) {
+      ;(staged ? setSelStaged : setSelUnstaged)(new Set([f.path]))
+      setSelected({ path: f.path, staged })
+      count = 1
+    }
+    setMenu({ x, y, staged, path: f.path, count: Math.max(1, count) })
   }
 
   async function ignorePattern(pattern: string) {
@@ -220,7 +238,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
             emptyText="Working tree clean."
             onClick={(_f, i, e) => clickRow(status?.unstaged ?? [], false, i, e)}
             onToggle={toggle}
-            onContext={(f, x, y) => setMenu({ x, y, staged: false, path: f.path })}
+            onContext={(f, x, y) => openMenu(f, false, x, y)}
           />
           <Box
             data-testid="commit-stage-bar"
@@ -278,7 +296,7 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
             emptyText="Nothing staged. Double-click an unstaged file or use Stage."
             onClick={(_f, i, e) => clickRow(status?.staged ?? [], true, i, e)}
             onToggle={toggle}
-            onContext={(f, x, y) => setMenu({ x, y, staged: true, path: f.path })}
+            onContext={(f, x, y) => openMenu(f, true, x, y)}
           />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1, minHeight: 0 }}>
@@ -335,44 +353,40 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
         </Box>
       </DialogContent>
 
-      <Menu
-        open={menu !== null}
+      <CommitFileContextMenu
+        target={menu}
         onClose={() => setMenu(null)}
-        anchorReference="anchorPosition"
-        anchorPosition={menu ? { top: menu.y, left: menu.x } : undefined}
-      >
-        <MenuItem
-          data-testid="ctx-stage-selected"
-          onClick={() => {
-            if (menu) stageSelection(menu.staged)
-            setMenu(null)
-          }}
-        >
-          <ListItemIcon />
-          <ListItemText>{menu?.staged ? "Unstage selected" : "Stage selected"}</ListItemText>
-          <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
-            {menu?.staged ? shortcutLabel("diff.unstageSelected") : shortcutLabel("diff.stageSelected")}
-          </Typography>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-delete-file"
-          onClick={() => {
-            if (menu) deleteSelection(menu.staged)
-            setMenu(null)
-          }}
-        >
-          <ListItemText>Delete…</ListItemText>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-ignore-file"
-          onClick={() => {
+        actions={{
+          onStage: () => void stageSelection(menu?.staged ?? false),
+          onReset: () => askConfirm("reset", menu?.staged ?? false),
+          onDelete: () => askConfirm("delete", menu?.staged ?? false),
+          onDifftool: () => {
+            if (menu) void engine.openWorkTreeDifftool(menu.path, menu.staged).catch((e) => setError(describeThrown(e)))
+          },
+          onCopyPath: () => {
+            const paths = [...((menu?.staged ?? false) ? selStaged : selUnstaged)]
+            void copyToClipboard((paths.length > 0 ? paths : menu ? [menu.path] : []).join("\n"))
+          },
+          onIgnore: () => {
             if (menu) setIgnoreFor(menu.path)
-            setMenu(null)
-          }}
-        >
-          <ListItemText>Add to .gitignore…</ListItemText>
-        </MenuItem>
-      </Menu>
+          },
+        }}
+      />
+      <ConfirmDialog
+        open={confirm !== null}
+        testid={confirm?.kind === "reset" ? "reset-files-confirm" : "delete-files-confirm"}
+        title={confirm?.kind === "reset" ? "Reset to HEAD" : "Delete files"}
+        text={
+          confirm?.kind === "reset"
+            ? `Discard the changes of ${confirm.paths.length === 1 ? confirm.paths[0] : `${confirm.paths.length} files`}?
+Tracked files go back to HEAD; new files are deleted. This cannot be undone.`
+            : `Delete ${confirm?.paths.length === 1 ? confirm.paths[0] : `${confirm?.paths.length ?? 0} files`} from the working tree? This cannot be undone.`
+        }
+        confirmLabel={confirm?.kind === "reset" ? "Reset" : "Delete"}
+        destructive
+        onConfirm={() => void runConfirmed()}
+        onCancel={() => setConfirm(null)}
+      />
 
       {ignoreFor !== null && (
         <IgnoreDialog open initialPattern={ignoreFor} onClose={() => setIgnoreFor(null)} onConfirm={ignorePattern} />
