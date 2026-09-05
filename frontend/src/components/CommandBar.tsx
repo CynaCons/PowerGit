@@ -20,6 +20,7 @@ import Toolbar from "@mui/material/Toolbar"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
 import { memo, useState, type RefObject } from "react"
+import { BrandMark } from "./BrandMark"
 import { useEngine } from "../engine"
 import { shortcutLabel } from "../hotkeys"
 import type { GitActions } from "../hooks/useGitActions"
@@ -80,7 +81,8 @@ function CommandBarImpl({
         data-tier={tier}
         sx={{ gap: 0.5, minHeight: 32, py: 0.25, px: 1, flexWrap: "nowrap", overflow: "hidden" }}
       >
-        <Typography variant="subtitle1" sx={{ mr: 1, fontWeight: 700 }}>
+        <BrandMark size={18} />
+        <Typography variant="subtitle1" sx={{ ml: 0.5, mr: 1, fontWeight: 700 }}>
           PowerGit
         </Typography>
         <ToolbarButton

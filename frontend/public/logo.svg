@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="1024" height="1024">
+  <!-- PowerGit mark (v0.13.14, direction D): the crossing lanes redrawn as two
+       equal strokes in one blue family. Source of truth for every icon:
+       regenerate with `npm run icons` (tauri icon) from frontend/. -->
+  <path d="M14 14c12 0 14 8 18 18s6 18 18 18" fill="none" stroke="#1553c9" stroke-width="9" stroke-linecap="round"/>
+  <path d="M14 50c12 0 14-8 18-18s6-18 18-18" fill="none" stroke="#7ec6ff" stroke-width="9" stroke-linecap="round"/>
+</svg>

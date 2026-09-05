@@ -21,7 +21,8 @@
     "test:perf": "node scripts/perf-run.mjs",
     "lint": "eslint src tests scripts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "icons": "tauri icon src/assets/logo.svg"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

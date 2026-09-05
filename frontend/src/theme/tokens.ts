@@ -41,6 +41,9 @@ export type Tokens = {
   primary: string
   primaryDark: string
   onPrimary: string
+  /** Brand mark strokes (src/assets/logo.svg): deep and light blue. */
+  brandDeep: string
+  brandLight: string
   selectionBg: string
   selectionBorder: string
   hover: string
@@ -82,6 +85,8 @@ export const light: Tokens = {
   primary: "#2563eb",
   primaryDark: "#1d4ed8",
   onPrimary: "#ffffff",
+  brandDeep: "#1553c9",
+  brandLight: "#7ec6ff",
   selectionBg: "#dbeafe",
   selectionBorder: "#2563eb",
   hover: "rgba(37, 99, 235, 0.08)",
@@ -140,6 +145,8 @@ export const dark: Tokens = {
   primary: "#60a5fa",
   primaryDark: "#3b82f6",
   onPrimary: "#0b1220",
+  brandDeep: "#3b7bff",
+  brandLight: "#9fd5ff",
   selectionBg: "#1f3a5f",
   selectionBorder: "#60a5fa",
   hover: "rgba(96, 165, 250, 0.12)",
@@ -221,6 +228,8 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-primary": t.primary,
     "--pg-primary-dark": t.primaryDark,
     "--pg-on-primary": t.onPrimary,
+    "--pg-brand-deep": t.brandDeep,
+    "--pg-brand-light": t.brandLight,
     "--pg-grid-sel": t.selectionBg,
     "--pg-grid-sel-border": t.selectionBorder,
     "--pg-grid-hover": t.hover,

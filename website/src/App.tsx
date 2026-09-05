@@ -45,7 +45,10 @@ export default function App() {
     <>
       <header className="topbar">
         <div className="wrap topbar-inner">
-          <span className="brand">PowerGit</span>
+          <span className="brand">
+            <img src="logo.svg" alt="" width="22" height="22" style={{ verticalAlign: "-4px", marginRight: 8 }} />
+            PowerGit
+          </span>
           <nav>
             <a href="#demo">Live demo</a>
             <a href="#features">Features</a>
