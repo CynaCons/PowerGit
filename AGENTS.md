@@ -71,14 +71,31 @@ npm run tauri dev         # native window (needs engine running for health)
 
 ## How we verify (token budget)
 
-Default proof is **Playwright e2e assertions**, not screenshots. Since
-v0.13.7 `.github/workflows/ci.yml` runs the same suites on every push and PR
-(engine xunit on Windows + Linux, tsc/lint/format/vitest/e2e on both, cargo
-tests, version + plan guards); a red CI is the gate, not a local "it works".
+Proof is **what the owner sees**, asserted by a test. Since v0.13.7
+`.github/workflows/ci.yml` runs the suites on every push and PR (engine xunit
+on Windows + Linux, tsc/lint/format/vitest/e2e on both, cargo tests, version +
+plan guards); a red CI is the gate, not a local "it works". CI does **not**
+run the visual suite; that is on demand (below).
 
 - Run `npm run test:e2e` **once** after a UI change. If it fails, do not run it again. Read the first error, fix, then run once.
-- Do **not** call Chrome DevTools `take_screenshot` / `take_snapshot` unless the owner asked to look, or pasted a screenshot. Those images re-enter the chat and dominate the context window.
-- Visual / pixel work is `npm run test:visual` (`tests/visual/`). Owner-triggered only.
+- Where layers compose (the graph canvas under the DOM rows, dialogs over
+  the grid, zoomed `#root`), a DOM assertion cannot see the result. Sample
+  the composited pixels instead: `tests/e2e/selected-row-graph.spec.ts` is
+  the pattern (screenshot a clip, decode it in-page, count colours). A
+  class or computed-style assertion on such a surface is not proof.
+- After touching CSS, tokens, `graph/draw.ts`, or layout, run the visual
+  subset for that area: `npm run test:visual -- --grep @grid` (`@bottom`,
+  `@dialogs`, `@themes`; `tests/visual/visual.spec.ts`). Baselines are per
+  platform; seed or refresh them with `npm run test:visual:update` and
+  look at the diff images before accepting. Never run the whole suite on CI.
+- Look at it: before closing UI work, capture the running window
+  (`scripts/capture-window.ps1`, Windows dev/packaged app) or the states in
+  docs/agents/memories/visual-walkthrough.md, and have a reviewer with vision
+  check them against that list. One screenshot per state is enough; do not
+  paste the whole session into the chat.
+- Do **not** call Chrome DevTools `take_screenshot` / `take_snapshot` for
+  routine debugging. Those images re-enter the chat and dominate the context
+  window; use the capture script and the visual subset instead.
 - Owner design demo is `npm run test:demo`. Parked until asked.
 - If the page is blank, read the browser console or Vite log first. Restart Vite on HMR/`ReferenceError`. Do not screenshot a white page.
 - Never `list_dir` `frontend/` — it walks `node_modules` and `src-tauri/target`. Use `frontend/src`.
@@ -149,6 +166,20 @@ Do not put secrets there.
 - Evidence or it didn't happen: before calling work complete, run the relevant
   smoke (engine test, `npm run tauri dev` / `npm run dev`) and
   put the proof in the worker report.
+- Owner reports are symptom-first. When the owner reports a defect, the first
+  commit is a failing test that reproduces the owner's sentence, quoted
+  verbatim in the test, on the platform it was reported from, asserting what
+  the owner sees (pixels where layers compose, timing measured in-page for
+  "feels laggy"). Only then fix. Do not rewrite the report into a diagnosis
+  and test the diagnosis: "commits disappear when selected" was tested for
+  three iterations as "author-highlight class absent" while the selected
+  commit's graph node stayed hidden under the row background (v0.12.1 to
+  v0.13.13, found 2026-09-05 by looking at the window).
+- Owner reports are closed by the owner. A PLAN.md task derived from an owner
+  report is never ticked by an agent: when the fix and its symptom test are
+  in, update the task text with "fixed <sha>, awaiting owner verification"
+  (`powerplan update_task`) and leave the box open. The owner ticks it after
+  seeing the fix; the iteration stays open until then.
 - Keep diffs small. Do not reformat files you are not changing.
 
 ## Reporting

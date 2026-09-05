@@ -18,6 +18,15 @@ having approved the content that goes into them.
   `%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe`; see docs/agents/memories/engine-exe-lock.md)
 - `cd frontend && npm run test:e2e` (needs a live engine on :7733)
 - `npm run test:resolution`
+- Visual subset for whatever changed since the last tag (`npm run test:visual
+  -- --grep @grid` etc.; see AGENTS.md "How we verify"). Not the full suite.
+- Look at it: start the app (`npm run tauri dev` or the packaged zip in step
+  2), select a commit, hover another, switch to Dark, zoom to 150 %, and
+  capture each state with `scripts/capture-window.ps1`; check the captures
+  against docs/agents/memories/visual-walkthrough.md. The v0.13.13 release
+  shipped with the selected commit's graph node hidden because nobody looked.
+- No open owner-report task in the current iteration without an owner tick
+  (AGENTS.md "Owner reports are closed by the owner").
 - Working tree clean; everything committed and pushed.
 
 ## 1. Version bump (one file)
