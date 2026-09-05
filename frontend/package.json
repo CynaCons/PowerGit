@@ -22,7 +22,7 @@
     "lint": "eslint src tests scripts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "icons": "tauri icon src/assets/logo.svg"
+    "icons": "tauri icon src/assets/app-icon.svg"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

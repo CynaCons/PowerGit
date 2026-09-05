@@ -3,6 +3,7 @@ import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
+import { MONO_FONT } from "../../theme"
 
 export function RebaseDialog({
   open,
@@ -37,7 +38,7 @@ export function RebaseDialog({
     >
       <Typography variant="body2">
         Rebase the current branch <strong>{currentBranch}</strong> onto{" "}
-        <Box component="span" sx={{ fontFamily: "Fira Code, ui-monospace, monospace" }}>
+        <Box component="span" sx={{ fontFamily: MONO_FONT }}>
           {ontoSha.slice(0, 7)}
         </Box>
         {ontoSubject ? ` (${ontoSubject})` : ""}.

@@ -7,6 +7,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import { useEngine, type RepoStatus, type StashInfo } from "../engine"
+import { MONO_FONT } from "../theme"
 
 type Props = {
   open: boolean
@@ -140,7 +141,7 @@ export function StashDialog({ open, dirtyCount, onClose, onStatus }: Props) {
                 <Typography
                   variant="body2"
                   sx={{
-                    fontFamily: "Fira Code, ui-monospace, monospace",
+                    fontFamily: MONO_FONT,
                     fontSize: 11.5,
                     flexShrink: 0,
                     color: "primary.main",

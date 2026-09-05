@@ -279,7 +279,9 @@ html {
 }
 
 .sha {
-  font-family: "Fira Code", ui-monospace, Consolas, monospace;
+  font-family:
+    "Cascadia Code", "Cascadia Mono", "JetBrains Mono", "Ubuntu Mono", "DejaVu Sans Mono", ui-monospace, Consolas,
+    monospace;
   font-size: 11px;
   justify-content: flex-end;
   padding-right: 8px;

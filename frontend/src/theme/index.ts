@@ -16,7 +16,11 @@ export { useZoom, zoomIn, zoomOut, zoomReset, zoomPercent } from "./zoom"
 // See docs/agents/memories/linux-fonts.md.
 const SANS_FONT =
   'system-ui, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", "Cantarell", "Noto Sans", "Inter", "DejaVu Sans", sans-serif'
-export const MONO_FONT = '"Fira Code", "JetBrains Mono", "DejaVu Sans Mono", ui-monospace, Consolas, monospace'
+// Platform-first, like the UI face: Cascadia on Windows 11 (ships with the
+// Terminal), Ubuntu Mono / DejaVu on GNOME, JetBrains Mono when installed.
+// Fira Code was dropped in v0.13.16 (owner: "the font ... is not very good").
+export const MONO_FONT =
+  '"Cascadia Code", "Cascadia Mono", "JetBrains Mono", "Ubuntu Mono", "DejaVu Sans Mono", ui-monospace, Consolas, monospace'
 
 export const codeSx = {
   fontFamily: MONO_FONT,

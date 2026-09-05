@@ -149,6 +149,7 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
       </Tooltip>
       {item.menu && (
         <Menu
+          transitionDuration={0}
           open={anchor !== null}
           anchorEl={anchor}
           onClose={() => setAnchor(null)}

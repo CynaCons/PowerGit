@@ -72,6 +72,7 @@ export function RevisionContextMenu({
   return (
     <>
       <Menu
+        transitionDuration={0}
         open={open}
         onClose={onClose}
         anchorReference="anchorPosition"

@@ -103,7 +103,7 @@ export function SplitButton({
           <ArrowDropDownIcon fontSize="small" />
         </Button>
       </ButtonGroup>
-      <Menu open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)}>
+      <Menu open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)} transitionDuration={0}>
         {children}
       </Menu>
     </>

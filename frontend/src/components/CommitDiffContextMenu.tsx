@@ -58,6 +58,7 @@ export function CommitDiffContextMenu({
   )
   return (
     <Menu
+      transitionDuration={0}
       open={target !== null}
       onClose={onClose}
       anchorReference="anchorPosition"

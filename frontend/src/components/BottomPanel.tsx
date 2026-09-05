@@ -1,4 +1,8 @@
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
+import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined"
 import Box from "@mui/material/Box"
+import IconButton from "@mui/material/IconButton"
+import Tooltip from "@mui/material/Tooltip"
 import LinearProgress from "@mui/material/LinearProgress"
 import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
@@ -7,12 +11,12 @@ import Typography from "@mui/material/Typography"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { CompactFileList } from "./CompactFileList"
-import { DiffOptionsBar } from "./DiffOptionsBar"
-import { DiffView } from "./DiffView"
 import { SplitHandle } from "./SplitHandle"
 import { BlobPane } from "./BlobPane"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import { CommitDetailView } from "./CommitDetailView"
+import { DiffPane } from "./DiffPane"
+import type { Loadable } from "./loadable"
 import {
   describeThrown,
   isAbort,
@@ -56,15 +60,6 @@ function writeStoredFilesWidth(width: number): void {
   }
 }
 
-type Loadable<T> =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  // `stale`: the previous selection's value, kept on screen while the next
-  // one loads (v0.13.14, owner: the white "Loading commit…" swap between
-  // selections "creates a visual break and flicker").
-  | { kind: "ready"; value: T; stale?: boolean }
-  | { kind: "error"; message: string }
-
 /** True once `pending` has been continuously true for `delayMs`; a short
  *  load never shows an indicator, a long one shows it without flicker. */
 function useDelayed(pending: boolean, delayMs: number): boolean {
@@ -94,6 +89,24 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const [blob, setBlob] = useState<Loadable<DiffDto>>({ kind: "idle" })
   const [diffToolError, setDiffToolError] = useState<string | null>(null)
   const [reloadTick, setReloadTick] = useState(0)
+  // Diff tab file list as a directory tree (pg.diffTree) or flat paths.
+  const [treeMode, setTreeModeState] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem("pg.diffTree") === "1"
+    } catch {
+      return false
+    }
+  })
+  const setTreeMode = (update: (t: boolean) => boolean) =>
+    setTreeModeState((t) => {
+      const next = update(t)
+      try {
+        window.localStorage.setItem("pg.diffTree", next ? "1" : "0")
+      } catch {
+        // Storage refused: the choice still applies for this window.
+      }
+      return next
+    })
   // Which commit the current `files`/`file` belong to, and which
   // (commit, path, options) the current diff was loaded for. Both keep the
   // diff effect from firing for a stale file when the commit changes, and
@@ -292,10 +305,20 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         {tab === 0 && <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} busy={busy} />}
         {tab === 1 && (
           <>
-            <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
+            <Box
+              sx={{
+                width: filesWidth,
+                flexShrink: 0,
+                overflow: "auto",
+                display: "flex",
+                flexDirection: "column",
+                position: "relative",
+              }}
+            >
               <CompactFileList
                 testid="file-list"
                 files={files}
+                tree={treeMode}
                 selectedPath={file}
                 emptyText="No files for this revision."
                 onSelect={(f) => setFile(f.path)}
@@ -311,6 +334,29 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
                   {diffToolError}
                 </Typography>
               )}
+              {/* Owner (v0.13.16): "a floating transparent button to activate a
+                  mode 'hierarchical' view" — flat paths or a directory tree. */}
+              <Tooltip title={treeMode ? "Show full paths" : "Group by directory"} placement="left">
+                <IconButton
+                  size="small"
+                  data-testid="file-list-mode"
+                  aria-label={treeMode ? "Show full paths" : "Group by directory"}
+                  onClick={() => setTreeMode((t) => !t)}
+                  sx={{
+                    position: "absolute",
+                    right: 10,
+                    bottom: 8,
+                    bgcolor: "rgba(21, 83, 201, 0.10)",
+                    color: "primary.main",
+                    backdropFilter: "blur(4px)",
+                    border: 1,
+                    borderColor: "divider",
+                    "&:hover": { bgcolor: "rgba(21, 83, 201, 0.22)" },
+                  }}
+                >
+                  {treeMode ? <ViewListOutlinedIcon fontSize="small" /> : <AccountTreeOutlinedIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
             </Box>
             <SplitHandle {...splitHandleProps} />
             <DiffPane
@@ -368,52 +414,6 @@ function CommitInfo({
         <EmptyState text={hasCurrent ? "Loading commit…" : "Select a revision"} testid="commit-empty" />
       )}
       {detail.kind === "ready" && <CommitDetailView detail={detail.value} />}
-    </Box>
-  )
-}
-
-function DiffPane({
-  diff,
-  busy,
-  file,
-  options,
-  onOptions,
-  onRetry,
-  onOpenDifftool,
-}: {
-  diff: Loadable<DiffDto>
-  busy: boolean
-  file: string | null
-  options: DiffOptions
-  onOptions: (o: DiffOptions) => void
-  onRetry: () => void
-  onOpenDifftool?: () => void
-}) {
-  return (
-    <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-      <Box
-        data-testid="diff-pane"
-        sx={{
-          m: 0,
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: "background.paper",
-        }}
-      >
-        {diff.kind === "ready" ? (
-          <DiffView diff={diff.value} onRetry={onRetry} onOpenDifftool={onOpenDifftool} />
-        ) : diff.kind === "error" ? (
-          <ErrorState message={diff.message} onRetry={onRetry} testid="diff-error" />
-        ) : (diff.kind === "loading" || file) && busy ? (
-          <LoadingState label="Loading diff…" testid="diff-loading" />
-        ) : diff.kind === "loading" || file ? null : (
-          <EmptyState text="Select a file." testid="diff-empty" />
-        )}
-      </Box>
-      <DiffOptionsBar options={options} onChange={onOptions} />
     </Box>
   )
 }

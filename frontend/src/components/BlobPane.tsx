@@ -96,7 +96,7 @@ export function BlobPane({
   return (
     <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box sx={{ px: 1.5, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
-        <Typography variant="caption" sx={{ fontFamily: "Fira Code, ui-monospace, monospace" }}>
+        <Typography variant="caption" sx={{ fontFamily: MONO_FONT }}>
           {path ?? "Select a file in the tree."}
         </Typography>
       </Box>

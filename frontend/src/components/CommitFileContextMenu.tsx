@@ -78,6 +78,7 @@ export function CommitFileContextMenu({
   }
   return (
     <Menu
+      transitionDuration={0}
       open={open}
       onClose={onClose}
       anchorReference="anchorPosition"

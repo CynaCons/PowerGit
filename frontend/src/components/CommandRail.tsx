@@ -86,6 +86,17 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...de
         overflow: "hidden",
       }}
     >
+      {/* Owner: the collapse control belongs at the top, where the eye starts. */}
+      <RailItem
+        item={{
+          id: "toggle",
+          label: expanded ? "Collapse" : "Expand",
+          icon: expanded ? <ChevronLeftIcon /> : <ChevronRightIcon />,
+          testid: "rail-toggle",
+          onClick: toggle,
+        }}
+        expanded={expanded}
+      />
       {nav.map((item) => (
         <RailItem key={item.id} item={item} expanded={expanded} />
       ))}
@@ -106,16 +117,6 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...de
           testid: "settings-button",
           shortcut: shortcutLabel("browse.openSettings"),
           onClick: onSettings,
-        }}
-        expanded={expanded}
-      />
-      <RailItem
-        item={{
-          id: "toggle",
-          label: expanded ? "Collapse" : "Expand",
-          icon: expanded ? <ChevronLeftIcon /> : <ChevronRightIcon />,
-          testid: "rail-toggle",
-          onClick: toggle,
         }}
         expanded={expanded}
       />

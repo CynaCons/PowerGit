@@ -1,6 +1,7 @@
 import Box from "@mui/material/Box"
 import Typography from "@mui/material/Typography"
 import type { CommitDetail } from "../engine"
+import { MONO_FONT } from "../theme"
 
 // The Commit tab's body (split out of BottomPanel.tsx for the lint size limit).
 export function CommitDetailView({ detail }: { detail: CommitDetail }) {
@@ -27,18 +28,11 @@ export function CommitDetailView({ detail }: { detail: CommitDetail }) {
         </Box>
       </Typography>
       {detail.parents.length > 0 && (
-        <Typography
-          variant="caption"
-          sx={{ display: "block", mt: 1, fontFamily: "Fira Code, ui-monospace, monospace" }}
-        >
+        <Typography variant="caption" sx={{ display: "block", mt: 1, fontFamily: MONO_FONT }}>
           Parents: {detail.parents.map((p) => p.slice(0, 7)).join(" ")}
         </Typography>
       )}
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ mt: 1, display: "block", fontFamily: "Fira Code, ui-monospace, monospace" }}
-      >
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block", fontFamily: MONO_FONT }}>
         {detail.id}
       </Typography>
     </>

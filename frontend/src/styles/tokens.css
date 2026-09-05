@@ -43,38 +43,6 @@
   src: url("/fonts/inter-latin-700.woff2") format("woff2");
 }
 
-@font-face {
-  font-family: "Fira Code";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/firacode-latin-400.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Fira Code";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("/fonts/firacode-latin-500.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Fira Code";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("/fonts/firacode-latin-600.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Fira Code";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("/fonts/firacode-latin-700.woff2") format("woff2");
-}
-
 /* Colour and density tokens are NOT declared here. They are written into
    `:root` at runtime by the MUI CssBaseline in src/theme/index.ts from the
    single literal source src/theme/tokens.ts (light + dark), so a hex value

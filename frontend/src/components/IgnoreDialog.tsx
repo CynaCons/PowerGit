@@ -8,6 +8,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import { useEngine, type IgnorePreview } from "../engine"
+import { MONO_FONT } from "../theme"
 
 type Props = {
   open: boolean
@@ -87,7 +88,7 @@ export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props
             borderColor: "divider",
             borderRadius: 1,
             p: 0.5,
-            fontFamily: "Fira Code, ui-monospace, monospace",
+            fontFamily: MONO_FONT,
             fontSize: 11.5,
           }}
         >

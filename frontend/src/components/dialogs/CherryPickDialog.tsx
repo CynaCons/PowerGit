@@ -4,6 +4,7 @@ import Typography from "@mui/material/Typography"
 import { useEngine } from "../../engine"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
+import { MONO_FONT } from "../../theme"
 
 // Cherry-pick and revert act on a single commit with no extra options, so
 // unlike Checkout/Reset/Rebase they call the engine directly instead of
@@ -46,7 +47,7 @@ export function CherryPickDialog({
     >
       <Typography variant="body2">
         Apply commit{" "}
-        <Box component="span" sx={{ fontFamily: "Fira Code, ui-monospace, monospace" }}>
+        <Box component="span" sx={{ fontFamily: MONO_FONT }}>
           {commit.slice(0, 7)}
         </Box>
         {subject ? ` (${subject})` : ""} onto the current branch.
