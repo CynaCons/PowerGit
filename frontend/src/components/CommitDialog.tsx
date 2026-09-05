@@ -4,24 +4,19 @@ import Dialog from "@mui/material/Dialog"
 import DialogContent from "@mui/material/DialogContent"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { shortcutLabel, useHotkeyLayer } from "../hotkeys"
-import {
-  describeThrown,
-  isAbort,
-  useEngine,
-  type DiffDto,
-  type DiffOptions,
-  type RepoStatus,
-  type StatusFile,
-} from "../engine"
+import { describeThrown, isAbort, useEngine, type DiffDto, type DiffOptions, type RepoStatus } from "../engine"
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { IgnoreDialog } from "./IgnoreDialog"
 import { FileListBox, ListHeader } from "./CommitFileLists"
-import { CommitFileContextMenu, type CommitFileMenuTarget } from "./CommitFileContextMenu"
+import { CommitFileContextMenu } from "./CommitFileContextMenu"
+import { useCommitFiles } from "../hooks/useCommitFiles"
 import { copyToClipboard } from "./clipboard"
 import { ConfirmDialog } from "./dialogs/ConfirmDialog"
+import { CommitDiffContextMenu } from "./CommitDiffContextMenu"
+import { useDiffLineSelection } from "../hooks/useDiffLineSelection"
 
 type Props = {
   open: boolean
@@ -39,27 +34,26 @@ type Props = {
 // double-click stages/unstages. Right-click opens the file context menu.
 export function CommitDialog({ open, status, amend, initialMessage, onClose, onStatus, onCommit }: Props) {
   const engine = useEngine()
-  const [selected, setSelected] = useState<{ path: string; staged: boolean } | null>(null)
-  const [selUnstaged, setSelUnstaged] = useState<Set<string>>(new Set())
-  const [selStaged, setSelStaged] = useState<Set<string>>(new Set())
   const [diff, setDiff] = useState<DiffDto | null>(null)
   const [diffOpts, setDiffOpts] = useState<DiffOptions>({ context: 3, ws: false, full: false })
   const [message, setMessage] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [menu, setMenu] = useState<CommitFileMenuTarget | null>(null)
-  const [confirm, setConfirm] = useState<{ kind: "reset" | "delete"; staged: boolean; paths: string[] } | null>(null)
   const [ignoreFor, setIgnoreFor] = useState<string | null>(null)
-  const anchorRef = useRef<{ unstaged: number; staged: number }>({ unstaged: -1, staged: -1 })
+  const files = useCommitFiles({ engine, status, onStatus, onError: setError })
+  const { selected, selUnstaged, selStaged, menu, setMenu, confirm, setConfirm } = files
+  const { clickRow, toggle, stageSelection, stageAll, askConfirm, runConfirmed, openMenu } = files
+  const [confirmLines, setConfirmLines] = useState<string | null>(null)
+  const [diffTick, setDiffTick] = useState(0)
 
   useEffect(() => {
     if (!open) return
-    setSelected(null)
-    setSelUnstaged(new Set())
-    setSelStaged(new Set())
+    files.clear()
     setDiff(null)
     setMessage(amend ? (initialMessage ?? "") : "")
     setError(null)
     setMenu(null)
+    // `files` is a fresh object every render; only `open` should retrigger this reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, amend, initialMessage])
 
   useEffect(() => {
@@ -87,95 +81,15 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
         })
       })
     return () => ctrl.abort()
-  }, [engine, selected, diffOpts])
+  }, [engine, selected, diffOpts, diffTick])
 
-  function clickRow(list: StatusFile[], staged: boolean, index: number, e: React.MouseEvent) {
-    const setter = staged ? setSelStaged : setSelUnstaged
-    const current = staged ? selStaged : selUnstaged
-    if (e.shiftKey && anchorRef.current[staged ? "staged" : "unstaged"] >= 0) {
-      const a = anchorRef.current[staged ? "staged" : "unstaged"]
-      const [lo, hi] = [Math.min(a, index), Math.max(a, index)]
-      const next = new Set(current)
-      for (let i = lo; i <= hi; i++) next.add(list[i].path)
-      setter(next)
-    } else if (e.ctrlKey || e.metaKey) {
-      const next = new Set(current)
-      if (next.has(list[index].path)) next.delete(list[index].path)
-      else next.add(list[index].path)
-      setter(next)
-      anchorRef.current[staged ? "staged" : "unstaged"] = index
-    } else {
-      setter(new Set([list[index].path]))
-      anchorRef.current[staged ? "staged" : "unstaged"] = index
-    }
-    setSelected({ path: list[index].path, staged })
-  }
-
-  async function toggle(file: StatusFile) {
-    try {
-      onStatus(await engine.stage([file.path], file.staged))
-      setSelected((cur) => (cur?.path === file.path ? null : cur))
-    } catch (e) {
-      setError(`stage failed: ${describeThrown(e)}`)
-    }
-  }
-
-  async function stageSelection(staged: boolean) {
-    const paths = [...(staged ? selStaged : selUnstaged)]
-    if (paths.length === 0) return
-    try {
-      onStatus(await engine.stage(paths, staged))
-      setSelStaged(new Set())
-      setSelUnstaged(new Set())
-    } catch (e) {
-      setError(`stage failed: ${describeThrown(e)}`)
-    }
-  }
-
-  async function stageAll(unstage: boolean) {
-    const files = unstage ? status?.staged : status?.unstaged
-    const paths = (files ?? []).map((f) => f.path)
-    if (paths.length === 0) return
-    try {
-      onStatus(await engine.stage(paths, unstage))
-      setSelStaged(new Set())
-      setSelUnstaged(new Set())
-    } catch (e) {
-      setError(`stage failed: ${describeThrown(e)}`)
-    }
-  }
-
-  function askConfirm(kind: "reset" | "delete", staged: boolean) {
-    const paths = [...(staged ? selStaged : selUnstaged)]
-    if (paths.length > 0) setConfirm({ kind, staged, paths })
-  }
-
-  async function runConfirmed() {
-    if (!confirm) return
-    const { kind, paths } = confirm
-    setConfirm(null)
-    try {
-      onStatus(kind === "delete" ? await engine.deleteFiles(paths) : await engine.resetFiles(paths))
-      setSelStaged(new Set())
-      setSelUnstaged(new Set())
-      setSelected(null)
-    } catch (e) {
-      setError(`${kind} failed: ${describeThrown(e)}`)
-    }
-  }
-
-  // Right-click targets the row under the pointer: an unselected row becomes
-  // the selection (Git Extensions behaviour), a selected one keeps the group.
-  function openMenu(f: StatusFile, staged: boolean, x: number, y: number) {
-    const current = staged ? selStaged : selUnstaged
-    let count = current.size
-    if (!current.has(f.path)) {
-      ;(staged ? setSelStaged : setSelUnstaged)(new Set([f.path]))
-      setSelected({ path: f.path, staged })
-      count = 1
-    }
-    setMenu({ x, y, staged, path: f.path, count: Math.max(1, count) })
-  }
+  const lines = useDiffLineSelection({
+    engine,
+    diff,
+    onStatus,
+    onError: setError,
+    onApplied: () => setDiffTick((t) => t + 1),
+  })
 
   async function ignorePattern(pattern: string) {
     onStatus(await engine.addToIgnore(pattern))
@@ -314,7 +228,12 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
               }}
             >
               {diff ? (
-                <DiffView diff={diff} />
+                <DiffView
+                  diff={diff}
+                  selection={lines.lineSel}
+                  onLineClick={lines.clickLine}
+                  onLineContextMenu={lines.openMenu}
+                />
               ) : (
                 <Typography color="text.secondary">Select a file to see its diff.</Typography>
               )}
@@ -371,6 +290,28 @@ export function CommitDialog({ open, status, amend, initialMessage, onClose, onS
             if (menu) setIgnoreFor(menu.path)
           },
         }}
+      />
+      <CommitDiffContextMenu
+        target={lines.menu}
+        staged={selected?.staged ?? false}
+        selectedChanges={lines.selectedChanges}
+        blocked={lines.blocked}
+        onClose={lines.closeMenu}
+        onStage={() => void lines.apply(selected?.staged ? "unstage" : "stage")}
+        onReset={() => setConfirmLines(lines.patchFor("reset"))}
+      />
+      <ConfirmDialog
+        open={confirmLines !== null}
+        testid="reset-lines-confirm"
+        title="Reset selected lines"
+        text={`Discard ${lines.selectedChanges === 1 ? "the selected change" : `${lines.selectedChanges} selected changes`} in ${selected?.path ?? "this file"}? The working tree is rewritten; this cannot be undone.`}
+        confirmLabel="Reset lines"
+        destructive
+        onConfirm={() => {
+          setConfirmLines(null)
+          void lines.apply("reset")
+        }}
+        onCancel={() => setConfirmLines(null)}
       />
       <ConfirmDialog
         open={confirm !== null}

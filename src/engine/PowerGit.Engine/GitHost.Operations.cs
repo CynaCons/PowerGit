@@ -340,6 +340,49 @@ public sealed partial class GitHost
         }
     }
 
+    /// <summary>
+    /// `git apply` of a patch the UI synthesized from selected diff lines
+    /// (frontend/src/patch/partial.ts), Git Extensions' "Stage / Reset
+    /// selected lines". The patch goes through a temp file (the runner has no
+    /// stdin). Whitespace warnings are silenced; a non-applying hunk is an
+    /// error with git's own message, nothing is applied partially.
+    /// </summary>
+    public void ApplyPatch(string patch, bool cached, bool reverse)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(patch))
+        {
+            throw new InvalidOperationException("patch is empty");
+        }
+
+        string file = Path.Combine(Path.GetTempPath(), $"powergit-{Guid.NewGuid():N}.patch");
+        File.WriteAllText(file, patch.Replace("\r\n", "\n"), new System.Text.UTF8Encoding(false));
+        try
+        {
+            List<string> args = ["apply", "--whitespace=nowarn", "--recount"];
+            if (cached)
+            {
+                args.Add("--cached");
+            }
+
+            if (reverse)
+            {
+                args.Add("--reverse");
+            }
+
+            args.AddRange(["--", file]);
+            CommandResult result = Run(root, [.. args]);
+            if (result.ExitCode != 0)
+            {
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? "git apply failed" : result.StdErr.Trim());
+            }
+        }
+        finally
+        {
+            try { File.Delete(file); } catch { /* temp file */ }
+        }
+    }
+
     public void DeleteFiles(IReadOnlyList<string> paths)
     {
         string root = RequireRoot();

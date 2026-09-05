@@ -104,19 +104,34 @@ export function DiffView({
   diff,
   onOpenDifftool,
   onRetry,
+  selection,
+  onLineClick,
+  onLineContextMenu,
 }: {
   diff: DiffDto
   onOpenDifftool?: () => void
   onRetry?: () => void
+  /** Line selection (v0.13.14, commit dialog): indices into diff.text.split("
+"). */
+  selection?: Set<number>
+  onLineClick?: (index: number, e: React.MouseEvent) => void
+  onLineContextMenu?: (index: number, e: React.MouseEvent) => void
 }) {
   const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
+  const selectable = onLineClick !== undefined
   // Plain elements with classes (app.css .diff-row*), not MUI Box: a row is
   // rendered hundreds of times per diff and per-element emotion styling was
   // most of the render cost (v0.13.14, diff-latency.spec).
   const renderLine = (i: number) => {
     const line = lines[i]
+    const selected = selection?.has(i) ?? false
     return (
-      <div className="diff-row">
+      <div
+        className={`diff-row${selectable ? " diff-row-selectable" : ""}${selected ? " diff-row-selected" : ""}`}
+        data-selected={selected ? "true" : undefined}
+        onClick={selectable ? (e) => onLineClick(i, e) : undefined}
+        onContextMenu={onLineContextMenu ? (e) => onLineContextMenu(i, e) : undefined}
+      >
         <div data-testid="diff-gutter" aria-hidden="true" className="diff-row-gutter">
           <span className="diff-row-num diff-row-num-old">{line.oldNum ?? ""}</span>
           <span className="diff-row-num diff-row-num-new">{line.newNum ?? ""}</span>

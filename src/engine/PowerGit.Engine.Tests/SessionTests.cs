@@ -118,6 +118,37 @@ public sealed class SessionTests : IClassFixture<WebApplicationFactory<Program>>
         await client.DeleteAsync($"/repos/{sid}");
     }
 
+    [Fact]
+    public async Task Patch_applies_selected_lines_to_index_and_reverse_to_worktree()
+    {
+        // v0.13.14 "Stage / Reset selected lines": the UI synthesizes a partial
+        // unified diff; the engine applies it with git apply.
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = TempRepo.Create("main");
+        string file = Path.Combine(repo.Dir, "a.txt");
+        File.WriteAllText(file, "a\nb\n");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        // Stage only the added line "b" (the diff of a.txt is "+b").
+        string stage = "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n a\n+b\n";
+        HttpResponseMessage res = await client.PostAsJsonAsync($"/repos/{sid}/patch", new { patch = stage, cached = true, reverse = false });
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        RepoStatusDto? status = await res.Content.ReadFromJsonAsync<RepoStatusDto>();
+        Assert.NotNull(status);
+        Assert.Contains(status.Staged, f => f.Path == "a.txt");
+
+        // Reset the same line in the working tree (reverse, not cached).
+        res = await client.PostAsJsonAsync($"/repos/{sid}/patch", new { patch = stage, cached = false, reverse = true });
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal("a", File.ReadAllText(file).Trim());
+
+        // A hunk that does not apply is an error, not a partial write.
+        string bogus = "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n zzz\n+b\n";
+        res = await client.PostAsJsonAsync($"/repos/{sid}/patch", new { patch = bogus, cached = false, reverse = false });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        await client.DeleteAsync($"/repos/{sid}");
+    }
+
     private sealed class TempRepo : IDisposable
     {
         public string Dir { get; }

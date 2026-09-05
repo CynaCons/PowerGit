@@ -62,6 +62,9 @@ test("click → diff on screen latency", async ({ page }) => {
         )
           toDiff = now
         if (toClass >= 0 && toFiles >= 0 && toDiff >= 0) break
+        // Two neighbouring commits can list the same files (e.g. PLAN.md only):
+        // the list text then never changes, so the files stage is the diff stage.
+        if (toDiff >= 0 && toFiles < 0) toFiles = toDiff
       }
       return { row, toClass: Math.round(toClass), toFiles: Math.round(toFiles), toDiff: Math.round(toDiff) }
     }, row)

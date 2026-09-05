@@ -164,6 +164,21 @@ html {
 .diff-row-text {
   padding-left: 8px;
 }
+/* Commit dialog line selection (v0.13.14): stage / reset selected lines. */
+.diff-row-selectable {
+  cursor: default;
+  user-select: none;
+}
+.diff-row-selectable:hover {
+  background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
+}
+.diff-row-selected,
+.diff-row-selected:hover {
+  background: var(--pg-grid-sel, #dbeafe);
+}
+.diff-row-selected .diff-row-gutter {
+  background: var(--pg-grid-sel, #dbeafe);
+}
 
 .grid-tail {
   flex-shrink: 0;

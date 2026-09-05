@@ -356,6 +356,17 @@ export class EngineClient {
 
   // ---- mutations --------------------------------------------------------
 
+  /** Apply a synthesized (partial) patch: stage (cached), unstage (cached + reverse) or reset lines in the working tree (reverse). */
+  async applyPatch(patch: string, options: { cached?: boolean; reverse?: boolean }): Promise<RepoStatus> {
+    return json<RepoStatus>(
+      await this.post(`${this.repoPath()}/patch`, {
+        patch,
+        cached: options.cached ?? false,
+        reverse: options.reverse ?? false,
+      }),
+    )
+  }
+
   /** Discard index + working-tree changes of `paths` (GE "Reset file(s) to HEAD"); untracked ones are deleted. */
   async resetFiles(paths: string[]): Promise<RepoStatus> {
     return json<RepoStatus>(await this.post(`${this.repoPath()}/files/reset`, { paths }))

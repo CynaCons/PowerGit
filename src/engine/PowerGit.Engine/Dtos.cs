@@ -117,6 +117,9 @@ public sealed record FilesDeleteRequest(string[] Paths);
 /// <summary>v0.13.14: discard working-tree and index changes of the given paths (Git Extensions "Reset file(s) to HEAD").</summary>
 public sealed record FilesResetRequest(string[] Paths);
 
+/// <summary>v0.13.14: apply a (partial) unified diff. Cached targets the index (stage / unstage), Reverse undoes it (unstage with Cached, reset selected lines in the working tree without).</summary>
+public sealed record ApplyPatchRequest(string Patch, bool Cached = false, bool Reverse = false);
+
 /// <summary>v0.13.14: open the external difftool on a working-tree file (index vs HEAD when <paramref name="Staged"/>).</summary>
 public sealed record WorkTreeDifftoolRequest(string Path, bool Staged = false);
 

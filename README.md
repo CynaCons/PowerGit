@@ -50,12 +50,11 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.13.13 (Ubuntu 26.04
-AppImage fixed and gated on 22.04/24.04/26.04, bounded git execution with
-capped and virtualized blobs/diffs, supervised engine with a recovery panel,
-an explicit session state machine with repository-scoped clients, pull/push
-previews with cancellation, System/Light/Dark themes and Ctrl+0/+/- zoom).
-Parked: worktrees, hotkey remapping UI, fetch/pull/push dialogs.
+Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.13.14 (selected commit
+stays visible in the graph, immediate selection and faster diffs, commit
+dialog with a Git Extensions-style file menu and stage/reset of selected
+lines, frameless window with integrated controls, new mark). Parked:
+worktrees, hotkey remapping UI, fetch/pull/push dialogs.
 
 ## Development
 
