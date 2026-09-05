@@ -5,22 +5,24 @@ import { engineHeaders, repoBase } from "../engine"
 // the UI shows an intentional notice instead of a million-line tree; diffs
 // and blobs are virtualized so only the visible window is in the DOM.
 
-async function firstRevisionWithChangedFiles(base: string): Promise<{ id: string; path: string }> {
+async function firstRevisionWithChangedFiles(base: string, skip = 0): Promise<{ id: string; path: string }> {
   const revisions = (await (await fetch(`${base}/revisions?max=25`, { headers: engineHeaders() })).json()) as Array<{
     id: string
   }>
+  let seen = 0
   for (const revision of revisions) {
     const files = (await (
       await fetch(`${base}/commits/${revision.id}/files`, { headers: engineHeaders() })
     ).json()) as Array<{ path: string }>
     if (files.length === 0) continue
+    if (seen++ < skip) continue
     return { id: revision.id, path: files[0].path }
   }
   throw new Error("the first 25 revisions contain no commit with changed files")
 }
 
-async function selectRevisionWithChangedFiles(page: Page, base: string) {
-  const revision = await firstRevisionWithChangedFiles(base)
+async function selectRevisionWithChangedFiles(page: Page, base: string, skip = 0) {
+  const revision = await firstRevisionWithChangedFiles(base, skip)
   const row = page.locator(`[data-testid="grid-row"]:has([data-testid="sha-cell"][title="${revision.id}"])`)
   await expect(row).toBeVisible()
   await row.click()
@@ -85,20 +87,31 @@ test("a truncated blob shows the notice with size, reason and actions", async ({
 test("the diff view is virtualized and keeps its gutter", async ({ page }) => {
   const base = await repoBase()
   const body = Array.from({ length: 20_000 }, (_, i) => `+added ${i}`).join("\n")
-  await page.route(`${base}/commits/*/diff?*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        path: "x.txt",
-        text: `diff --git a/x.txt b/x.txt\n@@ -0,0 +1,20000 @@\n${body}`,
-        binary: false,
-        sizeBytes: body.length,
-        truncated: false,
-        truncatedReason: null,
+  // v0.13.14: the first file's diff arrives with the file list through
+  // /changes (and is cached per commit), so the synthetic DTO is served on
+  // both routes and the second phase selects a different commit.
+  const routeDiff = async (dto: object) => {
+    await page.unroute(`${base}/commits/*/diff?*`)
+    await page.unroute(`${base}/commits/*/changes?*`)
+    await page.route(`${base}/commits/*/diff?*`, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dto) }),
+    )
+    await page.route(`${base}/commits/*/changes?*`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ files: [{ path: "x.txt", status: "M", binary: false }], firstDiff: dto }),
       }),
-    }),
-  )
+    )
+  }
+  await routeDiff({
+    path: "x.txt",
+    text: `diff --git a/x.txt b/x.txt\n@@ -0,0 +1,20000 @@\n${body}`,
+    binary: false,
+    sizeBytes: body.length,
+    truncated: false,
+    truncatedReason: null,
+  })
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
   // A merge commit may legitimately have no single-parent diff. Pick the
@@ -112,24 +125,17 @@ test("the diff view is virtualized and keeps its gutter", async ({ page }) => {
   expect(rows).toBeLessThan(400)
   await expect(page.getByTestId("diff-gutter").first()).toBeVisible()
   await expect(page.getByTestId("content-notice")).toHaveCount(0)
-  // Engine-side truncation surfaces the notice on diffs too.
-  await page.unroute(`${base}/commits/*/diff?*`)
-  await page.route(`${base}/commits/*/diff?*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        path: "x.txt",
-        text: "diff --git a/x b/x\n+x",
-        binary: false,
-        sizeBytes: 3_000_000,
-        truncated: true,
-        truncatedReason: "size",
-      }),
-    }),
-  )
-  await page.getByRole("tab", { name: "Commit" }).click()
-  await page.getByRole("tab", { name: /^Diff/ }).click()
+  // Engine-side truncation surfaces the notice on diffs too (another
+  // commit: the first one's diff is cached and would not be re-requested).
+  await routeDiff({
+    path: "x.txt",
+    text: "diff --git a/x b/x\n+x",
+    binary: false,
+    sizeBytes: 3_000_000,
+    truncated: true,
+    truncatedReason: "size",
+  })
+  await selectRevisionWithChangedFiles(page, base, 1)
   await expect(page.getByTestId("content-notice")).toContainText(/2\.9 MB|3\.0 MB/)
 })
 

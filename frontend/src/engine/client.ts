@@ -18,6 +18,7 @@ import type {
   StashInfo,
   TreeEntry,
   VsCodeInfo,
+  CommitChanges,
 } from "./types"
 
 /**
@@ -276,6 +277,19 @@ export class EngineClient {
     const qs = path ? `?path=${encodeURIComponent(path)}` : ""
     return json<TreeEntry[]>(
       await this.get(`${this.repoPath()}/commits/${encodeURIComponent(id)}/tree${qs}`, { signal }),
+    )
+  }
+
+  /** Files of a commit plus the diff of its first file in one request, so
+   *  the Diff tab needs one round trip after a selection, not two. */
+  async changes(id: string, options?: Partial<DiffOptions>, signal?: AbortSignal): Promise<CommitChanges> {
+    return json<CommitChanges>(
+      await this.get(
+        `${this.repoPath()}/commits/${encodeURIComponent(id)}/changes?${diffParams(options).replace(/^&/, "")}`,
+        {
+          signal,
+        },
+      ),
     )
   }
 

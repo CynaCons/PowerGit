@@ -213,6 +213,22 @@ repo.MapGet("/commits/{id}/files", (string id, GitHost git, HttpContext ctx) =>
     }
 });
 
+repo.MapGet("/commits/{id}/changes", (string id, GitHost git, int? context, bool? ws, bool? full, HttpContext ctx) =>
+{
+    try
+    {
+        return Results.Ok(git.GetChanges(id, context ?? 3, ws ?? false, full ?? false, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapGet("/commits/{id}/tree", (string id, string? path, GitHost git, HttpContext ctx) =>
 {
     try

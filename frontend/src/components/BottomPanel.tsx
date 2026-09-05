@@ -29,7 +29,7 @@ type Props = {
   onTab?: (tab: number) => void
 }
 
-const DEFAULT_DIFF_OPTIONS: DiffOptions = { context: 3, ws: false, full: false }
+import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
 
 const FILES_WIDTH_STORAGE_KEY = "pg.bottomFilesWidth"
 const DEFAULT_FILES_WIDTH = 340
@@ -71,6 +71,17 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const [blob, setBlob] = useState<Loadable<DiffDto>>({ kind: "idle" })
   const [diffToolError, setDiffToolError] = useState<string | null>(null)
   const [reloadTick, setReloadTick] = useState(0)
+  // Which commit the current `files`/`file` belong to, and which
+  // (commit, path, options) the current diff was loaded for. Both keep the
+  // diff effect from firing for a stale file when the commit changes, and
+  // from re-requesting a diff that arrived with the file list.
+  const filesFor = useRef<string | null>(null)
+  const diffFor = useRef<string | null>(null)
+  const lastCommitChange = useRef(0)
+  // Read at request time, not a dependency: changing the diff options must
+  // reload the diff (effect below), not the commit details and file list.
+  const diffOptsRef = useRef(diffOpts)
+  diffOptsRef.current = diffOpts
   // Shared by the Files (Diff) tab and File Tree tab so both file columns
   // resize together and remember one width across sessions.
   const [filesWidth, setFilesWidth] = useState<number>(() => readStoredFilesWidth())
@@ -103,11 +114,19 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
     setTreeFile(null)
     setBlob({ kind: "idle" })
     setDiffToolError(null)
-    // Debounced: arrow-keying or click-scrubbing through rows must not fire
-    // two engine requests per intermediate row.
+    // Leading-edge debounce: a single click fires at once; only a rapid run
+    // of selection changes (arrow-keying, click-scrubbing) waits 150 ms so
+    // intermediate rows do not each cost two engine requests.
+    const now = performance.now()
+    const delay = now - lastCommitChange.current < 250 ? 150 : 0
+    lastCommitChange.current = now
     const timer = setTimeout(() => {
-      engine
-        .commit(commitId, ctrl.signal)
+      // Shared with the click-time prefetch (engine/commitCache): usually the
+      // requests are already in flight when this runs. Stale answers are
+      // ignored via `ctrl`, not aborted, so the cache entry stays usable.
+      if (reloadTick > 0) forgetCommit(engine, commitId, diffOptsRef.current)
+      const data = commitData(engine, commitId, diffOptsRef.current)
+      data.commit
         .then((d) => {
           if (!ctrl.signal.aborted) setDetail({ kind: "ready", value: d })
         })
@@ -115,17 +134,23 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
           if (!ctrl.signal.aborted && !isAbort(e))
             setDetail({ kind: "error", message: `commit failed: ${describeThrown(e)}` })
         })
-      engine
-        .files(commitId, ctrl.signal)
-        .then((list) => {
+      // One round trip for the file list and the first file's diff.
+      data.changes
+        .then((changes) => {
           if (ctrl.signal.aborted) return
-          setFiles(list)
-          if (list[0]) setFile(list[0].path)
+          filesFor.current = commitId
+          setFiles(changes.files)
+          const first = changes.files[0]?.path ?? null
+          setFile(first)
+          if (first && changes.firstDiff && changes.firstDiff.path === first) {
+            diffFor.current = `${commitId}|${first}|${JSON.stringify(diffOptsRef.current)}`
+            setDiff({ kind: "ready", value: changes.firstDiff })
+          }
         })
         .catch(() => {
           if (!ctrl.signal.aborted) setFiles([])
         })
-    }, 150)
+    }, delay)
     return () => {
       clearTimeout(timer)
       ctrl.abort()
@@ -137,12 +162,20 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
       if (tab !== 1) setDiff({ kind: "idle" })
       return
     }
+    // The file list still belongs to the previous commit: the changes()
+    // request above will deliver the new list and first diff; asking for
+    // the old path against the new commit is a wasted round trip.
+    if (filesFor.current !== commitId) return
+    const key = `${commitId}|${file}|${JSON.stringify(diffOpts)}`
+    if (diffFor.current === key) return
     const ctrl = new AbortController()
     setDiff((d) => (d.kind === "ready" && d.value.path === file ? d : { kind: "loading" }))
     engine
       .diff(commitId, file, diffOpts, ctrl.signal)
       .then((d) => {
-        if (!ctrl.signal.aborted) setDiff({ kind: "ready", value: d })
+        if (ctrl.signal.aborted) return
+        diffFor.current = key
+        setDiff({ kind: "ready", value: d })
       })
       .catch((e: unknown) => {
         if (!ctrl.signal.aborted && !isAbort(e))

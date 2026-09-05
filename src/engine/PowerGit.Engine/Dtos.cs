@@ -45,6 +45,13 @@ public sealed record DiffDto(
     bool Truncated = false,
     string? TruncatedReason = null);
 
+/// <summary>
+/// v0.13.14: the changed files of a commit and the diff of the first one in a
+/// single response, so the Diff tab needs one round trip per selection.
+/// <paramref name="FirstDiff"/> is null when the commit changed nothing.
+/// </summary>
+public sealed record CommitChangesDto(IReadOnlyList<FileChangeDto> Files, DiffDto? FirstDiff);
+
 public sealed record StatusFileDto(string Path, string Status, bool Staged);
 
 public sealed record RepoStatusDto(

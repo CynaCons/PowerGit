@@ -179,6 +179,67 @@ public sealed partial class GitHost
         return BoundDiffText(path, show.StdOut, show.StdOutTruncated, "(no textual diff)");
     }
 
+    /// <summary>
+    /// File list plus the first file's diff (v0.13.14, owner: "can we make the
+    /// diff loading faster?"). The two git calls are independent once the
+    /// whole-commit patch is used for the first file: <c>diff-tree</c> for the
+    /// list and <c>show</c> for the patch run concurrently, and the first
+    /// file's section is cut out of the patch. If the patch was capped, is
+    /// binary, or its first section is not the first listed file (rename
+    /// ordering, pathological names), fall back to a per-file GetDiff so the
+    /// answer is always the same DTO a /diff request would give.
+    /// </summary>
+    public CommitChangesDto GetChanges(string id, int context = 3, bool ignoreWhitespace = false, bool fullFile = false, CancellationToken ct = default)
+    {
+        string root = RequireRoot();
+        int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
+        List<string> patchArgs = ["-c", "core.quotepath=false", "show", "--format=", "--find-renames", $"-U{u}"];
+        if (ignoreWhitespace)
+        {
+            patchArgs.Add("-w");
+        }
+
+        patchArgs.Add(id);
+        Task<IReadOnlyList<FileChangeDto>> filesTask = Task.Run(() => ListFiles(id, ct), ct);
+        Task<GitProcess.Result> patchTask = Task.Run(() => RunCapped(root, 30_000, ct, MaxDiffChars, [.. patchArgs]), ct);
+        Task.WaitAll([filesTask, patchTask], ct);
+        IReadOnlyList<FileChangeDto> files = filesTask.Result;
+        if (files.Count == 0)
+        {
+            return new CommitChangesDto(files, null);
+        }
+
+        string first = files[0].Path;
+        GitProcess.Result patch = patchTask.Result;
+        string? section = patch.ExitCode == 0 && !patch.StdOutTruncated ? FirstPatchSection(patch.StdOut, first) : null;
+        DiffDto firstDiff = section is not null
+            ? BoundDiffText(first, section, false, "(no textual diff)")
+            : GetDiff(id, first, context, ignoreWhitespace, fullFile, ct);
+        return new CommitChangesDto(files, firstDiff);
+    }
+
+    /// <summary>
+    /// The first <c>diff --git</c> section of a whole-commit patch when it is
+    /// the diff of <paramref name="path"/>; null otherwise (caller falls back).
+    /// </summary>
+    internal static string? FirstPatchSection(string patch, string path)
+    {
+        const string marker = "diff --git ";
+        if (!patch.StartsWith(marker, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        int next = patch.IndexOf("\n" + marker, StringComparison.Ordinal);
+        string section = next < 0 ? patch : patch[..(next + 1)];
+        int eol = section.IndexOf('\n');
+        string header = eol < 0 ? section : section[..eol];
+        // "diff --git a/<old> b/<new>": the listed path is the new name.
+        return header.EndsWith(" b/" + path, StringComparison.Ordinal) || header.EndsWith(" \"b/" + path + "\"", StringComparison.Ordinal)
+            ? section
+            : null;
+    }
+
     /// <summary>Largest diff text handed to the UI, in UTF-16 chars (~1 MB).</summary>
     public const int MaxDiffChars = 1_000_000;
 

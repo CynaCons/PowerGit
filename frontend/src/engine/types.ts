@@ -53,6 +53,9 @@ export type IgnorePreview = { pattern: string; files: string[]; count: number }
 
 export type DiffOptions = { context: number; ws: boolean; full: boolean }
 
+/** One round trip per selection: the changed files plus the first file's diff. */
+export type CommitChanges = { files: FileChange[]; firstDiff: DiffDto | null }
+
 /** Diff or blob text. v0.13.11: `sizeBytes` is the object's real size and
  *  `truncated`/`truncatedReason` ("size" | "lines") say explicitly when the
  *  engine cut the text, instead of a sentinel appended to it. */

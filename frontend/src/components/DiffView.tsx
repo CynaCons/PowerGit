@@ -91,11 +91,11 @@ function parseGutterLines(text: string): GutterLine[] {
   })
 }
 
-const GUTTER_COL_WIDTH = 40
-
 /** Diffs up to this many lines render every row (exact DOM text, whole-diff
- *  selection); longer ones are virtualized (v0.13.11). */
-export const VIRTUALIZE_MIN_LINES = 2_000
+ *  selection); longer ones are virtualized (v0.13.11). v0.13.14 lowered it
+ *  from 2000: an 800-line first diff (PLAN.md) cost a 400 ms render in dev
+ *  and its teardown slowed the next click, measured by diff-latency.spec. */
+export const VIRTUALIZE_MIN_LINES = 200
 
 /** Unified diff with a sticky two-column line-number gutter. v0.13.11:
  *  rows are virtualized (only the visible window is in the DOM), and a
@@ -110,39 +110,25 @@ export function DiffView({
   onRetry?: () => void
 }) {
   const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
+  // Plain elements with classes (app.css .diff-row*), not MUI Box: a row is
+  // rendered hundreds of times per diff and per-element emotion styling was
+  // most of the render cost (v0.13.14, diff-latency.spec).
   const renderLine = (i: number) => {
     const line = lines[i]
     return (
-      <Box sx={{ display: "flex", width: "max-content", minWidth: "100%" }}>
-        <Box
-          data-testid="diff-gutter"
-          aria-hidden="true"
-          sx={{
-            flexShrink: 0,
-            position: "sticky",
-            left: 0,
-            display: "flex",
-            bgcolor: "background.paper",
-            color: COLORS.gutter,
-            userSelect: "none",
-            borderRight: "1px solid var(--pg-diff-gutter-border, #e0e0e0)",
-          }}
-        >
-          <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.5 }}>
-            {line.oldNum ?? ""}
-          </Box>
-          <Box component="span" sx={{ width: GUTTER_COL_WIDTH, textAlign: "right", pr: 0.75 }}>
-            {line.newNum ?? ""}
-          </Box>
-        </Box>
-        <Box component="span" sx={{ pl: 1 }}>
+      <div className="diff-row">
+        <div data-testid="diff-gutter" aria-hidden="true" className="diff-row-gutter">
+          <span className="diff-row-num diff-row-num-old">{line.oldNum ?? ""}</span>
+          <span className="diff-row-num diff-row-num-new">{line.newNum ?? ""}</span>
+        </div>
+        <span className="diff-row-text">
           {line.segments.map((s, j) => (
             <span key={j} style={{ color: s.color, fontWeight: s.bold ? 700 : 400 }}>
               {s.text || " "}
             </span>
           ))}
-        </Box>
-      </Box>
+        </span>
+      </div>
     )
   }
   return (

@@ -20,6 +20,7 @@ import { useHistory } from "./hooks/useHistory"
 import { useJobs } from "./hooks/useJobs"
 import { useRepoState } from "./hooks/useRepoState"
 import { useStable } from "./hooks/useStable"
+import { prefetchCommit } from "./engine/commitCache"
 import { useHotkeyLayer, type CommandId } from "./hotkeys"
 import { zoomIn, zoomOut, zoomReset } from "./theme"
 
@@ -56,6 +57,14 @@ export default function App({ base }: { base: EngineClient }) {
   // The highlight must land in the click's own frame; commit details, files
   // and diff follow in a deferred render and load asynchronously.
   const deferredCurrent = useDeferredValue(current)
+  // Ask the engine as soon as the selection has committed (before the
+  // deferred bottom-panel render), so details and the first diff are in
+  // flight while React renders the panel; the panel finds the promises in
+  // engine/commitCache. Not in the click handler itself: a response landing
+  // mid-render interrupts the deferred render and costs more than it saves.
+  useEffect(() => {
+    prefetchCommit(client, current?.rev.id ?? null)
+  }, [client, current])
   const chrome = useStable({
     refresh: () => refresh().catch(() => undefined),
     openStash: () => open({ kind: "stash" }),

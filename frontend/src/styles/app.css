@@ -133,6 +133,38 @@ html {
   opacity: 1;
 }
 
+/* DiffView rows (v0.13.14): plain elements, see DiffView.renderLine. */
+.diff-row {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+}
+.diff-row-gutter {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  display: flex;
+  background: var(--pg-surface, #ffffff);
+  color: var(--pg-diff-gutter, #8a8a8a);
+  user-select: none;
+  border-right: 1px solid var(--pg-diff-gutter-border, #e0e0e0);
+}
+.diff-row-num {
+  display: inline-block;
+  width: 40px;
+  text-align: right;
+  box-sizing: border-box;
+}
+.diff-row-num-old {
+  padding-right: 4px;
+}
+.diff-row-num-new {
+  padding-right: 6px;
+}
+.diff-row-text {
+  padding-left: 8px;
+}
+
 .grid-tail {
   flex-shrink: 0;
   padding: 3px 16px;

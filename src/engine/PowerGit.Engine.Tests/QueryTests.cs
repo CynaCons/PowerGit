@@ -41,6 +41,43 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void GetChanges_matches_ListFiles_plus_GetDiff()
+    {
+        // v0.13.14: one round trip for the Diff tab. The combined answer must
+        // be byte-identical to what /files and /diff would have returned.
+        GitHost host = Opened();
+        IReadOnlyList<RevisionDto> revs = host.ListRevisions(40);
+        int checked_ = 0;
+        foreach (RevisionDto rev in revs.Where(r => r.Parents.Length > 0).Take(8))
+        {
+            CommitChangesDto changes = host.GetChanges(rev.Id);
+            IReadOnlyList<FileChangeDto> files = host.ListFiles(rev.Id);
+            Assert.Equal(files, changes.Files);
+            if (files.Count == 0)
+            {
+                Assert.Null(changes.FirstDiff);
+                continue;
+            }
+
+            DiffDto expected = host.GetDiff(rev.Id, files[0].Path);
+            Assert.Equal(expected, changes.FirstDiff);
+            checked_++;
+        }
+
+        Assert.True(checked_ > 0, "no commit with changes in the first 40 revisions");
+    }
+
+    [Fact]
+    public void FirstPatchSection_cuts_the_first_file_only()
+    {
+        string patch = "diff --git a/a.txt b/a.txt\nindex 1..2 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/b.txt b/b.txt\n+z\n";
+        Assert.Equal("diff --git a/a.txt b/a.txt\nindex 1..2 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-x\n+y\n", GitHost.FirstPatchSection(patch, "a.txt"));
+        Assert.Null(GitHost.FirstPatchSection(patch, "b.txt"));
+        Assert.Null(GitHost.FirstPatchSection("Binary files differ\n", "a.txt"));
+        Assert.Equal("diff --git a/only b/only\n+1\n", GitHost.FirstPatchSection("diff --git a/only b/only\n+1\n", "only"));
+    }
+
+    [Fact]
     public void GetWorkTreeDiff_untracked_file_shows_full_added_diff()
     {
         // Regression: `git diff` (without --cached) only ever compares the
