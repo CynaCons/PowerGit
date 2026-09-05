@@ -17,7 +17,7 @@ function readStored(): BarLayout {
     const raw = window.localStorage.getItem(BAR_STORAGE_KEY)
     return LAYOUTS.includes(raw as BarLayout) ? (raw as BarLayout) : "rail"
   } catch {
-    return "top"
+    return "rail"
   }
 }
 

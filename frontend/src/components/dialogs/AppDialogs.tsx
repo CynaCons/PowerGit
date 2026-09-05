@@ -36,6 +36,7 @@ export function AppDialogs({ dialogs, actions, repo, recents, repoState, jobs }:
   return (
     <>
       <CommitDialog
+        repository={repo?.root}
         open={dialog.kind === "commit"}
         status={status}
         amend={dialog.kind === "commit" && dialog.amend}

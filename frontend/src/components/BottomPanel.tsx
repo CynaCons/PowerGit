@@ -349,6 +349,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
                     bgcolor: "rgba(21, 83, 201, 0.10)",
                     color: "primary.main",
                     backdropFilter: "blur(4px)",
+                    WebkitBackdropFilter: "blur(4px)",
                     border: 1,
                     borderColor: "divider",
                     "&:hover": { bgcolor: "rgba(21, 83, 201, 0.22)" },

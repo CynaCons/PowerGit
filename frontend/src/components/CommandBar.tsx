@@ -84,7 +84,7 @@ function CommandBarImpl({ toolbarRef, tier, booting, ...deps }: CommandBarProps)
     }
     if (item.id === "merge") {
       return (
-        <Tooltip key={item.id} title="Merge branches (coming soon)">
+        <Tooltip key={item.id} title={item.label}>
           <span>{button}</span>
         </Tooltip>
       )
@@ -151,7 +151,7 @@ function CommandBarImpl({ toolbarRef, tier, booting, ...deps }: CommandBarProps)
                       item.onClick()
                     }}
                   >
-                    {item.id === "merge" ? "Merge… (coming soon)" : `${item.label}…`}
+                    {item.id === "merge" ? item.label : `${item.label}…`}
                   </MenuItem>
                 ))}
                 <MenuItem

@@ -34,8 +34,9 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     try {
       const d = await engine.commit("HEAD")
       initialMsg = d.body ? `${d.subject}\n\n${d.body}` : d.subject
-    } catch {
-      initialMsg = undefined
+    } catch (e) {
+      setEngineError(`Cannot amend the last commit: ${describeThrown(e)}`)
+      return
     }
     open({ kind: "commit", amend: true, initialMsg })
   }
@@ -45,7 +46,11 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     if (!msg.trim() || (!status?.stagedCount && !amend)) return
     await engine.createCommit(msg.trim(), amend)
     close("commit")
-    await refresh({ revisions: true, refs: true, status: true })
+    // Submission is complete now. A slow refresh must not keep a reopened
+    // dialog pending or later erase a new draft for this repository.
+    void refresh({ revisions: true, refs: true, status: true }).catch((e: unknown) => {
+      setEngineError(`Commit succeeded, but refreshing the repository failed: ${describeThrown(e)}`)
+    })
   }
 
   async function createRef(name: string) {

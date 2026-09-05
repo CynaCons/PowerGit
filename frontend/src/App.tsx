@@ -173,7 +173,13 @@ export default function App({ base }: { base: EngineClient }) {
         data-testid="browse-shell"
         sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}
       >
-        {railBar && <TitleStrip repoName={repo?.name} />}
+        {railBar && (
+          <TitleStrip
+            repoName={repo?.name}
+            booting={view.booting || (live && !demo && !loaded && !offline)}
+            busyLabel={busy ? jobLabel : null}
+          />
+        )}
         {!railBar && (
           <CommandBar
             toolbarRef={layout.toolbarRef}

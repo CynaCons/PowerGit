@@ -102,11 +102,7 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...de
       ))}
       <Divider sx={{ my: 0.5 }} />
       {commands.map((item) => (
-        <RailItem
-          key={item.id}
-          item={item.id === "merge" ? { ...item, label: "Merge (coming soon)" } : item}
-          expanded={expanded}
-        />
+        <RailItem key={item.id} item={item} expanded={expanded} />
       ))}
       <Box sx={{ flex: 1 }} />
       <RailItem

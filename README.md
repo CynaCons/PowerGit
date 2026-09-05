@@ -50,11 +50,12 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Shipped: v0.13.16 (commands in a
+Tracked openly in [PLAN.md](PLAN.md). Release v0.13.17 adds visible commit
+errors and retry, message-only amend, retained in-session drafts, and a
+commit dialog that fits at 150% and 200% zoom. It includes commands in a
 collapsible left rail, flat instrument-panel chrome in light and dark, HD
 app icon, instant context menus, directory-tree mode for the diff's file
-list, platform monospace font). Parked: worktrees, hotkey remapping UI,
-fetch/pull/push dialogs.
+list, and platform monospace fonts. Parked: worktrees and hotkey remapping UI.
 
 ## Development
 

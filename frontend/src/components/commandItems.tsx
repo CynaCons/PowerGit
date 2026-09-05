@@ -221,7 +221,7 @@ export function useCommandItems(d: CommandDeps): CommandItem[] {
     },
     {
       id: "merge",
-      label: "Merge",
+      label: "Merge (coming soon)",
       icon: <CallMergeIcon fontSize="small" />,
       testid: "merge-button",
       disabled: true,

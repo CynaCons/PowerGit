@@ -4,14 +4,21 @@ import ButtonBase from "@mui/material/ButtonBase"
 import Menu from "@mui/material/Menu"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { useState, type ReactNode } from "react"
+import { useEffect, useId, useState, type ReactNode } from "react"
 import { badgeText } from "./commandItems"
 
 // One row of the command rail: icon (+ label when the rail is expanded),
-// an optional count pill, and a chevron / right-click that opens the item's
-// options menu. The count (Commit's files changed) has its own place rather
-// than a corner badge: above the icon when collapsed, trailing the label
-// when expanded, so it is never clipped and grows to "999+" at most.
+// an optional count pill, and an options chevron that opens the item's
+// menu. The count (Commit's files changed) has its own place rather than a
+// corner badge: above the icon when collapsed, trailing the label when
+// expanded, so it is never clipped and grows to "999+" at most.
+//
+// The chevron is a sibling button, not a child of the row's button (a
+// button inside a button is invalid HTML and unreachable by keyboard); the
+// row itself opens the menu on right-click, Shift+F10 or the ContextMenu
+// key. The menu lets pointer events through its modal root so a right-click
+// on another row re-targets instead of being swallowed (same pattern as
+// RevisionContextMenu), with a manual outside-click close.
 
 export type Item = {
   id: string
@@ -53,8 +60,29 @@ function Pill({ n, testid }: { n: number; testid: string }) {
 
 export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  const menuId = useId()
   const hint = item.shortcut ? `${item.label} (${item.shortcut})` : item.label
   const showPill = item.badge !== undefined && item.badge > 0
+  const stacked = !expanded && showPill
+  const open = anchor !== null
+
+  // Click-away by hand: the modal root passes pointer events through, so
+  // the backdrop no longer closes the menu (see the file comment).
+  useEffect(() => {
+    if (!open) return
+    const closeIfOutside = (e: Event) => {
+      const el = e.target as HTMLElement | null
+      if (el?.closest(`[data-menu-id="${menuId}"]`)) return
+      setAnchor(null)
+    }
+    document.addEventListener("mousedown", closeIfOutside, true)
+    document.addEventListener("contextmenu", closeIfOutside, true)
+    return () => {
+      document.removeEventListener("mousedown", closeIfOutside, true)
+      document.removeEventListener("contextmenu", closeIfOutside, true)
+    }
+  }, [open, menuId])
+
   const icon = item.primary ? (
     <Box
       sx={{
@@ -73,89 +101,104 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
   ) : (
     item.icon
   )
-  // Collapsed: the pill sits above the icon inside the rail's width.
-  const stacked = !expanded && showPill
+
+  const openMenuFrom = (el: HTMLElement) => {
+    if (item.menu && !item.disabled) setAnchor(el)
+  }
+
   return (
     <>
-      <Tooltip title={expanded ? "" : hint} placement="right" disableInteractive>
-        <span style={{ display: "block" }}>
+      <Box sx={{ display: "flex", alignItems: "stretch", gap: "2px" }}>
+        <Tooltip title={expanded ? "" : hint} placement="right" disableInteractive>
+          <span style={{ display: "block", flex: 1, minWidth: 0 }}>
+            <ButtonBase
+              data-testid={item.testid}
+              aria-label={item.label}
+              aria-haspopup={item.menu ? "menu" : undefined}
+              title={expanded ? hint : undefined}
+              disabled={item.disabled}
+              onClick={item.onClick}
+              onContextMenu={
+                item.menu
+                  ? (e) => {
+                      e.preventDefault()
+                      openMenuFrom(e.currentTarget)
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                item.menu
+                  ? (e) => {
+                      if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+                        e.preventDefault()
+                        openMenuFrom(e.currentTarget)
+                      }
+                    }
+                  : undefined
+              }
+              sx={{
+                width: "100%",
+                minHeight: 34,
+                height: stacked ? 52 : 34,
+                display: "flex",
+                flexDirection: stacked ? "column" : "row",
+                alignItems: "center",
+                justifyContent: stacked ? "center" : "flex-start",
+                gap: stacked ? 0.25 : 1.25,
+                px: "11px",
+                borderRadius: 1.5,
+                color: item.disabled ? "text.disabled" : "text.primary",
+                "& .MuiSvgIcon-root": { fontSize: 18 },
+                "&:hover": { bgcolor: "action.hover" },
+                "&.Mui-focusVisible": { boxShadow: "inset 0 0 0 1px var(--pg-focus-ring, #1553c9)" },
+              }}
+            >
+              {stacked && <Pill n={item.badge!} testid={`${item.testid}-count`} />}
+              {icon}
+              {expanded && (
+                <Typography
+                  variant="body2"
+                  sx={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", flex: 1, textAlign: "left" }}
+                >
+                  {item.label}
+                </Typography>
+              )}
+              {expanded && showPill && <Pill n={item.badge!} testid={`${item.testid}-count`} />}
+            </ButtonBase>
+          </span>
+        </Tooltip>
+        {expanded && item.menu && (
           <ButtonBase
-            data-testid={item.testid}
-            aria-label={item.label}
-            title={expanded ? hint : undefined}
+            aria-label={`${item.label} options`}
+            aria-haspopup="menu"
+            data-testid={`${item.testid}-menu`}
             disabled={item.disabled}
-            onClick={item.onClick}
-            onContextMenu={
-              item.menu
-                ? (e) => {
-                    e.preventDefault()
-                    setAnchor(e.currentTarget)
-                  }
-                : undefined
-            }
+            onClick={(e) => openMenuFrom(e.currentTarget)}
             sx={{
-              width: "100%",
-              minHeight: 34,
-              height: stacked ? 52 : 34,
-              display: "flex",
-              flexDirection: stacked ? "column" : "row",
-              alignItems: "center",
-              justifyContent: stacked ? "center" : "flex-start",
-              gap: stacked ? 0.25 : 1.25,
-              px: "11px",
+              width: 22,
               borderRadius: 1.5,
-              color: item.disabled ? "text.disabled" : "text.primary",
-              "& .MuiSvgIcon-root": { fontSize: 18 },
+              color: item.disabled ? "text.disabled" : "text.secondary",
               "&:hover": { bgcolor: "action.hover" },
               "&.Mui-focusVisible": { boxShadow: "inset 0 0 0 1px var(--pg-focus-ring, #1553c9)" },
             }}
           >
-            {stacked && <Pill n={item.badge!} testid={`${item.testid}-count`} />}
-            {icon}
-            {expanded && (
-              <Typography
-                variant="body2"
-                sx={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", flex: 1, textAlign: "left" }}
-              >
-                {item.label}
-              </Typography>
-            )}
-            {expanded && showPill && <Pill n={item.badge!} testid={`${item.testid}-count`} />}
-            {expanded && item.menu && (
-              <Box
-                component="span"
-                role="button"
-                aria-label={`${item.label} options`}
-                data-testid={`${item.testid}-menu`}
-                onClick={(e: React.MouseEvent<HTMLElement>) => {
-                  e.stopPropagation()
-                  setAnchor(e.currentTarget)
-                }}
-                sx={{
-                  display: "grid",
-                  placeItems: "center",
-                  width: 20,
-                  height: 20,
-                  borderRadius: 1,
-                  color: "text.secondary",
-                  "&:hover": { bgcolor: "action.selected" },
-                }}
-              >
-                <ChevronRightIcon sx={{ fontSize: 16 }} />
-              </Box>
-            )}
+            <ChevronRightIcon sx={{ fontSize: 16 }} />
           </ButtonBase>
-        </span>
-      </Tooltip>
+        )}
+      </Box>
       {item.menu && (
         <Menu
           transitionDuration={0}
-          open={anchor !== null}
+          open={open}
           anchorEl={anchor}
           onClose={() => setAnchor(null)}
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
           transformOrigin={{ vertical: "top", horizontal: "left" }}
           onClick={() => setAnchor(null)}
+          slotProps={{
+            root: { sx: { pointerEvents: "none" } },
+            paper: { sx: { pointerEvents: "auto" }, "data-menu-id": menuId } as never,
+          }}
         >
           {item.menu}
         </Menu>
