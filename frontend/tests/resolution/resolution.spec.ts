@@ -80,6 +80,7 @@ test("[narrow] toolbar overflow keeps chrome in the viewport", async ({ page }) 
   // collapse into a More menu and the left panel auto-hides so the grid
   // keeps Author/Date/SHA. 800×600 is the smallest size we still call a
   // desktop window.
+  await page.addInitScript(() => window.localStorage.setItem("pg.bar", "top"))
   await page.setViewportSize({ width: 800, height: 600 })
   await page.goto("/")
   await expect(page.getByTestId("browse-shell")).toBeVisible()

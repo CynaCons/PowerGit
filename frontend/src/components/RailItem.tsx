@@ -1,15 +1,17 @@
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
-import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
 import ButtonBase from "@mui/material/ButtonBase"
 import Menu from "@mui/material/Menu"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
 import { useState, type ReactNode } from "react"
+import { badgeText } from "./commandItems"
 
-// One row of the command rail (split out of CommandRail.tsx for the lint
-// size limit): icon (+ label when the rail is expanded), optional badge,
-// and a chevron / right-click that opens the item's options menu.
+// One row of the command rail: icon (+ label when the rail is expanded),
+// an optional count pill, and a chevron / right-click that opens the item's
+// options menu. The count (Commit's files changed) has its own place rather
+// than a corner badge: above the icon when collapsed, trailing the label
+// when expanded, so it is never clipped and grows to "999+" at most.
 
 export type Item = {
   id: string
@@ -24,9 +26,35 @@ export type Item = {
   menu?: ReactNode
 }
 
+function Pill({ n, testid }: { n: number; testid: string }) {
+  return (
+    <Box
+      component="span"
+      data-testid={testid}
+      sx={{
+        display: "inline-block",
+        minWidth: 18,
+        height: 16,
+        lineHeight: "16px",
+        px: 0.75,
+        borderRadius: 8,
+        fontSize: 10.5,
+        fontWeight: 600,
+        textAlign: "center",
+        bgcolor: "primary.main",
+        color: "primary.contrastText",
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {badgeText(n)}
+    </Box>
+  )
+}
+
 export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const hint = item.shortcut ? `${item.label} (${item.shortcut})` : item.label
+  const showPill = item.badge !== undefined && item.badge > 0
   const icon = item.primary ? (
     <Box
       sx={{
@@ -37,6 +65,7 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
         placeItems: "center",
         bgcolor: "primary.main",
         color: "primary.contrastText",
+        flexShrink: 0,
       }}
     >
       {item.icon}
@@ -44,6 +73,8 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
   ) : (
     item.icon
   )
+  // Collapsed: the pill sits above the icon inside the rail's width.
+  const stacked = !expanded && showPill
   return (
     <>
       <Tooltip title={expanded ? "" : hint} placement="right" disableInteractive>
@@ -64,11 +95,13 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
             }
             sx={{
               width: "100%",
-              height: 34,
+              minHeight: 34,
+              height: stacked ? 52 : 34,
               display: "flex",
+              flexDirection: stacked ? "column" : "row",
               alignItems: "center",
-              justifyContent: "flex-start",
-              gap: 1.25,
+              justifyContent: stacked ? "center" : "flex-start",
+              gap: stacked ? 0.25 : 1.25,
               px: "11px",
               borderRadius: 1.5,
               color: item.disabled ? "text.disabled" : "text.primary",
@@ -77,14 +110,8 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
               "&.Mui-focusVisible": { boxShadow: "inset 0 0 0 1px var(--pg-focus-ring, #1553c9)" },
             }}
           >
-            <Badge
-              badgeContent={item.badge ?? 0}
-              color="primary"
-              overlap="rectangular"
-              sx={{ "& .MuiBadge-badge": { fontSize: 10, minWidth: 16, height: 16, px: 0.5 } }}
-            >
-              {icon}
-            </Badge>
+            {stacked && <Pill n={item.badge!} testid={`${item.testid}-count`} />}
+            {icon}
             {expanded && (
               <Typography
                 variant="body2"
@@ -93,6 +120,7 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
                 {item.label}
               </Typography>
             )}
+            {expanded && showPill && <Pill n={item.badge!} testid={`${item.testid}-count`} />}
             {expanded && item.menu && (
               <Box
                 component="span"

@@ -12,6 +12,7 @@ import { DiffView } from "./DiffView"
 import { SplitHandle } from "./SplitHandle"
 import { BlobPane } from "./BlobPane"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
+import { CommitDetailView } from "./CommitDetailView"
 import {
   describeThrown,
   isAbort,
@@ -371,48 +372,6 @@ function CommitInfo({
   )
 }
 
-function CommitDetailView({ detail }: { detail: CommitDetail }) {
-  return (
-    <>
-      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-        {detail.subject}
-      </Typography>
-      {detail.body ? (
-        <Typography variant="body2" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
-          {detail.body}
-        </Typography>
-      ) : null}
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        Author: {detail.author} &lt;{detail.authorEmail}&gt;
-        <Box component="span" sx={{ ml: 2, color: "text.disabled" }}>
-          {formatWhen(detail.authorDate)}
-        </Box>
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Committer: {detail.committer} &lt;{detail.committerEmail}&gt;
-        <Box component="span" sx={{ ml: 2, color: "text.disabled" }}>
-          {formatWhen(detail.commitDate)}
-        </Box>
-      </Typography>
-      {detail.parents.length > 0 && (
-        <Typography
-          variant="caption"
-          sx={{ display: "block", mt: 1, fontFamily: "Fira Code, ui-monospace, monospace" }}
-        >
-          Parents: {detail.parents.map((p) => p.slice(0, 7)).join(" ")}
-        </Typography>
-      )}
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ mt: 1, display: "block", fontFamily: "Fira Code, ui-monospace, monospace" }}
-      >
-        {detail.id}
-      </Typography>
-    </>
-  )
-}
-
 function DiffPane({
   diff,
   busy,
@@ -457,11 +416,4 @@ function DiffPane({
       <DiffOptionsBar options={options} onChange={onOptions} />
     </Box>
   )
-}
-
-function formatWhen(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso.replace("T", " ").slice(0, 16)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

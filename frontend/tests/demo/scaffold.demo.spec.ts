@@ -13,7 +13,7 @@ test("owner design demo — scaffold", async ({ page }) => {
   await page.getByTestId("left-panel").hover()
   await page.waitForTimeout(wait)
 
-  await page.getByTestId("toolbar").hover()
+  await page.getByTestId("title-strip").hover()
   await page.waitForTimeout(wait)
 
   const body = page.getByTestId("grid-body")

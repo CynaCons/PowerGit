@@ -119,9 +119,8 @@ export function SettingsDialog({ open, onClose }: Props) {
             onChange={(e) => setBarLayout(e.target.value as BarLayout)}
             inputProps={{ "aria-label": "Command bar" }}
           >
-            <MenuItem value="top">In the title bar</MenuItem>
-            <MenuItem value="floating">Floating at the bottom</MenuItem>
             <MenuItem value="rail">In the left rail</MenuItem>
+            <MenuItem value="top">In the title bar</MenuItem>
           </Select>
         </FormControl>
         <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 1 }}>

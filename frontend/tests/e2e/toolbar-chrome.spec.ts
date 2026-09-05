@@ -6,6 +6,12 @@ import { expect, test, type Page } from "@playwright/test"
 //  - "right click again somewhere else, it shows the browser right click menu"
 //  - "I really want my Fetch All option"
 
+// These specs cover the title-bar placement of the commands (Settings →
+// Command bar → "In the title bar"); the default since v0.13.15 is the rail.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("pg.bar", "top"))
+})
+
 async function boot(page: Page) {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()

@@ -57,9 +57,7 @@ export default function App({ base }: { base: EngineClient }) {
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
-  const barLayout = useBarLayout()
-  const floatingBar = barLayout === "floating"
-  const railBar = barLayout === "rail"
+  const railBar = useBarLayout() === "rail"
   // The highlight must land in the click's own frame; commit details, files
   // and diff follow in a deferred render and load asynchronously.
   const deferredCurrent = useDeferredValue(current)
@@ -175,8 +173,8 @@ export default function App({ base }: { base: EngineClient }) {
         data-testid="browse-shell"
         sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}
       >
-        {(floatingBar || railBar) && <TitleStrip repoName={repo?.name} />}
-        {!floatingBar && !railBar && (
+        {railBar && <TitleStrip repoName={repo?.name} />}
+        {!railBar && (
           <CommandBar
             toolbarRef={layout.toolbarRef}
             tier={layout.toolbarTier}
@@ -240,24 +238,6 @@ export default function App({ base }: { base: EngineClient }) {
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
               <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-                {floatingBar && (
-                  <CommandBar
-                    floating
-                    toolbarRef={layout.toolbarRef}
-                    tier={layout.toolbarTier}
-                    live={live}
-                    dirty={dirty}
-                    stashCount={stashes.length}
-                    hasCurrent={current !== undefined}
-                    remoteNames={remoteNames}
-                    defaultRemote={defaultRemote}
-                    booting={view.booting || (live && !demo && !loaded && !offline)}
-                    jobs={jobs}
-                    actions={actions}
-                    refresh={chrome.refresh}
-                    openStash={chrome.openStash}
-                  />
-                )}
                 <HistoryPane
                   rows={rows}
                   selected={selected}

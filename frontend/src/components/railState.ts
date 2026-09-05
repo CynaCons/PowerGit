@@ -3,7 +3,8 @@ export const RAIL_STORAGE_KEY = "pg.rail"
 
 export function readExpanded(): boolean {
   try {
-    return window.localStorage.getItem(RAIL_STORAGE_KEY) === "expanded"
+    // Expanded on first run so the labels are discoverable; the toggle persists the choice.
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) !== "collapsed"
   } catch {
     return false
   }

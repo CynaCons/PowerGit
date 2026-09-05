@@ -35,7 +35,15 @@ primary actions. No uppercase labels, no letter-spaced eyebrows.
 
 ## Layout
 Three flat regions that meet at 1px hairlines; no bordered, rounded cards
-around panes:
+around panes. The owner compared three placements of the commands on the
+real window (title bar, floating bottom bar, left rail) and chose the
+rail: a slim title strip (mark, name, repository, window controls) and a
+collapsible command rail (48px icons / 188px with labels, `pg.rail`) that
+also carries open / recents / settings. The Commit count is a pill of its
+own, above the icon when collapsed and after the label when expanded, and
+caps at "999+". The title-bar toolbar survives as Settings → Command bar →
+"In the title bar" (`pg.bar`); both render the one list in
+`components/commandItems.tsx`. The pre-rail wireframe, for reference:
 
 ```
 [✕ PowerGit] ⟳ Refresh [● Commit ▾] Stash ▾ Pull ▾ Push ▾ Fetch ▾ Branch ▾ Checkout Merge Rebase Tag   ─ □ ✕
