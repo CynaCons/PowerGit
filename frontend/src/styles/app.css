@@ -87,27 +87,30 @@ html {
   align-items: center;
 }
 
-.grid-row:hover:not(.selected) {
+/* Selection and hover tint the TEXT cells only. The row element stays
+   transparent: it is stacked above .graph-canvas (z-index below), so a row
+   background would cover the canvas node and lane lines of that commit.
+   That is exactly the owner report "commits disappear when they are
+   selected" (v0.12.1 – v0.13.13): the canvas paints its own selection/hover
+   band in the graph column (graph/draw.ts), the DOM paints the rest.
+   Guarded by tests/e2e/selected-row-graph.spec.ts (pixel sampling). */
+.grid-row:hover:not(.selected) .msg,
+.grid-row:hover:not(.selected) .author,
+.grid-row:hover:not(.selected) .date,
+.grid-row:hover:not(.selected) .sha {
   background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
 }
 
 .grid-row.selected {
-  background: var(--pg-grid-sel, #dbeafe);
-  border-left-color: var(--pg-grid-sel-border, #2563eb);
-}
-
-.grid-row:hover .msg,
-.grid-row:hover .author,
-.grid-row:hover .date,
-.grid-row:hover .sha {
   background: transparent;
+  border-left-color: var(--pg-grid-sel-border, #2563eb);
 }
 
 .grid-row.selected .msg,
 .grid-row.selected .author,
 .grid-row.selected .date,
 .grid-row.selected .sha {
-  background: transparent;
+  background: var(--pg-grid-sel, #dbeafe);
 }
 
 /* Text colour must be set explicitly (not just inherited) on rows whose

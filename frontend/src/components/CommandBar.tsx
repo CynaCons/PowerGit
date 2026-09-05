@@ -19,7 +19,7 @@ import MenuItem from "@mui/material/MenuItem"
 import Toolbar from "@mui/material/Toolbar"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { useState, type RefObject } from "react"
+import { memo, useState, type RefObject } from "react"
 import { useEngine } from "../engine"
 import { shortcutLabel } from "../hotkeys"
 import type { GitActions } from "../hooks/useGitActions"
@@ -49,7 +49,7 @@ export type CommandBarProps = {
 // pull/push/fetch) always visible, secondary group (branch, checkout, merge,
 // rebase, tag) collapsing into a "More" menu on narrow windows. The tier is
 // measured by useChromeLayout from the toolbar element handed in here.
-export function CommandBar({
+function CommandBarImpl({
   toolbarRef,
   tier,
   live,
@@ -342,3 +342,7 @@ export function CommandBar({
     </AppBar>
   )
 }
+
+// Memoised: selection changes must not re-render the toolbar (App passes
+// stable callbacks via useStable; `actions` is stabilised the same way).
+export const CommandBar = memo(CommandBarImpl)

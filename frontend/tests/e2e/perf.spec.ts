@@ -61,3 +61,47 @@ test("file tree and diff tab open while revisions load", async ({ page }) => {
   await page.getByRole("tab", { name: "File Tree" }).click()
   await expect(page.getByTestId("bottom-panel")).toBeVisible({ timeout: 5_000 })
 })
+
+// Owner report, 2026-09-05: "clicking on a commit takes some time ... if I
+// click quickly on commits, it feels like a lag. The clicking and
+// highlighting should be immediate and not depend on the loading of the
+// information." The highlight must land in the click's own frame; commit
+// details are a deferred render plus async loads. Measured in-page (not via
+// the Playwright click round-trip) so the number is the app's own work.
+// Dev-mode budget: production is ~25 ms; the Vite dev build carries React's
+// dev instrumentation, so the bound is generous but still fails the
+// pre-fix numbers (200–1460 ms with several 300 ms long tasks per click).
+test("clicking a row highlights it immediately, before commit details load", async ({ page }) => {
+  await page.goto("/")
+  const rows = page.getByTestId("grid-row")
+  await expect(rows.nth(8)).toBeVisible({ timeout: 30_000 })
+  await rows.nth(1).click()
+  await expect(rows.nth(1)).toHaveClass(/selected/)
+  const samples: Array<{ toClass: number; longest: number }> = []
+  for (const n of [3, 5, 7]) {
+    const sample = await rows.nth(n).evaluate(async (el) => {
+      const longTasks: number[] = []
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) longTasks.push(entry.duration)
+      })
+      observer.observe({ entryTypes: ["longtask"] })
+      const t0 = performance.now()
+      el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
+      let frames = 0
+      while (!el.classList.contains("selected") && frames < 120) {
+        await new Promise((r) => requestAnimationFrame(r))
+        frames++
+      }
+      const toClass = performance.now() - t0
+      await new Promise((r) => setTimeout(r, 600))
+      observer.disconnect()
+      return { toClass, longest: Math.max(0, ...longTasks) }
+    })
+    samples.push(sample)
+    await expect(rows.nth(n)).toHaveClass(/selected/)
+  }
+  const worstToClass = Math.max(...samples.map((s) => s.toClass))
+  const worstTask = Math.max(...samples.map((s) => s.longest))
+  expect(worstToClass, `click → highlight ${JSON.stringify(samples)}`).toBeLessThan(500)
+  expect(worstTask, `longest task after a click ${JSON.stringify(samples)}`).toBeLessThan(500)
+})

@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box"
-import { useEffect, useState } from "react"
+import { useDeferredValue, useEffect, useState } from "react"
 import { BottomPanel } from "./components/BottomPanel"
 import { CommandBar } from "./components/CommandBar"
 import { AppDialogs } from "./components/dialogs/AppDialogs"
@@ -19,6 +19,7 @@ import { useGitActions } from "./hooks/useGitActions"
 import { useHistory } from "./hooks/useHistory"
 import { useJobs } from "./hooks/useJobs"
 import { useRepoState } from "./hooks/useRepoState"
+import { useStable } from "./hooks/useStable"
 import { useHotkeyLayer, type CommandId } from "./hotkeys"
 import { zoomIn, zoomOut, zoomReset } from "./theme"
 
@@ -45,10 +46,28 @@ export default function App({ base }: { base: EngineClient }) {
   const { busy, jobLabel, runJob } = jobs
   const dialogs = useDialogs()
   const { open, hotkeysEnabled } = dialogs
-  const actions = useGitActions({ session, history, repoState, jobs, dialogs })
+  // useGitActions rebuilds its closures every render; hand memoised children
+  // stable identities so a row click re-renders only the grid and, deferred,
+  // the bottom panel (owner report: "clicking commits feels laggy").
+  const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs }))
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
+  // The highlight must land in the click's own frame; commit details, files
+  // and diff follow in a deferred render and load asynchronously.
+  const deferredCurrent = useDeferredValue(current)
+  const chrome = useStable({
+    refresh: () => refresh().catch(() => undefined),
+    openStash: () => open({ kind: "stash" }),
+    openRepo: () => void openFolder(),
+    openRecents: () => open({ kind: "recents" }),
+    openSettings: () => open({ kind: "settings" }),
+    selectTarget: (sha: string) => void history.jumpToRef(sha),
+    collapseLeft: () => setLeftOpen(false),
+    expandLeft: () => setLeftOpen(true),
+    checkoutRef: (name: string) => void actions.checkout(name, false),
+    configureRemote: (name: string) => open({ kind: "remoteConfig", remote: name }),
+  })
 
   // Browser/WebView zoom is deliberately app-scoped so it never changes the
   // surrounding Tauri page or breaks portal anchoring. Handle all common
@@ -153,17 +172,17 @@ export default function App({ base }: { base: EngineClient }) {
           booting={view.booting || (live && !demo && !loaded && !offline)}
           jobs={jobs}
           actions={actions}
-          refresh={() => refresh().catch(() => undefined)}
-          openStash={() => open({ kind: "stash" })}
+          refresh={chrome.refresh}
+          openStash={chrome.openStash}
         />
         {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
 
         <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
           <NavRail
             repoName={repo?.name}
-            onOpenRepo={() => void openFolder()}
-            onRecents={() => open({ kind: "recents" })}
-            onSettings={() => open({ kind: "settings" })}
+            onOpenRepo={chrome.openRepo}
+            onRecents={chrome.openRecents}
+            onSettings={chrome.openSettings}
           />
 
           <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -171,17 +190,17 @@ export default function App({ base }: { base: EngineClient }) {
               {leftOpen ? (
                 <RepoTree
                   tree={refs}
-                  onSelectTarget={(sha) => void history.jumpToRef(sha)}
-                  onCollapse={() => setLeftOpen(false)}
-                  onCheckoutRef={(name) => void actions.checkout(name, false)}
+                  onSelectTarget={chrome.selectTarget}
+                  onCollapse={chrome.collapseLeft}
+                  onCheckoutRef={chrome.checkoutRef}
                   onDeleteBranch={actions.removeBranch}
                   onDeleteTag={actions.removeTag}
                   onFetchRemote={actions.fetchRemote}
-                  onConfigureRemote={(name) => open({ kind: "remoteConfig", remote: name })}
+                  onConfigureRemote={chrome.configureRemote}
                   onOpenSubmodule={actions.openSubmodule}
                 />
               ) : (
-                <CollapsedLeftPanel onExpand={() => setLeftOpen(true)} />
+                <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
               <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
                 <HistoryPane
@@ -221,7 +240,7 @@ export default function App({ base }: { base: EngineClient }) {
                     "&:hover": { bgcolor: "primary.main" },
                   }}
                 />
-                <BottomPanel current={current} height={bottomHeight} tab={bottomTab} onTab={setBottomTab} />
+                <BottomPanel current={deferredCurrent} height={bottomHeight} tab={bottomTab} onTab={setBottomTab} />
               </Box>
             </Box>
           </Box>

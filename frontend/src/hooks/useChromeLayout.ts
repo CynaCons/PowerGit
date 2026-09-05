@@ -8,11 +8,27 @@ export type ChromeLayout = ReturnType<typeof useChromeLayout>
 // panel's open state, and the command bar's responsive tier. None of it is
 // persisted; it lives exactly as long as the window.
 export function useChromeLayout() {
-  const [bottomHeight, setBottomHeight] = useState(280)
+  const [requestedBottom, setBottomHeight] = useState(280)
+  // Content area height (CSS px, i.e. after application zoom). The bottom
+  // panel keeps a fixed pixel height, so at 150 % zoom on a small window the
+  // requested 280px could swallow the whole area and leave the grid 0px tall
+  // (found by selected-row-graph.spec at 150 %). Clamp to what is available.
+  const [contentHeight, setContentHeight] = useState(0)
   const [leftOpen, setLeftOpen] = useState(true)
   const [bottomTab, setBottomTab] = useState(0)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const dragState = useRef<{ startY: number; startH: number } | null>(null)
+
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    setContentHeight(el.clientHeight)
+    const ro = new ResizeObserver((entries) => setContentHeight(entries[0].contentRect.height))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const maxBottom = contentHeight > 0 ? Math.max(120, contentHeight - 140) : Number.POSITIVE_INFINITY
+  const bottomHeight = Math.min(requestedBottom, maxBottom)
 
   const onDividerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragState.current = { startY: e.clientY, startH: bottomHeight }

@@ -47,14 +47,19 @@ test("only the selected row is highlighted", async ({ page }) => {
   await expect(target).toHaveClass(/selected/)
   await expect(target).toHaveCSS("border-left-width", "2px")
 
-  const selectedBackground = await target.evaluate((el) => getComputedStyle(el).backgroundColor)
+  // The tint lives on the text cells, never on the row element itself: a
+  // row background would cover the graph canvas underneath (owner report
+  // "commits disappear when they are selected", see
+  // selected-row-graph.spec.ts). Compare the message cell across rows.
+  await expect(target).toHaveCSS("background-color", "rgba(0, 0, 0, 0)")
+  const selectedBackground = await target.locator(".msg").evaluate((el) => getComputedStyle(el).backgroundColor)
   const others = await rows.evaluateAll(
     (els, sel: string) =>
       els
         .filter((el) => !el.classList.contains("selected"))
         // The hovered row legitimately differs; the pointer sits on the row we
         // just clicked, so anything else tinted like the selection is a bug.
-        .map((el) => getComputedStyle(el).backgroundColor)
+        .map((el) => getComputedStyle(el.querySelector(".msg")!).backgroundColor)
         .filter((bg) => bg === sel).length,
     selectedBackground,
   )

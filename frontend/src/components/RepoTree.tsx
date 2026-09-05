@@ -8,7 +8,7 @@ import MenuItem from "@mui/material/MenuItem"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useEffect, useMemo, useRef, useState } from "react"
 import type { RefItem, RefTree } from "../engine"
 import { ROW_HEIGHT, SECTION_HEIGHT, SectionHeader, TreeRow, type Item } from "./RepoTreeRows"
 
@@ -82,7 +82,7 @@ function sortNodes(nodes: TreeNode[]) {
   for (const node of nodes) sortNodes(node.children)
 }
 
-export function RepoTree({
+function RepoTreeImpl({
   tree,
   onSelectTarget,
   onCollapse,
@@ -398,3 +398,7 @@ export function RepoTree({
     }
   }
 }
+
+// Memoised: the ref tree only changes on a refs refresh, never on a row
+// selection (App hands it stable callbacks via useStable).
+export const RepoTree = memo(RepoTreeImpl)

@@ -142,7 +142,13 @@ test("two windows pinned to different repositories do not switch each other", as
     expect(await (await fetch(`${base}/status`, { headers: engineHeaders() })).status).toBe(200)
     // Windows can retain a just-disposed FileSystemWatcher handle briefly.
     // Match the engine lifecycle fixture's bounded cleanup tolerance.
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
+    } catch (e) {
+      // A leftover temp repo is not a product defect; the assertions above
+      // already ran. Leave it for the OS temp cleaner and say so.
+      console.warn(`temp repo left behind (${dir}): ${String(e)}`)
+    }
   }
 })
 
