@@ -22,6 +22,21 @@ Playwright visual subset (`npm run test:visual -- --grep @grid`) stand in.
 Give the captures to a reviewer with vision (a fresh agent, not the author)
 with this checklist. One capture per state; do not paste the whole session.
 
+## Driving the real window (Windows)
+Start the dev app with WebView2 remote debugging and connect Playwright to
+it; you get the real Tauri window's DOM, screenshots and clicks, not a
+browser stand-in (this is how the frameless title bar was verified):
+
+```bash
+WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 npm run tauri dev
+# then, in node: chromium.connectOverCDP("http://127.0.0.1:9222") and pick the
+# page whose url starts with http://127.0.0.1:1420
+```
+`window.__TAURI_INTERNALS__` is present there, so shell-only UI (window
+controls, native dialogs) renders. Screen-coordinate clicking through
+user32 is a last resort: the window is at 200 % DPI on the owner's machine
+and app zoom multiplies it again, so guessed offsets hit the wrong control.
+
 ## States and what to check
 1. Fresh start, real repo: rows fill the grid; HEAD row has its refs;
    every visible row shows a graph node; status bar shows branch and
@@ -41,6 +56,10 @@ with this checklist. One capture per state; do not paste the whole session.
    long lines scroll inside the pane, tree rows expand.
 8. Commit dialog (Ctrl+Space) and Settings (Ctrl+,): open centred, no
    clipped labels, focus returns to the grid on Escape.
+9. Frameless title bar (v0.13.14): the three controls sit flush at the
+   window's right edge at any width and zoom, Maximize/Restore glyph
+   follows the state, empty bar space drags the window and double-click
+   toggles maximize, edges still resize.
 
 ## Recording the result
 Put "looked at: states 1-8 on <platform>, <date>" plus anything odd in the
