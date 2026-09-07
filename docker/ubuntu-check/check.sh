@@ -26,7 +26,7 @@ npx tsc -b --force
 npx vite build
 
 echo "== start engine =="
-dotnet run --project ../src/engine/PowerGit.Engine --urls http://127.0.0.1:7733 &> /tmp/engine.log &
+POWERGIT_DATA_DIR=/tmp/pg-engine-data dotnet run --project ../src/engine/PowerGit.Engine --urls http://127.0.0.1:7733 &> /tmp/engine.log &
 ENGINE_PID=$!
 for i in $(seq 1 120); do
   if curl -fsS http://127.0.0.1:7733/health >/dev/null 2>&1; then break; fi

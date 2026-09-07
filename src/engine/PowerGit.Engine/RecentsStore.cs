@@ -2,28 +2,47 @@ using System.Text.Json;
 
 namespace PowerGit.Engine;
 
+/// <summary>
+///  The per-user "recent repositories" list (v0.13.21 owner report: the
+///  shipped app listed development fixture repositories).
+///  <para>
+///  The store is one file per user, shared by every engine process on the
+///  machine: the packaged app's sidecar, <c>npm run engine</c>, and the
+///  engines the e2e suites drive — whose disposable fixture repositories
+///  used to fill all twenty slots. Two guards: entries whose root no longer
+///  exists are dropped on every read (fixtures are deleted after each
+///  spec), and <c>POWERGIT_DATA_DIR</c> moves the whole store, which the
+///  dev script and the harnesses set so they never touch the user's list.
+///  </para>
+/// </summary>
 public static class RecentsStore
 {
+    /// <summary>Overrides the data directory (dev script, harnesses, tests).</summary>
+    public const string DataDirEnvVar = "POWERGIT_DATA_DIR";
+
     private static readonly object Gate = new();
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
-    public static string FilePath
+    public static string DataDir
     {
         get
         {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "PowerGit");
+            string? overridden = Environment.GetEnvironmentVariable(DataDirEnvVar);
+            string dir = string.IsNullOrWhiteSpace(overridden)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PowerGit")
+                : overridden;
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "recents.json");
+            return dir;
         }
     }
+
+    public static string FilePath => Path.Combine(DataDir, "recents.json");
 
     public static IReadOnlyList<RepoInfo> List()
     {
         lock (Gate)
         {
-            return ReadUnlocked();
+            return Prune(ReadUnlocked());
         }
     }
 
@@ -31,7 +50,7 @@ public static class RecentsStore
     {
         lock (Gate)
         {
-            List<RepoInfo> list = [.. ReadUnlocked().Where(r => !string.Equals(r.Root, repo.Root, StringComparison.OrdinalIgnoreCase))];
+            List<RepoInfo> list = [.. Prune(ReadUnlocked()).Where(r => !string.Equals(r.Root, repo.Root, StringComparison.OrdinalIgnoreCase))];
             list.Insert(0, repo);
             if (list.Count > 20)
             {
@@ -40,6 +59,12 @@ public static class RecentsStore
 
             File.WriteAllText(FilePath, JsonSerializer.Serialize(list, Json));
         }
+    }
+
+    /// <summary>Drops entries whose root directory is gone (deleted fixtures, unplugged drives).</summary>
+    private static List<RepoInfo> Prune(List<RepoInfo> list)
+    {
+        return [.. list.Where(r => !string.IsNullOrEmpty(r.Root) && Directory.Exists(r.Root))];
     }
 
     private static List<RepoInfo> ReadUnlocked()

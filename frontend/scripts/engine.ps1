@@ -13,4 +13,10 @@ if (-not $env:POWERGIT_ENGINE_TOKEN) {
   }
   $env:POWERGIT_ENGINE_TOKEN = (Get-Content $tokenFile -Raw).Trim()
 }
+# Own data directory (recents.json) so the dev engine and the e2e fixtures
+# it opens never show up in the packaged app's "Recent repositories"
+# (v0.13.21 owner report). POWERGIT_DATA_DIR wins if already set.
+if (-not $env:POWERGIT_DATA_DIR) {
+  $env:POWERGIT_DATA_DIR = Join-Path ([System.IO.Path]::GetTempPath()) "powergit-dev-data"
+}
 & $dotnet run --project $project --urls "http://127.0.0.1:7733"
