@@ -12,8 +12,12 @@ fn main() {
         .lines()
         .find_map(|line| {
             let line = line.trim();
-            line.strip_prefix("\"version\":")
-                .map(|rest| rest.trim().trim_end_matches(',').trim_matches('"').to_string())
+            line.strip_prefix("\"version\":").map(|rest| {
+                rest.trim()
+                    .trim_end_matches(',')
+                    .trim_matches('"')
+                    .to_string()
+            })
         })
         .expect("\"version\" in frontend/package.json");
     println!("cargo:rustc-env=POWERGIT_VERSION={version}");

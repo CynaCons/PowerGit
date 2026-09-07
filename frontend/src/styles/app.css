@@ -285,9 +285,8 @@ html {
 }
 
 .sha {
-  font-family:
-    "Cascadia Code", "Cascadia Mono", "JetBrains Mono", "Ubuntu Mono", "DejaVu Sans Mono", ui-monospace, Consolas,
-    monospace;
+  font-family: var(--pg-font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   justify-content: flex-end;
   padding-right: 8px;
@@ -298,6 +297,7 @@ html {
 pre,
 code {
   font-family: var(--pg-font-mono);
+  font-variant-numeric: tabular-nums;
   font-variant-ligatures: none;
   font-feature-settings:
     "liga" 0,

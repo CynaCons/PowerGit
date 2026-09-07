@@ -322,6 +322,21 @@ else
   echo "alive after ${SMOKE_SECONDS} s: procs=$(tree_count) rss=$(( $(tree_rss_kb) / 1024 ))MB"
 fi
 
+# v0.13.19: the AppImage registers a desktop entry + hicolor icons on launch
+# (desktop_integration.rs) so GNOME can show its icon. Older artifacts skip.
+DESKTOP="$XDG_DATA_HOME/applications/powergit.desktop"
+if [ -f "$DESKTOP" ]; then
+  if grep -q '^Icon=powergit$' "$DESKTOP" && grep -q '^StartupWMClass=powergit$' "$DESKTOP" \
+     && [ -f "$XDG_DATA_HOME/icons/hicolor/256x256/apps/powergit.png" ]; then
+    pass "desktop entry + icons registered under $XDG_DATA_HOME"
+  else
+    echo "== desktop entry =="; cat "$DESKTOP"
+    fail "desktop entry written but incomplete (Icon/StartupWMClass/256px icon)"
+  fi
+else
+  skip "no desktop entry written (build predates v0.13.19 desktop integration)"
+fi
+
 echo "== app stderr (tail) =="; tail -n 40 "$ERR"
 if grep -Eq "$FATAL_RE" "$ERR"; then
   echo "== fatal lines =="; grep -E "$FATAL_RE" "$ERR"

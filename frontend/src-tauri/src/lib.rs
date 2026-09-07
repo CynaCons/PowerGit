@@ -1,3 +1,8 @@
+// Compiled everywhere (std only) so Windows/macOS builds type-check and
+// unit-test it; only the call in setup() is Linux-only.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod desktop_integration;
+
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::net::TcpListener;
@@ -6,8 +11,8 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
-use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
+use tauri_plugin_shell::ShellExt;
 
 const ENGINE_HOST: &str = "127.0.0.1";
 const ENGINE_DEFAULT_PORT: u16 = 7733;
@@ -72,7 +77,10 @@ fn engine_config(state: tauri::State<EngineState>) -> EngineConfig {
 /// Tauri command: where the sidecar log lives (shown by the recovery panel).
 #[tauri::command]
 fn engine_log_path(state: tauri::State<EngineState>) -> Option<String> {
-    state.log_path.as_ref().map(|p| p.to_string_lossy().into_owned())
+    state
+        .log_path
+        .as_ref()
+        .map(|p| p.to_string_lossy().into_owned())
 }
 
 /// Picks the port to spawn the sidecar on. The default port is tried first
@@ -124,7 +132,9 @@ fn generate_token() -> String {
 
 /// `YYYY-MM-DDTHH:MM:SS.mmmZ` without pulling in chrono.
 fn timestamp() -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let secs = now.as_secs();
     let millis = now.subsec_millis();
     // Civil-from-days (Howard Hinnant), good for any date we will see.
@@ -184,7 +194,10 @@ fn spawn_engine(handle: AppHandle) {
         let state = handle.state::<EngineState>();
         let port = state.port;
         let token = state.token.clone();
-        let sidecar = handle.shell().sidecar("powergit-engine").expect("sidecar not found");
+        let sidecar = handle
+            .shell()
+            .sidecar("powergit-engine")
+            .expect("sidecar not found");
         let spawned = sidecar
             // --parent-pid lets the engine exit with us even when we
             // are force-killed and never reach RunEvent::Exit below.
@@ -202,19 +215,29 @@ fn spawn_engine(handle: AppHandle) {
                 log_line(&state, &format!("failed to spawn sidecar: {e}"));
                 let _ = handle.emit(
                     "engine-exited",
-                    EngineExited { status: format!("spawn failed: {e}"), restarting: false },
+                    EngineExited {
+                        status: format!("spawn failed: {e}"),
+                        restarting: false,
+                    },
                 );
                 return;
             }
         };
-        log_line(&state, &format!("sidecar started on port {port} (pid {})", child.pid()));
+        log_line(
+            &state,
+            &format!("sidecar started on port {port} (pid {})", child.pid()),
+        );
         *state.child.lock().expect("engine state mutex poisoned") = Some(child);
 
         let mut status = String::from("terminated");
         while let Some(event) = rx.recv().await {
             match event {
-                CommandEvent::Stderr(line) => log_line(&state, String::from_utf8_lossy(&line).trim_end()),
-                CommandEvent::Stdout(line) => log_line(&state, String::from_utf8_lossy(&line).trim_end()),
+                CommandEvent::Stderr(line) => {
+                    log_line(&state, String::from_utf8_lossy(&line).trim_end())
+                }
+                CommandEvent::Stdout(line) => {
+                    log_line(&state, String::from_utf8_lossy(&line).trim_end())
+                }
                 CommandEvent::Error(e) => log_line(&state, &format!("io error: {e}")),
                 CommandEvent::Terminated(payload) => {
                     status = match (payload.code, payload.signal) {
@@ -229,15 +252,31 @@ fn spawn_engine(handle: AppHandle) {
         }
         *state.child.lock().expect("engine state mutex poisoned") = None;
         if *state.exiting.lock().expect("exiting flag poisoned") {
-            log_line(&state, &format!("sidecar stopped during shutdown ({status})"));
+            log_line(
+                &state,
+                &format!("sidecar stopped during shutdown ({status})"),
+            );
             return;
         }
         let restarting = may_restart(&state);
         log_line(
             &state,
-            &format!("sidecar exited: {status}{}", if restarting { ", restarting" } else { ", not restarting" }),
+            &format!(
+                "sidecar exited: {status}{}",
+                if restarting {
+                    ", restarting"
+                } else {
+                    ", not restarting"
+                }
+            ),
         );
-        let _ = handle.emit("engine-exited", EngineExited { status: status.clone(), restarting });
+        let _ = handle.emit(
+            "engine-exited",
+            EngineExited {
+                status: status.clone(),
+                restarting,
+            },
+        );
         if restarting {
             tokio::time::sleep(RESTART_BACKOFF).await;
             let base_url = state.base_url.clone();
@@ -250,16 +289,25 @@ fn spawn_engine(handle: AppHandle) {
 /// Opens (append) the engine log under the app's log dir; None when the dir
 /// cannot be created — logging must never block startup.
 fn open_engine_log(app: &AppHandle) -> (Option<PathBuf>, Option<File>) {
-    let Ok(dir) = app.path().app_log_dir() else { return (None, None) };
+    let Ok(dir) = app.path().app_log_dir() else {
+        return (None, None);
+    };
     if fs::create_dir_all(&dir).is_err() {
         return (None, None);
     }
     let path = dir.join("engine.log");
     // Keep the file bounded: rotate once past ~2 MB.
-    if fs::metadata(&path).map(|m| m.len() > 2 * 1024 * 1024).unwrap_or(false) {
+    if fs::metadata(&path)
+        .map(|m| m.len() > 2 * 1024 * 1024)
+        .unwrap_or(false)
+    {
         let _ = fs::rename(&path, dir.join("engine.log.1"));
     }
-    let file = OpenOptions::new().create(true).append(true).open(&path).ok();
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .ok();
     (Some(path), file)
 }
 
@@ -298,6 +346,14 @@ pub fn run() {
                 );
             }
 
+            // Linux AppImage: register a desktop entry + icons so GNOME can
+            // show our icon (see desktop_integration.rs). Off the startup
+            // path's critical section; failures only reach the log.
+            #[cfg(target_os = "linux")]
+            if let Some(summary) = desktop_integration::integrate(env!("POWERGIT_VERSION")) {
+                log_line(&state, &summary);
+            }
+
             spawn_engine(app.handle().clone());
             Ok(())
         })
@@ -326,7 +382,10 @@ mod tests {
         // exported by build.rs from frontend/package.json.
         let v = env!("POWERGIT_VERSION");
         assert_eq!(v.split('.').count(), 3, "{v} is not X.Y.Z");
-        assert!(v.split('.').all(|p| p.parse::<u32>().is_ok()), "{v} is not numeric");
+        assert!(
+            v.split('.').all(|p| p.parse::<u32>().is_ok()),
+            "{v} is not numeric"
+        );
         assert_ne!(v, "0.0.0");
     }
 
@@ -335,7 +394,9 @@ mod tests {
         let a = generate_token();
         let b = generate_token();
         assert_eq!(a.len(), 64);
-        assert!(a.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert!(a
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
         assert_ne!(a, b);
     }
 
@@ -383,9 +444,13 @@ mod tests {
     fn restart_budget_is_one_per_window_and_none_while_exiting() {
         let state = state_for_tests();
         assert!(may_restart(&state));
-        assert!(!may_restart(&state), "second crash inside the window must not restart");
+        assert!(
+            !may_restart(&state),
+            "second crash inside the window must not restart"
+        );
         // A new window resets the budget.
-        *state.restarts.lock().unwrap() = (1, Instant::now() - RESTART_WINDOW - Duration::from_secs(1));
+        *state.restarts.lock().unwrap() =
+            (1, Instant::now() - RESTART_WINDOW - Duration::from_secs(1));
         assert!(may_restart(&state));
         *state.exiting.lock().unwrap() = true;
         assert!(!may_restart(&state));

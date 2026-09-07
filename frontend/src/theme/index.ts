@@ -16,14 +16,17 @@ export { useZoom, zoomIn, zoomOut, zoomReset, zoomPercent } from "./zoom"
 // See docs/agents/memories/linux-fonts.md.
 const SANS_FONT =
   'system-ui, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", "Cantarell", "Noto Sans", "Inter", "DejaVu Sans", sans-serif'
-// Platform-first, like the UI face: Cascadia on Windows 11 (ships with the
-// Terminal), Ubuntu Mono / DejaVu on GNOME, JetBrains Mono when installed.
-// Fira Code was dropped in v0.13.16 (owner: "the font ... is not very good").
-export const MONO_FONT =
-  '"Cascadia Code", "Cascadia Mono", "JetBrains Mono", "Ubuntu Mono", "DejaVu Sans Mono", ui-monospace, Consolas, monospace'
+// One face everywhere (v0.13.19, owner: "use the same font as in the main
+// view everywhere"): diffs, file lists and SHAs use the UI stack above.
+// Column alignment in diffs then relies on tabular figures and the fact
+// that leading spaces still indent; a true monospace face was dropped
+// deliberately (Fira Code in v0.13.16, Cascadia here). Kept under the old
+// name so every consumer stays a one-line change if we ever go back.
+export const MONO_FONT = SANS_FONT
 
 export const codeSx = {
   fontFamily: MONO_FONT,
+  fontVariantNumeric: "tabular-nums",
   fontVariantLigatures: "none",
   fontFeatureSettings: '"liga" 0, "calt" 0',
 } satisfies SxProps<Theme>
