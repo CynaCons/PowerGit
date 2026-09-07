@@ -459,7 +459,7 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Acceptance: nine focused regressions, build/typecheck, lint and format passed. Unit suite 81/82 (unrelated graph timing budget); Windows full e2e interrupted and Linux engine check failed. Owner waived remaining local e2e, native, resolution, visual baseline and Linux/WebKit verification and authorized review-and-release on 2026-09-05. Exact evidence and limits: docs/agents/context/commit-reliability-handoff.md. [agent: codex]
 - [x] Owner release authorization on 2026-09-05: review and push, release the app; manual verification gate waived. Include reviewed pending UI changes, publish v0.13.17, then deliver a new frontend/UX audit. Existing CI and artifact guards remain enabled. [agent: codex]
 
-### v0.13.18 — Usable workspace at zoom and consistent settings (current) (ACTIVE)
+### v0.13.18 — Usable workspace at zoom and consistent settings (2026-09-07) (COMPLETE)
 > Follow-up audit: docs/agents/context/frontend-ux-next.md. Preserve existing release v0.13.17; implement the next scoped improvements. Record verification limits accurately.
 **Goal:** Fix reproduced shell zoom shrinkage and inaccessible rail actions, make responsive layout follow the content area, and make Settings save/cancel behavior predictable. Owner requested continued iteration with review and focused visual checks instead of large local e2e suites.
 - [x] Fix shell viewport sizing at 100/150/200% zoom; retain readable graph space and correct splitter motion. Verify actual settled bounds and pixels in Windows Chromium. [agent: claude]
