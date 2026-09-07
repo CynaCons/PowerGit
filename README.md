@@ -74,14 +74,13 @@ must be writable); the portable zip is replaced by hand.
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.14.0 adds in-app updates
-(Settings → Check for updates, signed manifests on each release), highlights
-the checked-out branch's history in the graph with a ring and dimming
-(scope and style in a pill under the graph), gives tags their own glyph,
-shows a merge commit's diff against its first parent, and makes the commit
-dialog fill the window with a resizable file column that can show a
-directory tree. It builds on v0.13.20's cheap refreshes, live change
-detection, remote-branch clouds, AppImage launcher entry and one UI font.
+Tracked openly in [PLAN.md](PLAN.md). Release v0.14.1 adds the diagnostic
+snapshot (rail button, plus a shell watchdog that writes it on its own when
+the window stops responding and points to it on the next launch), pending
+changes as Working directory / Index rows on top of HEAD reviewable from the
+main view, and floating option bars that stay open. It builds on v0.14.0's
+in-app updates, branch-history highlight, tag glyphs, merge diffs and the
+full-window commit dialog.
 Parked: worktrees and hotkey remapping UI.
 
 ## Development
