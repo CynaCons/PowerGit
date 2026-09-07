@@ -1,3 +1,4 @@
+import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useEffect, useRef, useState } from "react"
 import { drawRows, graphWidth } from "../graph/draw"
@@ -10,9 +11,25 @@ type Props = {
   onRowContextMenu?: (e: React.MouseEvent, index: number) => void
   loadingTail?: boolean
   onNearEnd?: () => void
+  /** Remote names from the ref tree; a ref whose first segment is one of
+   *  them is a remote-tracking branch. Without it, any slash counts. */
+  remoteNames?: string[]
 }
 
-export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, loadingTail, onNearEnd }: Props) {
+export function RevisionGrid({
+  rows,
+  selected,
+  onSelect,
+  onRowContextMenu,
+  loadingTail,
+  onNearEnd,
+  remoteNames,
+}: Props) {
+  const isRemote = (ref: string) => {
+    const slash = ref.indexOf("/")
+    if (slash < 0) return false
+    return !remoteNames || remoteNames.length === 0 || remoteNames.includes(ref.slice(0, slash))
+  }
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hovered, setHovered] = useState(-1)
@@ -184,14 +201,20 @@ export function RevisionGrid({ rows, selected, onSelect, onRowContextMenu, loadi
                 <div className="graph-cell" />
                 <div className="msg">
                   <span className="msg-refs">
-                    {refs.shown.map((ref) => (
-                      <span
-                        key={ref}
-                        className={`ref${ref === "HEAD" ? " head" : ref.includes("stash") ? " stash" : ref.includes("/") ? " remote" : ""}`}
-                      >
-                        {ref}
-                      </span>
-                    ))}
+                    {refs.shown.map((ref) => {
+                      const remote = ref !== "HEAD" && !ref.includes("stash") && isRemote(ref)
+                      return (
+                        <span
+                          key={ref}
+                          className={`ref${ref === "HEAD" ? " head" : ref.includes("stash") ? " stash" : remote ? " remote" : ""}`}
+                          data-ref-kind={ref === "HEAD" ? "head" : remote ? "remote" : "local"}
+                        >
+                          {/* v0.13.19, owner: "a little cloud icon on the left of the remote branches" */}
+                          {remote && <CloudOutlinedIcon className="ref-cloud" />}
+                          {ref}
+                        </span>
+                      )
+                    })}
                     {refs.extra > 0 ? <span className="ref extra">+{refs.extra}</span> : null}
                   </span>
                   <span className="msg-text">{row.rev.message}</span>

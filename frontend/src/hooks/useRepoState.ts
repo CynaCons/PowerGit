@@ -4,6 +4,9 @@ import { changeKindOf, describeThrown, type ChangeKind, type RefTree, type RepoS
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
 
+const ECHO_MS = 700
+const STATUS_POLL_MS = 10_000
+
 export type RefreshScope = { revisions?: boolean; refs?: boolean; status?: boolean; stashes?: boolean }
 
 export type RepoStateDeps = {
@@ -29,11 +32,16 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   // Per-panel refresh: callers name what an action could have changed so a
   // stage/commit never re-runs the full 4-call sweep. Every piece updates
   // the moment its own request lands (stale-while-revalidate).
-  const lastRefreshAt = useRef(0)
+  // Echo guard for the change stream (below): events that land while one of
+  // our own refreshes is in flight, or within ECHO_MS after it finished, are
+  // the watcher reporting what that action wrote. The SSE loop polls every
+  // 500 ms, so a shorter tail would let echoes through.
+  const inFlight = useRef(0)
+  const muteUntil = useRef(0)
   const refresh = useCallback(
     async (scope?: RefreshScope) => {
       if (!client.hasRepo) return
-      lastRefreshAt.current = Date.now()
+      inFlight.current++
       setRefreshing(true)
       const s = scope ?? { revisions: true, refs: true, status: true, stashes: true }
       const jobs: Promise<unknown>[] = []
@@ -55,8 +63,9 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       try {
         await Promise.all(jobs)
       } finally {
+        inFlight.current--
         setRefreshing(false)
-        lastRefreshAt.current = Date.now()
+        muteUntil.current = Date.now() + ECHO_MS
       }
       if (firstError) throw new Error(firstError)
     },
@@ -116,7 +125,10 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   // Live refresh: the engine streams a change version whenever .git metadata
   // moves (HEAD, refs, index) — external git activity shows up on its own.
   // Debounced so an event burst (e.g. a rebase) refreshes once, and muted
-  // right after our own refreshes so in-app actions don't refresh twice.
+  // while and briefly after our own refreshes so in-app actions don't
+  // refresh twice (v0.13.19: the mute used to be a flat 2 s from either end
+  // of a refresh, which silently dropped an agent's commit landing in that
+  // window — nothing re-sent it, so the graph stayed stale).
   // The low bits of the version classify the change (see engine
   // `changeKindOf`): a status-only burst only re-fetches status instead of
   // the full revisions+refs+status sweep. "refs" is the superset for the
@@ -138,7 +150,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       const isFirst = last === null
       last = e.data
       if (isFirst) return // initial snapshot, nothing changed
-      if (Date.now() - lastRefreshAt.current < 2000) return // our own action
+      if (inFlight.current > 0 || Date.now() < muteUntil.current) return // our own action
       const kind = changeKindOf(Number(e.data))
       if (pendingKind !== "refs") pendingKind = kind
       window.clearTimeout(timer)
@@ -152,6 +164,33 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     return () => {
       window.clearTimeout(timer)
       source?.close()
+    }
+  }, [live, client, refresh])
+
+  // Safety net for what the watcher cannot see (v0.13.19, owner: "stuff is
+  // not updated" after an agent touches the repo): edits to tracked files
+  // never touch .git until a git command runs, and a change stream can be
+  // missed while reconnecting. Re-fetch status every STATUS_POLL_MS while
+  // the window is visible, and do a full sweep when the window regains
+  // focus — that is exactly when the user comes back from the agent.
+  useEffect(() => {
+    if (!live || !client.hasRepo) return
+    const quiet = () => inFlight.current > 0 || Date.now() < muteUntil.current
+    const onFocus = () => {
+      if (!quiet()) void refresh().catch(() => undefined)
+    }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") onFocus()
+    }
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !quiet()) void refresh({ status: true }).catch(() => undefined)
+    }, STATUS_POLL_MS)
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      window.clearInterval(poll)
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onVisible)
     }
   }, [live, client, refresh])
 

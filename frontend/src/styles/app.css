@@ -252,6 +252,12 @@ html {
 .ref.remote {
   background: var(--pg-ref-remote-bg, #ecfdf5);
   color: var(--pg-ref-remote-fg, #059669);
+  gap: 3px;
+}
+
+.ref-cloud {
+  font-size: 11px !important;
+  flex-shrink: 0;
 }
 
 .ref.head {

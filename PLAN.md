@@ -468,6 +468,14 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Review, typecheck/build and inspect focused screenshots; no large local e2e reruns per owner instruction. Record limits and push completed changes. [agent: claude]
 - [x] Acceptance (2026-09-07): Codex's shell/rail edits kept and finished; Settings rewritten as drafts (Appearance, Git identity with scope note and plain line-ending labels, Tools). Guards: tests/e2e/shell-zoom.spec.ts (root fills 1280x800 at 150 %, Settings reachable in a 420 px-tall window, Cancel discards / Save applies, repo row opens the switcher) + shell settings specs + focus-management, 7/7; dialog-settings visual baseline refreshed and inspected; tsc + eslint clean. Not run: full e2e, resolution, native, Linux (owner: no large local suites). [agent: claude]
 
+### v0.13.19 — Never stale: change detection that survives agents, and remote refs marked with a cloud (current) (ACTIVE)
+**Goal:** Owner (2026-09-07): "sometimes the tool goes stale when an agent updates the repo"; "a clear visual differentiation between local branches and remote branches, a little cloud icon on the left of the remote branches"; "need also a button to refresh, just in case".
+- [x] Root cause: the change stream (GET /events, .git watcher) never sees an agent editing tracked files (no git command touches .git), and the client dropped any event within a flat 2 s of its own refresh, so an external commit landing in that window was lost for good. useRepoState now mutes only while a refresh is in flight plus 700 ms (one SSE poll), re-fetches status every 10 s while the window is visible, and does a full sweep when the window regains focus. Refresh (rail, F5) stays as the manual fallback. [agent: claude]
+- [x] Guard: live-refresh-scope.spec 'an edit to a tracked file with no git command shows up on its own' (fixture repo, no git command, status bar reaches '(1 change)'), plus the existing stage-only and commit cases, 3/3 against a private engine 0.13.17. [agent: claude]
+- [x] Graph ref chips: remote-tracking branches carry a cloud glyph (CloudOutlined) before the name and data-ref-kind=remote; a ref counts as remote when its first segment is a known remote name (a local feature/x branch no longer turns green). The ref tree already used the cloud icon. @grid visual baselines refreshed and inspected. [agent: claude]
+- [ ] Owner ticks: let an agent edit and commit in the open repository while PowerGit sits in the background; on coming back the change count and the graph are current without pressing Refresh.
+- [ ] Owner ticks: remote branches on graph rows are told apart from local ones at a glance (cloud glyph).
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content

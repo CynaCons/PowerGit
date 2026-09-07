@@ -246,6 +246,7 @@ export default function App({ base }: { base: EngineClient }) {
               <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
                 <HistoryPane
                   rows={rows}
+                  remoteNames={remoteNames}
                   selected={selected}
                   loadingTail={loadingTail}
                   loading={live && !demo && !loaded}

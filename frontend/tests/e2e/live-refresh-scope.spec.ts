@@ -98,6 +98,22 @@ test.describe("GET /events change classification", () => {
     }
   })
 
+  // v0.13.19 owner report: "sometimes the tool goes stale when an agent
+  // updates the repo". An agent editing a tracked file runs no git command,
+  // so .git never changes and the watcher stays silent; the status poll
+  // (useRepoState, 10 s while visible) is what picks it up.
+  test("an edit to a tracked file with no git command shows up on its own", async ({ page }) => {
+    await openRepoOnEngine(repoDir)
+    await page.goto("/")
+    await expect(page.getByTestId("grid-row")).toHaveCount(2)
+    await expect(page.getByTestId("engine-status")).toContainText("(0 changes)")
+
+    writeFileSync(join(repoDir, "a.txt"), "a\nedited by an agent\n")
+
+    await expect(page.getByTestId("engine-status")).toContainText("(1 change", { timeout: 20_000 })
+    git(repoDir, "checkout", "--", "a.txt")
+  })
+
   test("a status-only change refetches status only; a ref move refreshes revisions and keeps the selection", async ({
     page,
   }) => {

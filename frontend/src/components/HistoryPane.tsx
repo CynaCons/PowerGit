@@ -12,6 +12,7 @@ export type HistoryPaneProps = {
   rows: GraphRow[]
   selected: number
   loadingTail: boolean
+  remoteNames?: string[]
   /** Initial load of this repository (no rows yet); a background refresh keeps the rows. */
   loading: boolean
   engineError: string | null
@@ -29,6 +30,7 @@ export type HistoryPaneProps = {
 // stopped, demo) with its own primary action instead of one generic line.
 export function HistoryPane({
   rows,
+  remoteNames,
   selected,
   loadingTail,
   loading,
@@ -89,6 +91,7 @@ export function HistoryPane({
           selected={selected}
           onSelect={onSelect}
           loadingTail={loadingTail}
+          remoteNames={remoteNames}
           onNearEnd={onNearEnd}
           onRowContextMenu={onRowContextMenu}
         />
