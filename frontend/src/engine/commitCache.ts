@@ -1,3 +1,5 @@
+import { syntheticChanges, syntheticCommitDetail } from "../graph/synthetic"
+import { isDemoMode } from "../hooks/useEngineSession"
 import type { EngineClient } from "./client"
 import type { CommitChanges, CommitDetail, DiffOptions } from "./types"
 
@@ -33,6 +35,11 @@ function remember(k: string, entry: Entry) {
 
 /** Details + changes of a commit, shared across callers; starts the requests if needed. */
 export function commitData(engine: EngineClient, id: string, options: DiffOptions = DEFAULT_DIFF_OPTIONS): Entry {
+  // Demo (Pages, ?demo=1): no engine; the panel gets sample details and a
+  // sample diff for the selected row instead of "no repository open".
+  if (isDemoMode()) {
+    return { commit: Promise.resolve(syntheticCommitDetail(id)), changes: Promise.resolve(syntheticChanges(id)) }
+  }
   const k = key(engine, id, options)
   const hit = cache.get(k)
   if (hit) {

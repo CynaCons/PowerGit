@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report } from "../diagnostics"
 import { changeKindOf, describeThrown, type ChangeKind, type RefTree, type RepoStatus, type StashInfo } from "../engine"
+import { syntheticRefTree, syntheticStatus } from "../graph/synthetic"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
 
@@ -20,7 +21,7 @@ export type RepoState = ReturnType<typeof useRepoState>
 // action funnels through — including the engine's change stream and the
 // repository load that follows a session becoming "ready".
 export function useRepoState({ session, history }: RepoStateDeps) {
-  const { client, view, setEngineError, setRecents, handleFailure, openRepo } = session
+  const { client, view, setEngineError, setRecents, handleFailure, openRepo, demo } = session
   const { live } = view
   const { reloadHistory, resetHistory } = history
   const [refs, setRefs] = useState<RefTree | null>(null)
@@ -71,6 +72,14 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     },
     [client, reloadHistory, handleFailure],
   )
+
+  // Demo (Pages, ?demo=1): no engine, so the ref panel and status bar take
+  // the sample rows' refs instead of staying empty.
+  useEffect(() => {
+    if (!demo) return
+    setRefs(syntheticRefTree())
+    setStatus(syntheticStatus())
+  }, [demo])
 
   // Repository load: whenever this window's session changes (boot resolved
   // it, or the user opened another one) drop the old history and load.

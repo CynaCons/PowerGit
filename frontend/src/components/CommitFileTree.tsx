@@ -6,6 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState, type ReactNode } from "react"
 import { describeThrown, isAbort, useEngine, type TreeEntry } from "../engine"
+import { isDemoMode } from "../hooks/useEngineSession"
 
 type Props = {
   commitId: string | null
@@ -23,6 +24,10 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
     setRoot(null)
     setDirs(new Map())
     if (!commitId) return
+    if (isDemoMode()) {
+      setRoot({ entries: [], error: null })
+      return
+    }
     const ctrl = new AbortController()
     engine
       .tree(commitId, undefined, ctrl.signal)
@@ -63,6 +68,16 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
     return (
       <Box data-testid="commit-file-tree" sx={{ p: 2 }}>
         <CircularProgress size={18} />
+      </Box>
+    )
+  }
+  if (isDemoMode()) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          The repository tree at a revision comes from the git engine, which the browser demo runs without. In the app
+          this tab lists every file at the selected commit, unchanged ones included.
+        </Typography>
       </Box>
     )
   }
