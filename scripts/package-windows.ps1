@@ -25,7 +25,7 @@ if (-not $SkipBuild) {
     # need the private key. The override lives in a file because a JSON
     # --config argument does not survive npm on Windows intact.
     if ($env:POWERGIT_SIGN -eq "1") {
-      npm run tauri build -- --config tauri.updater.conf.json
+      npm run tauri build -- --config src-tauri/tauri.updater.conf.json
     } else {
       npm run tauri build
     }
