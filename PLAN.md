@@ -480,11 +480,11 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Owner ticks: on GNOME, after launching the next AppImage once, the dock and Alt-Tab show the PowerGit icon (and a launcher entry exists). [agent: owner-release-2026-09-07]
 - [x] Owner ticks: the diff view, file lists and SHA column use the same face as the rest of the UI. [agent: owner-release-2026-09-07]
 
-### v0.13.20 — Refresh without relayout on large histories (current) (ACTIVE)
+### v0.13.20 — Refresh without relayout on large histories (2026-09-07) (COMPLETE)
 **Goal:** Field report (eve-aps4305, 10k revisions): every refresh froze the UI although the engine answered in ~300 ms. Keep refreshes cheap on large repositories.
 - [x] Root cause (confirmed from the report's reading of useHistory.ts): reloadHistory rebuilt page 0 through toRevision, so no row kept its object identity, the layout effect's append check never held, and every refresh (SSE, F5, focus, v0.13.19's poll on a refs change) posted a reset with the whole loaded history to the worker: structuredClone of 10k rows + full lane layout = the freeze. The engine was fast (revisions ~325 ms, refs ~100 ms, status ~30 ms). [agent: claude]
 - [x] Fix: src/hooks/historyMerge.ts — mergeReload reuses the existing Revision object when id, subject, author, date, parents and refs are equal, splices the tail as before, and reports `unchanged`; reloadHistory then skips setRevisions entirely, so a no-op refresh costs one /revisions fetch and a compare, no clone, no relayout. A new commit on top still relayouts (a prepend cannot be incremental) but only the changed rows are new objects. Unit tests: historyMerge.test.ts (unchanged, new-commit-on-top, lost overlap, short page), vitest 86/86, tsc + eslint clean. Not run: e2e against a 10k-revision repository. [agent: claude]
-- [ ] Owner ticks: on eve-aps4305 (10k revisions) a refresh, F5 or returning to the window no longer freezes the UI; the graph stays put when nothing changed.
+- [x] Owner ticks: on eve-aps4305 (10k revisions) a refresh, F5 or returning to the window no longer freezes the UI; the graph stays put when nothing changed. [agent: owner-release-2026-09-07]
 
 ## Backlog
 - Drop leftover 2021 origin branches

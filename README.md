@@ -50,7 +50,9 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.13.19 keeps the view
+Tracked openly in [PLAN.md](PLAN.md). Release v0.13.20 makes refreshes
+cheap on large histories (unchanged rows keep their identity, so a no-op
+refresh never re-lays out the graph), keeps the view
 current while agents work in the repository (status re-checked every 10 s,
 full refresh on focus, change-stream echo guard fixed), marks remote
 branches with a cloud on graph rows, registers the AppImage's desktop entry
