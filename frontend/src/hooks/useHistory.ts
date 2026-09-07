@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report } from "../diagnostics"
-import { isAbort, type EngineClient, type RevisionDto } from "../engine"
+import { isAbort, type EngineClient } from "../engine"
 import { createLayouter, layoutGraph, type GraphLayouter } from "../graph/layout"
 import { syntheticHistory } from "../graph/synthetic"
 import type { GraphRow, Revision } from "../graph/types"
-
-function toRevision(dto: RevisionDto): Revision {
-  return {
-    id: dto.id,
-    parents: dto.parents,
-    message: dto.subject,
-    author: dto.author,
-    date: dto.date.replace("T", " ").slice(0, 16),
-    refs: dto.refs,
-  }
-}
+import { mergeReload, toRevision } from "./historyMerge"
 
 // History pages in from the engine: the first page renders fast, autofill
 // keeps loading in the background up to EAGER_CEILING, and scrolling or
@@ -219,18 +209,13 @@ export function useHistory({ client, demo, live, setEngineError, onFailure }: Hi
     abortInflight()
     const page = await fetchPage(0)
     if (histGen.current !== gen) return
-    const fresh = page.map(toRevision)
-    let next = fresh
-    let complete = page.length < PAGE
-    if (!complete) {
-      const old = revisionsRef.current
-      const lastId = fresh[fresh.length - 1]?.id
-      const k = lastId ? old.findIndex((r) => r.id === lastId) : -1
-      if (k >= 0) {
-        const seen = new Set(fresh.map((r) => r.id))
-        next = [...fresh, ...old.slice(k + 1).filter((r) => !seen.has(r.id))]
-        complete = historyCompleteRef.current
-      }
+    // Rows keep their identity where nothing changed (historyMerge.ts), so
+    // the layout effect sees an append or nothing at all instead of a
+    // 10k-row reset on every refresh; a no-op refresh skips setState.
+    const { next, complete, unchanged } = mergeReload(page, revisionsRef.current, PAGE, historyCompleteRef.current)
+    if (unchanged) {
+      setLoaded(true)
+      return
     }
     revCount.current = next.length
     revisionsRef.current = next
