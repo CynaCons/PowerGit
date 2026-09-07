@@ -65,3 +65,11 @@ and app zoom multiplies it again, so guessed offsets hit the wrong control.
 Put "looked at: states 1-8 on <platform>, <date>" plus anything odd in the
 worker report or the PLAN.md task text. A capture that shows an error state,
 synthetic data or a half-loaded graph is a finding, not a baseline.
+
+## State 10 — pending changes on top of HEAD (v0.14.1)
+
+With a dirty tree the graph shows "Working directory (N files)" and, when
+something is staged, "Index (N files)" above HEAD: dashed hollow nodes in
+HEAD's lane, italic message, no SHA. Clicking one fills the Diff tab from
+the status (worktree diffs); the Commit tab offers "Open commit dialog".
+Committing removes them. Capture with a real edit, not a fixture.

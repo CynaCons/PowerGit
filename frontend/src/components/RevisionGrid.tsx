@@ -190,6 +190,7 @@ export function RevisionGrid({
                 className={`grid-row${item.index === selected ? " selected" : ""}`}
                 data-testid="grid-row"
                 data-index={item.index}
+                data-artificial={row.artificial}
                 onClick={() => {
                   onSelect(item.index)
                   parentRef.current?.focus()
@@ -243,8 +244,8 @@ export function RevisionGrid({
                 </div>
                 <div className="author">{row.rev.author}</div>
                 <div className="date">{row.rev.date}</div>
-                <div className="sha" data-testid="sha-cell" title={row.rev.id}>
-                  {row.rev.id.slice(0, 7)}
+                <div className="sha" data-testid="sha-cell" title={row.artificial ? undefined : row.rev.id}>
+                  {row.artificial ? "" : row.rev.id.slice(0, 7)}
                 </div>
               </div>
             )

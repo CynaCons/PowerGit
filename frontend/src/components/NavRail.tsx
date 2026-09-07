@@ -1,6 +1,7 @@
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
 import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutlined"
 import HistoryIcon from "@mui/icons-material/History"
+import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
@@ -12,9 +13,10 @@ export type NavRailProps = {
   onOpenRepo: () => void
   onRecents: () => void
   onSettings: () => void
+  onSnapshot: () => void
 }
 
-export function NavRail({ repoName, onOpenRepo, onRecents, onSettings }: NavRailProps) {
+export function NavRail({ repoName, onOpenRepo, onRecents, onSettings, onSnapshot }: NavRailProps) {
   return (
     <Box
       component="nav"
@@ -64,6 +66,16 @@ export function NavRail({ repoName, onOpenRepo, onRecents, onSettings }: NavRail
         </IconButton>
       </Tooltip>
       <Box sx={{ flex: 1 }} />
+      <Tooltip title="Diagnostic snapshot" placement="right">
+        <IconButton
+          onClick={onSnapshot}
+          sx={{ borderRadius: 2 }}
+          data-testid="snapshot-button"
+          aria-label="Diagnostic snapshot"
+        >
+          <BugReportOutlinedIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
       <Tooltip title={`Settings (${shortcutLabel("browse.openSettings")})`} placement="right">
         <IconButton onClick={onSettings} sx={{ borderRadius: 2 }} data-testid="settings-button" aria-label="Settings">
           <SettingsOutlinedIcon fontSize="small" />

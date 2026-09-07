@@ -17,7 +17,9 @@ import { useEngine, type GitConfig, type VsCodeInfo } from "../engine"
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
 import { ZOOM_DEFAULT, getZoom, setZoom, stepZoom, zoomPercent } from "../theme/zoom"
+import { openLogsFolder } from "../diagnostics/snapshot"
 import { useUpdater } from "../hooks/useUpdater"
+import { isTauriShell } from "../shell"
 import { progressPercent, progressText } from "../updates/updateMachine"
 
 type Props = { open: boolean; onClose: () => void }
@@ -186,6 +188,11 @@ export function SettingsDialog({ open, onClose }: Props) {
         <Button disabled={!vs?.found} onClick={onApplyVsCode} sx={{ alignSelf: "flex-start" }}>
           Use VS Code as editor / diff / merge
         </Button>
+        {isTauriShell() && (
+          <Button onClick={() => void openLogsFolder()} sx={{ alignSelf: "flex-start" }} data-testid="open-logs-folder">
+            Open logs folder
+          </Button>
+        )}
 
         {section("Updates", version ? `PowerGit v${version}` : "PowerGit")}
         <UpdatesSection updater={updater} />

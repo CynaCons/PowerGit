@@ -27,6 +27,7 @@ export function RevisionContextMenu({
   onRebase,
   onCreateBranch,
   onCreateTag,
+  onOpenCommit,
 }: {
   target: ContextTarget | null
   branches: string[]
@@ -36,6 +37,7 @@ export function RevisionContextMenu({
   onRebase: () => void
   onCreateBranch: (sha: string) => void
   onCreateTag: (sha: string) => void
+  onOpenCommit: () => void
 }) {
   const localBranches = target ? branches.filter((b) => target.row.rev.refs.includes(b)) : []
   // Cherry-pick/revert have no extra options (unlike checkout/reset), so
@@ -82,119 +84,135 @@ export function RevisionContextMenu({
           paper: { id: "revision-context-menu", sx: { pointerEvents: "auto" } },
         }}
       >
-        <MenuItem
-          data-testid="ctx-checkout"
-          disabled={localBranches.length === 0}
-          onClick={() => {
-            onClose()
-            onCheckout(localBranches[0])
-          }}
-        >
-          <ListItemIcon>
-            <CallSplitIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Checkout Branch…</ListItemText>
-          <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
-            {shortcutLabel("browse.checkoutBranch")}
-          </Typography>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-create-branch"
-          onClick={() => {
-            const sha = target!.row.rev.id
-            onClose()
-            onCreateBranch(sha)
-          }}
-        >
-          <ListItemIcon>
-            <CallSplitIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Create Branch Here…</ListItemText>
-          <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
-            {shortcutLabel("browse.createBranch")}
-          </Typography>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-create-tag"
-          onClick={() => {
-            const sha = target!.row.rev.id
-            onClose()
-            onCreateTag(sha)
-          }}
-        >
-          <ListItemIcon>
-            <SellOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Create Tag Here…</ListItemText>
-          <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
-            {shortcutLabel("browse.createTag")}
-          </Typography>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-reset"
-          onClick={() => {
-            onClose()
-            onReset()
-          }}
-        >
-          <ListItemIcon>
-            <UndoIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Reset Current Branch to Here…</ListItemText>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-rebase"
-          onClick={() => {
-            onClose()
-            onRebase()
-          }}
-        >
-          <ListItemIcon>
-            <BuildIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Rebase Current Branch onto Here…</ListItemText>
-          <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
-            {shortcutLabel("browse.rebase")}
-          </Typography>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-copy-sha"
-          onClick={() => {
-            if (target) void navigator.clipboard?.writeText(target.row.rev.id)
-            onClose()
-          }}
-        >
-          <ListItemIcon>
-            <ContentCopyIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Copy SHA</ListItemText>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-cherry-pick"
-          onClick={() => {
-            const row = target!.row
-            onClose()
-            setCherryPickTarget(row)
-          }}
-        >
-          <ListItemIcon>
-            <ContentPasteGoIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Cherry-pick Here…</ListItemText>
-        </MenuItem>
-        <MenuItem
-          data-testid="ctx-revert"
-          onClick={() => {
-            const row = target!.row
-            onClose()
-            setRevertTarget(row)
-          }}
-        >
-          <ListItemIcon>
-            <SettingsBackupRestoreIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Revert Commit…</ListItemText>
-        </MenuItem>
+        {/* Pending-change rows (v0.14.1) are not commits: one action. */}
+        {target?.row.artificial && (
+          <MenuItem
+            data-testid="ctx-open-commit"
+            onClick={() => {
+              onClose()
+              onOpenCommit()
+            }}
+          >
+            <ListItemText>Open commit dialog…</ListItemText>
+          </MenuItem>
+        )}
+        {!target?.row.artificial && (
+          <>
+            <MenuItem
+              data-testid="ctx-checkout"
+              disabled={localBranches.length === 0}
+              onClick={() => {
+                onClose()
+                onCheckout(localBranches[0])
+              }}
+            >
+              <ListItemIcon>
+                <CallSplitIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Checkout Branch…</ListItemText>
+              <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+                {shortcutLabel("browse.checkoutBranch")}
+              </Typography>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-create-branch"
+              onClick={() => {
+                const sha = target!.row.rev.id
+                onClose()
+                onCreateBranch(sha)
+              }}
+            >
+              <ListItemIcon>
+                <CallSplitIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Create Branch Here…</ListItemText>
+              <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+                {shortcutLabel("browse.createBranch")}
+              </Typography>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-create-tag"
+              onClick={() => {
+                const sha = target!.row.rev.id
+                onClose()
+                onCreateTag(sha)
+              }}
+            >
+              <ListItemIcon>
+                <SellOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Create Tag Here…</ListItemText>
+              <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+                {shortcutLabel("browse.createTag")}
+              </Typography>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-reset"
+              onClick={() => {
+                onClose()
+                onReset()
+              }}
+            >
+              <ListItemIcon>
+                <UndoIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Reset Current Branch to Here…</ListItemText>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-rebase"
+              onClick={() => {
+                onClose()
+                onRebase()
+              }}
+            >
+              <ListItemIcon>
+                <BuildIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Rebase Current Branch onto Here…</ListItemText>
+              <Typography variant="caption" color="text.secondary" sx={{ pl: 2 }}>
+                {shortcutLabel("browse.rebase")}
+              </Typography>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-copy-sha"
+              onClick={() => {
+                if (target) void navigator.clipboard?.writeText(target.row.rev.id)
+                onClose()
+              }}
+            >
+              <ListItemIcon>
+                <ContentCopyIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Copy SHA</ListItemText>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-cherry-pick"
+              onClick={() => {
+                const row = target!.row
+                onClose()
+                setCherryPickTarget(row)
+              }}
+            >
+              <ListItemIcon>
+                <ContentPasteGoIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Cherry-pick Here…</ListItemText>
+            </MenuItem>
+            <MenuItem
+              data-testid="ctx-revert"
+              onClick={() => {
+                const row = target!.row
+                onClose()
+                setRevertTarget(row)
+              }}
+            >
+              <ListItemIcon>
+                <SettingsBackupRestoreIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Revert Commit…</ListItemText>
+            </MenuItem>
+          </>
+        )}
       </Menu>
       {cherryPickTarget && (
         <CherryPickDialog

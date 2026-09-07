@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test"
 test("dragging the bottom split handle resizes the file column and persists the width", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.getByTestId("grid-row").first().click()
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: /Diff/ }).click()
 
   const fileList = page.getByTestId("file-list")
@@ -32,7 +32,7 @@ test("dragging the bottom split handle resizes the file column and persists the 
 
   await page.reload()
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.getByTestId("grid-row").first().click()
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: /Diff/ }).click()
 
   const persisted = (await page.getByTestId("file-list").boundingBox())!

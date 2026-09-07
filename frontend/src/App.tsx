@@ -26,6 +26,15 @@ import { zoomIn, zoomOut, zoomReset } from "./theme"
 import { useBarLayout } from "./theme/barLayout"
 import { TitleStrip } from "./components/TitleStrip"
 import { CommandRail } from "./components/CommandRail"
+import { IncidentBanner } from "./components/IncidentBanner"
+import { SnapshotDialog, type SnapshotState } from "./components/SnapshotDialog"
+import { setStateSampler } from "./diagnostics"
+import { buildFrontendDump, takeSnapshot } from "./diagnostics/snapshot"
+import { describeThrown } from "./engine"
+import { withArtificialRows } from "./graph/artificial"
+import { useHeartbeat } from "./hooks/useHeartbeat"
+import { getThemePreference } from "./theme/appearance"
+import { getZoom } from "./theme/zoom"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together plus the browse-scope hotkeys. `base`
@@ -36,9 +45,26 @@ export default function App({ base }: { base: EngineClient }) {
   const { view, state, client, engineError, setEngineError, recents, demo } = session
   const { live, offline, repo } = view
   const history = useHistory({ client, demo, live, setEngineError, onFailure: session.handleFailure })
-  const { rows, selected, current, setSelectedSha, loadingTail, loaded, historyNote } = history
+  const { rows: engineRows, selectedSha, setSelectedSha, loadingTail, loaded, historyNote } = history
   const repoState = useRepoState({ session, history })
   const { refs, status, stashes, refresh, refreshing, openFolder, remoteNames, defaultRemote, dirty } = repoState
+  // Pending changes as rows on top of HEAD (v0.14.1): injected after layout,
+  // so the engine rows and the worker's append path stay untouched. Selection
+  // is resolved here so a pending row can be the current one.
+  const unstagedCount = status?.unstagedCount ?? 0
+  const stagedCount = status?.stagedCount ?? 0
+  const rows = useMemo(
+    () => withArtificialRows(engineRows, status ? { unstagedCount, stagedCount } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [engineRows, status !== null, unstagedCount, stagedCount],
+  )
+  const selected = useMemo(() => {
+    const i = selectedSha ? rows.findIndex((r) => r.rev.id === selectedSha) : -1
+    return i >= 0 ? i : rows.length > 0 ? 0 : -1
+  }, [rows, selectedSha])
+  const current = selected >= 0 ? rows[selected] : undefined
+  const headId = useMemo(() => engineRows.find((r) => r.isHead)?.rev.id ?? null, [engineRows])
+  useHeartbeat()
   // Tag chips on graph rows get a tag glyph (v0.14.0, owner: "tags should
   // be having a different little icon"); names come from the ref tree.
   const tagNames = useMemo(() => (refs?.tags ?? []).map((t) => t.name), [refs])
@@ -60,6 +86,31 @@ export default function App({ base }: { base: EngineClient }) {
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [snapshot, setSnapshot] = useState<SnapshotState>({ phase: "idle" })
+  // Owner (v0.14.1): "dump all the information that we need in a file or
+  // package, and I'll bring it back to you".
+  const takeDiagnosticSnapshot = async () => {
+    setSnapshot({ phase: "working" })
+    try {
+      const dump = await buildFrontendDump({
+        client,
+        version: view.health?.engine ?? null,
+        phase: state.phase,
+        repo,
+        rows: rows.length,
+        selected: current?.rev.id ?? null,
+        zoom: getZoom(),
+        theme: getThemePreference(),
+      })
+      setSnapshot({ phase: "done", result: await takeSnapshot(dump) })
+    } catch (e) {
+      setSnapshot({ phase: "error", message: describeThrown(e) })
+    }
+  }
+  useEffect(() => {
+    setStateSampler(() => ({ phase: state.phase, rows: rows.length, repo: repo?.name ?? null }))
+    return () => setStateSampler(null)
+  }, [state.phase, rows.length, repo?.name])
   const railBar = useBarLayout() === "rail"
   // The highlight must land in the click's own frame; commit details, files
   // and diff follow in a deferred render and load asynchronously.
@@ -78,6 +129,7 @@ export default function App({ base }: { base: EngineClient }) {
     openRepo: () => void openFolder(),
     openRecents: () => open({ kind: "recents" }),
     openSettings: () => open({ kind: "settings" }),
+    openSnapshot: () => void takeDiagnosticSnapshot(),
     selectTarget: (sha: string) => void history.jumpToRef(sha),
     collapseLeft: () => setLeftOpen(false),
     expandLeft: () => setLeftOpen(true),
@@ -200,6 +252,7 @@ export default function App({ base }: { base: EngineClient }) {
             openStash={chrome.openStash}
           />
         )}
+        <IncidentBanner />
         {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
 
         <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
@@ -209,6 +262,7 @@ export default function App({ base }: { base: EngineClient }) {
               onOpenRepo={chrome.openRepo}
               onRecents={chrome.openRecents}
               onSettings={chrome.openSettings}
+              onSnapshot={chrome.openSnapshot}
               live={live}
               dirty={dirty}
               stashCount={stashes.length}
@@ -226,6 +280,7 @@ export default function App({ base }: { base: EngineClient }) {
               onOpenRepo={chrome.openRepo}
               onRecents={chrome.openRecents}
               onSettings={chrome.openSettings}
+              onSnapshot={chrome.openSnapshot}
             />
           )}
 
@@ -289,7 +344,15 @@ export default function App({ base }: { base: EngineClient }) {
                     "&:hover": { bgcolor: "primary.main" },
                   }}
                 />
-                <BottomPanel current={deferredCurrent} height={bottomHeight} tab={bottomTab} onTab={setBottomTab} />
+                <BottomPanel
+                  current={deferredCurrent}
+                  status={status}
+                  headId={headId}
+                  onOpenCommit={actions.openCommit}
+                  height={bottomHeight}
+                  tab={bottomTab}
+                  onTab={setBottomTab}
+                />
               </Box>
             </Box>
           </Box>
@@ -313,6 +376,7 @@ export default function App({ base }: { base: EngineClient }) {
           jobs={jobs}
         />
         <JobPanel jobs={jobs} onClose={() => jobs.setPanelOpen(false)} />
+        <SnapshotDialog state={snapshot} onClose={() => setSnapshot({ phase: "idle" })} />
         <RecoveryPanel
           open={recoveryOpen || (state.phase === "engine-failed" && !demo)}
           phase={state}

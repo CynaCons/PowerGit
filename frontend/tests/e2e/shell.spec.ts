@@ -130,8 +130,11 @@ test("grid virtualizes a large history", async ({ page }) => {
 
 test("sha column is visible", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByTestId("sha-cell").first()).toBeVisible()
-  await expect(page.getByTestId("sha-cell").first()).toHaveText(/^[0-9a-f]{7}$/i)
+  // The first rows may be the pending-change rows (v0.14.1), which have no
+  // SHA; the first real commit's cell must show seven hex digits.
+  const sha = page.locator('[data-testid="grid-row"]:not([data-artificial]) [data-testid="sha-cell"]').first()
+  await expect(sha).toBeVisible()
+  await expect(sha).toHaveText(/^[0-9a-f]{7}$/i)
 })
 
 test("settings opens from the navrail", async ({ page }) => {
@@ -165,7 +168,7 @@ test("file tree tab shows repo tree at revision", async ({ page }) => {
 
 test("revision context menu offers checkout, reset, rebase", async ({ page }) => {
   await page.goto("/")
-  await page.getByTestId("grid-row").first().click({ button: "right" })
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click({ button: "right" })
   await expect(page.getByTestId("ctx-checkout")).toBeVisible()
   await expect(page.getByTestId("ctx-reset")).toBeVisible()
   await expect(page.getByTestId("ctx-rebase")).toBeVisible()
@@ -173,7 +176,7 @@ test("revision context menu offers checkout, reset, rebase", async ({ page }) =>
   await expect(page.getByRole("heading", { name: /Rebase/ })).toBeVisible()
   await page.getByRole("button", { name: "Cancel" }).click()
 
-  await page.getByTestId("grid-row").first().click({ button: "right" })
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click({ button: "right" })
   await page.getByTestId("ctx-reset").click()
   await expect(page.getByRole("heading", { name: /Reset branch/ })).toBeVisible()
   await page.getByRole("button", { name: "Cancel" }).click()

@@ -1,3 +1,4 @@
+import { isArtificialId } from "../graph/artificial"
 import { describeThrown } from "../engine"
 import type { Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
@@ -7,7 +8,7 @@ import type { RepoState } from "./useRepoState"
 
 export type GitActionsDeps = {
   session: Pick<EngineSession, "client" | "view" | "setEngineError">
-  history: Pick<History, "current">
+  history: Pick<History, "current" | "selectedSha">
   repoState: Pick<RepoState, "status" | "setStatus" | "setRefs" | "refresh" | "branchNames" | "openFolder">
   jobs: Pick<Jobs, "withBusy" | "runJob">
   dialogs: Dialogs
@@ -110,12 +111,14 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
 
   // Shared by the toolbar buttons and their hotkeys so both entry points
   // always agree on behaviour.
+  // Pending-change rows (v0.14.1) are not commits: no ref, no rebase.
+  const onArtificial = isArtificialId(history.selectedSha ?? "")
   function openCreateBranch() {
-    if (!current) return
+    if (!current || onArtificial) return
     open({ kind: "createRef", refKind: "branch", sha: current.rev.id, subject: current.rev.message })
   }
   function openCreateTag() {
-    if (!current) return
+    if (!current || onArtificial) return
     open({ kind: "createRef", refKind: "tag", sha: current.rev.id, subject: current.rev.message })
   }
   function openCheckoutBranch() {
@@ -123,7 +126,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     if (name) open({ kind: "checkout", branch: name })
   }
   function openRebase() {
-    if (current) open({ kind: "rebase", row: current })
+    if (current && !onArtificial) open({ kind: "rebase", row: current })
   }
   async function deleteBranchPrompt() {
     const hint = branchNames.length > 0 ? `Delete which branch?\n(${branchNames.join(", ")})` : "Delete which branch?"

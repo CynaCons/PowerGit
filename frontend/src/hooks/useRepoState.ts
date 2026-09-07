@@ -159,16 +159,24 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       const isFirst = last === null
       last = e.data
       if (isFirst) return // initial snapshot, nothing changed
-      if (inFlight.current > 0 || Date.now() < muteUntil.current) return // our own action
+      // Our own action's echo lands while its refresh is in flight or just
+      // after; an external change in that same window (git add, then commit
+      // a second later) must not be lost, so the event is deferred past the
+      // mute instead of dropped (v0.14.1). Refreshes that change nothing are
+      // cheap since v0.13.20.
+      const echoDelay = Math.max(muteUntil.current - Date.now() + 100, inFlight.current > 0 ? ECHO_MS + 500 : 0)
       const kind = changeKindOf(Number(e.data))
       if (pendingKind !== "refs") pendingKind = kind
       window.clearTimeout(timer)
-      timer = window.setTimeout(() => {
-        const scope: RefreshScope =
-          pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
-        pendingKind = "none"
-        void refresh(scope).catch(() => undefined)
-      }, 400)
+      timer = window.setTimeout(
+        () => {
+          const scope: RefreshScope =
+            pendingKind === "status" ? { status: true } : { revisions: true, refs: true, status: true }
+          pendingKind = "none"
+          void refresh(scope).catch(() => undefined)
+        },
+        Math.max(400, echoDelay),
+      )
     }
     return () => {
       window.clearTimeout(timer)

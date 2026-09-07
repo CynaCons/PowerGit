@@ -8,7 +8,7 @@ import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
 import Tabs from "@mui/material/Tabs"
 import Typography from "@mui/material/Typography"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { CompactFileList } from "./CompactFileList"
 import { SplitHandle } from "./SplitHandle"
@@ -25,17 +25,25 @@ import {
   type DiffDto,
   type DiffOptions,
   type FileChange,
+  type RepoStatus,
 } from "../engine"
 import type { GraphRow } from "../graph/types"
 
 type Props = {
   current: GraphRow | undefined
+  /** Pending-change rows (v0.14.1) read their files from the status. */
+  status: RepoStatus | null
+  /** HEAD's sha: the File Tree of a pending row is the tree at HEAD. */
+  headId: string | null
+  onOpenCommit: () => void
   height: number
   tab?: number
   onTab?: (tab: number) => void
 }
 
 import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
+import { PendingSummary } from "./PendingSummary"
+import { pendingOf, usePendingDiff } from "./pendingRows"
 
 const FILES_WIDTH_STORAGE_KEY = "pg.bottomFilesWidth"
 const DEFAULT_FILES_WIDTH = 340
@@ -75,8 +83,9 @@ function useDelayed(pending: boolean, delayMs: number): boolean {
   return shown && pending
 }
 
-export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
+export function BottomPanel({ current, status, headId, onOpenCommit, height, tab: tabProp, onTab }: Props) {
   const engine = useEngine()
+  const pendingRow = useMemo(() => pendingOf(current, status), [current, status])
   const [tabState, setTabState] = useState(0)
   const tab = tabProp ?? tabState
   const setTab = onTab ?? setTabState
@@ -124,12 +133,22 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   const commitId = current && current.rev.id.length >= 16 ? current.rev.id : null
+  // Pending rows: files come from the status, the diff from the worktree.
+  const pendingDiff = usePendingDiff(pendingRow, pendingRow ? file : null, diffOpts)
+  useEffect(() => {
+    if (!pendingRow) return
+    setFiles(pendingRow.files)
+    setFile((f) => (f && pendingRow.files.some((x) => x.path === f) ? f : (pendingRow.files[0]?.path ?? null)))
+    setDetail({ kind: "idle" })
+  }, [pendingRow])
 
   // Latest selection wins (v0.13.11): every request below is tied to an
   // AbortController the cleanup aborts, so arrow-keying through rows never
   // leaves stale git children running or stale responses applied.
   useEffect(() => {
     if (!commitId) {
+      // A pending-change row has no commit; its effect above owns the files.
+      if (pendingRow) return
       setDetail({ kind: "idle" })
       setFiles([])
       setFile(null)
@@ -194,6 +213,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
       clearTimeout(timer)
       ctrl.abort()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, commitId, reloadTick])
 
   useEffect(() => {
@@ -268,8 +288,14 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
   // runs the tool in the background and returns immediately, so this only
   // surfaces a validation/startup error, not the tool's own exit status.
   function openInDifftool(path: string) {
-    if (!commitId) return
     setDiffToolError(null)
+    if (pendingRow) {
+      void engine
+        .openWorkTreeDifftool(path, pendingRow.staged)
+        .catch((e: unknown) => setDiffToolError(`open in diff tool failed: ${describeThrown(e)}`))
+      return
+    }
+    if (!commitId) return
     void engine
       .openDifftool(commitId, path)
       .catch((e: unknown) => setDiffToolError(`open in diff tool failed: ${describeThrown(e)}`))
@@ -302,14 +328,22 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         ref={panelRef}
         sx={{ flex: 1, minHeight: 0, display: "flex", opacity: busy ? 0.6 : 1, transition: "opacity 120ms" }}
       >
-        {tab === 0 && <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} busy={busy} />}
+        {tab === 0 &&
+          (pendingRow ? (
+            <PendingSummary pending={pendingRow} branch={status?.branch ?? null} onOpenCommit={onOpenCommit} />
+          ) : (
+            <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} busy={busy} />
+          ))}
         {tab === 1 && (
           <>
             <Box
               sx={{
                 width: filesWidth,
                 flexShrink: 0,
-                overflow: "auto",
+                // The list scrolls inside; the mode button below is anchored
+                // to this box's visible bottom, not to the scrolled content
+                // (v0.14.1, owner: floating buttons that "disappear").
+                overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
                 position: "relative",
@@ -361,7 +395,7 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
             </Box>
             <SplitHandle {...splitHandleProps} />
             <DiffPane
-              diff={diff}
+              diff={pendingRow ? pendingDiff : diff}
               busy={busy}
               file={file}
               options={diffOpts}
@@ -374,7 +408,10 @@ export function BottomPanel({ current, height, tab: tabProp, onTab }: Props) {
         {tab === 2 && (
           <>
             <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto" }} data-testid="commit-file-tree-wrap">
-              <CommitFileTree commitId={commitId} onSelectFile={(path) => setTreeFile(path)} />
+              <CommitFileTree
+                commitId={commitId ?? (pendingRow ? headId : null)}
+                onSelectFile={(path) => setTreeFile(path)}
+              />
             </Box>
             <SplitHandle {...splitHandleProps} />
             {blob.kind === "error" ? (

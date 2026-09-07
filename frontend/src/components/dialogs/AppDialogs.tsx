@@ -71,6 +71,7 @@ export function AppDialogs({ dialogs, actions, repo, recents, repoState, jobs }:
       />
 
       <RevisionContextMenu
+        onOpenCommit={actions.openCommit}
         target={ctxTarget}
         branches={branchNames}
         onClose={() => close("context")}

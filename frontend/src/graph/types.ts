@@ -25,6 +25,8 @@ export type GraphRow = {
   hasRefs: boolean
   isHead: boolean
   segments: RowSegment[]
+  /** Pending changes shown as a row on top of HEAD (v0.14.1): "worktree" (unstaged) or "index" (staged). */
+  artificial?: "worktree" | "index"
 }
 
 export const LANE_WIDTH = 16

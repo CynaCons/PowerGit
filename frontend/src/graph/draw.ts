@@ -146,6 +146,8 @@ export function drawRows(
       drawNode(ctx, xFor(row.lane), centerY, row, laneColors, headOutline, {
         fill: dimming && !highlighted ? nonRelative : null,
         ring: ringing && highlighted,
+        // Pending-change rows (v0.14.1): a dashed hollow node, not a commit.
+        hollow: row.artificial !== undefined,
       })
     }
 
@@ -417,7 +419,7 @@ function bezier(ctx: CanvasRenderingContext2D, e0: Point, c0: Point, c1: Point, 
   ctx.stroke()
 }
 
-type NodeStyle = { fill: string | null; ring: boolean }
+type NodeStyle = { fill: string | null; ring: boolean; hollow?: boolean }
 
 function drawNode(
   ctx: CanvasRenderingContext2D,
@@ -432,6 +434,16 @@ function drawNode(
   const left = x - d / 2
   const top = y - d / 2
   ctx.fillStyle = style.fill ?? laneColors[row.color % laneColors.length]
+  if (style.hollow) {
+    ctx.strokeStyle = ctx.fillStyle
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([2, 2])
+    ctx.beginPath()
+    ctx.arc(x, y, d / 2, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    return
+  }
 
   if (row.hasRefs) {
     ctx.fillRect(Math.round(left), Math.round(top), d, d)

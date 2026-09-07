@@ -310,3 +310,10 @@ code {
     "liga" 0,
     "calt" 0;
 }
+
+/* Pending-change rows on top of HEAD (v0.14.1): not commits, so they read
+   as a note rather than a message, and carry no SHA. */
+.grid-row[data-artificial] .msg-text {
+  font-style: italic;
+  color: var(--pg-text-secondary, #5b6573);
+}

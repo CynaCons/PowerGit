@@ -31,7 +31,7 @@ test("split handle has a minimum 8px hit area and a visible hover/active state",
 test("pointercancel releases the handle and persists the width like pointerup", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.getByTestId("grid-row").first().click()
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: /Diff/ }).click()
 
   const fileList = page.getByTestId("file-list")

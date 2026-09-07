@@ -20,7 +20,7 @@ test("cherry-pick dialog calls the engine and surfaces a conflict error", async 
     },
   )
 
-  await page.getByTestId("grid-row").first().click({ button: "right" })
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click({ button: "right" })
   await page.getByTestId("ctx-cherry-pick").click()
   await expect(page.getByRole("heading", { name: /Cherry-pick/ })).toBeVisible()
 
@@ -51,7 +51,7 @@ test("revert dialog calls the engine and closes on success", async ({ page }) =>
     },
   )
 
-  await page.getByTestId("grid-row").first().click({ button: "right" })
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click({ button: "right" })
   await page.getByTestId("ctx-revert").click()
   await expect(page.getByRole("heading", { name: /Revert/ })).toBeVisible()
 

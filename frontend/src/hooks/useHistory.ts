@@ -275,6 +275,7 @@ export function useHistory({ client, demo, live, setEngineError, onFailure }: Hi
     rows,
     selected,
     current,
+    selectedSha,
     setSelectedSha,
     loadingTail,
     loaded,

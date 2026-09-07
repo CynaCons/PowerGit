@@ -3,6 +3,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft"
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
 import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutlined"
 import HistoryIcon from "@mui/icons-material/History"
+import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
 import Box from "@mui/material/Box"
 import Divider from "@mui/material/Divider"
@@ -21,13 +22,14 @@ import { RAIL_STORAGE_KEY, readExpanded } from "./railState"
 // settings entries the plain NavRail had.
 
 export type CommandRailProps = CommandDeps & {
+  onSnapshot: () => void
   repoName?: string
   onOpenRepo: () => void
   onRecents: () => void
   onSettings: () => void
 }
 
-export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...deps }: CommandRailProps) {
+export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, onSnapshot, ...deps }: CommandRailProps) {
   const commands = useCommandItems(deps)
   const [expanded, setExpanded] = useState(readExpanded)
   const toggle = () => {
@@ -118,6 +120,18 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...de
           <RailItem key={item.id} item={item} expanded={expanded} />
         ))}
       </Box>
+      {/* Owner (v0.14.1): "an emergency button just above the settings" that
+          packages the logs and state for a report. */}
+      <RailItem
+        item={{
+          id: "snapshot",
+          label: "Diagnostic snapshot",
+          icon: <BugReportOutlinedIcon />,
+          testid: "snapshot-button",
+          onClick: onSnapshot,
+        }}
+        expanded={expanded}
+      />
       <RailItem
         item={{
           id: "settings",

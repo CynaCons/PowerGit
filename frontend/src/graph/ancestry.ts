@@ -25,6 +25,8 @@ export function markAncestry(rows: readonly GraphRow[]): Ancestry | null {
   if (!head) return null
   const marks = new Map<string, Mark>()
   marks.set(head.rev.id, 2)
+  // Pending-change rows sit on top of HEAD and are its future: never dimmed.
+  for (const row of rows) if (row.artificial) marks.set(row.rev.id, 2)
   for (const row of rows) {
     const mark = marks.get(row.rev.id)
     if (!mark) continue

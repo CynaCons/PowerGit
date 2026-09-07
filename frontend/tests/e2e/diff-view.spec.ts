@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test"
 test("diff view does not wrap and shows a line-number gutter", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.getByTestId("grid-row").first().click()
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: /Diff/ }).click()
   await expect(page.getByTestId("diff-pane")).toBeVisible()
 
@@ -29,7 +29,7 @@ test("diff view does not wrap and shows a line-number gutter", async ({ page }) 
 test("blob view does not wrap long lines", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.getByTestId("grid-row").first().click()
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: "File Tree" }).click()
   await expect(page.getByTestId("commit-file-tree")).toBeVisible()
 
@@ -48,7 +48,7 @@ test("blob view does not wrap long lines", async ({ page }) => {
 test("double-click a file in the Files tab requests the external diff tool", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.getByTestId("grid-row").first().click()
+  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: /Diff/ }).click()
 
   const rows = page.getByTestId("file-list-row")

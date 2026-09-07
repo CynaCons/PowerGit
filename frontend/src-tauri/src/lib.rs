@@ -2,6 +2,9 @@
 // unit-test it; only the call in setup() is Linux-only.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod desktop_integration;
+mod snapshot;
+mod tinyhttp;
+mod watchdog;
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -43,6 +46,21 @@ struct EngineState {
     /// Set on ExitRequested so a Terminated event during shutdown is not
     /// mistaken for a crash.
     exiting: Mutex<bool>,
+    /// v0.14.1 diagnostics: the webview's own log beside engine.log, the
+    /// last heartbeat the page sent (None until the first), whether the
+    /// watchdog currently considers the page unresponsive, and when this
+    /// shell started.
+    frontend_log: Mutex<Option<File>>,
+    last_beat: Mutex<Option<Instant>>,
+    unresponsive_since: Mutex<Option<Instant>>,
+    started: Instant,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Incident {
+    at: String,
+    snapshot: String,
 }
 
 #[derive(serde::Serialize)]
@@ -81,6 +99,235 @@ fn engine_log_path(state: tauri::State<EngineState>) -> Option<String> {
         .log_path
         .as_ref()
         .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Tauri command: the page beats every 2 s; silence is what the watchdog
+/// (watchdog.rs) turns into an incident.
+#[tauri::command]
+fn heartbeat(state: tauri::State<EngineState>) {
+    *state.last_beat.lock().expect("beat mutex poisoned") = Some(Instant::now());
+}
+
+/// Tauri command: the page streams its diagnostics here so they exist on
+/// disk when the page itself can no longer show them.
+#[tauri::command]
+fn log_frontend(state: tauri::State<EngineState>, lines: Vec<String>) {
+    let mut guard = state.frontend_log.lock().expect("frontend log poisoned");
+    if let Some(file) = guard.as_mut() {
+        for line in lines {
+            let _ = writeln!(file, "{line}");
+        }
+        let _ = file.flush();
+    }
+}
+
+/// Tauri command: writes snapshot-<time>.zip in the log dir and returns its
+/// path. `frontend` is the page's own dump (empty when the watchdog calls
+/// without a responsive page).
+#[tauri::command]
+fn diagnostic_snapshot(app: AppHandle, frontend: String) -> Result<String, String> {
+    write_snapshot(&app, frontend, "button")
+}
+
+/// Tauri command: the incident the watchdog recorded during the previous
+/// run, if any; cleared once read so the banner shows once.
+#[tauri::command]
+fn last_incident(app: AppHandle) -> Option<Incident> {
+    let path = app.path().app_log_dir().ok()?.join("incident.json");
+    let text = fs::read_to_string(&path).ok()?;
+    let _ = fs::remove_file(&path);
+    serde_json::from_str(&text).ok()
+}
+
+/// Tauri command: the log directory (Settings -> Open logs folder).
+#[tauri::command]
+fn log_dir(app: AppHandle) -> Option<String> {
+    app.path()
+        .app_log_dir()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+fn log_dir_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("log dir: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("log dir: {e}"))?;
+    Ok(dir)
+}
+
+/// Assembles the package (snapshot.rs) from the shell's facts, both logs,
+/// the page's dump and the engine's answers, and writes it to the log dir.
+fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<String, String> {
+    let state = app.state::<EngineState>();
+    let dir = log_dir_path(app)?;
+    let beat_age = state
+        .last_beat
+        .lock()
+        .expect("beat mutex poisoned")
+        .map(|b| format!("{:.1}s ago", b.elapsed().as_secs_f64()))
+        .unwrap_or_else(|| "never".into());
+    let unresponsive = state
+        .unresponsive_since
+        .lock()
+        .expect("watchdog mutex poisoned")
+        .map(|t| format!("{:.0}s", t.elapsed().as_secs_f64()))
+        .unwrap_or_else(|| "no".into());
+    let child_pid = state
+        .child
+        .lock()
+        .expect("engine state mutex poisoned")
+        .as_ref()
+        .map(|c| c.pid().to_string())
+        .unwrap_or_else(|| "none".into());
+    let restarts = state.restarts.lock().expect("restart mutex poisoned").0;
+    let facts = snapshot::shell_facts(&[
+        ("powergit", env!("POWERGIT_VERSION").into()),
+        ("taken", timestamp()),
+        ("trigger", trigger.into()),
+        (
+            "os",
+            format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
+        ),
+        ("shell pid", std::process::id().to_string()),
+        (
+            "uptime",
+            format!("{:.0}s", state.started.elapsed().as_secs_f64()),
+        ),
+        ("engine port", state.port.to_string()),
+        ("engine pid", child_pid),
+        ("engine restarts in window", restarts.to_string()),
+        ("last webview heartbeat", beat_age),
+        ("webview unresponsive for", unresponsive),
+    ]);
+    let mut parts = vec![
+        snapshot::Part::text("shell.txt", facts),
+        snapshot::Part::text("frontend.json", frontend),
+    ];
+    for name in [
+        "engine.log",
+        "engine.log.1",
+        "frontend.log",
+        "frontend.log.1",
+    ] {
+        let bytes = fs::read(dir.join(name)).unwrap_or_default();
+        if !bytes.is_empty() || !name.ends_with(".1") {
+            parts.push(snapshot::Part {
+                name: name.into(),
+                bytes,
+            });
+        }
+    }
+    // Engine facts straight from the sidecar; each is best-effort so a dead
+    // engine still yields a package that says so.
+    let timeout = Duration::from_secs(3);
+    let fetch = |path: &str| match tinyhttp::get(state.port, path, &state.token, timeout) {
+        Ok(body) => body,
+        Err(e) => serde_json::json!({ "error": e }).to_string(),
+    };
+    let sessions = fetch("/repos/sessions");
+    parts.push(snapshot::Part::text("engine/health.json", fetch("/health")));
+    parts.push(snapshot::Part::text(
+        "engine/sessions.json",
+        sessions.clone(),
+    ));
+    parts.push(snapshot::Part::text(
+        "engine/recents.json",
+        fetch("/repos/recents"),
+    ));
+    if let Ok(serde_json::Value::Array(list)) = serde_json::from_str::<serde_json::Value>(&sessions)
+    {
+        for session in list {
+            if let Some(id) = session.get("id").and_then(|v| v.as_str()) {
+                parts.push(snapshot::Part::text(
+                    &format!("engine/jobs-{id}.json"),
+                    fetch(&format!("/repos/{id}/jobs")),
+                ));
+            }
+        }
+    }
+    let bytes = snapshot::build_zip(&parts)?;
+    let name = format!("snapshot-{}.zip", timestamp().replace(':', "-"));
+    let path = dir.join(name);
+    fs::write(&path, bytes).map_err(|e| format!("write snapshot: {e}"))?;
+    log_line(
+        &state,
+        &format!(
+            "diagnostic snapshot ({trigger}) written to {}",
+            path.display()
+        ),
+    );
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// The watchdog loop: watchdog.rs decides, this applies the effects.
+fn spawn_watchdog(handle: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(watchdog::INTERVAL).await;
+            let state = handle.state::<EngineState>();
+            if *state.exiting.lock().expect("exiting flag poisoned") {
+                return;
+            }
+            let age = state
+                .last_beat
+                .lock()
+                .expect("beat mutex poisoned")
+                .map(|b| b.elapsed());
+            let unresponsive = state
+                .unresponsive_since
+                .lock()
+                .expect("watchdog mutex poisoned")
+                .is_some();
+            match watchdog::step(age, unresponsive) {
+                watchdog::Transition::None => {}
+                watchdog::Transition::BecameUnresponsive => {
+                    *state
+                        .unresponsive_since
+                        .lock()
+                        .expect("watchdog mutex poisoned") = Some(Instant::now());
+                    log_line(
+                        &state,
+                        &format!(
+                            "webview unresponsive: no heartbeat for {:.0}s",
+                            age.map(|a| a.as_secs_f64()).unwrap_or(0.0)
+                        ),
+                    );
+                    match write_snapshot(&handle, String::new(), "watchdog") {
+                        Ok(path) => {
+                            if let Ok(dir) = log_dir_path(&handle) {
+                                let incident = Incident {
+                                    at: timestamp(),
+                                    snapshot: path,
+                                };
+                                if let Ok(text) = serde_json::to_string(&incident) {
+                                    let _ = fs::write(dir.join("incident.json"), text);
+                                }
+                            }
+                        }
+                        Err(e) => log_line(&state, &format!("watchdog snapshot failed: {e}")),
+                    }
+                }
+                watchdog::Transition::Recovered => {
+                    let since = state
+                        .unresponsive_since
+                        .lock()
+                        .expect("watchdog mutex poisoned")
+                        .take();
+                    if let Some(t) = since {
+                        log_line(
+                            &state,
+                            &format!(
+                                "webview responsive again after {:.0}s",
+                                t.elapsed().as_secs_f64()
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    });
 }
 
 /// Picks the port to spawn the sidecar on. The default port is tried first
@@ -311,6 +558,24 @@ fn open_engine_log(app: &AppHandle) -> (Option<PathBuf>, Option<File>) {
     (Some(path), file)
 }
 
+/// frontend.log beside engine.log, same rotation (v0.14.1).
+fn open_frontend_log(app: &AppHandle) -> Option<File> {
+    let dir = app.path().app_log_dir().ok()?;
+    fs::create_dir_all(&dir).ok()?;
+    let path = dir.join("frontend.log");
+    if fs::metadata(&path)
+        .map(|m| m.len() > 2 * 1024 * 1024)
+        .unwrap_or(false)
+    {
+        let _ = fs::rename(&path, dir.join("frontend.log.1"));
+    }
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .ok()
+}
+
 // The engine sidecar serves git over HTTP. It is spawned at startup and
 // supervised for the lifetime of the app; the frontend polls /health and
 // shows the recovery panel if it never comes up. The child handle lives in
@@ -327,11 +592,22 @@ pub fn run() {
         // locally signed build through the flow, build with a --config
         // override of plugins.updater.endpoints (see the release skill).
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![engine_config, engine_log_path])
+        // Settings -> Open logs folder and the snapshot dialog's "Show in folder".
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![
+            engine_config,
+            engine_log_path,
+            heartbeat,
+            log_frontend,
+            diagnostic_snapshot,
+            last_incident,
+            log_dir
+        ])
         .setup(|app| {
             let port = resolve_engine_port();
             let token = generate_token();
             let (log_path, log) = open_engine_log(app.handle());
+            let frontend_log = open_frontend_log(app.handle());
             app.manage(EngineState {
                 base_url: format!("http://{ENGINE_HOST}:{port}"),
                 port,
@@ -341,6 +617,10 @@ pub fn run() {
                 log: Mutex::new(log),
                 restarts: Mutex::new((0, Instant::now())),
                 exiting: Mutex::new(false),
+                frontend_log: Mutex::new(frontend_log),
+                last_beat: Mutex::new(None),
+                unresponsive_since: Mutex::new(None),
+                started: Instant::now(),
             });
 
             let state = app.state::<EngineState>();
@@ -361,6 +641,7 @@ pub fn run() {
             }
 
             spawn_engine(app.handle().clone());
+            spawn_watchdog(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -443,6 +724,10 @@ mod tests {
             log: Mutex::new(None),
             restarts: Mutex::new((0, Instant::now())),
             exiting: Mutex::new(false),
+            frontend_log: Mutex::new(None),
+            last_beat: Mutex::new(None),
+            unresponsive_since: Mutex::new(None),
+            started: Instant::now(),
         }
     }
 

@@ -55,6 +55,15 @@ default, greys out everything else, so its history and the merges into it
 stand out. The pill at the bottom of the graph column switches between all
 ancestors and the first-parent line, and turns the ring or the dimming off.
 
+## If something goes wrong
+
+Rail → **Diagnostic snapshot** (above Settings) writes a zip next to the
+logs with the app and engine logs, the engine's state and the page's own
+diagnostics; attach it to your report. Should the window ever stop
+responding, the app's shell notices within 15 seconds, writes the same
+snapshot on its own, and tells you where it is on the next launch.
+Settings → Tools → Open logs folder shows the files.
+
 ## Updating
 
 Settings → Updates → "Check for updates" asks GitHub for the latest release,
