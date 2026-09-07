@@ -20,15 +20,29 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build sidecar + app + package
+      - name: Build sidecar + app + package (signed for the updater)
         shell: pwsh
+        # v0.14.0: the installer is signed so the in-app updater can verify
+        # it; createUpdaterArtifacts is passed here rather than committed so
+        # local package-windows.ps1 runs never need the private key.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          POWERGIT_SIGN: "1"
         run: scripts/package-windows.ps1
+      - name: Keep the installer signature for the manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-sig
+          path: dist/*-setup.exe.sig
+          if-no-files-found: error
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.zip
             dist/*-setup.exe
+            dist/*-setup.exe.sig
 
   linux:
     runs-on: ubuntu-22.04
@@ -88,9 +102,57 @@ jobs:
           name: appimage-matrix-logs
           path: /tmp/appimage-matrix/**/app.std*.txt
           if-no-files-found: ignore
+      - name: Sign the repaired AppImage for the updater
+        # v0.14.0: inspect-appimage.sh --fix repacked the file, so the
+        # signature tauri build wrote no longer matches; sign what ships.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        working-directory: frontend
+        run: |
+          APP=$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)
+          rm -f "$APP.sig"
+          npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$APP"
+          test -s "$APP.sig"
+      - name: Keep the AppImage signature for the manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-sig
+          path: frontend/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+          if-no-files-found: error
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+            frontend/src-tauri/target/release/bundle/appimage/*.AppImage.sig
             frontend/src-tauri/target/release/bundle/deb/*.deb
+
+  manifest:
+    # v0.14.0: latest.json is what the app's "Check for updates" reads
+    # (releases/latest/download/latest.json). Built once both signed
+    # artifacts exist, so a half-built release never advertises itself.
+    needs: [windows, linux]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-sig
+          path: sigs
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-sig
+          path: sigs
+      - name: Assemble latest.json
+        run: |
+          node scripts/build-updater-manifest.mjs --tag "${GITHUB_REF_NAME}"             --linux-sig sigs/*.AppImage.sig --windows-sig sigs/*-setup.exe.sig --out latest.json
+          node scripts/check-version.mjs --tag "${GITHUB_REF_NAME}" --manifest latest.json
+          cat latest.json
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: latest.json

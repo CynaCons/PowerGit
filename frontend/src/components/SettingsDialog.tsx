@@ -1,4 +1,7 @@
+import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
+import LinearProgress from "@mui/material/LinearProgress"
+import Link from "@mui/material/Link"
 import Dialog from "@mui/material/Dialog"
 import DialogActions from "@mui/material/DialogActions"
 import DialogContent from "@mui/material/DialogContent"
@@ -14,6 +17,8 @@ import { useEngine, type GitConfig, type VsCodeInfo } from "../engine"
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
 import { ZOOM_DEFAULT, getZoom, setZoom, stepZoom, zoomPercent } from "../theme/zoom"
+import { useUpdater } from "../hooks/useUpdater"
+import { progressPercent, progressText } from "../updates/updateMachine"
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -32,6 +37,8 @@ export function SettingsDialog({ open, onClose }: Props) {
   const [theme, setTheme] = useState<ThemePreference>("system")
   const [bar, setBar] = useState<BarLayout>("rail")
   const [zoom, setZoomDraft] = useState(ZOOM_DEFAULT)
+  const [version, setVersion] = useState<string | null>(null)
+  const updater = useUpdater()
 
   useEffect(() => {
     if (!open) return
@@ -48,6 +55,11 @@ export function SettingsDialog({ open, onClose }: Props) {
       .vsCode()
       .then(setVs)
       .catch(() => setVs({ found: false, path: null, applied: false }))
+    // App and engine share the one version in package.json (check-version.mjs).
+    engine
+      .health()
+      .then((h) => setVersion(h.engine))
+      .catch(() => setVersion(null))
   }, [engine, open])
 
   async function onSave() {
@@ -174,6 +186,9 @@ export function SettingsDialog({ open, onClose }: Props) {
         <Button disabled={!vs?.found} onClick={onApplyVsCode} sx={{ alignSelf: "flex-start" }}>
           Use VS Code as editor / diff / merge
         </Button>
+
+        {section("Updates", version ? `PowerGit v${version}` : "PowerGit")}
+        <UpdatesSection updater={updater} />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
@@ -182,5 +197,96 @@ export function SettingsDialog({ open, onClose }: Props) {
         </Button>
       </DialogActions>
     </Dialog>
+  )
+}
+
+// Manual updates (v0.14.0): nothing is fetched until "Check for updates",
+// nothing installed until "Download and restart". Outside the desktop app
+// (browser, Pages demo) the section only says where updates come from.
+function UpdatesSection({ updater }: { updater: ReturnType<typeof useUpdater> }) {
+  const { state, kind, checkNow, install } = updater
+  if (kind === "none") {
+    return (
+      <Typography variant="body2" color="text.secondary" data-testid="updates-none">
+        Updates come with the desktop app. Downloads:{" "}
+        <Link href="https://github.com/CynaCons/PowerGit/releases" target="_blank" rel="noreferrer">
+          github.com/CynaCons/PowerGit/releases
+        </Link>
+      </Typography>
+    )
+  }
+  const busy = state.phase === "checking" || state.phase === "downloading"
+  const update =
+    state.phase === "available" || state.phase === "ready" || state.phase === "downloading" ? state.update : null
+  return (
+    <Box
+      sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+      data-testid="updates-section"
+      data-phase={state.phase}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Button variant="outlined" size="small" onClick={checkNow} disabled={busy} data-testid="update-check">
+          Check for updates
+        </Button>
+        {state.phase === "checking" && (
+          <Typography variant="body2" color="text.secondary">
+            Checking…
+          </Typography>
+        )}
+        {state.phase === "upToDate" && (
+          <Typography variant="body2" color="text.secondary" data-testid="update-uptodate">
+            You are up to date.
+          </Typography>
+        )}
+      </Box>
+      {update && (
+        <Typography variant="body2" data-testid="update-available">
+          PowerGit v{update.version} is available.
+          {update.notes ? ` ${update.notes}` : ""}
+        </Typography>
+      )}
+      {state.phase === "available" && (
+        <>
+          <Typography variant="caption" color="text.secondary">
+            PowerGit closes, installs v{state.update.version} and reopens.
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={install}
+            sx={{ alignSelf: "flex-start" }}
+            data-testid="update-install"
+          >
+            Download and restart
+          </Button>
+        </>
+      )}
+      {state.phase === "downloading" && (
+        <Box data-testid="update-progress">
+          <LinearProgress
+            variant={progressPercent(state.received, state.total) === null ? "indeterminate" : "determinate"}
+            value={progressPercent(state.received, state.total) ?? 0}
+          />
+          <Typography variant="caption" color="text.secondary">
+            Downloading {progressText(state.received, state.total)}
+          </Typography>
+        </Box>
+      )}
+      {state.phase === "ready" && (
+        <Typography variant="body2" color="text.secondary" data-testid="update-ready">
+          Downloaded. PowerGit is restarting…
+        </Typography>
+      )}
+      {state.phase === "error" && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="body2" color="error" data-testid="update-error">
+            {state.message}
+          </Typography>
+          <Button size="small" onClick={state.update ? install : checkNow}>
+            Retry
+          </Button>
+        </Box>
+      )}
+    </Box>
   )
 }

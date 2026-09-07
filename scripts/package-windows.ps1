@@ -20,7 +20,15 @@ if (-not $SkipBuild) {
     npm ci
     $code = $LASTEXITCODE
     if ($code -ne 0) { Pop-Location; exit $code }
-    npm run tauri build
+    # v0.14.0: CI sets POWERGIT_SIGN=1 (with the TAURI_SIGNING_* secrets) so the
+    # installer gets its updater signature; local runs stay unsigned and never
+    # need the private key. The override lives in a file because a JSON
+    # --config argument does not survive npm on Windows intact.
+    if ($env:POWERGIT_SIGN -eq "1") {
+      npm run tauri build -- --config tauri.updater.conf.json
+    } else {
+      npm run tauri build
+    }
     $code = $LASTEXITCODE
     Pop-Location
     if ($code -ne 0) { exit $code }

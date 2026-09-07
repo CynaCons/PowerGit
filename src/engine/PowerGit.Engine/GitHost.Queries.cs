@@ -132,7 +132,13 @@ public sealed partial class GitHost
             30_000,
             ct,
             "-c", "core.quotepath=false",
-            "diff-tree", "--root", "-r", "--no-commit-id", "--name-status", "-M", id);
+            // --diff-merges=first-parent: a merge is diffed against its first
+            // parent, as Git Extensions does; without it diff-tree prints
+            // nothing for a merge (owner, v0.14.0: "merge commits are not
+            // showing a diff"). -m --first-parent is not the same: it also
+            // emits the diff against the second parent. Byte-identical output
+            // for ordinary and root commits.
+            "diff-tree", "--root", "-r", "--no-commit-id", "--name-status", "-M", "--diff-merges=first-parent", id);
         if (diff.ExitCode != 0)
         {
             throw new InvalidOperationException(diff.StdErr.Trim());
@@ -161,7 +167,7 @@ public sealed partial class GitHost
         int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
         List<string> args = [
             "-c", "core.quotepath=false",
-            "show", "--format=", "--find-renames", $"-U{u}",
+            "show", "--format=", "--find-renames", "--diff-merges=first-parent", $"-U{u}",
             id,
         ];
         if (ignoreWhitespace)
@@ -193,7 +199,8 @@ public sealed partial class GitHost
     {
         string root = RequireRoot();
         int u = fullFile ? 100_000 : Math.Clamp(context, 0, 1000);
-        List<string> patchArgs = ["-c", "core.quotepath=false", "show", "--format=", "--find-renames", $"-U{u}"];
+        // --diff-merges=first-parent: same merge handling as ListFiles/GetDiff.
+        List<string> patchArgs = ["-c", "core.quotepath=false", "show", "--format=", "--find-renames", "--diff-merges=first-parent", $"-U{u}"];
         if (ignoreWhitespace)
         {
             patchArgs.Add("-w");

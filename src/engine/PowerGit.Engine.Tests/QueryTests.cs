@@ -68,6 +68,34 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void Merge_commit_lists_files_and_first_parent_diff()
+    {
+        // Owner (v0.14.0): "merge commits are not showing a diff in the diff
+        // view". diff-tree/show print nothing for a merge unless told which
+        // parent; Git Extensions diffs against the first parent.
+        using TempRepo repo = new();
+        File.WriteAllText(Path.Combine(repo.Dir, "main.txt"), "main work\n");
+        repo.StageAndCommit("main change");
+        GitProcess.Run("git", ["merge", "--no-ff", "-m", "Merge branch 'feature'", "feature"], repo.Dir, 30_000);
+
+        GitHost host = new();
+        Assert.NotNull(host.TryDiscover(repo.Dir));
+        RevisionDto merge = host.ListRevisions(1)[0];
+        Assert.Equal(2, merge.Parents.Length);
+
+        // Against the first parent only: the feature branch's one file, not
+        // main's own change seen from the second parent.
+        IReadOnlyList<FileChangeDto> files = host.ListFiles(merge.Id);
+        FileChangeDto file = Assert.Single(files);
+        Assert.NotEqual("main.txt", file.Path);
+        CommitChangesDto changes = host.GetChanges(merge.Id);
+        Assert.Equal(files, changes.Files);
+        Assert.NotNull(changes.FirstDiff);
+        Assert.Contains("@@", changes.FirstDiff!.Text);
+        Assert.Equal(host.GetDiff(merge.Id, files[0].Path), changes.FirstDiff);
+    }
+
+    [Fact]
     public void FirstPatchSection_cuts_the_first_file_only()
     {
         string patch = "diff --git a/a.txt b/a.txt\nindex 1..2 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/b.txt b/b.txt\n+z\n";

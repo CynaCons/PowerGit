@@ -105,6 +105,38 @@ Before a minor release also run the 10-minute longevity gate once on 26.04
 (`scripts/appimage-matrix.ps1 <file> -Versions "26.04" -Longevity 10`, and
 again with `DISPLAY_MODE=wayland`).
 
+## 3b. Updater manifest (v0.14.0)
+
+The app's Settings → "Check for updates" reads
+`https://github.com/CynaCons/PowerGit/releases/latest/download/latest.json`
+and verifies each artifact's minisign signature against the public key in
+`frontend/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`). The
+release workflow does all of it: the windows job builds with
+`POWERGIT_SIGN=1` (writes `_x64-setup.exe.sig`), the linux job signs the
+*repaired* AppImage with `npx tauri signer sign` after `inspect-appimage.sh
+--fix` and the launch matrix, and the `manifest` job assembles
+`latest.json` with `scripts/build-updater-manifest.mjs`, checks it with
+`node scripts/check-version.mjs --tag vX.Y.Z --manifest latest.json`, and
+uploads it. Both jobs need the repository secrets
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+The private key and its password live only in those secrets and in
+`~/.tauri/powergit.key` / `powergit.key.password` on the owner's machine.
+Losing both orphans every installed app (it rejects manifests signed by any
+other key). Never commit them. Local `scripts/package-windows.ps1` runs stay
+unsigned and need neither.
+
+After the run: `gh release view vX.Y.Z` must list `latest.json`, the
+`.AppImage.sig` and the `-setup.exe.sig`. Then, from an installed previous
+version, Settings → Check for updates must find vX.Y.Z; "Download and
+restart" reopens the app on it. That is the owner's tick for the updater.
+
+To walk the flow before a real release: sign a local AppImage with
+`npx tauri signer sign -f ~/.tauri/powergit.key -p <password> <file>`,
+write a `latest.json` by hand with a higher version and a `file://` or local
+`http://` URL, and build the app with
+`--config '{"plugins":{"updater":{"endpoints":["http://127.0.0.1:8099/latest.json"],"dangerousInsecureTransportProtocol":true}}}'`.
+
 ## 4. GitHub release notes
 
 Use `gh release view vX.Y.Z --web` / `gh release edit` to add notes:

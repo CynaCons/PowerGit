@@ -321,6 +321,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_process::init())
+        // In-app updates (v0.14.0): endpoint and public key come from
+        // tauri.conf.json (the GitHub release's latest.json). To walk a
+        // locally signed build through the flow, build with a --config
+        // override of plugins.updater.endpoints (see the release skill).
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![engine_config, engine_log_path])
         .setup(|app| {
             let port = resolve_engine_port();

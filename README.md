@@ -48,6 +48,14 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 More screenshots and an interactive live demo:
 **[cynacons.github.io/PowerGit](https://cynacons.github.io/PowerGit/)**
 
+## Updating
+
+Settings → Updates → "Check for updates" asks GitHub for the latest release,
+verifies its signature and, on "Download and restart", installs it and
+reopens PowerGit. Nothing is checked or downloaded unless you press the
+button. Works for the Windows installer and the Linux AppImage (the AppImage
+must be writable); the portable zip is replaced by hand.
+
 ## Status & roadmap
 
 Tracked openly in [PLAN.md](PLAN.md). Release v0.13.20 makes refreshes

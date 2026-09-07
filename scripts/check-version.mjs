@@ -5,6 +5,7 @@
 //   --engine-url http://127.0.0.1:7733   also compare GET /health "engine"
 //   --dist dist                          also check packaged artifact names
 //   --tag vX.Y.Z                         also compare a git tag / release name
+//   --manifest latest.json               also check the updater manifest (v0.14.0)
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -74,6 +75,21 @@ const tag = opt("--tag")
 if (tag) {
   if (tag === `v${version}`) ok(`tag ${tag} matches`)
   else fail(`tag ${tag} does not match v${version}`)
+}
+
+// v0.14.0: the updater manifest the app reads from the release.
+const manifest = opt("--manifest")
+if (manifest) {
+  const m = JSON.parse(readFileSync(manifest, "utf8"))
+  if (m.version === version) ok(`manifest version ${m.version}`)
+  else fail(`manifest version ${m.version} != ${version}`)
+  for (const key of ["linux-x86_64", "windows-x86_64"]) {
+    const p = m.platforms?.[key]
+    if (!p) fail(`manifest has no ${key}`)
+    else if (!p.url.includes(`/v${version}/`) || !p.url.includes(`_${version}_`)) fail(`${key} url ${p.url} lacks ${version}`)
+    else if (!p.signature || p.signature.length < 40) fail(`${key} signature missing`)
+    else ok(`manifest ${key}`)
+  }
 }
 
 if (failures.length) {
