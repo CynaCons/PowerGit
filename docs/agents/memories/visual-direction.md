@@ -79,3 +79,17 @@ Cream + serif + terracotta; near-black + one acid accent; hairline
 broadsheet columns; the rounded-card kit (which is exactly what the
 v0.13.13 shell was: every pane a bordered rounded Paper on a grey floor);
 uppercase eyebrows (the grid header was one); middle-dot meta strings.
+
+## The graph's second signal: the checked-out branch's history (v0.14.0)
+
+After selection, the one other thing the graph says is which commits the
+checked-out branch reaches. Reachable nodes carry a thin ring in the head
+outline colour (HEAD keeps its 2px ring); with "Dim others" on, everything
+outside that history is painted in the Git Extensions non-relative grey
+(`--pg-lane-non-relative`) and the highlighted lines get one extra pixel of
+stroke. Scope is all ancestors or the first-parent line. The choices live
+in the floating pill at the bottom-left of the graph column
+(`GraphOptionsBar`), the same device as the diff options pill. Text cells
+are never dimmed: the message column stays readable, the graph column
+carries the signal. Tag chips carry a tag glyph in violet; remote chips a
+cloud in green.

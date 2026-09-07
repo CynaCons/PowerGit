@@ -14,6 +14,7 @@ html {
 }
 
 .main {
+  position: relative; /* anchors the graph options pill (v0.14.0) */
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -252,6 +253,12 @@ html {
 .ref.remote {
   background: var(--pg-ref-remote-bg, #ecfdf5);
   color: var(--pg-ref-remote-fg, #059669);
+  gap: 3px;
+}
+
+.ref.tag {
+  background: var(--pg-ref-tag-bg, #f5f3ff);
+  color: var(--pg-ref-tag-fg, #6d28d9);
   gap: 3px;
 }
 

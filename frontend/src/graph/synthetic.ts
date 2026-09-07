@@ -82,6 +82,7 @@ export function syntheticHistory(count: number, seed = 1): Revision[] {
     const forceMerge = i === count - 3 && openBranches.length > 0
     if (i === 0) {
       parents = []
+      lastMain = id
     } else if ((forceMerge || roll < 0.18) && openBranches.length > 0 && lastMain) {
       const branchTip = openBranches.pop() as string
       parents = [lastMain, branchTip]

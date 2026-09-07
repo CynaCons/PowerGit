@@ -1,7 +1,11 @@
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { markAncestry } from "../graph/ancestry"
 import { drawRows, graphWidth } from "../graph/draw"
+import { useGraphOptions } from "../graph/graphOptions"
+import { GraphOptionsBar } from "./GraphOptionsBar"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 
 type Props = {
@@ -14,6 +18,8 @@ type Props = {
   /** Remote names from the ref tree; a ref whose first segment is one of
    *  them is a remote-tracking branch. Without it, any slash counts. */
   remoteNames?: string[]
+  /** Tag names from the ref tree; matching chips get the tag glyph. */
+  tagNames?: string[]
 }
 
 export function RevisionGrid({
@@ -24,7 +30,9 @@ export function RevisionGrid({
   loadingTail,
   onNearEnd,
   remoteNames,
+  tagNames,
 }: Props) {
+  const tagSet = useMemo(() => new Set(tagNames ?? []), [tagNames])
   const isRemote = (ref: string) => {
     const slash = ref.indexOf("/")
     if (slash < 0) return false
@@ -33,6 +41,11 @@ export function RevisionGrid({
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hovered, setHovered] = useState(-1)
+  // Branch history highlight (v0.14.0): recomputed only when the rows
+  // change (a refresh that changes nothing keeps the array, see
+  // historyMerge.ts), never per click.
+  const ancestry = useMemo(() => markAncestry(rows), [rows])
+  const graphOptions = useGraphOptions()
   // Last SHA the auto-scroll effect actually settled on. A --date-order
   // refresh can reorder rows so the same commit lands at a different index
   // with no user action; comparing SHAs (not the index) keeps that from
@@ -104,8 +117,8 @@ export function RevisionGrid({
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, hovered)
-  }, [rows, start, end, selected, hovered, width])
+    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, hovered, ancestry, graphOptions)
+  }, [rows, start, end, selected, hovered, width, ancestry, graphOptions])
 
   return (
     <div className="main" data-testid="revision-grid">
@@ -202,15 +215,24 @@ export function RevisionGrid({
                 <div className="msg">
                   <span className="msg-refs">
                     {refs.shown.map((ref) => {
-                      const remote = ref !== "HEAD" && !ref.includes("stash") && isRemote(ref)
+                      const tag = ref !== "HEAD" && tagSet.has(ref)
+                      const remote = ref !== "HEAD" && !tag && !ref.includes("stash") && isRemote(ref)
+                      const kind =
+                        ref === "HEAD"
+                          ? "head"
+                          : ref.includes("stash")
+                            ? "stash"
+                            : tag
+                              ? "tag"
+                              : remote
+                                ? "remote"
+                                : "local"
                       return (
-                        <span
-                          key={ref}
-                          className={`ref${ref === "HEAD" ? " head" : ref.includes("stash") ? " stash" : remote ? " remote" : ""}`}
-                          data-ref-kind={ref === "HEAD" ? "head" : remote ? "remote" : "local"}
-                        >
-                          {/* v0.13.19, owner: "a little cloud icon on the left of the remote branches" */}
+                        <span key={ref} className={`ref${kind === "local" ? "" : ` ${kind}`}`} data-ref-kind={kind}>
+                          {/* v0.13.19, owner: "a little cloud icon on the left of the remote branches";
+                              v0.14.0: "tags should be having a different little icon" */}
                           {remote && <CloudOutlinedIcon className="ref-cloud" />}
+                          {tag && <SellOutlinedIcon className="ref-cloud" />}
                           {ref}
                         </span>
                       )
@@ -229,6 +251,7 @@ export function RevisionGrid({
           })}
         </div>
       </div>
+      <GraphOptionsBar />
       {loadingTail && (
         <div className="grid-tail" data-testid="history-tail-loading">
           Loading more history…

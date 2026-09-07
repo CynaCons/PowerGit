@@ -34,7 +34,10 @@ test.describe("merge commit diff", () => {
   let repoDir: string
   let previousRepo: string | null = null
 
-  test.beforeAll(() => {
+  test.beforeAll(async () => {
+    // The engine is shared by every spec: remember what it had open BEFORE
+    // the first test swaps in the fixture, so afterAll hands it back.
+    previousRepo = await currentRepoPath()
     repoDir = mkdtempSync(join(tmpdir(), "pg-merge-"))
     git(repoDir, "init", "-q", "-b", "main")
     writeFileSync(join(repoDir, "a.txt"), "a\n")
@@ -65,7 +68,6 @@ test.describe("merge commit diff", () => {
   })
 
   test("the merge row lists its changed files and shows a diff", async ({ page }) => {
-    previousRepo = await currentRepoPath()
     await openRepoOnEngine(repoDir)
     await page.goto("/")
     const rows = page.getByTestId("grid-row")

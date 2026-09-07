@@ -1,9 +1,12 @@
+import { edgeInScope, inScope, type Ancestry } from "./ancestry"
+import { DEFAULT_GRAPH_OPTIONS, type GraphOptions } from "./graphOptions"
 import {
   LANE_COLORS,
   LANE_LINE_WIDTH,
   LANE_WIDTH,
   MAX_LANES,
   NODE_DIMENSION,
+  NON_RELATIVE_COLOR,
   NO_LANE,
   type GraphRow,
   type RowSegment,
@@ -53,6 +56,8 @@ export function drawRows(
   width: number,
   selected: number,
   hovered = -1,
+  ancestry: Ancestry | null = null,
+  options: GraphOptions = DEFAULT_GRAPH_OPTIONS,
 ): void {
   ctx.clearRect(0, 0, width, Math.max(1, end - start) * rowHeight)
   ctx.lineCap = "butt"
@@ -69,6 +74,14 @@ export function drawRows(
   const hoverFill = rootStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
   const laneColors = LANE_COLORS.map((fallback, i) => rootStyle.getPropertyValue(`--pg-lane-${i + 1}`).trim() || fallback)
   const headOutline = rootStyle.getPropertyValue("--pg-lane-head").trim() || "#1a1a1a"
+  // Branch history highlight (v0.14.0): commits reachable from HEAD keep
+  // their lane colour (and a ring); with `dim`, everything else is painted
+  // in the Git Extensions non-relative grey. A colour swap rather than
+  // globalAlpha keeps the canvas identical on WebKitGTK and never blends
+  // over the selection band.
+  const nonRelative = rootStyle.getPropertyValue("--pg-lane-non-relative").trim() || NON_RELATIVE_COLOR
+  const dimming = ancestry !== null && options.dim
+  const ringing = ancestry !== null && options.ring
 
   for (let i = start; i < end; i++) {
     const row = rows[i]
@@ -108,10 +121,14 @@ export function drawRows(
       const startX = xFor(lanes.startLane)
       const centerX = xFor(lanes.centerLane)
       const endX = xFor(lanes.endLane)
-      const color = laneColors[segment.color % laneColors.length]
       const diag = diagonalInfo(lanes)
+      const onPath =
+        ancestry !== null &&
+        edgeInScope(ancestry, options.scope, segment.childId, segment.parentId, firstParentOf(rows, segment.childId))
+      const color = dimming && !onPath ? nonRelative : laneColors[segment.color % laneColors.length]
+      const lineWidth = dimming && onPath ? LANE_LINE_WIDTH + 1 : LANE_LINE_WIDTH
 
-      const drawer = new SegmentDrawer(ctx, color, LANE_WIDTH, rowHeight)
+      const drawer = new SegmentDrawer(ctx, color, LANE_WIDTH, rowHeight, lineWidth)
       drawDiagonals(
         drawer,
         { x: startX, y: centerY - rowHeight },
@@ -125,11 +142,29 @@ export function drawRows(
     }
 
     if (row.lane < MAX_LANES) {
-    drawNode(ctx, xFor(row.lane), centerY, row, laneColors, headOutline)
+      const highlighted = inScope(ancestry, options.scope, row.rev.id)
+      drawNode(ctx, xFor(row.lane), centerY, row, laneColors, headOutline, {
+        fill: dimming && !highlighted ? nonRelative : null,
+        ring: ringing && highlighted,
+      })
     }
 
     ctx.restore()
   }
+}
+
+// A child's first parent, for the first-parent scope; rows are few per
+// frame and the lookup is a linear scan over a virtualised window's rows
+// only when the highlight is on.
+const firstParentCache = new WeakMap<GraphRow[], Map<string, string | undefined>>()
+function firstParentOf(rows: GraphRow[], childId: string): string | undefined {
+  let map = firstParentCache.get(rows)
+  if (!map) {
+    map = new Map()
+    for (const r of rows) map.set(r.rev.id, r.rev.parents[0])
+    firstParentCache.set(rows, map)
+  }
+  return map.get(childId)
 }
 
 function xFor(lane: number): number {
@@ -264,9 +299,10 @@ class SegmentDrawer {
     color: string,
     private readonly laneWidth: number,
     private readonly rowHeight: number,
+    lineWidth: number = LANE_LINE_WIDTH,
   ) {
     ctx.strokeStyle = color
-    ctx.lineWidth = LANE_LINE_WIDTH
+    ctx.lineWidth = lineWidth
   }
 
   drawTo(x: number, y: number, toPerp = true): void {
@@ -381,11 +417,21 @@ function bezier(ctx: CanvasRenderingContext2D, e0: Point, c0: Point, c1: Point, 
   ctx.stroke()
 }
 
-function drawNode(ctx: CanvasRenderingContext2D, x: number, y: number, row: GraphRow, laneColors = LANE_COLORS, headOutline = "#1a1a1a"): void {
+type NodeStyle = { fill: string | null; ring: boolean }
+
+function drawNode(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  row: GraphRow,
+  laneColors = LANE_COLORS,
+  headOutline = "#1a1a1a",
+  style: NodeStyle = { fill: null, ring: false },
+): void {
   const d = NODE_DIMENSION
   const left = x - d / 2
   const top = y - d / 2
-  ctx.fillStyle = laneColors[row.color % laneColors.length]
+  ctx.fillStyle = style.fill ?? laneColors[row.color % laneColors.length]
 
   if (row.hasRefs) {
     ctx.fillRect(Math.round(left), Math.round(top), d, d)
@@ -395,9 +441,12 @@ function drawNode(ctx: CanvasRenderingContext2D, x: number, y: number, row: Grap
     ctx.fill()
   }
 
-  if (row.isHead) {
+  // HEAD keeps its 2px ring; the rest of the highlighted history gets a
+  // thinner one (owner: "a thin black outer boundary, like what we have
+  // for the head").
+  if (row.isHead || style.ring) {
     ctx.strokeStyle = headOutline
-    ctx.lineWidth = 2
+    ctx.lineWidth = row.isHead ? 2 : 1.5
     if (row.hasRefs) {
       ctx.strokeRect(Math.round(left) - 1, Math.round(top) - 1, d + 2, d + 2)
     } else {

@@ -48,7 +48,7 @@ export type Tokens = {
   selectionBorder: string
   hover: string
   focusRing: string
-  ref: Record<"local" | "remote" | "head" | "stash" | "extra", RefBadge>
+  ref: Record<"local" | "remote" | "head" | "stash" | "tag" | "extra", RefBadge>
   diff: {
     added: string
     removed: string
@@ -96,6 +96,7 @@ export const light: Tokens = {
     remote: { bg: "#ecfdf5", fg: "#059669" },
     head: { bg: "#fef2f2", fg: "#dc2626" },
     stash: { bg: "#fef9c3", fg: "#a16207" },
+    tag: { bg: "#f5f3ff", fg: "#6d28d9" },
     extra: { bg: "#f3f4f6", fg: "#6b7280" },
   },
   // Git Extensions git-coloring palette: AppColorDefaults.cs /
@@ -156,6 +157,7 @@ export const dark: Tokens = {
     remote: { bg: "#0b3d2e", fg: "#86efac" },
     head: { bg: "#4a1d1d", fg: "#fecaca" },
     stash: { bg: "#3f2a06", fg: "#fde68a" },
+    tag: { bg: "#2e1f5e", fg: "#ddd6fe" },
     extra: { bg: "#2c3239", fg: "#c5cbd3" },
   },
   diff: {

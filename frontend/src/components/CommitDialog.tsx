@@ -16,6 +16,14 @@ import { CommitFileContextMenu } from "./CommitFileContextMenu"
 import { useCommitFiles } from "../hooks/useCommitFiles"
 import { copyToClipboard } from "./clipboard"
 import { ConfirmDialog } from "./dialogs/ConfirmDialog"
+import { SplitHandle } from "./SplitHandle"
+import { CommitFilesBar } from "./CommitFilesBar"
+import {
+  DEFAULT_COMMIT_FILES_WIDTH,
+  MAX_COMMIT_FILES_WIDTH_RATIO,
+  MIN_COMMIT_FILES_WIDTH,
+  useCommitFilesLayout,
+} from "./commitFilesLayout"
 import { CommitDiffContextMenu } from "./CommitDiffContextMenu"
 import { useDiffLineSelection } from "../hooks/useDiffLineSelection"
 
@@ -35,6 +43,8 @@ type Props = {
 // Selection follows GE: click selects, ctrl+click toggles, shift+click ranges,
 // double-click stages/unstages. Right-click opens the file context menu.
 export function CommitDialog({ open, status, amend, initialMessage, repository, onClose, onStatus, onCommit }: Props) {
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const { filesWidth, setFilesWidth, commitWidth, treeMode, toggleTree } = useCommitFilesLayout()
   const engine = useEngine()
   const zoom = useZoom()
   const [diff, setDiff] = useState<DiffDto | null>(null)
@@ -154,9 +164,12 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
       slotProps={{
         paper: {
           sx: {
-            width: `min(calc(96vw / ${zoom}), 1100px)`,
+            // v0.14.0 (owner: the commit panel "takes only part of the
+            // application space"): nearly the whole window, like Git
+            // Extensions' FormCommit maximised.
+            width: `calc((100vw - 32px) / ${zoom})`,
             maxWidth: `calc((100vw - 32px) / ${zoom})`,
-            height: `min(calc(80vh / ${zoom}), 720px)`,
+            height: `calc((100vh - 32px) / ${zoom})`,
             maxHeight: `calc((100vh - 32px) / ${zoom})`,
             margin: `${16 / zoom}px`,
             display: "flex",
@@ -165,10 +178,11 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
         },
       }}
     >
-      <DialogContent sx={{ display: "flex", gap: 2, p: 2, flex: 1, minHeight: 0, overflow: "hidden" }}>
+      <DialogContent ref={contentRef} sx={{ display: "flex", gap: 1, p: 2, flex: 1, minHeight: 0, overflow: "hidden" }}>
         <Box
+          data-testid="commit-files-column"
           sx={{
-            width: "min(340px, 44%)",
+            width: filesWidth,
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
@@ -180,6 +194,7 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
           <ListHeader label={`Unstaged (${status?.unstagedCount ?? 0})`} />
           <FileListBox
             testid="unstaged-list"
+            tree={treeMode}
             staged={false}
             files={status?.unstaged ?? []}
             selected={selUnstaged}
@@ -238,6 +253,7 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
           <ListHeader label={`Staged (${status?.stagedCount ?? 0})`} />
           <FileListBox
             testid="staged-list"
+            tree={treeMode}
             staged={true}
             files={status?.staged ?? []}
             selected={selStaged}
@@ -246,7 +262,18 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
             onToggle={toggle}
             onContext={(f, x, y) => openMenu(f, true, x, y)}
           />
+          <CommitFilesBar tree={treeMode} onToggle={toggleTree} />
         </Box>
+        <SplitHandle
+          testid="commit-split-handle"
+          value={filesWidth}
+          defaultValue={DEFAULT_COMMIT_FILES_WIDTH}
+          min={MIN_COMMIT_FILES_WIDTH}
+          maxRatio={MAX_COMMIT_FILES_WIDTH_RATIO}
+          getContainerWidth={() => contentRef.current?.clientWidth ?? filesWidth}
+          onChange={setFilesWidth}
+          onCommit={commitWidth}
+        />
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1, minHeight: 0 }}>
           <Box sx={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box

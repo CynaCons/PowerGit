@@ -13,6 +13,7 @@ export type HistoryPaneProps = {
   selected: number
   loadingTail: boolean
   remoteNames?: string[]
+  tagNames?: string[]
   /** Initial load of this repository (no rows yet); a background refresh keeps the rows. */
   loading: boolean
   engineError: string | null
@@ -31,6 +32,7 @@ export type HistoryPaneProps = {
 export function HistoryPane({
   rows,
   remoteNames,
+  tagNames,
   selected,
   loadingTail,
   loading,
@@ -92,6 +94,7 @@ export function HistoryPane({
           onSelect={onSelect}
           loadingTail={loadingTail}
           remoteNames={remoteNames}
+          tagNames={tagNames}
           onNearEnd={onNearEnd}
           onRowContextMenu={onRowContextMenu}
         />

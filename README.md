@@ -48,6 +48,13 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 More screenshots and an interactive live demo:
 **[cynacons.github.io/PowerGit](https://cynacons.github.io/PowerGit/)**
 
+## Following the checked-out branch
+
+The graph rings every commit the checked-out branch reaches and, by
+default, greys out everything else, so its history and the merges into it
+stand out. The pill at the bottom of the graph column switches between all
+ancestors and the first-parent line, and turns the ring or the dimming off.
+
 ## Updating
 
 Settings → Updates → "Check for updates" asks GitHub for the latest release,

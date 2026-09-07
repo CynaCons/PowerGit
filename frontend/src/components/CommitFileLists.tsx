@@ -24,8 +24,11 @@ export function FileListBox({
   onToggle,
   onContext,
   testid,
+  tree = false,
 }: {
   files: StatusFile[]
+  /** Directory tree instead of full paths (v0.14.0, the diff view's mode). */
+  tree?: boolean
   staged: boolean
   selected: Set<string>
   emptyText: string
@@ -38,6 +41,7 @@ export function FileListBox({
     <CompactFileList
       testid={testid}
       files={files}
+      tree={tree}
       selectedSet={selected}
       emptyText={emptyText}
       onRowClick={(f, index, e) => {

@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box"
-import { useDeferredValue, useEffect, useState } from "react"
+import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { BottomPanel } from "./components/BottomPanel"
 import { CommandBar } from "./components/CommandBar"
 import { AppDialogs } from "./components/dialogs/AppDialogs"
@@ -39,6 +39,9 @@ export default function App({ base }: { base: EngineClient }) {
   const { rows, selected, current, setSelectedSha, loadingTail, loaded, historyNote } = history
   const repoState = useRepoState({ session, history })
   const { refs, status, stashes, refresh, refreshing, openFolder, remoteNames, defaultRemote, dirty } = repoState
+  // Tag chips on graph rows get a tag glyph (v0.14.0, owner: "tags should
+  // be having a different little icon"); names come from the ref tree.
+  const tagNames = useMemo(() => (refs?.tags ?? []).map((t) => t.name), [refs])
   const jobs = useJobs({
     client,
     dispatch: session.dispatch,
@@ -247,6 +250,7 @@ export default function App({ base }: { base: EngineClient }) {
                 <HistoryPane
                   rows={rows}
                   remoteNames={remoteNames}
+                  tagNames={tagNames}
                   selected={selected}
                   loadingTail={loadingTail}
                   loading={live && !demo && !loaded}
