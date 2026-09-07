@@ -50,12 +50,16 @@ More screenshots and an interactive live demo:
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.13.17 adds visible commit
-errors and retry, message-only amend, retained in-session drafts, and a
-commit dialog that fits at 150% and 200% zoom. It includes commands in a
-collapsible left rail, flat instrument-panel chrome in light and dark, HD
-app icon, instant context menus, directory-tree mode for the diff's file
-list, and platform monospace fonts. Parked: worktrees and hotkey remapping UI.
+Tracked openly in [PLAN.md](PLAN.md). Release v0.13.19 keeps the view
+current while agents work in the repository (status re-checked every 10 s,
+full refresh on focus, change-stream echo guard fixed), marks remote
+branches with a cloud on graph rows, registers the AppImage's desktop entry
+and icons so GNOME shows the PowerGit icon, uses one UI font everywhere,
+fills the window at every zoom with Settings always reachable in the rail,
+and stages Settings changes until Save. It includes the collapsible command
+rail, flat instrument-panel chrome in light and dark, HD app icon, instant
+context menus and the directory-tree mode for the diff's file list.
+Parked: worktrees and hotkey remapping UI.
 
 ## Development
 

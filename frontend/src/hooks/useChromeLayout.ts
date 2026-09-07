@@ -72,9 +72,11 @@ export function useChromeLayout() {
     ro.observe(el)
     return () => ro.disconnect()
   }, [barLayout])
-  // The top toolbar is absent in rail mode. Measure the space that actually
-  // contains the ref panel and graph, including rail expansion and zoom.
-  const overflowed = contentWidth > 0 && contentWidth < 740
+  // Title-bar layout: the toolbar's own tier decides (it collapses to a
+  // "More" menu below 790px and the ref panel goes with it). Rail layout has
+  // no top toolbar, so measure the content area that actually holds the ref
+  // panel and graph, including rail expansion and zoom (v0.13.18).
+  const overflowed = barLayout === "top" ? toolbarTier === "overflow" : contentWidth > 0 && contentWidth < 740
 
   // Below the overflow width there is not enough room for both the ref panel
   // (232px fixed) and a readable grid: the Author/Date/SHA columns get pushed
