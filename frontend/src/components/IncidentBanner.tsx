@@ -10,7 +10,12 @@ import { copyToClipboard } from "./clipboard"
 export function IncidentBanner() {
   const [incident, setIncident] = useState<Incident | null>(null)
   useEffect(() => {
-    void lastIncident().then((i) => setIncident(i))
+    // The shell clears the incident once read; React StrictMode runs this
+    // effect twice in dev, so only a hit may set state (a later null must
+    // not wipe the first answer).
+    void lastIncident().then((i) => {
+      if (i) setIncident(i)
+    })
   }, [])
   if (!incident) return null
   const when = incident.at.replace("T", " ").slice(0, 19)
