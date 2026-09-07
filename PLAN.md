@@ -486,6 +486,13 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Fix: src/hooks/historyMerge.ts — mergeReload reuses the existing Revision object when id, subject, author, date, parents and refs are equal, splices the tail as before, and reports `unchanged`; reloadHistory then skips setRevisions entirely, so a no-op refresh costs one /revisions fetch and a compare, no clone, no relayout. A new commit on top still relayouts (a prepend cannot be incremental) but only the changed rows are new objects. Unit tests: historyMerge.test.ts (unchanged, new-commit-on-top, lost overlap, short page), vitest 86/86, tsc + eslint clean. Not run: e2e against a 10k-revision repository. [agent: claude]
 - [x] Owner ticks: on eve-aps4305 (10k revisions) a refresh, F5 or returning to the window no longer freezes the UI; the graph stays put when nothing changed. [agent: owner-release-2026-09-07]
 
+### v0.13.21 — Showcase page, demo and screenshots (current) (ACTIVE)
+**Goal:** Owner (2026-09-07): "We need to update the page and refine the demo and fix the screenshots." The Pages site shipped without a single image (base path), a v0.6.0 download button, screenshots from v0.13.17, and a demo whose bottom panel showed an engine error.
+- [x] Site: images resolve under the /PowerGit/ base (they all 404ed), the download button and screens caption read the version from frontend/package.json at build time, feature cards and screen captions describe v0.13.20 (rail, never stale, partial staging, frameless, AppImage launcher entry), the demo tip matches the rail layout. [agent: claude]
+- [x] Demo: sample rows with real-looking SHAs, subjects, authors and recent dates; forks and merges in the first rows; branches, remotes and tags in the ref panel; Commit and Diff tabs served from sample data (commitCache demo branch) instead of "commit failed: no repository open"; File Tree tab explains it needs the engine. Checked in the browser with ?demo=1. [agent: claude]
+- [x] Screenshots re-captured from the real app on the PowerGit repository (capture-showcase.mjs: rail layout, light + dark, diff tab in tree mode, file tree, commit dialog, Stash options menu) and each one inspected before publishing. [agent: claude]
+- [ ] Owner ticks: cynacons.github.io/PowerGit shows every screenshot, the current version on the download button, and a demo whose bottom panel shows commit details and a diff.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
