@@ -48,6 +48,9 @@ $zip = Join-Path $dist "PowerGit_${version}_win64.zip"
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -Force
 
 Copy-Item (Join-Path $release "bundle\nsis\PowerGit_${version}_x64-setup.exe") $dist -Force
+# v0.14.0: the updater signature tauri build writes next to the installer when
+# POWERGIT_SIGN=1 (absent on unsigned local runs).
+Copy-Item (Join-Path $release "bundle\nsis\PowerGit_${version}_x64-setup.exe.sig") $dist -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "artifacts:"
