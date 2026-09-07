@@ -35,6 +35,8 @@ export function NavRail({ repoName, onOpenRepo, onRecents, onSettings }: NavRail
     >
       <Tooltip title={repoName ?? "PowerGit"} placement="right">
         <IconButton
+          onClick={onRecents}
+          aria-label="Switch repository"
           color="primary"
           sx={{
             borderRadius: 2,

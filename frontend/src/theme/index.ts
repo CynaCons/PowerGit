@@ -83,10 +83,10 @@ export function buildTheme(mode: ThemeMode, zoom = 1): Theme {
           // on html as well as body prevents the scaled box from extending
           // the document scroll area at the supported viewport sizes.
           "html, body, #root": { height: "100%", margin: 0, overflow: "hidden" },
-          // Compensate the layout box for CSS zoom so its visual height stays
-          // exactly the viewport height (and does not enlarge document
-          // scrollHeight on WebKit/Chromium).
-          "#root": zoom === 1 ? {} : { zoom, height: `calc(100% / ${zoom})`, width: `calc(100% / ${zoom})` },
+          // Percentages already account for the parent's zoom. Dividing
+          // those again shrinks the shell to 1/zoom of the window. Viewport
+          // units give an explicit visual target in Chromium and WebKit.
+          "#root": { zoom, height: `calc(100vh / ${zoom})`, width: `calc(100vw / ${zoom})` },
           // sx-generated classes cannot be matched by the inline-style
           // selector, so disable ligatures globally; Inter has no
           // meaningful ligatures.

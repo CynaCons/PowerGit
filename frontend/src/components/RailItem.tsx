@@ -108,7 +108,7 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
 
   return (
     <>
-      <Box sx={{ display: "flex", alignItems: "stretch", gap: "2px" }}>
+      <Box sx={{ display: "flex", alignItems: "stretch", gap: "2px", flexShrink: 0 }}>
         <Tooltip title={expanded ? "" : hint} placement="right" disableInteractive>
           <span style={{ display: "block", flex: 1, minWidth: 0 }}>
             <ButtonBase
@@ -158,7 +158,8 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
               {expanded && (
                 <Typography
                   variant="body2"
-                  sx={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", flex: 1, textAlign: "left" }}
+                  noWrap
+                  sx={{ fontSize: 12.5, fontWeight: 500, minWidth: 0, flex: 1, textAlign: "left" }}
                 >
                   {item.label}
                 </Typography>

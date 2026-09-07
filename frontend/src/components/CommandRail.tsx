@@ -46,7 +46,7 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...de
       label: repoName ?? "PowerGit",
       icon: <AccountTreeOutlinedIcon />,
       testid: "rail-repo",
-      onClick: () => {},
+      onClick: onRecents,
     },
     {
       id: "open",
@@ -97,14 +97,27 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, ...de
         }}
         expanded={expanded}
       />
-      {nav.map((item) => (
-        <RailItem key={item.id} item={item} expanded={expanded} />
-      ))}
-      <Divider sx={{ my: 0.5 }} />
-      {commands.map((item) => (
-        <RailItem key={item.id} item={item} expanded={expanded} />
-      ))}
-      <Box sx={{ flex: 1 }} />
+      <Box
+        data-testid="rail-commands"
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          gap: 0.25,
+          "& > *": { flexShrink: 0 },
+        }}
+      >
+        {nav.map((item) => (
+          <RailItem key={item.id} item={item} expanded={expanded} />
+        ))}
+        <Divider sx={{ my: 0.5 }} />
+        {commands.map((item) => (
+          <RailItem key={item.id} item={item} expanded={expanded} />
+        ))}
+      </Box>
       <RailItem
         item={{
           id: "settings",

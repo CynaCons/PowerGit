@@ -459,6 +459,15 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Acceptance: nine focused regressions, build/typecheck, lint and format passed. Unit suite 81/82 (unrelated graph timing budget); Windows full e2e interrupted and Linux engine check failed. Owner waived remaining local e2e, native, resolution, visual baseline and Linux/WebKit verification and authorized review-and-release on 2026-09-05. Exact evidence and limits: docs/agents/context/commit-reliability-handoff.md. [agent: codex]
 - [x] Owner release authorization on 2026-09-05: review and push, release the app; manual verification gate waived. Include reviewed pending UI changes, publish v0.13.17, then deliver a new frontend/UX audit. Existing CI and artifact guards remain enabled. [agent: codex]
 
+### v0.13.18 — Usable workspace at zoom and consistent settings (current) (ACTIVE)
+> Follow-up audit: docs/agents/context/frontend-ux-next.md. Preserve existing release v0.13.17; implement the next scoped improvements. Record verification limits accurately.
+**Goal:** Fix reproduced shell zoom shrinkage and inaccessible rail actions, make responsive layout follow the content area, and make Settings save/cancel behavior predictable. Owner requested continued iteration with review and focused visual checks instead of large local e2e suites.
+- [x] Fix shell viewport sizing at 100/150/200% zoom; retain readable graph space and correct splitter motion. Verify actual settled bounds and pixels in Windows Chromium. [agent: claude]
+- [x] Keep command rail actions reachable in short windows, pin Settings, and respond to available width in both rail and title-bar layouts. Make the repository row open the repository switcher. [agent: claude]
+- [x] Make Settings consistently stage changes until Save, with Cancel/dismissal discarding edits; show Git setting scope and readable line-ending labels. Review async and error behavior. [agent: claude]
+- [x] Review, typecheck/build and inspect focused screenshots; no large local e2e reruns per owner instruction. Record limits and push completed changes. [agent: claude]
+- [x] Acceptance (2026-09-07): Codex's shell/rail edits kept and finished; Settings rewritten as drafts (Appearance, Git identity with scope note and plain line-ending labels, Tools). Guards: tests/e2e/shell-zoom.spec.ts (root fills 1280x800 at 150 %, Settings reachable in a 420 px-tall window, Cancel discards / Save applies, repo row opens the switcher) + shell settings specs + focus-management, 7/7; dialog-settings visual baseline refreshed and inspected; tsc + eslint clean. Not run: full e2e, resolution, native, Linux (owner: no large local suites). [agent: claude]
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react"
+import { useBarLayout } from "../theme/barLayout"
+import { useZoom } from "../theme/zoom"
 
 export type ToolbarTier = "full" | "compact" | "overflow"
 
@@ -8,12 +10,15 @@ export type ChromeLayout = ReturnType<typeof useChromeLayout>
 // panel's open state, and the command bar's responsive tier. None of it is
 // persisted; it lives exactly as long as the window.
 export function useChromeLayout() {
+  const zoom = useZoom()
+  const barLayout = useBarLayout()
   const [requestedBottom, setBottomHeight] = useState(280)
   // Content area height (CSS px, i.e. after application zoom). The bottom
   // panel keeps a fixed pixel height, so at 150 % zoom on a small window the
   // requested 280px could swallow the whole area and leave the grid 0px tall
   // (found by selected-row-graph.spec at 150 %). Clamp to what is available.
   const [contentHeight, setContentHeight] = useState(0)
+  const [contentWidth, setContentWidth] = useState(0)
   const [leftOpen, setLeftOpen] = useState(true)
   const [bottomTab, setBottomTab] = useState(0)
   const contentRef = useRef<HTMLDivElement | null>(null)
@@ -23,7 +28,11 @@ export function useChromeLayout() {
     const el = contentRef.current
     if (!el || typeof ResizeObserver === "undefined") return
     setContentHeight(el.clientHeight)
-    const ro = new ResizeObserver((entries) => setContentHeight(entries[0].contentRect.height))
+    setContentWidth(el.clientWidth)
+    const ro = new ResizeObserver((entries) => {
+      setContentHeight(entries[0].contentRect.height)
+      setContentWidth(entries[0].contentRect.width)
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -36,7 +45,7 @@ export function useChromeLayout() {
   }
   const onDividerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragState.current) return
-    const dy = dragState.current.startY - e.clientY
+    const dy = (dragState.current.startY - e.clientY) / zoom
     const max = (contentRef.current?.clientHeight ?? 600) - 140
     setBottomHeight(Math.min(Math.max(120, dragState.current.startH + dy), Math.max(120, max)))
   }
@@ -55,15 +64,17 @@ export function useChromeLayout() {
     const el = toolbarRef.current
     if (!el) return
     const apply = (w: number) => setToolbarTier(w >= 1080 ? "full" : w >= 790 ? "compact" : "overflow")
-    apply(el.getBoundingClientRect().width)
+    apply(el.clientWidth)
     // ResizeObserver is unavailable in no-DOM test shims; width then just
     // stays at whatever the first measurement produced.
     if (typeof ResizeObserver === "undefined") return
     const ro = new ResizeObserver((entries) => apply(entries[0].contentRect.width))
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
-  const overflowed = toolbarTier === "overflow"
+  }, [barLayout])
+  // The top toolbar is absent in rail mode. Measure the space that actually
+  // contains the ref panel and graph, including rail expansion and zoom.
+  const overflowed = contentWidth > 0 && contentWidth < 740
 
   // Below the overflow width there is not enough room for both the ref panel
   // (232px fixed) and a readable grid: the Author/Date/SHA columns get pushed
