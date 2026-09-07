@@ -65,17 +65,14 @@ must be writable); the portable zip is replaced by hand.
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.13.20 makes refreshes
-cheap on large histories (unchanged rows keep their identity, so a no-op
-refresh never re-lays out the graph), keeps the view
-current while agents work in the repository (status re-checked every 10 s,
-full refresh on focus, change-stream echo guard fixed), marks remote
-branches with a cloud on graph rows, registers the AppImage's desktop entry
-and icons so GNOME shows the PowerGit icon, uses one UI font everywhere,
-fills the window at every zoom with Settings always reachable in the rail,
-and stages Settings changes until Save. It includes the collapsible command
-rail, flat instrument-panel chrome in light and dark, HD app icon, instant
-context menus and the directory-tree mode for the diff's file list.
+Tracked openly in [PLAN.md](PLAN.md). Release v0.14.0 adds in-app updates
+(Settings → Check for updates, signed manifests on each release), highlights
+the checked-out branch's history in the graph with a ring and dimming
+(scope and style in a pill under the graph), gives tags their own glyph,
+shows a merge commit's diff against its first parent, and makes the commit
+dialog fill the window with a resizable file column that can show a
+directory tree. It builds on v0.13.20's cheap refreshes, live change
+detection, remote-branch clouds, AppImage launcher entry and one UI font.
 Parked: worktrees and hotkey remapping UI.
 
 ## Development
