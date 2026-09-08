@@ -21,6 +21,7 @@ export const failed = (e: GitLogEntry): boolean => e.exitCode !== 0
 // the console — the console shows everything — they just do not pop a card.
 const PROBES: readonly RegExp[] = [
   /^git rev-parse\b.*(--verify|@\{upstream\})/,
+  /^git rev-list\b.*@\{upstream\}/,
   /^git remote get-url\b/,
   /^git ls-files\b.*--error-unmatch\b/,
   /^git config --get\b/,

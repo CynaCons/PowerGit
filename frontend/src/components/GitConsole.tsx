@@ -1,11 +1,10 @@
 import Box from "@mui/material/Box"
 import ButtonBase from "@mui/material/ButtonBase"
-import InputBase from "@mui/material/InputBase"
 import Tooltip from "@mui/material/Tooltip"
 import CloseIcon from "@mui/icons-material/Close"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import TerminalIcon from "@mui/icons-material/Terminal"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import type { EngineClient, GitLogEntry } from "../engine"
 import { shortcutLabel } from "../hotkeys"
 import { useGitLog } from "../hooks/useGitLog"
@@ -172,15 +171,20 @@ function GitConsolePanel({ entries, height }: { entries: GitLogEntry[]; height: 
         <Box component="span" sx={{ fontSize: 11, fontWeight: 700, color: "var(--pg-console-meta)" }}>
           GIT CONSOLE
         </Box>
-        <InputBase
+        {/* A bare input, not InputBase: the console is its own dark surface
+            and a test needs the testid on the element it types into. */}
+        <Box
+          component="input"
           data-testid="git-console-filter"
-          inputProps={{ "aria-label": "Filter git commands" }}
+          aria-label="Filter git commands"
           placeholder="Filter"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
           sx={{
             flex: 1,
+            minWidth: 0,
             maxWidth: 320,
+            height: 18,
             fontFamily: "var(--pg-font-mono)",
             fontSize: 11,
             color: "var(--pg-console-text)",
@@ -188,7 +192,9 @@ function GitConsolePanel({ entries, height }: { entries: GitLogEntry[]; height: 
             border: "1px solid var(--pg-console-border)",
             borderRadius: 0.5,
             px: 0.75,
-            "& input::placeholder": { color: "var(--pg-console-meta)", opacity: 1 },
+            outline: "none",
+            "&::placeholder": { color: "var(--pg-console-meta)", opacity: 1 },
+            "&:focus-visible": { outline: "var(--pg-focus-ring-w) solid var(--pg-focus-ring)" },
           }}
         />
         <Box component="span" data-testid="git-console-shown" sx={{ fontSize: 11, color: "var(--pg-console-meta)" }}>

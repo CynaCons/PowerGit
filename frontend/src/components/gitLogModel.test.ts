@@ -54,6 +54,7 @@ test("the engine's probes never pop a failure card, real failures do", () => {
   const probes = [
     "git rev-parse --verify -q refs/stash",
     "git rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+    "git rev-list --left-right --count HEAD...@{upstream}",
     "git remote get-url origin",
     "git ls-files --error-unmatch -- a.txt",
     "git config --get user.name",
