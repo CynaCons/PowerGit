@@ -10,7 +10,10 @@ public sealed class GitHostTests
         DirectoryInfo? cursor = new(dir);
         while (cursor is not null)
         {
-            if (Directory.Exists(Path.Combine(cursor.FullName, ".git")))
+            // A git worktree has `.git` as a FILE, not a directory (the same
+            // check GitHost.TryDiscover makes): without the File.Exists arm every
+            // test using this helper fails when the suite runs from a worktree.
+            if (Directory.Exists(Path.Combine(cursor.FullName, ".git")) || File.Exists(Path.Combine(cursor.FullName, ".git")))
             {
                 return cursor.FullName;
             }
@@ -132,8 +135,12 @@ public sealed class GitHostTests
     }
 
     [Fact]
-    public void CherryPick_conflict_aborts_and_leaves_a_clean_tree()
+    public void CherryPick_conflict_stops_in_the_cherry_picking_state()
     {
+        // v0.15.0 replaced the v0.4.7 contract ("a conflict is an error:
+        // abort and return 400") with Git Extensions': the operation stops
+        // and the state says so, so the UI can offer Resolve / Continue /
+        // Abort. CHERRY_PICK_HEAD stays until one of those is chosen.
         using TempRepo repo = new();
         GitHost host = new();
         host.Open(repo.Dir);
@@ -147,9 +154,14 @@ public sealed class GitHostTests
         File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "main-edit\n");
         repo.StageAndCommit("main-conflict");
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => host.CherryPick(conflictCommitId));
-        Assert.Contains("Cherry-pick", ex.Message, StringComparison.Ordinal);
-        Assert.False(File.Exists(Path.Combine(repo.Dir, ".git", "CHERRY_PICK_HEAD")));
+        RepoStatusDto stopped = host.CherryPick(conflictCommitId);
+        Assert.Equal("cherry-picking", stopped.State);
+        Assert.Equal("cherry-pick", stopped.Operation?.Kind);
+        Assert.True(File.Exists(Path.Combine(repo.Dir, ".git", "CHERRY_PICK_HEAD")));
+        Assert.Contains(stopped.Unstaged, f => f.Path == "a.txt" && f.Status == "C");
+
+        RepoStatusDto aborted = host.SequencerAction("cherry-pick", "abort");
+        Assert.Equal("none", aborted.State);
         Assert.False(repo.IsDirtyPublic());
     }
 
@@ -183,8 +195,9 @@ public sealed class GitHostTests
     }
 
     [Fact]
-    public void Revert_conflict_aborts_and_leaves_a_clean_tree()
+    public void Revert_conflict_stops_in_the_reverting_state()
     {
+        // Same contract change as CherryPick_conflict_stops_in_the_cherry_picking_state.
         using TempRepo repo = new();
         GitHost host = new();
         host.Open(repo.Dir);
@@ -196,9 +209,13 @@ public sealed class GitHostTests
         File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "v3\n");
         repo.StageAndCommit("a-v3");
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => host.Revert(v2Id));
-        Assert.Contains("Revert", ex.Message, StringComparison.Ordinal);
-        Assert.False(File.Exists(Path.Combine(repo.Dir, ".git", "REVERT_HEAD")));
+        RepoStatusDto stopped = host.Revert(v2Id);
+        Assert.Equal("reverting", stopped.State);
+        Assert.Equal("revert", stopped.Operation?.Kind);
+        Assert.True(File.Exists(Path.Combine(repo.Dir, ".git", "REVERT_HEAD")));
+
+        RepoStatusDto aborted = host.SequencerAction("revert", "abort");
+        Assert.Equal("none", aborted.State);
         Assert.False(repo.IsDirtyPublic());
     }
 
@@ -438,6 +455,64 @@ internal sealed partial class TempRepo : IDisposable
     {
         Git("add", "-A");
         Git("commit", "-m", message);
+    }
+
+    /// <summary>Runs git in the temp repo (identity is configured by the constructor).</summary>
+    public void Run(params string[] args) => Git(args);
+
+    /// <summary>Writes a file relative to the repo root, creating directories as needed.</summary>
+    public void Write(string relativePath, string content)
+    {
+        string full = Path.Combine(Dir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllText(full, content);
+    }
+
+    public string Read(string relativePath)
+        => File.ReadAllText(Path.Combine(Dir, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+    /// <summary>
+    ///  Two branches that both changed <c>conflict.txt</c> from a shared base,
+    ///  so merging or rebasing one onto the other stops on a both-modified
+    ///  conflict. Leaves <paramref name="checkout"/> checked out (default
+    ///  "main"); the other branch is "topic".
+    /// </summary>
+    public void Conflict(string checkout = "main")
+    {
+        Git("checkout", "main");
+        Write("conflict.txt", "base\n");
+        StageAndCommit("conflict-base");
+        Git("checkout", "-b", "topic");
+        Write("conflict.txt", "topic\n");
+        Write("topic-only.txt", "topic\n");
+        StageAndCommit("topic-change");
+        Git("checkout", "main");
+        Write("conflict.txt", "main\n");
+        StageAndCommit("main-change");
+        Git("checkout", checkout);
+    }
+
+    /// <summary>The subject of every commit reachable from HEAD, newest first.</summary>
+    public string[] Subjects()
+        => Output("log", "--format=%s").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public string Output(params string[] args)
+    {
+        System.Diagnostics.ProcessStartInfo psi = new("git")
+        {
+            WorkingDirectory = Dir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (string a in args)
+        {
+            psi.ArgumentList.Add(a);
+        }
+
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        string output = p?.StandardOutput.ReadToEnd() ?? "";
+        p?.WaitForExit(30_000);
+        return output.Trim();
     }
 
     /// <summary>
