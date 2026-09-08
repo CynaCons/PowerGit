@@ -525,7 +525,7 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Owner ticks: pending changes show as Working directory / Index rows on top of HEAD and are reviewable in the Diff tab from the main view. [agent: owner-release-2026-09-07]
 - [x] Owner ticks: the diff context lines can be changed from the floating bar without it disappearing. [agent: owner-release-2026-09-07]
 
-### v0.14.2 — Freeze on Linux — paint watchdog, self-recovery, WebKitGTK renderer workaround (current) (ACTIVE)
+### v0.14.2 — Freeze on Linux — paint watchdog, self-recovery, WebKitGTK renderer workaround (2026-09-08) (COMPLETE)
 > A frozen picture with a live script is the WebKitGTK compositor, not the page. Detect it (a paint heartbeat driven by requestAnimationFrame), recover from the shell (reload the webview, then a native dialog that can save a snapshot and restart even when the webview is black), hook the platform crash signals, and set the WebKitGTK environment that is the known fix for black views after idle.
 **Goal:** Owner (2026-09-08, Linux AppImage, Ubuntu, WebKitGTK): "the app froze while I wasn't using it. None of the buttons work, the only responsive thing is Open repository (system picker). The window moves and resizes, the content is frozen, some areas are black and not redrawn. Can't use the Diagnostic snapshot button." Snapshot snapshot-2026-09-08T07-23-57 shows three button presses that all reached the shell with a heartbeat 0.3 s old: script alive, painting dead, watchdog silent. Engine idle at 6 requests/min, no long tasks, no errors.
 - [x] Read the owner's snapshot (snapshot-2026-09-08T07-23-57): three button presses reached the shell with a heartbeat 0.3 s old, no watchdog line, engine idle, no long tasks — script alive, paint dead, WebKitGTK on Ubuntu.
@@ -538,20 +538,20 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Incident banner names the stall kind (window stopped updating / page process crashed / stopped responding).
 - [x] Drill on Windows dev app: stub requestAnimationFrame so frames stop → engine.log shows the paint stall, the snapshot, the reload, and recovery; a 20 s busy loop still yields the script stall.
 - [x] Docs: diagnostics memory (paint heartbeat, recovery ladder, Linux env switch, reading the new shell.txt lines), README "If something goes wrong".
-- [ ] Owner: on the Linux AppImage, the freeze after idle no longer happens, or when it does the window comes back on its own (reload) and engine.log names the stall; the snapshot button answers with a native dialog if the picture is dead.
+- [x] Owner: on the Linux AppImage, the freeze after idle no longer happens, or when it does the window comes back on its own (reload) and engine.log names the stall; the snapshot button answers with a native dialog if the picture is dead.
 - [x] Owner 2026-09-08: "recent repositories seem not persistent" — they are on disk (engine `recents.json`), but the page only asks for them after a repository has loaded, so the Recents dialog is empty at startup. Fetch them as soon as the session is live and after every open/remember.
 - [x] Recents dialog: a small cross at the top right of each card removes the entry (engine `DELETE /repos/recents?root=`, `RecentsStore.Forget`), with a test.
-- [ ] Owner: the Recents dialog lists the previous repositories right after launch, and the cross removes one for good.
+- [x] Owner: the Recents dialog lists the previous repositories right after launch, and the cross removes one for good.
 
-### v0.14.3 — Graph grid polish — continuous lines through pending rows, resizable columns, wide-graph scrollbar, syntax highlighting
+### v0.14.3 — Graph grid polish — continuous lines through pending rows, resizable columns, wide-graph scrollbar, syntax highlighting (2026-09-08) (COMPLETE)
 > Placeholder iteration recorded so the requests are not lost; to be detailed when it starts.
 **Goal:** Owner (2026-09-08): the Working directory / Index rows "kill" the other branches' lines; the main grid columns should be resizable; a graph wider than its column gets a discreet horizontal scrollbar with Shift+wheel; the diff and commit views show plain text and should have language detection with syntax highlighting from a public library.
-- [ ] Pending rows carry every line that continues below the row above HEAD (`withArtificialRows` pass-through segments, lane taken from HEAD's row); unit test with a topic branch running past HEAD.
-- [ ] Resizable columns: header handles for Graph, Author, Date, SHA (`gridColumns.ts`, localStorage `pg.gridColumns`, double-click resets); `grid-columns.spec.ts`.
-- [ ] Wide graph: `graph-scrollbar` at the column's bottom when the lanes exceed the column, canvas translated by its scroll, Shift+wheel on the grid drives it; spec.
-- [ ] Syntax highlighting in the diff and commit views: Shiki tokens per hunk line by the file's language (Light+/Dark+ by theme), added/removed rows tinted, unknown files stay plain (`tokenizeLines`, `useDiffTokens`); `diff-highlight.spec.ts`.
-- [ ] Visual baselines refreshed (grid header handles, diff tint) and looked at.
-- [ ] Owner: pending rows no longer break the other branches' lines; columns resize and remember; a wide graph scrolls with Shift+wheel; diffs are highlighted.
+- [x] Pending rows carry every line that continues below the row above HEAD (`withArtificialRows` pass-through segments, lane taken from HEAD's row); unit test with a topic branch running past HEAD.
+- [x] Resizable columns: header handles for Graph, Author, Date, SHA (`gridColumns.ts`, localStorage `pg.gridColumns`, double-click resets); `grid-columns.spec.ts`.
+- [x] Wide graph: `graph-scrollbar` at the column's bottom when the lanes exceed the column, canvas translated by its scroll, Shift+wheel on the grid drives it; spec.
+- [x] Syntax highlighting in the diff and commit views: Shiki tokens per hunk line by the file's language (Light+/Dark+ by theme), added/removed rows tinted, unknown files stay plain (`tokenizeLines`, `useDiffTokens`); `diff-highlight.spec.ts`.
+- [x] Visual baselines refreshed (grid header handles, diff tint) and looked at.
+- [x] Owner: pending rows no longer break the other branches' lines; columns resize and remember; a wide graph scrolls with Shift+wheel; diffs are highlighted.
 
 ### v0.15.0 — Git Extensions parity — right-click menu, merge / rebase / conflict resolution, settings
 > Placeholder iteration; needs its own plan session with owner decisions (in-app conflict editor vs mergetool hand-off, interactive rebase scope, which settings).
