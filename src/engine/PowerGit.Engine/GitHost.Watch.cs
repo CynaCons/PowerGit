@@ -120,12 +120,28 @@ public sealed partial class GitHost
     // tags, and refs/stash — since those can all change the commit list, the
     // ref tree, and status together. "Status" is just the index, so a status
     // re-fetch alone is enough.
-    private static GitChangeKind ClassifyPath(string path)
+    //
+    // v0.15.0: the operation-state files (MERGE_HEAD, CHERRY_PICK_HEAD,
+    // REVERT_HEAD, REBASE_HEAD, AUTO_MERGE, MERGE_MSG, SQUASH_MSG) and the
+    // rebase-merge / rebase-apply / sequencer directories are refs too, so an
+    // external `git merge` stopping on a conflict reaches the UI's banner.
+    private static readonly string[] OperationStateFiles =
+    [
+        "/MERGE_HEAD", "/CHERRY_PICK_HEAD", "/REVERT_HEAD", "/REBASE_HEAD",
+        "/AUTO_MERGE", "/MERGE_MSG", "/SQUASH_MSG",
+        "/rebase-merge", "/rebase-apply", "/sequencer",
+    ];
+
+    internal static GitChangeKind ClassifyPath(string path)
     {
         string p = path.Replace('\\', '/');
         if (p.EndsWith("/HEAD", StringComparison.Ordinal)
             || p.EndsWith("/packed-refs", StringComparison.Ordinal)
-            || p.Contains("/refs/", StringComparison.Ordinal))
+            || p.Contains("/refs/", StringComparison.Ordinal)
+            || p.Contains("/rebase-merge/", StringComparison.Ordinal)
+            || p.Contains("/rebase-apply/", StringComparison.Ordinal)
+            || p.Contains("/sequencer/", StringComparison.Ordinal)
+            || OperationStateFiles.Any(f => p.EndsWith(f, StringComparison.Ordinal)))
         {
             return GitChangeKind.Refs;
         }

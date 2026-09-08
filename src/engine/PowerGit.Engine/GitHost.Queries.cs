@@ -432,6 +432,17 @@ public sealed partial class GitHost
             char x = line[0];
             char y = line[1];
             string path = line[3..].Trim().Replace(" -> ", "\t").Split('\t')[^1];
+
+            // v0.15.0: an unmerged entry (DD, AU, UD, UA, DU, AA, UU) is one
+            // conflicted file, listed once as unstaged "C". Untracked "??"
+            // keeps its historical "U" label, which is why git's own U code
+            // cannot be passed through.
+            if (IsUnmerged(x, y))
+            {
+                unstaged.Add(new StatusFileDto(path, "C", Staged: false));
+                continue;
+            }
+
             if (x is not ' ' and not '?')
             {
                 staged.Add(new StatusFileDto(path, x.ToString(), Staged: true));
@@ -447,8 +458,217 @@ public sealed partial class GitHost
         // v0.13.12: the Pull/Push previews name the upstream explicitly.
         CommandResult up = Run(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}");
         string? upstream = up.ExitCode == 0 && !string.IsNullOrWhiteSpace(up.StdOut) ? up.StdOut.Trim() : null;
-        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind, upstream);
+        (string state, RepoOperationDto? operation) = GetOperationState(root);
+        ConflictFileDto[]? conflicts = unstaged.Any(f => f.Status == "C") ? [.. ListConflicts(root)] : null;
+        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind, upstream, state, operation, conflicts);
     }
+
+    private static bool IsUnmerged(char x, char y)
+        => (x, y) is ('D', 'D') or ('A', 'U') or ('U', 'D') or ('U', 'A') or ('D', 'U') or ('A', 'A') or ('U', 'U');
+
+    /// <summary>
+    /// The unmerged index entries (`git ls-files -u -z`: mode, sha, stage,
+    /// tab, path), one <see cref="ConflictFileDto"/> per path with its kind
+    /// derived from which of the stages 1 (base), 2 (ours), 3 (theirs) exist.
+    /// </summary>
+    internal IReadOnlyList<ConflictFileDto> ListConflicts(string root)
+    {
+        CommandResult result = Run(root, "-c", "core.quotepath=false", "ls-files", "-u", "-z");
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(result.StdErr.Trim());
+        }
+
+        Dictionary<string, string?[]> stages = new(StringComparer.Ordinal);
+        List<string> order = [];
+        foreach (string rec in result.StdOut.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int tab = rec.IndexOf('\t');
+            if (tab < 0)
+            {
+                continue;
+            }
+
+            string[] meta = rec[..tab].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (meta.Length < 3 || !int.TryParse(meta[2], out int stage) || stage is < 1 or > 3)
+            {
+                continue;
+            }
+
+            string path = rec[(tab + 1)..];
+            if (!stages.TryGetValue(path, out string?[]? shas))
+            {
+                shas = new string?[4];
+                stages[path] = shas;
+                order.Add(path);
+            }
+
+            shas[stage] = meta[1];
+        }
+
+        List<ConflictFileDto> conflicts = [];
+        foreach (string path in order)
+        {
+            string?[] s = stages[path];
+            bool hasBase = s[1] is not null, hasOurs = s[2] is not null, hasTheirs = s[3] is not null;
+            string kind = (hasBase, hasOurs, hasTheirs) switch
+            {
+                (true, true, true) => "both-modified",
+                (false, true, true) => "added-by-both",
+                (true, false, true) => "deleted-by-us",
+                (true, true, false) => "deleted-by-them",
+                (false, true, false) => "added-by-us",
+                (false, false, true) => "added-by-them",
+                _ => "both-deleted",
+            };
+            conflicts.Add(new ConflictFileDto(path, hasBase, hasOurs, hasTheirs, s[1], s[2], s[3], kind));
+        }
+
+        return conflicts;
+    }
+
+    /// <summary>
+    /// v0.15.0: what the repository is in the middle of, read from the git dir
+    /// the way `git status` does it (wt-status.c). rebase-merge/ (the merge
+    /// backend, interactive or not) and rebase-apply/ (am) win over
+    /// MERGE_HEAD, which wins over CHERRY_PICK_HEAD and REVERT_HEAD; a squash
+    /// merge that stopped leaves only SQUASH_MSG and still counts as merging
+    /// so the UI can offer "Commit merge" / Abort for it.
+    /// </summary>
+    internal (string State, RepoOperationDto? Operation) GetOperationState(string root)
+    {
+        string gitDir = GitDir(root);
+        string? ReadLine(string relative)
+        {
+            string file = Path.Combine(gitDir, relative);
+            if (!File.Exists(file))
+            {
+                return null;
+            }
+
+            try
+            {
+                string? first = File.ReadLines(file).FirstOrDefault();
+                return string.IsNullOrWhiteSpace(first) ? null : first.Trim();
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
+
+        string? ReadAll(string relative)
+        {
+            string file = Path.Combine(gitDir, relative);
+            try
+            {
+                return File.Exists(file) ? File.ReadAllText(file).Replace("\r\n", "\n").Trim() : null;
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
+
+        int? ReadInt(string relative) => int.TryParse(ReadLine(relative), out int n) ? n : null;
+        static string? ShortBranch(string? headName)
+            => headName is null ? null : headName.StartsWith("refs/heads/", StringComparison.Ordinal) ? headName["refs/heads/".Length..] : headName;
+
+        if (Directory.Exists(Path.Combine(gitDir, "rebase-merge")))
+        {
+            string? onto = ReadLine("rebase-merge/onto");
+            return ("rebasing", new RepoOperationDto(
+                "rebase",
+                ShortBranch(ReadLine("rebase-merge/head-name")),
+                onto,
+                NameOf(root, onto),
+                ReadInt("rebase-merge/msgnum"),
+                ReadInt("rebase-merge/end"),
+                ReadLine("rebase-merge/stopped-sha"),
+                File.Exists(Path.Combine(gitDir, "rebase-merge", "interactive")),
+                ReadAll("rebase-merge/message")));
+        }
+
+        if (Directory.Exists(Path.Combine(gitDir, "rebase-apply")))
+        {
+            string? onto = ReadLine("rebase-apply/onto");
+            return ("rebasing", new RepoOperationDto(
+                "rebase",
+                ShortBranch(ReadLine("rebase-apply/head-name")),
+                onto,
+                NameOf(root, onto),
+                ReadInt("rebase-apply/next"),
+                ReadInt("rebase-apply/last"),
+                ReadLine("rebase-apply/original-commit")));
+        }
+
+        string branch = Run(root, "rev-parse", "--abbrev-ref", "HEAD").StdOut.Trim();
+        string? mergeHead = ReadLine("MERGE_HEAD");
+        if (mergeHead is not null)
+        {
+            return ("merging", new RepoOperationDto("merge", branch, mergeHead, NameOf(root, mergeHead), Message: ReadAll("MERGE_MSG")));
+        }
+
+        if (File.Exists(Path.Combine(gitDir, "SQUASH_MSG")))
+        {
+            return ("merging", new RepoOperationDto("merge", branch, Message: ReadAll("SQUASH_MSG")));
+        }
+
+        string? cherry = ReadLine("CHERRY_PICK_HEAD");
+        if (cherry is not null)
+        {
+            return ("cherry-picking", new RepoOperationDto("cherry-pick", branch, StoppedSha: cherry, Total: SequencerTotal(gitDir)));
+        }
+
+        string? revert = ReadLine("REVERT_HEAD");
+        if (revert is not null)
+        {
+            return ("reverting", new RepoOperationDto("revert", branch, StoppedSha: revert, Total: SequencerTotal(gitDir)));
+        }
+
+        return ("none", null);
+    }
+
+    /// <summary>Commands still queued in sequencer/todo (a multi-commit cherry-pick or revert); null for a single-commit one.</summary>
+    private static int? SequencerTotal(string gitDir)
+    {
+        string todo = Path.Combine(gitDir, "sequencer", "todo");
+        if (!File.Exists(todo))
+        {
+            return null;
+        }
+
+        try
+        {
+            return File.ReadLines(todo).Count(l => l.Length > 0 && l[0] != '#');
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>A branch or tag name for a sha when one points exactly at it (rebase's "onto", MERGE_HEAD); null otherwise.</summary>
+    private string? NameOf(string root, string? sha)
+    {
+        if (string.IsNullOrWhiteSpace(sha))
+        {
+            return null;
+        }
+
+        CommandResult result = Run(root, "name-rev", "--name-only", "--no-undefined", "--refs=refs/heads/*", "--refs=refs/remotes/*", "--refs=refs/tags/*", sha);
+        string name = result.StdOut.Trim();
+        if (result.ExitCode != 0 || name.Length == 0 || name.Contains('~') || name.Contains('^'))
+        {
+            return null;
+        }
+
+        return name.StartsWith("tags/", StringComparison.Ordinal) ? name["tags/".Length..] : name;
+    }
+
+    /// <summary>The real git dir (`.git` may be a file in worktrees and submodules), native separators.</summary>
+    internal string GitDir(string root)
+        => Run(root, "rev-parse", "--absolute-git-dir").StdOut.Trim().Replace('/', Path.DirectorySeparatorChar);
 
     // Branches without an upstream (or a detached HEAD) make `@{upstream}`
     // fail to resolve; git's exact wording there varies by version/locale,
