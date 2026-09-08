@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -126,12 +127,106 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, events.StatusCode);
     }
 
+    // v0.15.0 sequencer routes. Every one of these runs against a throwaway
+    // TempRepo, never the real work tree.
+    [Fact]
+    public async Task Merge_conflict_route_answers_200_with_the_merging_state()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Conflict();
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        HttpResponseMessage merged = await client.PostAsJsonAsync($"/repos/{sid}/merge", new { branch = "topic" });
+        Assert.Equal(HttpStatusCode.OK, merged.StatusCode);
+        RepoStatusDto? status = await merged.Content.ReadFromJsonAsync<RepoStatusDto>();
+        Assert.Equal("merging", status?.State);
+        Assert.Equal("merge", status?.Operation?.Kind);
+        Assert.Contains(status!.Unstaged, f => f.Path == "conflict.txt" && f.Status == "C");
+
+        HttpResponseMessage conflicts = await client.GetAsync($"/repos/{sid}/conflicts");
+        conflicts.EnsureSuccessStatusCode();
+        ConflictFileDto[] list = await conflicts.Content.ReadFromJsonAsync<ConflictFileDto[]>() ?? [];
+        Assert.Equal("both-modified", Assert.Single(list).Kind);
+
+        HttpResponseMessage blob = await client.GetAsync($"/repos/{sid}/conflicts/blob?path=conflict.txt&stage=3");
+        blob.EnsureSuccessStatusCode();
+        Assert.Equal("topic", (await blob.Content.ReadFromJsonAsync<DiffDto>())?.Text.Trim());
+
+        HttpResponseMessage aborted = await client.PostAsJsonAsync($"/repos/{sid}/merge/abort", new { });
+        Assert.Equal(HttpStatusCode.OK, aborted.StatusCode);
+        Assert.Equal("none", (await aborted.Content.ReadFromJsonAsync<RepoStatusDto>())?.State);
+
+        // ff-only against a diverged branch is still a plain 400.
+        HttpResponseMessage ffOnly = await client.PostAsJsonAsync($"/repos/{sid}/merge", new { branch = "topic", ff = "only" });
+        Assert.Equal(HttpStatusCode.BadRequest, ffOnly.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rebase_todo_is_a_post_and_leaves_no_state()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Conflict("topic");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        // GET is not mapped: capturing touches the git dir, so it must take
+        // the group's Mutate gate like any other mutation.
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await client.GetAsync($"/repos/{sid}/rebase/todo")).StatusCode);
+
+        HttpResponseMessage todo = await client.PostAsJsonAsync($"/repos/{sid}/rebase/todo", new { onto = "main" });
+        todo.EnsureSuccessStatusCode();
+        RebaseTodoDto? body = await todo.Content.ReadFromJsonAsync<RebaseTodoDto>();
+        Assert.Equal("topic", body?.HeadName);
+        Assert.Equal("pick", Assert.Single(body!.Lines).Action);
+
+        HttpResponseMessage status = await client.GetAsync($"/repos/{sid}/status");
+        Assert.Equal("none", (await status.Content.ReadFromJsonAsync<RepoStatusDto>())?.State);
+    }
+
+    [Fact]
+    public async Task Sequencer_routes_answer_409_while_a_job_holds_the_gate()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        string sid = await client.OpenSessionAsync(repo.Dir);
+        GitHost session = _factory.Services.GetRequiredService<RepoRegistry>().Get(sid)!;
+
+        using ManualResetEventSlim held = new(false);
+        using ManualResetEventSlim release = new(false);
+        session.StartJob("fetch", () =>
+        {
+            held.Set();
+            release.Wait();
+            return "done";
+        });
+        held.Wait();
+
+        try
+        {
+            HttpResponseMessage collide = await client.PostAsJsonAsync($"/repos/{sid}/merge", new { branch = "feature" });
+            Assert.Equal(HttpStatusCode.Conflict, collide.StatusCode);
+            Assert.Contains("fetch", (await collide.Content.ReadFromJsonAsync<BusyResponse>())?.Running ?? "", StringComparison.Ordinal);
+
+            // Reads bypass the gate, mutations do not.
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/repos/{sid}/conflicts")).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync($"/repos/{sid}/rebase/todo", new { onto = "feature" })).StatusCode);
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
     private static string FindRepoRoot()
     {
         DirectoryInfo? cursor = new(AppContext.BaseDirectory);
         while (cursor is not null)
         {
-            if (Directory.Exists(Path.Combine(cursor.FullName, ".git")))
+            // A git worktree has `.git` as a FILE, not a directory (the same
+            // check GitHost.TryDiscover makes): without the File.Exists arm every
+            // test using this helper fails when the suite runs from a worktree.
+            if (Directory.Exists(Path.Combine(cursor.FullName, ".git")) || File.Exists(Path.Combine(cursor.FullName, ".git")))
             {
                 return cursor.FullName;
             }
