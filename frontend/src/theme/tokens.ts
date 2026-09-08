@@ -58,7 +58,8 @@ export type Tokens = {
     gutter: string
     gutterBorder: string
   }
-  fileStatus: Record<"A" | "M" | "D" | "R" | "U" | "other", string>
+  /** v0.15.0: "C" is an unmerged (conflicted) path. */
+  fileStatus: Record<"A" | "M" | "D" | "R" | "U" | "C" | "other", string>
   status: { ok: string; warn: string; error: string }
   graph: {
     /** Git Extensions AppColor.GraphBranch1–7 (light) — parity, do not tune. */
@@ -116,6 +117,7 @@ export const light: Tokens = {
     D: "#d3000B",
     R: "#00a89a",
     U: "#e6a700",
+    C: "#c2410c",
     other: "#737373",
   },
   // MUI's own defaults, spelled out so dark can override them.
@@ -175,6 +177,7 @@ export const dark: Tokens = {
     D: "#ff8a80",
     R: "#5eead4",
     U: "#fbbf24",
+    C: "#fb923c",
     other: "#a3abb8",
   },
   status: { ok: "#5ee38a", warn: "#fbbf24", error: "#ff8a80" },
@@ -248,6 +251,7 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-file-d": t.fileStatus.D,
     "--pg-file-r": t.fileStatus.R,
     "--pg-file-u": t.fileStatus.U,
+    "--pg-file-c": t.fileStatus.C,
     "--pg-file-other": t.fileStatus.other,
     "--pg-status-ok": t.status.ok,
     "--pg-status-warn": t.status.warn,

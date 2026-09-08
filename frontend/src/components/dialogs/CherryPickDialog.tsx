@@ -53,7 +53,7 @@ export function CherryPickDialog({
         {subject ? ` (${subject})` : ""} onto the current branch.
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        If conflicts occur, the cherry-pick is aborted and your branch stays untouched.
+        If conflicts occur, the cherry-pick stops and a banner offers Resolve / Continue / Skip / Abort.
       </Typography>
       <OpError error={error} />
     </OpDialog>

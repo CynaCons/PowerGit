@@ -7,7 +7,6 @@ import LinearProgress from "@mui/material/LinearProgress"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import Toolbar from "@mui/material/Toolbar"
-import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
 import { memo, useState, type ReactNode, type RefObject } from "react"
 import type { ToolbarTier } from "../hooks/useChromeLayout"
@@ -82,13 +81,6 @@ function CommandBarImpl({ toolbarRef, tier, booting, ...deps }: CommandBarProps)
         </Badge>
       )
     }
-    if (item.id === "merge") {
-      return (
-        <Tooltip key={item.id} title={item.label}>
-          <span>{button}</span>
-        </Tooltip>
-      )
-    }
     return button
   }
 
@@ -151,7 +143,7 @@ function CommandBarImpl({ toolbarRef, tier, booting, ...deps }: CommandBarProps)
                       item.onClick()
                     }}
                   >
-                    {item.id === "merge" ? item.label : `${item.label}…`}
+                    {`${item.label}…`}
                   </MenuItem>
                 ))}
                 <MenuItem

@@ -68,6 +68,51 @@ export type DiffDto = {
   truncatedReason: "size" | "lines" | null
 }
 export type StatusFile = { path: string; status: string; staged: boolean }
+
+/** v0.15.0: the operation the repository is in the middle of. A stopped
+ *  merge/rebase/cherry-pick/revert is a state, not an error (Git Extensions
+ *  parity); "none" is the ordinary case. */
+export type RepoOperationKind = "merging" | "rebasing" | "cherry-picking" | "reverting"
+export type RepoOperationState = "none" | RepoOperationKind
+
+/** Which index stages `git ls-files -u` reports for one unmerged path. */
+export type ConflictKind =
+  | "both-modified"
+  | "added-by-both"
+  | "deleted-by-us"
+  | "deleted-by-them"
+  | "added-by-us"
+  | "added-by-them"
+  | "both-deleted"
+
+/** One unmerged path. Stage numbers are git's: 1 base, 2 ours, 3 theirs;
+ *  during a rebase "ours" is the branch being rebased onto (the UI relabels). */
+export type ConflictFile = {
+  path: string
+  hasBase: boolean
+  hasOurs: boolean
+  hasTheirs: boolean
+  baseSha: string | null
+  oursSha: string | null
+  theirsSha: string | null
+  kind: ConflictKind
+}
+
+export type RepoOperation = {
+  kind: RepoOperationKind
+  /** Branch being rebased (rebase-merge/head-name) or merged (MERGE_MSG). */
+  headName: string | null
+  onto: string | null
+  ontoName: string | null
+  step: number | null
+  total: number | null
+  /** The commit the sequencer stopped at. */
+  stoppedSha: string | null
+  interactive: boolean
+  /** MERGE_MSG / SQUASH_MSG while merging. */
+  message: string | null
+}
+
 export type RepoStatus = {
   branch: string
   unstagedCount: number
@@ -79,7 +124,44 @@ export type RepoStatus = {
   behind: number | null
   /** e.g. "origin/main"; null without an upstream (v0.13.12). */
   upstream: string | null
+  /** v0.15.0; engines before it omit the three fields (treated as "none"). */
+  state?: RepoOperationState
+  operation?: RepoOperation | null
+  conflicts?: ConflictFile[] | null
 }
+
+/** POST /merge (v0.15.0, Git Extensions FormMergeBranch). `squash` excludes
+ *  `ff: "no"`; a dirty tree is accepted only with `autostash`. */
+export type MergeOptions = {
+  branch: string
+  ff: "only" | "allow" | "no"
+  squash: boolean
+  message: string | null
+  autostash: boolean
+  noCommit: boolean
+}
+
+export type RebaseOptions = { autosquash: boolean; rebaseMerges: boolean; autostash: boolean }
+
+/** A todo line as git generated it (POST /rebase/todo). Lines without a sha
+ *  (label, reset, merge, exec, …) are read-only. */
+export type RebaseTodoLine = { action: string; sha: string | null; subject: string | null; raw: string }
+export type RebaseTodo = { lines: RebaseTodoLine[]; onto: string; headName: string }
+
+/** One line the UI sends back for an interactive rebase: pick | reword | edit
+ *  | squash | fixup | drop with `sha`; reword and squash may carry `message`;
+ *  anything else is written from `raw` verbatim. */
+export type RebaseTodoEntry = { action: string; sha: string | null; message: string | null; raw: string | null }
+
+export type SequencerOp = "rebase" | "cherry-pick" | "revert"
+export type SequencerAction = "continue" | "skip" | "abort"
+
+/** GE HandleConflictSelectSide, stage based (so a rebase's inverted ours /
+ *  theirs is a labelling matter in the UI only). */
+export type ConflictTake = "ours" | "theirs" | "base" | "mark" | "delete"
+export type ConflictStage = 1 | 2 | 3
+
+export type ArchiveFormat = "zip" | "tar.gz"
 export type RefItem = { name: string; fullName: string; target: string; current: boolean }
 export type Submodule = { name: string; path: string; head: string | null }
 export type RefTree = {

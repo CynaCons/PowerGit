@@ -10,6 +10,7 @@ export type CommandId =
   | "browse.createTag"
   | "browse.checkoutBranch"
   | "browse.rebase"
+  | "browse.mergeBranch"
   | "browse.pull"
   | "browse.push"
   | "browse.quickFetch"
@@ -71,6 +72,14 @@ export const CATALOG: CommandDef[] = [
     ge: "Rebase",
     scope: "browse",
     chord: chord("E", { ctrl: true, shift: true }),
+    available: true,
+  },
+  // GE MergeBranches (v0.15.0).
+  {
+    id: "browse.mergeBranch",
+    ge: "MergeBranches",
+    scope: "browse",
+    chord: chord("M", { ctrl: true }),
     available: true,
   },
   { id: "browse.pull", ge: "PullOrFetch", scope: "browse", chord: chord("ArrowDown", { ctrl: true }), available: true },

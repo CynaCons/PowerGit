@@ -7,6 +7,7 @@ import { ErrorBanner } from "./components/ErrorBanner"
 import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
 import { JobPanel } from "./components/JobPanel"
 import { NavRail } from "./components/NavRail"
+import { OperationBanner } from "./components/OperationBanner"
 import { RecoveryPanel } from "./components/RecoveryPanel"
 import { RepoTree } from "./components/RepoTree"
 import { StatusBar } from "./components/StatusBar"
@@ -135,6 +136,8 @@ export default function App({ base }: { base: EngineClient }) {
     expandLeft: () => setLeftOpen(true),
     checkoutRef: (name: string) => void actions.checkout(name, false),
     configureRemote: (name: string) => open({ kind: "remoteConfig", remote: name }),
+    mergeRef: (name: string) => actions.openMerge(name),
+    rebaseOnto: (name: string) => open({ kind: "rebase", onto: name }),
   })
 
   // Browser/WebView zoom is deliberately app-scoped so it never changes the
@@ -175,6 +178,7 @@ export default function App({ base }: { base: EngineClient }) {
       "browse.createTag": actions.openCreateTag,
       "browse.checkoutBranch": actions.openCheckoutBranch,
       "browse.rebase": actions.openRebase,
+      "browse.mergeBranch": actions.openMergeBranch,
       "browse.pull": () => {
         if (live && !busy) jobs.openPreview("pull")
       },
@@ -241,6 +245,7 @@ export default function App({ base }: { base: EngineClient }) {
             tier={layout.toolbarTier}
             live={live}
             dirty={dirty}
+            operation={status?.state ?? "none"}
             stashCount={stashes.length}
             hasCurrent={current !== undefined}
             remoteNames={remoteNames}
@@ -254,6 +259,16 @@ export default function App({ base }: { base: EngineClient }) {
         )}
         <IncidentBanner />
         {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
+        {/* A stopped merge/rebase is a state, not an error: its exits sit
+            directly under the error banner, above the graph (v0.15.0). */}
+        <OperationBanner
+          status={status}
+          busy={busy}
+          onResolve={actions.openResolveConflicts}
+          onContinue={() => void actions.continueOperation()}
+          onSkip={() => void actions.skipOperation()}
+          onAbort={actions.abortOperation}
+        />
 
         <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
           {railBar ? (
@@ -265,6 +280,7 @@ export default function App({ base }: { base: EngineClient }) {
               onSnapshot={chrome.openSnapshot}
               live={live}
               dirty={dirty}
+              operation={status?.state ?? "none"}
               stashCount={stashes.length}
               hasCurrent={current !== undefined}
               remoteNames={remoteNames}
@@ -297,6 +313,8 @@ export default function App({ base }: { base: EngineClient }) {
                   onFetchRemote={actions.fetchRemote}
                   onConfigureRemote={chrome.configureRemote}
                   onOpenSubmodule={actions.openSubmodule}
+                  onMergeRef={chrome.mergeRef}
+                  onRebaseOnto={chrome.rebaseOnto}
                 />
               ) : (
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
@@ -315,7 +333,23 @@ export default function App({ base }: { base: EngineClient }) {
                   onNearEnd={history.onNearEnd}
                   onRowContextMenu={(e, index) => {
                     e.preventDefault()
-                    open({ kind: "context", target: { x: e.clientX, y: e.clientY, row: rows[index] } })
+                    // The right-click has already moved the selection; the
+                    // previous one is what "Compare selected commits" means.
+                    const previousSha = selectedSha && selectedSha !== rows[index]?.rev.id ? selectedSha : null
+                    open({ kind: "context", target: { x: e.clientX, y: e.clientY, row: rows[index], previousSha } })
+                  }}
+                  onRefContextMenu={(e, name, kind, index) => {
+                    open({
+                      kind: "refContext",
+                      target: {
+                        x: e.clientX,
+                        y: e.clientY,
+                        name,
+                        kind,
+                        current: kind === "local" && name === repo?.branch,
+                        sha: rows[index]?.rev.id ?? null,
+                      },
+                    })
                   }}
                   onRetry={() => void refresh().catch(() => undefined)}
                   onOpenRepo={() => void openFolder()}

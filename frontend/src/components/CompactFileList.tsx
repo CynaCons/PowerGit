@@ -11,6 +11,7 @@ const STATUS_COLORS: Record<string, string> = {
   D: "var(--pg-file-d, #d3000B)",
   R: "var(--pg-file-r, #00a89a)",
   U: "var(--pg-file-u, #e6a700)",
+  C: "var(--pg-file-c, #c2410c)",
 }
 
 function statusColor(status: string): string {

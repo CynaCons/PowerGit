@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test"
 // Audit item A.9: cherry-pick and revert were disabled "(coming soon)"
 // placeholders in the revision context menu. Both requests are intercepted
 // so these tests never mutate the real repository the dev engine has open.
+// v0.15.0 wording: a conflicted sequencer operation stops and is resolved
+// from the banner — it is no longer aborted behind the user's back.
 test("cherry-pick dialog calls the engine and surfaces a conflict error", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
@@ -15,7 +17,7 @@ test("cherry-pick dialog calls the engine and surfaces a conflict error", async 
       await route.fulfill({
         status: 400,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Cherry-pick stopped (conflicts or errors); the cherry-pick was aborted." }),
+        body: JSON.stringify({ error: "Cherry-pick stops: conflicts need resolving." }),
       })
     },
   )
@@ -46,7 +48,14 @@ test("revert dialog calls the engine and closes on success", async ({ page }) =>
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ branch: "main", unstagedCount: 0, stagedCount: 0, unstaged: [], staged: [] }),
+        body: JSON.stringify({
+          branch: "main",
+          unstagedCount: 0,
+          stagedCount: 0,
+          unstaged: [],
+          staged: [],
+          state: "none",
+        }),
       })
     },
   )

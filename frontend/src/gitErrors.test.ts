@@ -32,6 +32,23 @@ describe("explainGitFailure", () => {
     expect(explainGitFailure("fetch was cancelled").kind).toBe("cancelled")
   })
 
+  it("classifies conflicts and in-progress operations (v0.15.0)", () => {
+    const merge = explainGitFailure(
+      "CONFLICT (content): Merge conflict in a.txt\nAutomatic merge failed; fix conflicts",
+    )
+    expect(merge.kind).toBe("conflict")
+    expect(merge.hint).toMatch(/Resolve conflicts/)
+    expect(explainGitFailure("error: could not apply 1a2b3c4... second").kind).toBe("conflict")
+    expect(explainGitFailure("Committing is not possible because you have unmerged files.").kind).toBe("conflict")
+    expect(explainGitFailure("fatal: It seems that there is already a rebase-merge directory").kind).toBe("in-progress")
+    expect(explainGitFailure("error: You have not concluded your merge (MERGE_HEAD exists).").kind).toBe("in-progress")
+    // The generic "commit your changes" rule must not win over the two above.
+    expect(
+      explainGitFailure("error: Please commit your changes or stash them before you merge.\nYou are in the middle of")
+        .kind,
+    ).toBe("in-progress")
+  })
+
   it("falls back to the first line for unknown failures", () => {
     const f = explainGitFailure("\nsomething odd\nsecond line")
     expect(f.kind).toBe("other")

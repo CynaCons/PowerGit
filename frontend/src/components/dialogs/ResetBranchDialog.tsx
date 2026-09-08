@@ -15,6 +15,7 @@ export function ResetBranchDialog({
   subject,
   currentBranch,
   dirtyCount,
+  initialMode = "mixed",
   onClose,
   onConfirm,
 }: {
@@ -23,15 +24,17 @@ export function ResetBranchDialog({
   subject?: string
   currentBranch: string
   dirtyCount: number
+  /** Preselected mode when the menu already said which one (v0.15.0). */
+  initialMode?: ResetMode
   onClose: () => void
   onConfirm: (mode: ResetMode) => Promise<void>
 }) {
-  const [mode, setMode] = useState<ResetMode>("mixed")
+  const [mode, setMode] = useState<ResetMode>(initialMode)
   const { error, submit } = useActionDialog({ open, label: "reset", action: () => onConfirm(mode), onClose })
 
   useEffect(() => {
-    if (open) setMode("mixed")
-  }, [open])
+    if (open) setMode(initialMode)
+  }, [open, initialMode])
 
   return (
     <OpDialog

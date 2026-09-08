@@ -1,6 +1,16 @@
 import type {
+  ArchiveFormat,
   ChangeKind,
   CommitDetail,
+  ConflictFile,
+  ConflictStage,
+  ConflictTake,
+  MergeOptions,
+  RebaseOptions,
+  RebaseTodo,
+  RebaseTodoEntry,
+  SequencerAction,
+  SequencerOp,
   DiffDto,
   DiffOptions,
   FileChange,
@@ -458,8 +468,131 @@ export class EngineClient {
     return json<RepoStatus>(await this.post(`${this.repoPath()}/reset`, { commit, mode }))
   }
 
-  async rebase(onto: string): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/rebase`, { onto }))
+  // ---- merge / rebase / sequencer (v0.15.0) ------------------------------
+  // A stopped operation (conflicts, an `edit` line) comes back as 200 with
+  // `state` set; only a real failure is a 400. Every call returns the new
+  // status so the banner appears without a second round trip.
+
+  async merge(options: MergeOptions): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/merge`, options))
+  }
+
+  /** 400 while conflicts remain; otherwise commits the merge (or the squash). */
+  async mergeContinue(message?: string | null): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/merge/continue`, { message: message ?? null }))
+  }
+
+  async mergeAbort(): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/merge/abort`))
+  }
+
+  /** `git rebase [--autostash] [--rebase-merges] [--autosquash] onto`; with
+   *  `todo` the interactive path runs that list instead of git's own. */
+  async rebase(onto: string, options?: Partial<RebaseOptions>, todo?: RebaseTodoEntry[]): Promise<RepoStatus> {
+    return json<RepoStatus>(
+      await this.post(`${this.repoPath()}/rebase`, {
+        onto,
+        autosquash: options?.autosquash ?? false,
+        rebaseMerges: options?.rebaseMerges ?? false,
+        autostash: options?.autostash ?? false,
+        todo: todo ?? null,
+      }),
+    )
+  }
+
+  /** `git rebase|cherry-pick|revert --continue|--skip|--abort`. */
+  async sequencerAction(op: SequencerOp, action: SequencerAction): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/${op}/${action}`))
+  }
+
+  rebaseContinue(): Promise<RepoStatus> {
+    return this.sequencerAction("rebase", "continue")
+  }
+
+  rebaseSkip(): Promise<RepoStatus> {
+    return this.sequencerAction("rebase", "skip")
+  }
+
+  rebaseAbort(): Promise<RepoStatus> {
+    return this.sequencerAction("rebase", "abort")
+  }
+
+  /** git's own todo for `rebase -i onto` (autosquash order, label/reset/merge
+   *  lines), captured without leaving rebase state behind. */
+  async rebaseTodo(onto: string, options?: Partial<RebaseOptions>): Promise<RebaseTodo> {
+    return json<RebaseTodo>(
+      await this.post(`${this.repoPath()}/rebase/todo`, {
+        onto,
+        autosquash: options?.autosquash ?? false,
+        rebaseMerges: options?.rebaseMerges ?? false,
+      }),
+    )
+  }
+
+  async conflicts(signal?: AbortSignal): Promise<ConflictFile[]> {
+    return json<ConflictFile[]>(await this.get(`${this.repoPath()}/conflicts`, { signal }))
+  }
+
+  /** `git show :<stage>:<path>` — 1 base, 2 ours, 3 theirs; bounded like blobs. */
+  async conflictBlob(path: string, stage: ConflictStage, signal?: AbortSignal): Promise<DiffDto> {
+    return json<DiffDto>(
+      await this.get(`${this.repoPath()}/conflicts/blob?path=${encodeURIComponent(path)}&stage=${stage}`, {
+        signal,
+      }),
+    )
+  }
+
+  async resolveConflicts(paths: string[], take: ConflictTake): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/conflicts/resolve`, { paths, take }))
+  }
+
+  /** Detached `git mergetool --no-prompt -y -- path`; 400 without a merge.tool. */
+  async openMergetool(path: string): Promise<void> {
+    await json<{ ok: boolean }>(await this.post(`${this.repoPath()}/mergetool`, { path }))
+  }
+
+  // ---- compare / archive (v0.15.0) ----------------------------------------
+
+  private compareQuery(from: string, to: string | null): string {
+    return `from=${encodeURIComponent(from)}&${to === null ? "worktree=true" : `to=${encodeURIComponent(to)}`}`
+  }
+
+  /** Files changed between two commits (`to` null: `from` vs the working tree) plus the first diff. */
+  async compare(from: string, to: string | null, options?: Partial<DiffOptions>, signal?: AbortSignal) {
+    return json<CommitChanges>(
+      await this.get(`${this.repoPath()}/compare?${this.compareQuery(from, to)}${diffParams(options)}`, { signal }),
+    )
+  }
+
+  async compareDiff(
+    from: string,
+    to: string | null,
+    path: string,
+    options?: Partial<DiffOptions>,
+    signal?: AbortSignal,
+  ): Promise<DiffDto> {
+    return json<DiffDto>(
+      await this.get(
+        `${this.repoPath()}/compare?${this.compareQuery(from, to)}&path=${encodeURIComponent(path)}${diffParams(options)}`,
+        { signal },
+      ),
+    )
+  }
+
+  /** Streamed `git archive`; the token rides in the query like /events so a
+   *  plain navigation can download it. */
+  archiveUrl(id: string, format: ArchiveFormat = "zip"): string {
+    return `${this.baseUrl}${this.repoPath()}/commits/${encodeURIComponent(id)}/archive?format=${encodeURIComponent(format)}&token=${encodeURIComponent(this.token)}`
+  }
+
+  async archive(id: string, format: ArchiveFormat = "zip"): Promise<Blob> {
+    const res = await this.request(
+      `${this.repoPath()}/commits/${encodeURIComponent(id)}/archive?format=${encodeURIComponent(format)}`,
+      {},
+      { timeoutMs: 0 },
+    )
+    if (!res.ok) await json(res)
+    return res.blob()
   }
 
   async cherryPick(id: string): Promise<RepoStatus> {

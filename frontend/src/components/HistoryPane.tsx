@@ -21,6 +21,7 @@ export type HistoryPaneProps = {
   onSelect: (index: number) => void
   onNearEnd: () => void
   onRowContextMenu: (e: React.MouseEvent, index: number) => void
+  onRefContextMenu?: (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => void
   onRetry: () => void
   onOpenRepo: () => void
   onRecover: () => void
@@ -41,6 +42,7 @@ export function HistoryPane({
   onSelect,
   onNearEnd,
   onRowContextMenu,
+  onRefContextMenu,
   onRetry,
   onOpenRepo,
   onRecover,
@@ -97,6 +99,7 @@ export function HistoryPane({
           tagNames={tagNames}
           onNearEnd={onNearEnd}
           onRowContextMenu={onRowContextMenu}
+          onRefContextMenu={onRefContextMenu}
         />
       </Box>
     </Box>

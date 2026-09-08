@@ -3,13 +3,12 @@ import SearchIcon from "@mui/icons-material/Search"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
 import InputBase from "@mui/material/InputBase"
-import Menu from "@mui/material/Menu"
-import MenuItem from "@mui/material/MenuItem"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import type { RefItem, RefTree } from "../engine"
+import { RefContextMenu, type RefMenuKind } from "./dialogs/RefContextMenu"
 import { ROW_HEIGHT, SECTION_HEIGHT, SectionHeader, TreeRow, type Item } from "./RepoTreeRows"
 
 type Props = {
@@ -22,6 +21,9 @@ type Props = {
   onFetchRemote?: (name: string) => void
   onConfigureRemote?: (name: string) => void
   onOpenSubmodule?: (path: string) => void
+  /** v0.15.0: the ref menu's merge/rebase entries. */
+  onMergeRef?: (name: string) => void
+  onRebaseOnto?: (name: string) => void
 }
 
 type TreeNode = {
@@ -33,11 +35,7 @@ type TreeNode = {
   full?: string
 }
 
-type CtxMenu =
-  | { kind: "branch"; name: string; x: number; y: number }
-  | { kind: "tag"; name: string; x: number; y: number }
-  | { kind: "remote"; name: string; x: number; y: number }
-  | { kind: "submodule"; path: string; x: number; y: number }
+type CtxMenu = { kind: RefMenuKind; name: string; x: number; y: number }
 
 // Above this many refs a section/group starts collapsed: a monorepo can hold
 // thousands of remote branches, and expanding them all by default buries the
@@ -92,6 +90,8 @@ function RepoTreeImpl({
   onFetchRemote,
   onConfigureRemote,
   onOpenSubmodule,
+  onMergeRef,
+  onRebaseOnto,
 }: Props) {
   const [ctx, setCtx] = useState<CtxMenu | null>(null)
   const [filter, setFilter] = useState("")
@@ -156,11 +156,13 @@ function RepoTreeImpl({
     const leafCtx = (icon: Item["icon"], full: string): ((x: number, y: number) => void) | undefined => {
       switch (icon) {
         case "branch":
-          return (x, y) => setCtx({ kind: "branch", name: full, x, y })
+          return (x, y) => setCtx({ kind: "local", name: full, x, y })
         case "tag":
           return (x, y) => setCtx({ kind: "tag", name: full, x, y })
         case "remote":
-          return (x, y) => setCtx({ kind: "remote", name: full.split("/")[0] ?? full, x, y })
+          // The full "origin/main" so checkout/merge act on the branch; the
+          // menu's Fetch entry takes the remote out of it again.
+          return (x, y) => setCtx({ kind: "remote", name: full, x, y })
         default:
           return undefined
       }
@@ -202,11 +204,7 @@ function RepoTreeImpl({
             onClick: () => {
               if (node.target) onSelectTarget?.(node.target)
             },
-            onContext: node.current
-              ? undefined
-              : dirCtx && icon === "remote"
-                ? dirCtx
-                : (leafCtx(icon, full) ?? dirCtx),
+            onContext: node.current ? undefined : (leafCtx(icon, full) ?? dirCtx),
           })
         }
       }
@@ -278,7 +276,7 @@ function RepoTreeImpl({
           label: s.name,
           icon: "submodule",
           onClick: () => onOpenSubmodule?.(s.path),
-          onContext: (x, y) => setCtx({ kind: "submodule", path: s.path, x, y }),
+          onContext: (x, y) => setCtx({ kind: "submodule", name: s.path, x, y }),
         })
       }
     }
@@ -361,50 +359,22 @@ function RepoTreeImpl({
         </Box>
       </Box>
 
-      <Menu
-        open={ctx !== null}
+      <RefContextMenu
+        target={ctx}
+        variant="tree"
         onClose={() => setCtx(null)}
-        anchorReference="anchorPosition"
-        anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}
-      >
-        {itemsFor(ctx).map((item) => (
-          <MenuItem
-            key={item.testid}
-            data-testid={item.testid}
-            onClick={() => {
-              item.action()
-              setCtx(null)
-            }}
-          >
-            {item.label}
-          </MenuItem>
-        ))}
-      </Menu>
+        actions={{
+          onCheckout: (name) => onCheckoutRef?.(name),
+          onMerge: (name) => onMergeRef?.(name),
+          onRebaseOnto: (name) => onRebaseOnto?.(name),
+          onDelete: (name, kind) => (kind === "tag" ? onDeleteTag?.(name) : onDeleteBranch?.(name)),
+          onFetchRemote: (name) => onFetchRemote?.(name),
+          onConfigureRemote: (name) => onConfigureRemote?.(name),
+          onOpenSubmodule: (path) => onOpenSubmodule?.(path),
+        }}
+      />
     </Paper>
   )
-
-  function itemsFor(c: CtxMenu | null): { label: string; testid: string; action: () => void }[] {
-    if (!c) return []
-    switch (c.kind) {
-      case "branch":
-        return [
-          { label: "Checkout Branch", testid: "tree-checkout", action: () => onCheckoutRef?.(c.name) },
-          { label: "Delete Branch…", testid: "tree-delete-branch", action: () => onDeleteBranch?.(c.name) },
-        ]
-      case "tag":
-        return [
-          { label: "Checkout Tag", testid: "tree-checkout-tag", action: () => onCheckoutRef?.(c.name) },
-          { label: "Delete Tag…", testid: "tree-delete-tag", action: () => onDeleteTag?.(c.name) },
-        ]
-      case "remote":
-        return [
-          { label: "Fetch Remote", testid: "tree-fetch-remote", action: () => onFetchRemote?.(c.name) },
-          { label: "Configure Remote…", testid: "tree-configure-remote", action: () => onConfigureRemote?.(c.name) },
-        ]
-      case "submodule":
-        return [{ label: "Open Submodule", testid: "tree-open-submodule", action: () => onOpenSubmodule?.(c.path) }]
-    }
-  }
 }
 
 // Memoised: the ref tree only changes on a refs refresh, never on a row

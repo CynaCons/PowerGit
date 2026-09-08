@@ -4,6 +4,7 @@ import CircularProgress from "@mui/material/CircularProgress"
 import Typography from "@mui/material/Typography"
 import type { RepoStatus } from "../engine"
 import type { SessionView } from "../session/state"
+import { operationCaption } from "./operationText"
 
 export type StatusBarProps = {
   view: SessionView
@@ -39,6 +40,9 @@ export function StatusBar({
 }: StatusBarProps) {
   const { live, repo, health, statusText, primaryAction } = view
   const showRepo = live && repo
+  // v0.15.0: a stopped merge/rebase is visible even when the banner above
+  // the graph is scrolled out of the way, the way GE's status strip does it.
+  const operation = operationCaption(status)
   return (
     <Box
       data-testid="engine-status"
@@ -69,6 +73,16 @@ export function StatusBar({
           >
             {repo.branch}
           </Typography>
+          {operation && (
+            <Typography
+              data-testid="status-operation"
+              variant="caption"
+              noWrap
+              sx={{ flexShrink: 0, fontWeight: 700, color: "warning.main" }}
+            >
+              {operation}
+            </Typography>
+          )}
           {status?.ahead != null && status?.behind != null && (
             <Typography
               variant="caption"

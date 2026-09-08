@@ -49,7 +49,7 @@ export function RevertDialog({
         {subject ? ` (${subject})` : ""}.
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        If conflicts occur, the revert is aborted and your branch stays untouched.
+        If conflicts occur, the revert stops and a banner offers Resolve / Continue / Skip / Abort.
       </Typography>
       <OpError error={error} />
     </OpDialog>

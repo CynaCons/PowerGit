@@ -176,8 +176,10 @@ test("revision context menu offers checkout, reset, rebase", async ({ page }) =>
   await expect(page.getByRole("heading", { name: /Rebase/ })).toBeVisible()
   await page.getByRole("button", { name: "Cancel" }).click()
 
+  // v0.15.0: Reset is a submenu of the three modes (Git Extensions parity).
   await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click({ button: "right" })
   await page.getByTestId("ctx-reset").click()
+  await page.locator("#revision-context-menu-sub").getByTestId("ctx-reset-mixed").click()
   await expect(page.getByRole("heading", { name: /Reset branch/ })).toBeVisible()
   await page.getByRole("button", { name: "Cancel" }).click()
 })

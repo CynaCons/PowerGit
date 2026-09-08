@@ -12,7 +12,7 @@ import SyncIcon from "@mui/icons-material/Sync"
 import Divider from "@mui/material/Divider"
 import MenuItem from "@mui/material/MenuItem"
 import type { ReactNode } from "react"
-import { useEngine } from "../engine"
+import { useEngine, type RepoOperationState } from "../engine"
 import { shortcutLabel } from "../hotkeys"
 import type { GitActions } from "../hooks/useGitActions"
 import type { Jobs } from "../hooks/useJobs"
@@ -42,6 +42,8 @@ export type CommandItem = {
 export type CommandDeps = {
   live: boolean
   dirty: number
+  /** What the repository is in the middle of (v0.15.0). */
+  operation?: RepoOperationState
   stashCount: number
   hasCurrent: boolean
   remoteNames: string[]
@@ -55,6 +57,9 @@ export type CommandDeps = {
 export function useCommandItems(d: CommandDeps): CommandItem[] {
   const engine = useEngine()
   const { live, dirty, stashCount, hasCurrent, remoteNames, defaultRemote, jobs, actions, refresh, openStash } = d
+  const operation = d.operation ?? "none"
+  const merging = operation === "merging"
+  const rebasing = operation === "rebasing"
   const { busy, runJob, runJobSequence, openPreview } = jobs
   return [
     {
@@ -221,12 +226,24 @@ export function useCommandItems(d: CommandDeps): CommandItem[] {
     },
     {
       id: "merge",
-      label: "Merge (coming soon)",
+      label: "Merge",
       icon: <CallMergeIcon fontSize="small" />,
       testid: "merge-button",
-      disabled: true,
-      onClick: () => {},
+      disabled: !live,
+      shortcut: shortcutLabel("browse.mergeBranch"),
+      onClick: actions.openMergeBranch,
       secondary: true,
+      // While a merge is stopped, the same button is how you leave it.
+      menu: merging
+        ? [
+            <MenuItem key="continue" data-testid="merge-continue" onClick={() => void actions.continueOperation()}>
+              Commit merge
+            </MenuItem>,
+            <MenuItem key="abort" data-testid="merge-abort" onClick={actions.abortOperation}>
+              Abort merge
+            </MenuItem>,
+          ]
+        : undefined,
     },
     {
       id: "rebase",
@@ -237,6 +254,19 @@ export function useCommandItems(d: CommandDeps): CommandItem[] {
       shortcut: shortcutLabel("browse.rebase"),
       onClick: actions.openRebase,
       secondary: true,
+      menu: rebasing
+        ? [
+            <MenuItem key="continue" data-testid="rebase-continue" onClick={() => void actions.continueOperation()}>
+              Continue rebase
+            </MenuItem>,
+            <MenuItem key="skip" data-testid="rebase-skip" onClick={() => void actions.skipOperation()}>
+              Skip commit
+            </MenuItem>,
+            <MenuItem key="abort" data-testid="rebase-abort" onClick={actions.abortOperation}>
+              Abort rebase
+            </MenuItem>,
+          ]
+        : undefined,
     },
     {
       id: "tag",

@@ -10,7 +10,18 @@ export type GitFailure = {
   hint: string | null
   /** The original text. */
   raw: string
-  kind: "auth" | "ssh" | "network" | "diverged" | "rejected" | "dirty" | "no-upstream" | "cancelled" | "other"
+  kind:
+    | "auth"
+    | "ssh"
+    | "network"
+    | "diverged"
+    | "rejected"
+    | "dirty"
+    | "no-upstream"
+    | "cancelled"
+    | "conflict"
+    | "in-progress"
+    | "other"
 }
 
 const RULES: Array<{ kind: GitFailure["kind"]; test: RegExp; title: string; hint: string | null }> = [
@@ -37,6 +48,21 @@ const RULES: Array<{ kind: GitFailure["kind"]; test: RegExp; title: string; hint
     test: /Could not resolve host|Connection refused|Connection timed out|unable to access|Network is unreachable|Failed to connect|Recv failure|SSL_ERROR|schannel/i,
     title: "Remote unreachable",
     hint: "Check the network, VPN or proxy and the remote URL (Repository ▸ remotes).",
+  },
+  // v0.15.0: a stopped merge/rebase is a state the banner owns, so the two
+  // rules below sit before "dirty"/"diverged" — git's own conflict text
+  // mentions "commit your changes" and "merge" too.
+  {
+    kind: "in-progress",
+    test: /already in progress|MERGE_HEAD exists|is in progress|rebase-merge directory|You have not concluded|You are in the middle of/i,
+    title: "An operation is already in progress",
+    hint: "Finish it first: Continue, Skip or Abort from the banner above the graph.",
+  },
+  {
+    kind: "conflict",
+    test: /CONFLICT \(|Automatic merge failed|fix conflicts|Resolve all conflicts|unmerged files|unresolved conflict|could not apply|conflicts remain/i,
+    title: "Conflicts need resolving",
+    hint: "Open Resolve conflicts from the banner, take a side or use the mergetool per file, then Continue — or Abort.",
   },
   {
     kind: "no-upstream",

@@ -92,6 +92,7 @@ test("GE default chords we claim", () => {
     "browse.createTag": chord("T", { ctrl: true }),
     "browse.checkoutBranch": chord(".", { ctrl: true }),
     "browse.rebase": chord("E", { ctrl: true, shift: true }),
+    "browse.mergeBranch": chord("M", { ctrl: true }),
     "browse.pull": chord("ArrowDown", { ctrl: true }),
     "browse.push": chord("ArrowUp", { ctrl: true }),
     "browse.quickFetch": chord("ArrowDown", { ctrl: true, shift: true }),

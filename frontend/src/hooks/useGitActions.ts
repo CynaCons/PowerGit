@@ -4,6 +4,7 @@ import type { Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
 import type { Jobs } from "./useJobs"
+import { useOperationActions } from "./useOperationActions"
 import type { RepoState } from "./useRepoState"
 
 export type GitActionsDeps = {
@@ -17,7 +18,10 @@ export type GitActionsDeps = {
 export type GitActions = ReturnType<typeof useGitActions>
 
 // Every git operation the shell can start, shared by the command bar, the
-// hotkeys, the context menu and the ref tree so all entry points agree.
+// hotkeys, the context menus, the operation banner and the ref tree so all
+// entry points agree. The v0.15.0 operations (merge, rebase, sequencer,
+// conflicts, compare, archive) live in useOperationActions and are spread
+// into the same object.
 export function useGitActions({ session, history, repoState, jobs, dialogs }: GitActionsDeps) {
   const { client: engine, view, setEngineError } = session
   const repo = view.repo
@@ -25,6 +29,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   const { status, setStatus, setRefs, refresh, branchNames, openFolder } = repoState
   const { withBusy, runJob } = jobs
   const { dialog, open, close } = dialogs
+  const operations = useOperationActions({ session, repoState, jobs, dialogs })
 
   function openCommit() {
     open({ kind: "commit", amend: false, initialMsg: undefined })
@@ -78,32 +83,40 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
       await refresh({ revisions: true, refs: true, status: true })
     })
   }
-  async function rebase() {
-    if (dialog.kind !== "rebase") return
-    const sha = dialog.row.rev.id
-    await withBusy("Rebasing", async () => {
-      setStatus(await engine.rebase(sha))
-      await refresh({ revisions: true, refs: true, status: true })
+
+  // v0.15.0: every destructive action asks through the in-app ConfirmDialog
+  // (a window.confirm is an OS prompt in the WebView and blocks automation).
+  function removeBranch(name: string) {
+    operations.confirm({
+      title: `Delete branch '${name}'?`,
+      body: "Commits only on this branch become unreachable.",
+      confirmLabel: "Delete branch",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          setRefs(await engine.deleteBranch(name))
+          await refresh({ revisions: true })
+        } catch (e) {
+          setEngineError(`Delete branch failed: ${describeThrown(e)}`)
+        }
+      },
     })
   }
-
-  async function removeBranch(name: string) {
-    if (!window.confirm(`Delete branch '${name}'?`)) return
-    try {
-      setRefs(await engine.deleteBranch(name))
-      await refresh({ revisions: true })
-    } catch (e) {
-      setEngineError(`Delete branch failed: ${describeThrown(e)}`)
-    }
-  }
-  async function removeTag(name: string) {
-    if (!window.confirm(`Delete tag '${name}'?`)) return
-    try {
-      setRefs(await engine.deleteTag(name))
-      await refresh({ revisions: true })
-    } catch (e) {
-      setEngineError(`Delete tag failed: ${describeThrown(e)}`)
-    }
+  function removeTag(name: string) {
+    operations.confirm({
+      title: `Delete tag '${name}'?`,
+      body: "The tag is removed locally; a remote copy stays until it is deleted there too.",
+      confirmLabel: "Delete tag",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          setRefs(await engine.deleteTag(name))
+          await refresh({ revisions: true })
+        } catch (e) {
+          setEngineError(`Delete tag failed: ${describeThrown(e)}`)
+        }
+      },
+    })
   }
   async function fetchRemote(name: string) {
     await runJob(`Fetching ${name}`, () => engine.startFetch(name))
@@ -126,12 +139,14 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     if (name) open({ kind: "checkout", branch: name })
   }
   function openRebase() {
-    if (current && !onArtificial) open({ kind: "rebase", row: current })
+    if (current && !onArtificial) open({ kind: "rebase", onto: current.rev.id, ontoSubject: current.rev.message })
   }
-  async function deleteBranchPrompt() {
-    const hint = branchNames.length > 0 ? `Delete which branch?\n(${branchNames.join(", ")})` : "Delete which branch?"
-    const target = window.prompt(hint)
-    if (target?.trim()) await removeBranch(target.trim())
+  /** Ctrl+M / rail Merge: pick the branch in the dialog. */
+  function openMergeBranch() {
+    operations.openMerge(branchNames.find((b) => b !== repo?.branch))
+  }
+  function deleteBranchPrompt() {
+    open({ kind: "deleteBranch" })
   }
   function openSubmodule(path: string) {
     if (!repo) return
@@ -147,21 +162,27 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     })
   }
   function dropLatestStash() {
-    if (!window.confirm("Drop stash@{0}? This cannot be undone.")) return
-    void withBusy("Dropping stash", async () => {
-      await engine.dropStash("stash@{0}")
-      await refresh({ revisions: true, status: true, stashes: true })
+    operations.confirm({
+      title: "Drop stash@{0}?",
+      body: "The stashed changes are gone for good.",
+      confirmLabel: "Drop stash",
+      danger: true,
+      onConfirm: () =>
+        withBusy("Dropping stash", async () => {
+          await engine.dropStash("stash@{0}")
+          await refresh({ revisions: true, status: true, stashes: true })
+        }),
     })
   }
 
   return {
+    ...operations,
     openCommit,
     openAmend,
     commit,
     createRef,
     checkout,
     reset,
-    rebase,
     removeBranch,
     removeTag,
     fetchRemote,
@@ -169,6 +190,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     openCreateTag,
     openCheckoutBranch,
     openRebase,
+    openMergeBranch,
     deleteBranchPrompt,
     openSubmodule,
     applyLatestStash,

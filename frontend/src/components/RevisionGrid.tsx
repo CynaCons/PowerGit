@@ -14,6 +14,8 @@ type Props = {
   selected: number
   onSelect: (index: number) => void
   onRowContextMenu?: (e: React.MouseEvent, index: number) => void
+  /** Right-click on a ref chip (v0.15.0): its own menu, not the row's. */
+  onRefContextMenu?: (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => void
   loadingTail?: boolean
   onNearEnd?: () => void
   /** Remote names from the ref tree; a ref whose first segment is one of
@@ -28,6 +30,7 @@ export function RevisionGrid({
   selected,
   onSelect,
   onRowContextMenu,
+  onRefContextMenu,
   loadingTail,
   onNearEnd,
   remoteNames,
@@ -319,8 +322,23 @@ export function RevisionGrid({
                               : remote
                                 ? "remote"
                                 : "local"
+                      const menuKind = kind === "local" || kind === "remote" || kind === "tag" ? kind : null
                       return (
-                        <span key={ref} className={`ref${kind === "local" ? "" : ` ${kind}`}`} data-ref-kind={kind}>
+                        <span
+                          key={ref}
+                          className={`ref${kind === "local" ? "" : ` ${kind}`}`}
+                          data-ref-kind={kind}
+                          data-ref={ref}
+                          onContextMenu={
+                            onRefContextMenu && menuKind
+                              ? (e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  onRefContextMenu(e, ref, menuKind, item.index)
+                                }
+                              : undefined
+                          }
+                        >
                           {/* v0.13.19, owner: "a little cloud icon on the left of the remote branches";
                               v0.14.0: "tags should be having a different little icon" */}
                           {remote && <CloudOutlinedIcon className="ref-cloud" />}
