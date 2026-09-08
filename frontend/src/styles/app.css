@@ -27,7 +27,10 @@ html {
 .grid-header,
 .grid-row {
   display: grid;
-  grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-author, 128px) var(--col-date, 142px) var(--col-sha, 86px);
+  grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-author, 128px) var(
+      --col-date,
+      142px
+    ) var(--col-sha, 86px);
   align-items: center;
   height: var(--pg-row-height, 28px);
 }
@@ -40,7 +43,10 @@ html {
 @media (max-width: 1200px) {
   .grid-header,
   .grid-row {
-    grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-author, 104px) var(--col-date, 106px) var(--col-sha, 68px);
+    grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-author, 104px) var(
+        --col-date,
+        106px
+      ) var(--col-sha, 68px);
   }
   .date {
     font-size: 11px;
