@@ -14,7 +14,7 @@ import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
 import ToggleButton from "@mui/material/ToggleButton"
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useEngine, type GitConfig, type ToolInfo, type VsCodeInfo } from "../engine"
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
@@ -79,14 +79,23 @@ export function SettingsDialog({ open, onClose }: Props) {
   // The read is cancelled on the way out: flipping twice quickly (or React's
   // double-mount in dev) otherwise lets the earlier answer land last and
   // show the other scope's values, or blank the fields altogether.
+  const loadedScope = useRef<string | null>(null)
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      loadedScope.current = null
+      return
+    }
     let cancelled = false
-    setCfg(null)
+    // Blank the fields only when the scope they show actually changed. A
+    // re-run for any other reason (the dialog re-rendering while the app
+    // refreshes behind it) must not flash the identity empty.
+    if (loadedScope.current !== null && loadedScope.current !== scope) setCfg(null)
     engine
       .config(scope)
       .then((c) => {
-        if (!cancelled) setCfg(c)
+        if (cancelled) return
+        loadedScope.current = scope
+        setCfg(c)
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "config failed")

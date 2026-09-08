@@ -58,6 +58,11 @@ test("the engine's probes never pop a failure card, real failures do", () => {
     "git remote get-url origin",
     "git ls-files --error-unmatch -- a.txt",
     "git config --get user.name",
+    // The settings dialog reads several keys that are usually unset, at a
+    // named scope; each answers "no" with exit 1 (v0.15.0).
+    "git config --local --get merge.tool",
+    "git config --global --get core.editor",
+    "git config --show-origin --get user.email",
   ]
   for (const command of probes) {
     const e = entry({ command, exitCode: 1 })

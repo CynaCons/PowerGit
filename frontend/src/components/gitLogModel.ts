@@ -24,7 +24,10 @@ const PROBES: readonly RegExp[] = [
   /^git rev-list\b.*@\{upstream\}/,
   /^git remote get-url\b/,
   /^git ls-files\b.*--error-unmatch\b/,
-  /^git config --get\b/,
+  // Any config read, at any scope: `config --get`, `config --local --get`
+  // and `config --show-origin --get` all exit 1 when the key is unset, and
+  // the settings dialog asks about several keys that usually are.
+  /^git config\b(?=.*--get\b)/,
   /^git name-rev\b/,
   /^git submodule status\b/,
   /^git check-ignore\b/,

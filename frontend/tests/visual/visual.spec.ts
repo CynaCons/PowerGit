@@ -85,6 +85,10 @@ test.describe("@dialogs", () => {
     await page.keyboard.press("Escape")
     await page.keyboard.press("Control+Comma")
     await expect(page.getByRole("dialog")).toBeVisible()
+    // The identity fields stay disabled until the engine answers with this
+    // repository's config; capturing before that gives a baseline of empty
+    // boxes that would hide any later change to them.
+    await expect(page.getByTestId("settings-user-name")).toBeEnabled()
     await expect(page).toHaveScreenshot("dialog-settings.png")
   })
 })
