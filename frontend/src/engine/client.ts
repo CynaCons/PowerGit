@@ -16,6 +16,7 @@ import type {
   FileChange,
   GitConfig,
   GitJob,
+  GitLogEntry,
   Health,
   IgnorePreview,
   JobStarted,
@@ -634,6 +635,13 @@ export class EngineClient {
 
   async jobs(): Promise<GitJob[]> {
     return json<GitJob[]>(await this.get(`${this.repoPath()}/jobs`))
+  }
+
+  /** The Git console's rolling log (v0.15.1). `after` is the highest id
+   *  already held, so the console polls for a delta rather than the buffer. */
+  async gitLog(after?: number, signal?: AbortSignal): Promise<GitLogEntry[]> {
+    const qs = after !== undefined ? `?after=${after}` : ""
+    return json<GitLogEntry[]>(await this.get(`${this.repoPath()}/gitlog${qs}`, { signal, timeoutMs: 10_000 }))
   }
 
   async cancelJob(id: string): Promise<boolean> {

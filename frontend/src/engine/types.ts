@@ -192,6 +192,24 @@ export type GitJob = {
 }
 export type JobStarted = { id: string; kind: string }
 
+/** One git invocation as the Git console shows it (v0.15.1). The engine
+ *  keeps the last 50 per session; `id` is monotonic so the console can ask
+ *  for a delta. `command` and `output` are sanitized engine-side — a push
+ *  URL can carry a token (GitCommandSanitizer.cs). */
+export type GitLogEntry = {
+  id: number
+  /** UTC ISO-8601. */
+  at: string
+  /** e.g. "git fetch --prune origin". */
+  command: string
+  /** git's exit code; -1 when it timed out or was cancelled. */
+  exitCode: number
+  durationMs: number
+  /** stdout then stderr, capped at 8 KB engine-side. */
+  output: string
+  truncated: boolean
+}
+
 export type StashInfo = { reference: string; id: string; subject: string }
 
 /** Coarse classification of a GET /events change notification: "refs"
