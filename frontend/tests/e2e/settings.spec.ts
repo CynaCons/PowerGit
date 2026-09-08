@@ -51,6 +51,7 @@ test.describe("settings", () => {
     await expect(page.getByTestId("settings-user-name")).toHaveValue("Local Only")
     await page.getByTestId("settings-user-name").fill("Renamed Locally")
     await page.getByRole("button", { name: "Save" }).click()
+    await expect(page.getByRole("dialog")).toHaveCount(0)
 
     await expect.poll(async () => (await localConfig()).userName).toBe("Renamed Locally")
   })
@@ -65,6 +66,7 @@ test.describe("settings", () => {
     await confirmDelete.click()
     await page.getByTestId("settings-autofetch").selectOption({ label: "Every 5 minutes" })
     await page.getByRole("button", { name: "Save" }).click()
+    await expect(page.getByRole("dialog")).toHaveCount(0)
 
     // Survives a reload: the preference is stored, not just in this render.
     await page.reload()
@@ -100,6 +102,7 @@ test.describe("settings", () => {
     await page.getByTestId("settings-confirm-delete-branch").click()
     await page.getByTestId("settings-autofetch").selectOption({ label: "Never" })
     await page.getByRole("button", { name: "Save" }).click()
+    await expect(page.getByRole("dialog")).toHaveCount(0)
   })
 
   test("the tool pickers offer what the machine has and write git's own keys", async ({ page }) => {
@@ -116,6 +119,7 @@ test.describe("settings", () => {
 
     await page.getByTestId("settings-editor").fill("code --wait")
     await page.getByRole("button", { name: "Save" }).click()
+    await expect(page.getByRole("dialog")).toHaveCount(0)
     await expect.poll(async () => (await localConfig()).editor).toBe("code --wait")
   })
 })
