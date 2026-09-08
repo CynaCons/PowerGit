@@ -26,6 +26,19 @@ Captured 2026-08-20 from `master` at `7f75cee29`.
 - File list + diff: `src/app/GitUI/UserControls/FileStatusList*.cs`, `CommitDiff*.cs`.
 - Commit dialog: under `src/app/GitUI/CommandsDialogs/` (FormCommit family). PowerGit v1 treats this as an overlay, not a philosophy change.
 
+## Dialog map (v0.15.0)
+
+Which GE form each PowerGit surface answers to. GE's source is on the
+`master` mirror under `src/app/GitUI/CommandsDialogs/`.
+
+| Git Extensions | PowerGit |
+|---|---|
+| `FormMergeBranch` | `dialogs/MergeDialog.tsx` (ff only / allow / no-ff, squash, message, autostash) |
+| `FormRebase` | `dialogs/RebaseDialog.tsx` + `dialogs/InteractiveRebaseDialog.tsx`; its Continue / Skip / Abort / Solve-conflicts buttons live in `components/OperationBanner.tsx` instead, because the state outlives any dialog |
+| `FormResolveConflicts` | `dialogs/ResolveConflictsDialog.tsx`; the stage-based `HandleConflictSelectSide` in `GitModule.cs` is the model for `POST /conflicts/resolve` |
+| `RevisionGridControl` context menu | `dialogs/revisionMenuModel.ts` (the item model) rendered by `dialogs/RevisionContextMenu.tsx`; ref chips get `dialogs/RefContextMenu.tsx` |
+| `FormCommit` fixup/squash items | the commit dialog opened with a `fixup!` / `squash!` message |
+
 ## Leave on Windows
 - `src/native/GitExtensionsShellEx/` Explorer extension.
 - `externals/conemu-inside` terminal.

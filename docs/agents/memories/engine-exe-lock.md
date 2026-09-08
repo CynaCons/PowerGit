@@ -36,7 +36,11 @@ Stop-Process -Name PowerGit.Engine -Force -ErrorAction SilentlyContinue
 # Engine ops endpoints (v0.4.7)
 - `POST /checkout {ref, force}` — 400 with a "force" hint when tree is dirty.
 - `POST /reset {commit, mode: soft|mixed|hard}`.
-- `POST /rebase {onto}` — auto-aborts a conflicted rebase so the repo is never
-  left mid-rebase; error text says so.
+- `POST /rebase {onto, autosquash, rebaseMerges, autostash, todo?}` — since
+  v0.15.0 a conflicted rebase **stops and stays stopped**: 200 with
+  `RepoStatusDto.State = "rebasing"` and the conflicts. The auto-abort is
+  gone, along with the error text that promised it. Same for cherry-pick
+  and revert, plus `/merge` and the continue/skip/abort routes. See
+  [operation-state.md](operation-state.md) before changing any of it.
 - Ops tests build throwaway repos via `TempRepo` helper in GitHostTests.cs
   (`git init -b main`). Never run reset/rebase tests against the real repo.
