@@ -33,6 +33,17 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
   author, date and SHA columns (double-click restores); a graph wider than
   its column gets a discreet scrollbar, Shift+wheel scrolls it. Diffs and
   the commit dialog highlight code by the file's language, light and dark.
+- **Merge, rebase and conflicts, in the app** — merge with the fast-forward
+  and squash options, rebase onto anything, rebase interactively with a
+  reorderable list of commits, and resolve conflicts file by file (take
+  either side, or open your merge tool) from a banner that says what is in
+  progress and offers Continue, Skip and Abort.
+- **A commit menu that has everything** — checkout, branch, tag, cherry-pick,
+  revert, reset, compare, copy, archive and open in browser, with the same
+  shortcuts the toolbar shows; branches and tags have their own menu.
+- **See what git actually ran** — one line at the bottom opens a console with
+  every command, its output and its exit code, and a failure says why on its
+  own. Credentials never reach it.
 - **The graph, always complete** — all branches, all tags, stashes as nodes;
   Git Extensions lane colours and a lane layout checked against GE's own
   graph snapshots; smooth up to thousands of commits.

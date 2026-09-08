@@ -38,6 +38,8 @@ Which GE form each PowerGit surface answers to. GE's source is on the
 | `FormResolveConflicts` | `dialogs/ResolveConflictsDialog.tsx`; the stage-based `HandleConflictSelectSide` in `GitModule.cs` is the model for `POST /conflicts/resolve` |
 | `RevisionGridControl` context menu | `dialogs/revisionMenuModel.ts` (the item model) rendered by `dialogs/RevisionContextMenu.tsx`; ref chips get `dialogs/RefContextMenu.tsx` |
 | `FormCommit` fixup/squash items | the commit dialog opened with a `fixup!` / `squash!` message |
+| The "Git command log" window | `GitConsole.tsx`: a dock line that opens a panel, rather than GE's separate window — the owner called that one "too intrusive" (see [git-command-log.md](git-command-log.md)) |
+| `FormSettings` Git config pages | `SettingsDialog.tsx` with `settings/ToolsSection` and `settings/BehaviourSection`; scopes are a toggle, not separate pages |
 
 ## Leave on Windows
 - `src/native/GitExtensionsShellEx/` Explorer extension.
