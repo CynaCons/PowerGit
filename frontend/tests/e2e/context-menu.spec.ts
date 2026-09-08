@@ -55,6 +55,12 @@ test.describe("revision context menu", () => {
   const openMenu = async (page: Page) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
+    // The chips come from each revision's own refs, but Merge and the two
+    // Delete submenus classify them against the ref tree, which lands a
+    // moment later. Wait for the tree, or the menu is built from an empty
+    // branch list and those three entries are hidden.
+    await expect(page.locator('[data-testid="tree-row"][data-label="topic"]')).toBeVisible()
+    await expect(page.locator('[data-testid="tree-row"][data-label="v1.0"]')).toBeVisible()
     await page.locator('[data-testid="grid-row"]:has([data-ref="topic"])').first().click({ button: "right" })
     await expect(page.locator("#revision-context-menu")).toBeVisible()
   }

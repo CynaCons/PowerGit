@@ -12,7 +12,11 @@ export function operationHeadline(status: RepoStatus): string {
   const step = op?.step != null && op?.total != null ? ` (step ${op.step} of ${op.total})` : ""
   switch (status.state) {
     case "merging": {
-      const from = op?.headName ? `'${op.headName}'` : "a branch"
+      // The engine reports the current branch as headName and the incoming
+      // side as ontoName (the name of MERGE_HEAD); merging a commit with no
+      // ref on it leaves only the sha.
+      const incoming = op?.ontoName ?? short(op?.onto)
+      const from = incoming ? `'${incoming}'` : "a branch"
       return `Merging ${from} into ${status.branch}`
     }
     case "rebasing": {

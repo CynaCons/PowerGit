@@ -92,7 +92,10 @@ test.describe("merge with conflicts", () => {
     await page.getByTestId("merge-ff-only").click()
     await page.getByTestId("merge-confirm").click()
 
-    await expect(page.getByTestId("error-banner")).toContainText(/fast[- ]forward/i)
+    // The dialog keeps its own failure, like cherry-pick and revert do: the
+    // user is still in the flow and can pick another mode.
+    await expect(page.getByTestId("merge-dialog")).toBeVisible()
+    await expect(page.getByTestId("merge-dialog")).toContainText(/fast[- ]forward/i)
     // Refusing is not starting: nothing to continue or abort.
     await expect(page.getByTestId("op-banner")).toHaveCount(0)
   })

@@ -569,6 +569,8 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [ ] Owner: a conflicting merge is resolved end to end from the banner (Resolve → take theirs → Commit merge).
 - [ ] Owner: an interactive rebase squashes and reorders; a rebase that stops offers Continue / Skip / Abort.
 - [ ] Owner: settings scopes and tools take effect (git config --show-origin), confirmations obey the Behaviour switches.
+- [ ] Owner 2026-09-08: raw git output surface, prototypes reviewed (artifact 0cead3bd), owner picked B+D — a permanent 22 px "Git console" dock line at the bottom that opens (Ctrl+`) into a real log with filter and copy, plus a transient card in the corner on failures only. Engine keeps a rolling buffer of its last 50 git invocations (sanitized command, exit code, duration, output) at GET /repos/{id}/gitlog and on the change stream; per-entry size cap; Ctrl+` through the hotkey catalog.
+- [ ] Owner: the git console shows the exact command and output of every operation, and a failed command says why without being hunted for.
 
 ### v0.15.1 — Graph search — find or filter from the top bar
 > Placeholder; design later.

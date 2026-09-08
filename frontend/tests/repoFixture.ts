@@ -14,7 +14,11 @@ import { ENGINE_URL, engineHeaders } from "./engine"
 let tick = 0
 
 export function git(cwd: string, ...args: string[]): string {
-  const date = `2026-09-08T11:${String(tick++).padStart(2, "0")}:00+00:00`
+  // One minute per call from a fixed start, so the graph order is stable
+  // across runs. Minutes must roll into hours: a bare counter produced
+  // "11:62" and git refused the date.
+  const at = new Date(Date.UTC(2026, 8, 8, 11, 0, 0) + tick++ * 60_000)
+  const date = at.toISOString().replace(/\.\d+Z$/, "+00:00")
   return execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], {
     cwd,
     stdio: "pipe",
@@ -56,15 +60,35 @@ export async function currentRepoPath(): Promise<string | null> {
   return ((await res.json()) as { root?: string }).root ?? null
 }
 
-/** Windows keeps handles on a repository the engine watched; retry the rm. */
+/** Closes the engine's session for this path, which stops its file watcher. */
+export async function closeRepoOnEngine(dir: string): Promise<void> {
+  try {
+    const res = await fetch(`${ENGINE_URL}/repos`, { headers: engineHeaders() })
+    if (!res.ok) return
+    const sessions = (await res.json()) as { id: string; root: string }[]
+    const norm = (p: string) => p.replace(/[\\/]+$/, "").toLowerCase()
+    for (const s of sessions.filter((s) => norm(s.root) === norm(dir))) {
+      await fetch(`${ENGINE_URL}/repos/${encodeURIComponent(s.id)}`, { method: "DELETE", headers: engineHeaders() })
+    }
+  } catch {
+    // Best effort: removeRepo still retries.
+  }
+}
+
+/**
+ * Windows keeps handles on a repository the engine watched, so the session
+ * is closed first (that disposes the watcher) and the rm still retries: the
+ * handle can outlive the request by a moment.
+ */
 export async function removeRepo(dir: string): Promise<void> {
+  await closeRepoOnEngine(dir)
   for (let attempt = 1; ; attempt++) {
     try {
       rmSync(dir, { recursive: true, force: true })
       return
     } catch (e) {
-      if (attempt >= 5) throw e
-      await new Promise((r) => setTimeout(r, 300 * attempt))
+      if (attempt >= 8) throw e
+      await new Promise((r) => setTimeout(r, 250 * attempt))
     }
   }
 }

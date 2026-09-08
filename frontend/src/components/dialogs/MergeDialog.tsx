@@ -75,6 +75,7 @@ export function MergeDialog({
       open={open}
       title={`Merge into '${currentBranch}'`}
       onClose={onClose}
+      testid="merge-dialog"
       actions={
         <>
           <Button onClick={onClose} disabled={busy}>
