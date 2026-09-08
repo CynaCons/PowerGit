@@ -171,13 +171,46 @@ public sealed partial class GitHost
     /// </summary>
     internal CommandResult RunTimed(string? workingDirectory, int timeoutMs, CancellationToken ct, params string[] args)
     {
-        GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, int.MaxValue, GitEnvironment);
+        GitProcess.Result r = RunLogged(args, workingDirectory, timeoutMs, ct, int.MaxValue, GitEnvironment);
         return new CommandResult(r.ExitCode, r.StdOut, r.StdErr);
     }
 
     /// <summary>Like <see cref="RunTimed(string?, int, CancellationToken, string[])"/> but stops reading (and kills git) past <paramref name="maxStdOutChars"/>.</summary>
     internal GitProcess.Result RunCapped(string? workingDirectory, int timeoutMs, CancellationToken ct, int maxStdOutChars, params string[] args)
-        => GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, GitEnvironment);
+        => RunLogged(args, workingDirectory, timeoutMs, ct, maxStdOutChars, GitEnvironment);
+
+    /// <summary>
+    ///  The single choke point where a git child is started <em>and</em>
+    ///  recorded (v0.15.1). Everything above — <see cref="Run"/>, the
+    ///  RunTimed overloads, <see cref="RunCapped"/>,
+    ///  <see cref="RunTimedWithEnv"/> — comes through here, so the Git
+    ///  console misses nothing, reads included. A timeout or a cancellation
+    ///  is recorded too (exit code -1) and then rethrown unchanged.
+    /// </summary>
+    private GitProcess.Result RunLogged(
+        IReadOnlyList<string> args,
+        string? workingDirectory,
+        int timeoutMs,
+        CancellationToken ct,
+        int maxStdOutChars,
+        IReadOnlyDictionary<string, string> environment)
+    {
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
+            GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment);
+            RecordCommand(args, r.ExitCode, ElapsedMs(started), r.StdOut, r.StdErr);
+            return r;
+        }
+        catch (Exception ex)
+        {
+            RecordCommand(args, -1, ElapsedMs(started), null, ex.Message);
+            throw;
+        }
+    }
+
+    private static long ElapsedMs(long startedTimestamp)
+        => (long)System.Diagnostics.Stopwatch.GetElapsedTime(startedTimestamp).TotalMilliseconds;
 
     private static readonly IReadOnlyDictionary<string, string> GitEnvironment = new Dictionary<string, string>
     {
@@ -199,7 +232,7 @@ public sealed partial class GitHost
             env[key] = value;
         }
 
-        GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, CancellationToken.None, int.MaxValue, env);
+        GitProcess.Result r = RunLogged(args, workingDirectory, timeoutMs, CancellationToken.None, int.MaxValue, env);
         return new CommandResult(r.ExitCode, r.StdOut, r.StdErr);
     }
 

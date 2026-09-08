@@ -933,6 +933,13 @@ repo.MapGet("/jobs/{id}", (string id, GitHost git) =>
 
 repo.MapGet("/jobs", (GitHost git) => Results.Ok(git.ListJobs()));
 
+// v0.15.1: the Git console's rolling log — the last 50 git invocations this
+// session made, sanitized (GitCommandSanitizer), reads included. `after` is
+// the highest id the caller already has, so the console polls for a delta
+// instead of re-reading the whole buffer. A GET, so it bypasses the write
+// gate and can be read while a fetch holds it.
+repo.MapGet("/gitlog", (GitHost git, long? after) => Results.Ok(git.CommandLog(after)));
+
 // Cancels a running job: the git process tree is killed and the job ends
 // "failed" with cancelled=true. Listed with the job routes in the group
 // filter so it does not queue behind the job's own write gate.
