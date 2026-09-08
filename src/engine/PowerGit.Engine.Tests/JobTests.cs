@@ -19,7 +19,10 @@ public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
         DirectoryInfo? cursor = new(AppContext.BaseDirectory);
         while (cursor is not null)
         {
-            if (Directory.Exists(Path.Combine(cursor.FullName, ".git")))
+            // A git worktree has `.git` as a FILE, not a directory (the same
+            // check GitHost.TryDiscover makes): without the File.Exists arm every
+            // test using this helper fails when the suite runs from a worktree.
+            if (Directory.Exists(Path.Combine(cursor.FullName, ".git")) || File.Exists(Path.Combine(cursor.FullName, ".git")))
             {
                 return cursor.FullName;
             }

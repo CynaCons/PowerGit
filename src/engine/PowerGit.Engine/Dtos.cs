@@ -54,6 +54,40 @@ public sealed record CommitChangesDto(IReadOnlyList<FileChangeDto> Files, DiffDt
 
 public sealed record StatusFileDto(string Path, string Status, bool Staged);
 
+/// <summary>
+/// v0.15.0: one unmerged index entry as `git ls-files -u` reports it. Kind is
+/// derived from which stages exist: both-modified (1,2,3), added-by-both (2,3),
+/// deleted-by-us (1,3), deleted-by-them (1,2), added-by-us (2), added-by-them
+/// (3), both-deleted (1). Stage numbers are git's: 1 base, 2 ours, 3 theirs
+/// (during a rebase "ours" is the branch being rebased onto; the UI relabels).
+/// </summary>
+public sealed record ConflictFileDto(
+    string Path,
+    bool HasBase,
+    bool HasOurs,
+    bool HasTheirs,
+    string? BaseSha,
+    string? OursSha,
+    string? TheirsSha,
+    string Kind);
+
+/// <summary>
+/// v0.15.0: the operation the repository is in the middle of (Kind is merge,
+/// rebase, cherry-pick or revert). Step/Total come from rebase-merge/msgnum
+/// and end (or rebase-apply/next and last); StoppedSha is the commit the
+/// sequencer stopped at; Message is MERGE_MSG / SQUASH_MSG while merging.
+/// </summary>
+public sealed record RepoOperationDto(
+    string Kind,
+    string? HeadName = null,
+    string? Onto = null,
+    string? OntoName = null,
+    int? Step = null,
+    int? Total = null,
+    string? StoppedSha = null,
+    bool Interactive = false,
+    string? Message = null);
+
 public sealed record RepoStatusDto(
     string Branch,
     int UnstagedCount,
@@ -62,7 +96,12 @@ public sealed record RepoStatusDto(
     StatusFileDto[] Staged,
     int? Ahead = null,
     int? Behind = null,
-    string? Upstream = null);
+    string? Upstream = null,
+    // v0.15.0: "none" | "merging" | "rebasing" | "cherry-picking" | "reverting".
+    // A stopped operation is a state, not an error (Git Extensions parity).
+    string State = "none",
+    RepoOperationDto? Operation = null,
+    ConflictFileDto[]? Conflicts = null);
 
 public sealed record RefItemDto(string Name, string FullName, string Target, bool Current);
 
@@ -96,7 +135,52 @@ public sealed record CheckoutRequest(string Ref, bool Force = false);
 
 public sealed record ResetRequest(string Commit, string Mode);
 
-public sealed record RebaseRequest(string Onto);
+/// <summary>
+/// v0.15.0: `git rebase [--autostash] [--rebase-merges] [--autosquash] onto`.
+/// With <paramref name="Todo"/> the rebase is interactive and runs the given
+/// list (see <see cref="RebaseTodoEntry"/>) instead of git's own.
+/// </summary>
+public sealed record RebaseRequest(
+    string Onto,
+    bool Autosquash = false,
+    bool RebaseMerges = false,
+    bool Autostash = false,
+    RebaseTodoEntry[]? Todo = null);
+
+/// <summary>
+/// One line the UI sends back for an interactive rebase. Action is
+/// pick | reword | edit | squash | fixup | drop with <paramref name="Sha"/>;
+/// reword and squash may carry the new <paramref name="Message"/>. Any other
+/// action (label, reset, merge, exec, break, …) is written from
+/// <paramref name="Raw"/> verbatim.
+/// </summary>
+public sealed record RebaseTodoEntry(string Action, string? Sha = null, string? Message = null, string? Raw = null);
+
+/// <summary>A todo line as git generated it (POST /rebase/todo). Non-commit lines have no Sha and are read-only.</summary>
+public sealed record RebaseTodoLine(string Action, string? Sha, string? Subject, string Raw);
+
+public sealed record RebaseTodoDto(RebaseTodoLine[] Lines, string Onto, string HeadName);
+
+public sealed record RebaseTodoRequest(string Onto, bool Autosquash = false, bool RebaseMerges = false);
+
+/// <summary>
+/// v0.15.0: Git Extensions FormMergeBranch. Ff is only | allow | no; Squash
+/// excludes no-ff; a dirty tree is accepted only with Autostash.
+/// </summary>
+public sealed record MergeRequest(
+    string Branch,
+    string Ff = "allow",
+    bool Squash = false,
+    string? Message = null,
+    bool Autostash = false,
+    bool NoCommit = false);
+
+public sealed record MergeContinueRequest(string? Message = null);
+
+/// <summary>Take is ours | theirs | base | mark | delete (GE HandleConflictSelectSide, stage based).</summary>
+public sealed record ConflictResolveRequest(string[] Paths, string Take);
+
+public sealed record MergetoolRequest(string Path);
 
 public sealed record PullRequest(bool Rebase = false);
 

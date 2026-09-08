@@ -184,7 +184,24 @@ public sealed partial class GitHost
         ["GIT_OPTIONAL_LOCKS"] = "0",
         // Never block on a credential or editor prompt inside a headless engine.
         ["GIT_TERMINAL_PROMPT"] = "0",
+        // v0.15.0: merge, rebase --continue, cherry-pick and revert all want
+        // an editor for their message; the engine never does, and a stopped
+        // operation is reported as state instead (GitHost.Sequencer.cs).
+        ["GIT_EDITOR"] = "true",
     };
+
+    /// <summary>Like <see cref="RunTimed(string?, int, string[])"/> with extra environment on top of <see cref="GitEnvironment"/> (interactive rebase sets GIT_SEQUENCE_EDITOR).</summary>
+    internal CommandResult RunTimedWithEnv(string? workingDirectory, int timeoutMs, IReadOnlyDictionary<string, string> extra, params string[] args)
+    {
+        Dictionary<string, string> env = new(GitEnvironment);
+        foreach ((string key, string value) in extra)
+        {
+            env[key] = value;
+        }
+
+        GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, CancellationToken.None, int.MaxValue, env);
+        return new CommandResult(r.ExitCode, r.StdOut, r.StdErr);
+    }
 
     private static string? FindOnPath(string fileName)
     {

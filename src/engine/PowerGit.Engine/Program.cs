@@ -625,11 +625,191 @@ repo.MapPost("/reset", (ResetRequest body, GitHost git) =>
     }
 });
 
+// v0.15.0 sequencer routes. All synchronous, all answering the new
+// RepoStatusDto: a stopped merge/rebase/cherry-pick/revert is 200 with
+// State + Operation + Conflicts, not the 400-and-auto-abort of v0.4.7.
+repo.MapPost("/merge", (MergeRequest body, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.Merge(body));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/merge/continue", (MergeContinueRequest? body, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.MergeContinue(body?.Message));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/merge/abort", (GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.MergeAbort());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
 {
     try
     {
-        return Results.Ok(git.Rebase(body.Onto));
+        return Results.Ok(git.Rebase(body));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+// POST, not GET: capturing git's own todo runs a rebase that immediately
+// fails its sequence editor, which touches the git dir, so it must take the
+// session's Mutate gate like any other mutation.
+repo.MapPost("/rebase/todo", (RebaseTodoRequest body, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.CaptureRebaseTodo(body));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/rebase/{action}", (string action, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.SequencerAction("rebase", action));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/cherry-pick/{action}", (string action, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.SequencerAction("cherry-pick", action));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/revert/{action}", (string action, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.SequencerAction("revert", action));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapGet("/conflicts", (GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.ListConflicts());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapGet("/conflicts/blob", (string path, int? stage, GitHost git, HttpContext ctx) =>
+{
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        return Results.BadRequest(new ErrorResponse("path is required"));
+    }
+
+    try
+    {
+        return Results.Ok(git.GetConflictBlob(path, stage ?? 2, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/conflicts/resolve", (ConflictResolveRequest body, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.ResolveConflicts(body.Paths, body.Take));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+// Detached like /difftool: the tool window can stay open indefinitely.
+repo.MapPost("/mergetool", (MergetoolRequest body, GitHost git) =>
+{
+    try
+    {
+        git.OpenMergetool(body.Path);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+// Compare two revisions, or one against the working tree (no `to`).
+// Without `path`: CommitChangesDto (files + first diff); with it: DiffDto.
+repo.MapGet("/compare", (string from, string? to, string? path, GitHost git, int? context, bool? ws, bool? full, HttpContext ctx) =>
+{
+    try
+    {
+        return Results.Ok(git.Compare(from, to, path, context ?? 3, ws ?? false, full ?? false, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapGet("/commits/{id}/archive", (string id, string? format, GitHost git) =>
+{
+    try
+    {
+        Stream stream = git.OpenArchive(id, format ?? "zip", out string fileName, out string contentType);
+        return Results.File(stream, contentType, fileName);
     }
     catch (Exception ex)
     {
