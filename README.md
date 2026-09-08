@@ -29,6 +29,10 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 
 ## Highlights
 
+- **A grid you can shape** — drag the header dividers to resize the graph,
+  author, date and SHA columns (double-click restores); a graph wider than
+  its column gets a discreet scrollbar, Shift+wheel scrolls it. Diffs and
+  the commit dialog highlight code by the file's language, light and dark.
 - **The graph, always complete** — all branches, all tags, stashes as nodes;
   Git Extensions lane colours and a lane layout checked against GE's own
   graph snapshots; smooth up to thousands of commits.

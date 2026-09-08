@@ -124,13 +124,15 @@ export function languageForPath(path: string): string | null {
 }
 
 async function createCoreHighlighter(): Promise<HighlighterCore> {
-  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, { default: lightPlus }] = await Promise.all([
-    import("shiki/core"),
-    import("@shikijs/engine-javascript"),
-    import("@shikijs/themes/light-plus"),
-  ])
+  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, { default: lightPlus }, { default: darkPlus }] =
+    await Promise.all([
+      import("shiki/core"),
+      import("@shikijs/engine-javascript"),
+      import("@shikijs/themes/light-plus"),
+      import("@shikijs/themes/dark-plus"),
+    ])
   return createHighlighterCore({
-    themes: [lightPlus],
+    themes: [lightPlus, darkPlus],
     langs: [],
     // The pure-JS RegExp engine avoids loading Shiki's Oniguruma .wasm over
     // Tauri's custom `tauri://` scheme, which is unverified on the
@@ -183,6 +185,34 @@ export async function highlightToHtml(code: string, lang: string | null): Promis
     const highlighter = await getHighlighter()
     await ensureLanguageLoaded(highlighter, lang)
     return highlighter.codeToHtml(code, { lang, theme: THEME })
+  } catch {
+    return null
+  }
+}
+
+export type Token = { content: string; color?: string }
+
+const DARK_THEME = "dark-plus"
+
+/**
+ * Tokenizes `code` as `lang` for the diff view (v0.14.3, owner: "automatic
+ * language recognition and syntax highlighting" in the diff and commit
+ * views): one token list per line, colours from VS Code's Light+ or Dark+
+ * theme. Same limits and same null-means-plain contract as highlightToHtml.
+ */
+export async function tokenizeLines(code: string, lang: string | null, mode: "light" | "dark"): Promise<Token[][] | null> {
+  if (!lang) return null
+  if (code.length > MAX_HIGHLIGHT_CHARS) return null
+  let lines = 1
+  for (let i = 0; i < code.length; i++) {
+    if (code.charCodeAt(i) === 10) lines++
+    if (lines > MAX_HIGHLIGHT_LINES) return null
+  }
+  try {
+    const highlighter = await getHighlighter()
+    await ensureLanguageLoaded(highlighter, lang)
+    const themed = highlighter.codeToTokensBase(code, { lang, theme: mode === "dark" ? DARK_THEME : THEME })
+    return themed.map((line) => line.map((t) => ({ content: t.content, color: t.color })))
   } catch {
     return null
   }

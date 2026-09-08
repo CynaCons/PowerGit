@@ -21,12 +21,13 @@ html {
   display: flex;
   flex-direction: column;
   background: var(--pg-surface, #fff);
+  position: relative; /* anchors .graph-scrollbar (v0.14.3) */
 }
 
 .grid-header,
 .grid-row {
   display: grid;
-  grid-template-columns: var(--graph-width, 96px) minmax(180px, 1fr) 128px 142px 86px;
+  grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-author, 128px) var(--col-date, 142px) var(--col-sha, 86px);
   align-items: center;
   height: var(--pg-row-height, 28px);
 }
@@ -39,7 +40,7 @@ html {
 @media (max-width: 1200px) {
   .grid-header,
   .grid-row {
-    grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) 104px 106px 68px;
+    grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-author, 104px) var(--col-date, 106px) var(--col-sha, 68px);
   }
   .date {
     font-size: 11px;
@@ -47,7 +48,8 @@ html {
 }
 
 .grid-header {
-  padding: 0 16px;
+  padding: 0 16px 0 0;
+  position: relative;
   font-size: 12px;
   font-weight: 500;
   color: var(--pg-text-meta, #5b6778);
@@ -138,6 +140,14 @@ html {
   display: flex;
   width: max-content;
   min-width: 100%;
+}
+/* v0.14.3: with syntax colours on the tokens, the added/removed state moves
+   to a tint behind the line (the sign keeps its green/red). */
+.diff-row-added {
+  background: var(--pg-diff-added-bg, rgba(24, 145, 0, 0.1));
+}
+.diff-row-removed {
+  background: var(--pg-diff-removed-bg, rgba(211, 0, 11, 0.1));
 }
 .diff-row-gutter {
   flex-shrink: 0;
@@ -316,4 +326,68 @@ code {
 .grid-row[data-artificial] .msg-text {
   font-style: italic;
   color: var(--pg-text-secondary, #5b6573);
+}
+
+/* v0.14.3: resizable columns (owner: "the columns in the main graph view
+   should be resizeable"). A handle sits on the right edge of each header
+   cell; widths persist in localStorage (gridColumns.ts). */
+.grid-header > div {
+  position: relative;
+  padding-left: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.grid-header > div:first-child {
+  padding-left: 16px;
+}
+.col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+.col-resize::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 3px;
+  width: 1px;
+  background: var(--pg-border-soft, #e6eaf0);
+}
+.col-resize:hover::after,
+.col-resize[data-active]::after {
+  background: var(--pg-focus-ring, #2563eb);
+}
+
+/* v0.14.3: a graph wider than its column gets a discreet scrollbar at the
+   column's bottom (owner: "use shift scroll to scroll left or right"). */
+.graph-scrollbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  z-index: 3;
+  scrollbar-width: thin;
+  opacity: 0.55;
+}
+.graph-scrollbar:hover {
+  opacity: 1;
+}
+.graph-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+.graph-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--pg-text-meta, #5b6778);
+  border-radius: 3px;
+}
+.graph-scrollbar > div {
+  height: 1px;
 }

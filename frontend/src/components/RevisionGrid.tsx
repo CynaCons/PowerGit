@@ -1,12 +1,13 @@
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { markAncestry } from "../graph/ancestry"
 import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
 import { GraphOptionsBar } from "./GraphOptionsBar"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
+import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
 
 type Props = {
   rows: GraphRow[]
@@ -40,6 +41,7 @@ export function RevisionGrid({
   }
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const scrollbarRef = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(-1)
   // Branch history highlight (v0.14.0): recomputed only when the rows
   // change (a refresh that changes nothing keeps the array, see
@@ -51,11 +53,16 @@ export function RevisionGrid({
   // with no user action; comparing SHAs (not the index) keeps that from
   // yanking the viewport.
   const lastScrolledSha = useRef<string | null>(null)
+  // Column widths (v0.14.3, owner: "the columns ... should be resizeable"):
+  // user-set pixels kept in localStorage; graph falls back to the automatic
+  // width below until the user drags it.
+  const [widths, setWidths] = useState<ColumnWidths>(loadWidths)
+  useEffect(() => saveWidths(widths), [widths])
   // The graph column is sized by the deepest lane in view and can reach
   // ~660px on a wide history, which pushed Date and SHA off the right edge
   // at ordinary window sizes as more history paged in. Cap it at a share of
-  // the grid so the metadata columns always survive; deep lanes past the cap
-  // are clipped rather than allowed to eat the row.
+  // the grid so the metadata columns always survive; deep lanes past the
+  // cap scroll (v0.14.3) instead of being clipped.
   const [bodyWidth, setBodyWidth] = useState(0)
   useEffect(() => {
     const el = parentRef.current
@@ -66,7 +73,32 @@ export function RevisionGrid({
     return () => ro.disconnect()
   }, [])
   const naturalWidth = graphWidth(rows)
-  const width = bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth
+  const autoWidth = bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth
+  const width = widths.graph ?? autoWidth
+  // Horizontal scroll of the graph column when the lanes do not fit
+  // (owner: "a discreet scroll bar at the bottom of that column ... shift
+  // scroll to scroll left or right"). The canvas is translated by it.
+  const overflow = Math.max(0, naturalWidth - width)
+  const [graphScroll, setGraphScroll] = useState(0)
+  useEffect(() => {
+    if (graphScroll > overflow) setGraphScroll(overflow)
+  }, [overflow, graphScroll])
+  useEffect(() => {
+    const el = parentRef.current
+    if (!el) return
+    // Native listener: React registers wheel as passive, and the body must
+    // not also scroll on Shift+wheel.
+    const onWheel = (e: WheelEvent) => {
+      if (!e.shiftKey) return
+      const bar = scrollbarRef.current
+      if (!bar || bar.scrollWidth <= bar.clientWidth) return
+      e.preventDefault()
+      bar.scrollLeft += e.deltaX || e.deltaY
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [])
+
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -116,18 +148,77 @@ export function RevisionGrid({
     canvas.style.height = `${visible * ROW_HEIGHT}px`
     const ctx = canvas.getContext("2d")
     if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    drawRows(ctx, rows, start, end, ROW_HEIGHT, width, selected, hovered, ancestry, graphOptions)
-  }, [rows, start, end, selected, hovered, width, ancestry, graphOptions])
+    // Shifted left by the graph scroll; the drawn width grows by the same
+    // amount so the selection band still spans the visible column.
+    ctx.setTransform(dpr, 0, 0, dpr, -graphScroll * dpr, 0)
+    drawRows(ctx, rows, start, end, ROW_HEIGHT, width + graphScroll, selected, hovered, ancestry, graphOptions)
+  }, [rows, start, end, selected, hovered, width, graphScroll, ancestry, graphOptions])
+
+  // Header drag handles: pointer capture on the handle, width follows the
+  // pointer; double-click restores the default.
+  const dragStart = useCallback(
+    (key: ColumnKey) => (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+      const handle = e.currentTarget
+      const startX = e.clientX
+      const startWidth = key === "graph" ? width : widths[key]
+      handle.setPointerCapture(e.pointerId)
+      handle.dataset.active = "true"
+      const move = (ev: PointerEvent) => {
+        setWidths((w) => ({ ...w, [key]: clampWidth(key, startWidth + ev.clientX - startX) }))
+      }
+      const up = () => {
+        delete handle.dataset.active
+        handle.removeEventListener("pointermove", move)
+        handle.removeEventListener("pointerup", up)
+        handle.removeEventListener("pointercancel", up)
+      }
+      handle.addEventListener("pointermove", move)
+      handle.addEventListener("pointerup", up)
+      handle.addEventListener("pointercancel", up)
+    },
+    [width, widths],
+  )
+  const resetColumn = (key: ColumnKey) => () => setWidths((w) => ({ ...w, [key]: DEFAULT_WIDTHS[key] }))
+  const handle = (key: ColumnKey) => (
+    <div
+      className="col-resize"
+      data-testid={`col-resize-${key}`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Resize ${key} column`}
+      onPointerDown={dragStart(key)}
+      onDoubleClick={resetColumn(key)}
+    />
+  )
+  const columnVars = {
+    ["--graph-width" as string]: `${width}px`,
+    ["--col-author" as string]: `${widths.author}px`,
+    ["--col-date" as string]: `${widths.date}px`,
+    ["--col-sha" as string]: `${widths.sha}px`,
+  }
 
   return (
     <div className="main" data-testid="revision-grid">
-      <div className="grid-header" style={{ ["--graph-width" as string]: `${width}px` }}>
-        <div>Graph</div>
+      <div className="grid-header" style={columnVars}>
+        <div>
+          Graph
+          {handle("graph")}
+        </div>
         <div>Message</div>
-        <div>Author</div>
-        <div>Date</div>
-        <div>SHA</div>
+        <div>
+          Author
+          {handle("author")}
+        </div>
+        <div>
+          Date
+          {handle("date")}
+        </div>
+        <div>
+          SHA
+          {handle("sha")}
+        </div>
       </div>
       <div
         ref={parentRef}
@@ -172,7 +263,7 @@ export function RevisionGrid({
           style={{
             height: virtualizer.getTotalSize(),
             position: "relative",
-            ["--graph-width" as string]: `${width}px`,
+            ...columnVars,
           }}
         >
           <canvas
@@ -252,6 +343,17 @@ export function RevisionGrid({
           })}
         </div>
       </div>
+      {overflow > 0 && (
+        <div
+          ref={scrollbarRef}
+          className="graph-scrollbar"
+          data-testid="graph-scrollbar"
+          style={{ width }}
+          onScroll={(e) => setGraphScroll(e.currentTarget.scrollLeft)}
+        >
+          <div style={{ width: naturalWidth }} />
+        </div>
+      )}
       <GraphOptionsBar />
       {loadingTail && (
         <div className="grid-tail" data-testid="history-tail-loading">

@@ -46,6 +46,35 @@ describe("withArtificialRows", () => {
     expect(rows[1].segments.map((s) => s.id)).toEqual([`${INDEX_ID}:${id("head")}`, `${WORKTREE_ID}:${INDEX_ID}`])
   })
 
+  it("lets every line from the row above pass through the inserted rows (v0.14.3)", () => {
+    // topic sits above head and its line to base runs past head: it must
+    // still be drawn on the Working directory row, in the lane it has on
+    // HEAD's row.
+    const rows = layoutGraph([
+      rev("topic", ["base"], ["topic"]),
+      rev("head", ["base"], ["HEAD", "main"]),
+      rev("base", []),
+    ])
+    const out = withArtificialRows(rows, { unstagedCount: 1, stagedCount: 1 })
+    const headIndex = out.findIndex((r) => r.isHead)
+    const above = out[headIndex - 3]
+    expect(above.rev.id).toBe(id("topic"))
+    const continuing = above.segments.filter((s) => s.parentId !== above.rev.id)
+    expect(continuing.length).toBeGreaterThan(0)
+    for (const row of [out[headIndex - 2], out[headIndex - 1]]) {
+      expect(row.artificial).toBeDefined()
+      for (const s of continuing) {
+        const copy = row.segments.find((x) => x.id === s.id)
+        expect(copy).toBeDefined()
+        const onHead = out[headIndex].segments.find((h) => h.id === s.id)
+        expect(copy!.lane).toBe(onHead ? onHead.lane : s.lane)
+      }
+      // The pending row's own lane stays clear of a line that runs past HEAD.
+      const busy = continuing.filter((s) => s.parentId !== id("head")).map((s) => s.lane)
+      expect(busy).not.toContain(row.lane)
+    }
+  })
+
   it("takes a free lane when a line passes through HEAD's lane above it", () => {
     // topic (newest, on another branch) -> base; head -> base. Date order
     // puts topic above head; whether a lane is busy depends on the layout.

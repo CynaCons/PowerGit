@@ -52,6 +52,18 @@ export function withArtificialRows(rows: GraphRow[], counts: PendingCounts | nul
   if (counts.stagedCount > 0)
     specs.push({ id: INDEX_ID, artificial: "index", message: `Index (${files(counts.stagedCount)})` })
 
+  // Every line that continues below the row above HEAD passes through the
+  // inserted rows too (v0.14.3, owner: the pseudo-commits "are killing the
+  // other lines from the other branches"). A pass-through is drawn from
+  // its lane on the previous row to its lane on the next one, so the copy
+  // takes the lane the segment has on HEAD's row where it exists.
+  const passThrough: RowSegment[] = (above?.segments ?? [])
+    .filter((s) => s.parentId !== above!.rev.id)
+    .map((s) => {
+      const onHead = head.segments.find((h) => h.id === s.id)
+      return onHead ? { ...s, lane: onHead.lane } : s
+    })
+
   // Chain: WORKTREE -> INDEX -> HEAD (or straight to HEAD when one is absent).
   const artificial: GraphRow[] = []
   for (let i = 0; i < specs.length; i++) {
@@ -71,7 +83,7 @@ export function withArtificialRows(rows: GraphRow[], counts: PendingCounts | nul
       color: head.color,
       hasRefs: false,
       isHead: false,
-      segments: [segment],
+      segments: [...passThrough, segment],
       artificial: spec.artificial,
     })
   }

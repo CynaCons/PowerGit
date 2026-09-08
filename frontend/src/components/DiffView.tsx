@@ -1,6 +1,8 @@
 import Box from "@mui/material/Box"
-import { useMemo } from "react"
+import { useTheme } from "@mui/material/styles"
+import { useEffect, useMemo, useState } from "react"
 import type { DiffDto } from "../engine"
+import { languageForPath, tokenizeLines, type Token } from "../highlight"
 import { codeSx } from "../theme"
 import { ContentNotice } from "./ContentNotice"
 import { VirtualLines } from "./VirtualLines"
@@ -54,7 +56,8 @@ function classifyLine(line: string): { segments: Segment[] } {
 // leading number of each side is where that side's line numbering restarts.
 const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
 
-type GutterLine = { segments: Segment[]; oldNum: number | null; newNum: number | null }
+type LineKind = "add" | "remove" | "context" | "other"
+type GutterLine = { segments: Segment[]; oldNum: number | null; newNum: number | null; kind: LineKind }
 
 // Walks the unified diff text once, tracking the running old/new line
 // counters so each rendered row can show both side's line numbers, like Git
@@ -71,24 +74,64 @@ function parseGutterLines(text: string): GutterLine[] {
       oldNum = Number(hunk[1])
       newNum = Number(hunk[2])
       inHunk = true
-      return { segments, oldNum: null, newNum: null }
+      return { segments, oldNum: null, newNum: null, kind: "other" as const }
     }
     if (!inHunk || line.startsWith("\\")) {
       // Meta lines before the first hunk, and "\ No newline at end of
       // file", carry no line number on either side.
-      return { segments, oldNum: null, newNum: null }
+      return { segments, oldNum: null, newNum: null, kind: "other" as const }
     }
     if (line.startsWith("+")) {
-      return { segments, oldNum: null, newNum: newNum++ }
+      return { segments, oldNum: null, newNum: newNum++, kind: "add" as const }
     }
     if (line.startsWith("-")) {
-      return { segments, oldNum: oldNum++, newNum: null }
+      return { segments, oldNum: oldNum++, newNum: null, kind: "remove" as const }
     }
-    const both = { segments, oldNum, newNum }
+    const both = { segments, oldNum, newNum, kind: "context" as const }
     oldNum += 1
     newNum += 1
     return both
   })
+}
+
+/**
+ * Syntax colours for the hunk lines (v0.14.3, owner: "the diff view and
+ * commit view are showing plaintext ... automatic language recognition and
+ * syntax highlighting"). The language comes from the file's path; the hunk
+ * content (sign stripped, old and new lines in order) is tokenized as one
+ * stream so multi-line constructs keep their state, then mapped back to
+ * the diff's line indexes. Plain rendering stays until the tokens arrive
+ * and whenever they cannot (unknown language, oversized diff).
+ */
+function useDiffTokens(text: string, lines: GutterLine[], path: string, mode: "light" | "dark"): Map<number, Token[]> | null {
+  const [tokens, setTokens] = useState<{ key: string; map: Map<number, Token[]> } | null>(null)
+  const key = `${mode}|${path}|${text}`
+  useEffect(() => {
+    const lang = languageForPath(path)
+    if (!lang) return
+    const indexes: number[] = []
+    const raw = text.split("\n")
+    const code: string[] = []
+    lines.forEach((l, i) => {
+      if (l.kind === "other") return
+      indexes.push(i)
+      code.push(raw[i].slice(1))
+    })
+    if (indexes.length === 0) return
+    let cancelled = false
+    void tokenizeLines(code.join("\n"), lang, mode).then((result) => {
+      if (cancelled || !result) return
+      const map = new Map<number, Token[]>()
+      result.forEach((line, j) => {
+        if (j < indexes.length) map.set(indexes[j], line)
+      })
+      setTokens({ key, map })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [key, text, lines, path, mode])
+  return tokens && tokens.key === key ? tokens.map : null
 }
 
 /** Diffs up to this many lines render every row (exact DOM text, whole-diff
@@ -111,13 +154,14 @@ export function DiffView({
   diff: DiffDto
   onOpenDifftool?: () => void
   onRetry?: () => void
-  /** Line selection (v0.13.14, commit dialog): indices into diff.text.split("
-"). */
+  /** Line selection (v0.13.14, commit dialog): indices into diff.text.split("\n"). */
   selection?: Set<number>
   onLineClick?: (index: number, e: React.MouseEvent) => void
   onLineContextMenu?: (index: number, e: React.MouseEvent) => void
 }) {
   const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
+  const mode = useTheme().palette.mode
+  const tokens = useDiffTokens(diff.text, lines, diff.path, mode)
   const selectable = onLineClick !== undefined
   // Plain elements with classes (app.css .diff-row*), not MUI Box: a row is
   // rendered hundreds of times per diff and per-element emotion styling was
@@ -125,9 +169,11 @@ export function DiffView({
   const renderLine = (i: number) => {
     const line = lines[i]
     const selected = selection?.has(i) ?? false
+    const highlighted = tokens?.get(i)
+    const kindClass = line.kind === "add" ? " diff-row-added" : line.kind === "remove" ? " diff-row-removed" : ""
     return (
       <div
-        className={`diff-row${selectable ? " diff-row-selectable" : ""}${selected ? " diff-row-selected" : ""}`}
+        className={`diff-row${kindClass}${selectable ? " diff-row-selectable" : ""}${selected ? " diff-row-selected" : ""}`}
         data-selected={selected ? "true" : undefined}
         onClick={selectable ? (e) => onLineClick(i, e) : undefined}
         onContextMenu={onLineContextMenu ? (e) => onLineContextMenu(i, e) : undefined}
@@ -137,11 +183,22 @@ export function DiffView({
           <span className="diff-row-num diff-row-num-new">{line.newNum ?? ""}</span>
         </div>
         <span className="diff-row-text">
-          {line.segments.map((s, j) => (
-            <span key={j} style={{ color: s.color, fontWeight: s.bold ? 700 : 400 }}>
-              {s.text || " "}
-            </span>
-          ))}
+          {highlighted ? (
+            <>
+              <span style={{ color: line.segments[0]?.color }}>{line.segments[0]?.text.charAt(0) ?? " "}</span>
+              {highlighted.map((t, j) => (
+                <span key={j} className="diff-token" style={{ color: t.color }}>
+                  {t.content}
+                </span>
+              ))}
+            </>
+          ) : (
+            line.segments.map((s, j) => (
+              <span key={j} style={{ color: s.color, fontWeight: s.bold ? 700 : 400 }}>
+                {s.text || " "}
+              </span>
+            ))
+          )}
         </span>
       </div>
     )

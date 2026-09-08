@@ -546,6 +546,12 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 ### v0.14.3 — Graph grid polish — continuous lines through pending rows, resizable columns, wide-graph scrollbar, syntax highlighting
 > Placeholder iteration recorded so the requests are not lost; to be detailed when it starts.
 **Goal:** Owner (2026-09-08): the Working directory / Index rows "kill" the other branches' lines; the main grid columns should be resizable; a graph wider than its column gets a discreet horizontal scrollbar with Shift+wheel; the diff and commit views show plain text and should have language detection with syntax highlighting from a public library.
+- [ ] Pending rows carry every line that continues below the row above HEAD (`withArtificialRows` pass-through segments, lane taken from HEAD's row); unit test with a topic branch running past HEAD.
+- [ ] Resizable columns: header handles for Graph, Author, Date, SHA (`gridColumns.ts`, localStorage `pg.gridColumns`, double-click resets); `grid-columns.spec.ts`.
+- [ ] Wide graph: `graph-scrollbar` at the column's bottom when the lanes exceed the column, canvas translated by its scroll, Shift+wheel on the grid drives it; spec.
+- [ ] Syntax highlighting in the diff and commit views: Shiki tokens per hunk line by the file's language (Light+/Dark+ by theme), added/removed rows tinted, unknown files stay plain (`tokenizeLines`, `useDiffTokens`); `diff-highlight.spec.ts`.
+- [ ] Visual baselines refreshed (grid header handles, diff tint) and looked at.
+- [ ] Owner: pending rows no longer break the other branches' lines; columns resize and remember; a wide graph scrolls with Shift+wheel; diffs are highlighted.
 
 ### v0.15.0 — Git Extensions parity — right-click menu, merge / rebase / conflict resolution, settings
 > Placeholder iteration; needs its own plan session with owner decisions (in-app conflict editor vs mergetool hand-off, interactive rebase scope, which settings).
