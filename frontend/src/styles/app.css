@@ -27,10 +27,11 @@ html {
 .grid-header,
 .grid-row {
   display: grid;
-  grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-author, 128px) var(
-      --col-date,
-      142px
-    ) var(--col-sha, 86px);
+  /* v0.14.3: the three metadata widths come from RevisionGrid (gridColumns.ts). */
+  --col-a: var(--col-author, 128px);
+  --col-d: var(--col-date, 142px);
+  --col-s: var(--col-sha, 86px);
+  grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-a) var(--col-d) var(--col-s);
   align-items: center;
   height: var(--pg-row-height, 28px);
 }
@@ -43,10 +44,10 @@ html {
 @media (max-width: 1200px) {
   .grid-header,
   .grid-row {
-    grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-author, 104px) var(
-        --col-date,
-        106px
-      ) var(--col-sha, 68px);
+    --col-a: var(--col-author, 104px);
+    --col-d: var(--col-date, 106px);
+    --col-s: var(--col-sha, 68px);
+    grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-a) var(--col-d) var(--col-s);
   }
   .date {
     font-size: 11px;
