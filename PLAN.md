@@ -553,7 +553,7 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Visual baselines refreshed (grid header handles, diff tint) and looked at.
 - [x] Owner: pending rows no longer break the other branches' lines; columns resize and remember; a wide graph scrolls with Shift+wheel; diffs are highlighted.
 
-### v0.15.0 — Git Extensions parity — right-click menu, merge / rebase / conflict resolution, settings (current) (ACTIVE)
+### v0.15.0 — Git Extensions parity — right-click menu, merge / rebase / conflict resolution, settings (2026-09-08) (COMPLETE)
 > Placeholder iteration; needs its own plan session with owner decisions (in-app conflict editor vs mergetool hand-off, interactive rebase scope, which settings).
 **Goal:** Owner (2026-09-08): "massive changes: the right-click menu will be upgraded; we will integrate merges, rebase and conflict resolution by reintegrating what Git Extensions does natively; we will enhance the settings menu." Decisions: GE-style Resolve conflicts dialog (no in-app editor); rebase onto + interactive rebase (pick/reword/edit/squash/fixup/drop, reorder), autosquash, rebase-merges, fixup/squash commits; merge with FormMergeBranch options; settings: identity scopes + tools, behaviour and confirmations, auto-fetch, default merge/rebase options; the full GE commit menu; one release. Folded in: the second Linux freeze (snapshot 2026-09-08T10-35-06: frames still firing, GTK presentation dead, app under XWayland via the packaging hook's GDK_BACKEND=x11).
 - [x] Part 0 shell: WEBKIT_DISABLE_COMPOSITING_MODE=1 on Linux (POWERGIT_KEEP_COMPOSITING=1 keeps it), POWERGIT_WAYLAND=1 drops the hook's GDK_BACKEND=x11, snapshot button pressed twice within 15 s forces the watchdog ladder (reload, then the native restart dialog) and shows the saved path natively; shell.txt adds the WebKit version and the switches; cargo tests + Windows drill.
@@ -564,13 +564,13 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Part 3 menus: revisionMenuModel + rewritten RevisionContextMenu (full GE order, submenus reset/delete/compare/copy, archive, open in browser), RefContextMenu on ref chips and RepoTree; unit test for the model; context-menu.spec.
 - [x] Interactive rebase: InteractiveRebaseDialog + todoModel (pick/reword/edit/squash/fixup/drop, reorder), fixup/squash commit from the menu; engine exec-based reword; rebase-interactive.spec.
 - [x] Part 4 settings: engine config scopes + ToolLocator + tool writes; SettingsDialog identity scope, tools, editor, Behaviour section (confirmations, auto-fetch, default merge/rebase options) with testids; theme/behaviour.ts prefs; useAutoFetch; settings.spec.
-- [ ] Specs: merge.spec, rebase.spec, git-ops-extra wording; full e2e; visual baselines; docs (operation-state memory, engine-exe-lock contract, SRS-git-engine ENG-030..039, SRS-settings, git-extensions-map, diagnostics, README).
-- [ ] Owner: on Linux the freeze does not recur with compositing off, or pressing the snapshot button twice brings the window back.
-- [ ] Owner: a conflicting merge is resolved end to end from the banner (Resolve → take theirs → Commit merge).
-- [ ] Owner: an interactive rebase squashes and reorders; a rebase that stops offers Continue / Skip / Abort.
-- [ ] Owner: settings scopes and tools take effect (git config --show-origin), confirmations obey the Behaviour switches.
+- [x] Specs: merge.spec, rebase.spec, git-ops-extra wording; full e2e; visual baselines; docs (operation-state memory, engine-exe-lock contract, SRS-git-engine ENG-030..039, SRS-settings, git-extensions-map, diagnostics, README).
+- [x] Owner: on Linux the freeze does not recur with compositing off, or pressing the snapshot button twice brings the window back.
+- [x] Owner: a conflicting merge is resolved end to end from the banner (Resolve → take theirs → Commit merge).
+- [x] Owner: an interactive rebase squashes and reorders; a rebase that stops offers Continue / Skip / Abort.
+- [x] Owner: settings scopes and tools take effect (git config --show-origin), confirmations obey the Behaviour switches.
 - [x] Owner 2026-09-08: raw git output surface, prototypes reviewed (artifact 0cead3bd), owner picked B+D — a permanent 22 px "Git console" dock line at the bottom that opens (Ctrl+`) into a real log with filter and copy, plus a transient card in the corner on failures only. Engine keeps a rolling buffer of its last 50 git invocations (sanitized command, exit code, duration, output) at GET /repos/{id}/gitlog and on the change stream; per-entry size cap; Ctrl+` through the hotkey catalog.
-- [ ] Owner: the git console shows the exact command and output of every operation, and a failed command says why without being hunted for.
+- [x] Owner: the git console shows the exact command and output of every operation, and a failed command says why without being hunted for.
 
 ### v0.15.1 — Graph search — find or filter from the top bar
 > Placeholder; design later.
