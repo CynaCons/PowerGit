@@ -521,11 +521,18 @@ repo.MapGet("/refs", (GitHost git) =>
     }
 });
 
-repo.MapGet("/config", (GitHost git) =>
+// `scope` (v0.15.0): "local" or "global" reads what that file sets, so the
+// settings dialog can edit one scope; without it the effective value wins.
+repo.MapGet("/config", (GitHost git, string? scope) =>
 {
     try
     {
-        return Results.Ok(git.GetConfig());
+        if (scope is not null and not "local" and not "global")
+        {
+            return Results.Json(new ErrorResponse("scope must be local or global"), statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return Results.Ok(git.GetConfig(scope));
     }
     catch (Exception ex)
     {
@@ -546,6 +553,9 @@ repo.MapPut("/config", (GitConfigUpdate body, GitHost git) =>
 });
 
 repo.MapGet("/tools/vscode", () => Results.Ok(VsCodeLocator.Detect()));
+
+// Every diff/merge tool and editor found on this machine (v0.15.0 settings).
+repo.MapGet("/tools", (GitHost git) => Results.Ok(git.ListTools()));
 
 repo.MapPost("/tools/vscode", (GitHost git) =>
 {

@@ -753,37 +753,158 @@ public sealed partial class GitHost
         return new RefTreeDto([.. branches], [.. remotes], [.. tags], [.. submodules]);
     }
 
-    public GitConfigDto GetConfig()
+    public GitConfigDto GetConfig() => GetConfig(null);
+
+    /// <summary>
+    /// The effective configuration, or the values set at one scope when
+    /// <paramref name="scope"/> is "global" or "local" (v0.15.0: the
+    /// settings dialog edits one scope at a time and says where an
+    /// inherited value came from).
+    /// </summary>
+    public GitConfigDto GetConfig(string? scope)
     {
         string root = RequireRoot();
+        string? flag = scope switch
+        {
+            "global" => "--global",
+            "local" => "--local",
+            _ => null,
+        };
+        string? Value(string key) => GetConfigValue(root, key, flag);
         return new GitConfigDto(
-            GetConfigValue(root, "user.name"),
-            GetConfigValue(root, "user.email"),
-            GetConfigValue(root, "core.autocrlf"),
-            "local");
+            Value("user.name"),
+            Value("user.email"),
+            Value("core.autocrlf"),
+            scope ?? "local",
+            Value("core.editor"),
+            Value("diff.tool"),
+            Value("merge.tool"),
+            OriginOf(root, "user.name"),
+            OriginOf(root, "user.email"));
+    }
+
+    /// <summary>"local", "global", "system" or null: which file wins for this key.</summary>
+    private string? OriginOf(string root, string key)
+    {
+        CommandResult result = Run(root, "config", "--show-origin", "--get", key);
+        if (result.ExitCode != 0)
+        {
+            return null;
+        }
+
+        string origin = result.StdOut.Split('\t')[0].Trim();
+        if (origin.Length == 0)
+        {
+            return null;
+        }
+
+        // "file:C:/Users/x/.gitconfig", or "file:.git/config" relative to the
+        // repository: the global file is the one in the home directory,
+        // anything under a .git directory is this repository's own.
+        string path = origin.StartsWith("file:", StringComparison.Ordinal) ? origin[5..] : origin;
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string normalized = path.Replace('\\', '/');
+        if (normalized.Split('/').Any(segment => segment.Equals(".git", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "local";
+        }
+
+        if (!string.IsNullOrEmpty(home) && normalized.StartsWith(home.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase))
+        {
+            return "global";
+        }
+
+        return "system";
     }
 
     public GitConfigDto SetConfig(GitConfigUpdate update)
     {
         string root = RequireRoot();
         string scope = update.Global ? "--global" : "--local";
+        // An empty string means "stop setting this here": git has no way to
+        // write a blank value that reads back as unset, so it is unset
+        // instead (--unset on a key that is not there exits 5, which is fine).
+        void Set(string key, string value)
+        {
+            if (value.Length == 0)
+            {
+                Run(root, "config", scope, "--unset", key);
+            }
+            else
+            {
+                Run(root, "config", scope, key, value);
+            }
+        }
+
         if (update.UserName is not null)
         {
-            Run(root, "config", scope, "user.name", update.UserName);
+            Set("user.name", update.UserName);
         }
 
         if (update.UserEmail is not null)
         {
-            Run(root, "config", scope, "user.email", update.UserEmail);
+            Set("user.email", update.UserEmail);
         }
 
         if (update.AutoCrlf is not null)
         {
-            Run(root, "config", scope, "core.autocrlf", update.AutoCrlf);
+            Set("core.autocrlf", update.AutoCrlf);
         }
 
-        return GetConfig();
+        if (update.Editor is not null)
+        {
+            Set("core.editor", update.Editor);
+        }
+
+        if (update.DiffTool is not null)
+        {
+            SetTool(root, scope, "diff", update.DiffTool, update.DiffToolPath);
+        }
+
+        if (update.MergeTool is not null)
+        {
+            SetTool(root, scope, "merge", update.MergeTool, update.MergeToolPath);
+        }
+
+        return GetConfig(update.Global ? "global" : "local");
     }
+
+    /// <summary>
+    /// Points <c>diff.tool</c> / <c>merge.tool</c> at a tool. Git drives the
+    /// ones it knows by name, so only the path may need saying; VS Code and
+    /// anything the user typed need an explicit command
+    /// (<c>difftool.&lt;name&gt;.cmd</c>).
+    /// </summary>
+    private void SetTool(string root, string scope, string kind, string tool, string? path)
+    {
+        if (tool.Length == 0)
+        {
+            Run(root, "config", scope, "--unset", $"{kind}.tool");
+            return;
+        }
+
+        Run(root, "config", scope, $"{kind}.tool", tool);
+        if (kind == "merge")
+        {
+            // Without this git asks "was the merge successful?" on the console
+            // after every mergetool run, which nothing here can answer.
+            Run(root, "config", scope, $"mergetool.{tool}.trustExitCode", "true");
+        }
+
+        if (tool == "vscode")
+        {
+            string exe = path ?? VsCodeLocator.Detect().Path ?? "code";
+            Run(root, "config", scope, $"{kind}tool.vscode.cmd",
+                $"\"{exe}\" {(kind == "diff" ? VsCodeLocator.DiffCommand : VsCodeLocator.MergeCommand)}");
+        }
+        else if (!string.IsNullOrWhiteSpace(path))
+        {
+            Run(root, "config", scope, $"{kind}tool.{tool}.path", path);
+        }
+    }
+
+    /// <summary>The diff/merge tools and editors present on this machine.</summary>
+    public ToolInfoDto[] ListTools() => ToolLocator.Detect();
 
     public VsCodeInfo DetectAndMaybeApplyVsCode()
     {
@@ -940,9 +1061,11 @@ public sealed partial class GitHost
         return result.ExitCode != 0;
     }
 
-    private string? GetConfigValue(string root, string key)
+    private string? GetConfigValue(string root, string key, string? scopeFlag = null)
     {
-        CommandResult result = Run(root, "config", "--get", key);
+        CommandResult result = scopeFlag is null
+            ? Run(root, "config", "--get", key)
+            : Run(root, "config", scopeFlag, "--get", key);
         string value = result.StdOut.Trim();
         return result.ExitCode == 0 && value.Length > 0 ? value : null;
     }

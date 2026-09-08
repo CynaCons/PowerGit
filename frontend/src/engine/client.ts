@@ -24,6 +24,7 @@ import type {
   RepoInfo,
   RepoStatus,
   RevisionDto,
+  ToolInfo,
   SessionInfo,
   StashInfo,
   TreeEntry,
@@ -362,8 +363,15 @@ export class EngineClient {
     return json<RemoteInfo[]>(await this.get(`${this.repoPath()}/remotes`))
   }
 
-  async config(): Promise<GitConfig> {
-    return json<GitConfig>(await this.get(`${this.repoPath()}/config`))
+  /** `scope` reads exactly what that file sets; omit it for the effective value. */
+  async config(scope?: "local" | "global"): Promise<GitConfig> {
+    const qs = scope ? `?scope=${scope}` : ""
+    return json<GitConfig>(await this.get(`${this.repoPath()}/config${qs}`))
+  }
+
+  /** Diff/merge tools and editors present on this machine (v0.15.0). */
+  async tools(): Promise<ToolInfo[]> {
+    return json<ToolInfo[]>(await this.get(`${this.repoPath()}/tools`))
   }
 
   async vsCode(): Promise<VsCodeInfo> {
@@ -437,12 +445,19 @@ export class EngineClient {
     await json<{ ok: boolean }>(await this.post(`${this.repoPath()}/stash/drop`, { name: reference }))
   }
 
-  async saveConfig(patch: Partial<GitConfig> & { global?: boolean }): Promise<GitConfig> {
+  async saveConfig(
+    patch: Partial<GitConfig> & { global?: boolean; diffToolPath?: string | null; mergeToolPath?: string | null },
+  ): Promise<GitConfig> {
     return json<GitConfig>(
       await this.put(`${this.repoPath()}/config`, {
         userName: patch.userName,
         userEmail: patch.userEmail,
         autoCrlf: patch.autoCrlf,
+        editor: patch.editor,
+        diffTool: patch.diffTool,
+        mergeTool: patch.mergeTool,
+        diffToolPath: patch.diffToolPath,
+        mergeToolPath: patch.mergeToolPath,
         global: patch.global ?? false,
       }),
     )

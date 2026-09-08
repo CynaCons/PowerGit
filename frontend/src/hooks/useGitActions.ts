@@ -87,36 +87,42 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   // v0.15.0: every destructive action asks through the in-app ConfirmDialog
   // (a window.confirm is an OS prompt in the WebView and blocks automation).
   function removeBranch(name: string) {
-    operations.confirm({
-      title: `Delete branch '${name}'?`,
-      body: "Commits only on this branch become unreachable.",
-      confirmLabel: "Delete branch",
-      danger: true,
-      onConfirm: async () => {
-        try {
-          setRefs(await engine.deleteBranch(name))
-          await refresh({ revisions: true })
-        } catch (e) {
-          setEngineError(`Delete branch failed: ${describeThrown(e)}`)
-        }
+    operations.confirm(
+      {
+        title: `Delete branch '${name}'?`,
+        body: "Commits only on this branch become unreachable.",
+        confirmLabel: "Delete branch",
+        danger: true,
+        onConfirm: async () => {
+          try {
+            setRefs(await engine.deleteBranch(name))
+            await refresh({ revisions: true })
+          } catch (e) {
+            setEngineError(`Delete branch failed: ${describeThrown(e)}`)
+          }
+        },
       },
-    })
+      "confirmDeleteBranch",
+    )
   }
   function removeTag(name: string) {
-    operations.confirm({
-      title: `Delete tag '${name}'?`,
-      body: "The tag is removed locally; a remote copy stays until it is deleted there too.",
-      confirmLabel: "Delete tag",
-      danger: true,
-      onConfirm: async () => {
-        try {
-          setRefs(await engine.deleteTag(name))
-          await refresh({ revisions: true })
-        } catch (e) {
-          setEngineError(`Delete tag failed: ${describeThrown(e)}`)
-        }
+    operations.confirm(
+      {
+        title: `Delete tag '${name}'?`,
+        body: "The tag is removed locally; a remote copy stays until it is deleted there too.",
+        confirmLabel: "Delete tag",
+        danger: true,
+        onConfirm: async () => {
+          try {
+            setRefs(await engine.deleteTag(name))
+            await refresh({ revisions: true })
+          } catch (e) {
+            setEngineError(`Delete tag failed: ${describeThrown(e)}`)
+          }
+        },
       },
-    })
+      "confirmDeleteBranch",
+    )
   }
   async function fetchRemote(name: string) {
     await runJob(`Fetching ${name}`, () => engine.startFetch(name))

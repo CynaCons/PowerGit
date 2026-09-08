@@ -174,7 +174,25 @@ export type GitConfig = {
   userName: string | null
   userEmail: string | null
   autoCrlf: string | null
+  /** Which scope these values were read at: "local", "global" or the effective view. */
   scope: string
+  /** v0.15.0 settings; a pre-v0.15 engine omits them. */
+  editor?: string | null
+  diffTool?: string | null
+  mergeTool?: string | null
+  /** Where the identity actually comes from: "local" | "global" | "system" | null. */
+  userNameOrigin?: string | null
+  userEmailOrigin?: string | null
+}
+
+/** A diff/merge tool or editor the engine found on this machine (v0.15.0). */
+export type ToolInfo = {
+  name: string
+  label: string
+  path: string | null
+  found: boolean
+  /** Which roles it can fill: "diff", "merge", "editor". */
+  kinds: string[]
 }
 export type VsCodeInfo = { found: boolean; path: string | null; applied: boolean }
 

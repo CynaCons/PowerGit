@@ -1,6 +1,7 @@
 import { describeThrown, type ArchiveFormat, type ConflictTake, type MergeOptions, type RebaseOptions } from "../engine"
 import type { RebaseTodoEntry } from "../engine"
 import { sequencerOpOf } from "../components/operationText"
+import { getBehaviour, type Behaviour } from "../theme/behaviour"
 import { commitWebUrl } from "../components/dialogs/gitUrls"
 import type { ConfirmRequest, Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
@@ -38,8 +39,16 @@ export function useOperationActions({ session, repoState, jobs, dialogs }: Opera
   const { withBusy } = jobs
   const { dialog, open } = dialogs
 
-  /** In-app confirmation; replaces window.confirm (v0.15.0). */
-  function confirm(request: ConfirmRequest) {
+  /**
+   * In-app confirmation; replaces window.confirm (v0.15.0). `pref` names the
+   * Behaviour switch that governs it: when the user has turned that
+   * confirmation off, the action simply runs (Settings, Behaviour).
+   */
+  function confirm(request: ConfirmRequest, pref?: keyof Behaviour) {
+    if (pref && !getBehaviour()[pref]) {
+      void request.onConfirm()
+      return
+    }
     open({ kind: "confirm", request })
   }
 
@@ -76,14 +85,13 @@ export function useOperationActions({ session, repoState, jobs, dialogs }: Opera
     })
   }
 
-  /** Always confirmed: aborting throws away whatever the operation did. */
+  /** Confirmed unless the user turned that off: aborting throws away whatever the operation did. */
   function abortOperation() {
     const state = status?.state ?? "none"
     if (state === "none") return
     const op = sequencerOpOf(status)
-    open({
-      kind: "confirm",
-      request: {
+    confirm(
+      {
         title: `Abort the ${state.replace(/ing$/, "")}?`,
         body: `The working tree goes back to where it was before the ${state.replace(/ing$/, "")} started. Any conflict resolution done so far is lost.`,
         confirmLabel: "Abort",
@@ -94,7 +102,8 @@ export function useOperationActions({ session, repoState, jobs, dialogs }: Opera
             await refresh(FULL)
           }),
       },
-    })
+      "confirmAbortOperation",
+    )
   }
 
   /** Take a side (or mark resolved / delete) for the given unmerged paths.

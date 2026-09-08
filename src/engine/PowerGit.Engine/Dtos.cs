@@ -117,13 +117,30 @@ public sealed record GitConfigDto(
     string? UserName,
     string? UserEmail,
     string? AutoCrlf,
-    string Scope);
+    string Scope,
+    // v0.15.0 settings: the tools, and where the identity actually comes
+    // from ("global", "local", "system" or null when unset), so the dialog
+    // can say "inherited from global" instead of pretending it is local.
+    string? Editor = null,
+    string? DiffTool = null,
+    string? MergeTool = null,
+    string? UserNameOrigin = null,
+    string? UserEmailOrigin = null);
 
 public sealed record GitConfigUpdate(
     string? UserName,
     string? UserEmail,
     string? AutoCrlf,
-    bool Global = false);
+    bool Global = false,
+    string? Editor = null,
+    string? DiffTool = null,
+    string? MergeTool = null,
+    /// <summary>Where the chosen diff/merge tool lives, when git cannot find it itself.</summary>
+    string? DiffToolPath = null,
+    string? MergeToolPath = null);
+
+/// <summary>A diff/merge tool or editor found on this machine (v0.15.0).</summary>
+public sealed record ToolInfoDto(string Name, string Label, string? Path, bool Found, string[] Kinds);
 
 public sealed record VsCodeInfo(bool Found, string? Path, bool Applied);
 

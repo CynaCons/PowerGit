@@ -12,14 +12,19 @@ import MenuItem from "@mui/material/MenuItem"
 import Select from "@mui/material/Select"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
+import ToggleButton from "@mui/material/ToggleButton"
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup"
 import { useEffect, useState } from "react"
-import { useEngine, type GitConfig, type VsCodeInfo } from "../engine"
+import { useEngine, type GitConfig, type ToolInfo, type VsCodeInfo } from "../engine"
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
 import { ZOOM_DEFAULT, getZoom, setZoom, stepZoom, zoomPercent } from "../theme/zoom"
 import { openLogsFolder } from "../diagnostics/snapshot"
 import { useUpdater } from "../hooks/useUpdater"
 import { isTauriShell } from "../shell"
+import { DEFAULT_BEHAVIOUR, getBehaviour, setBehaviour, type Behaviour } from "../theme/behaviour"
+import { BehaviourSection } from "./settings/BehaviourSection"
+import { ToolsSection } from "./settings/ToolsSection"
 import { progressPercent, progressText } from "../updates/updateMachine"
 
 type Props = { open: boolean; onClose: () => void }
@@ -40,6 +45,11 @@ export function SettingsDialog({ open, onClose }: Props) {
   const [bar, setBar] = useState<BarLayout>("rail")
   const [zoom, setZoomDraft] = useState(ZOOM_DEFAULT)
   const [version, setVersion] = useState<string | null>(null)
+  // v0.15.0: which config file the identity fields edit, the tools this
+  // machine has, and the behaviour draft.
+  const [scope, setScope] = useState<"local" | "global">("local")
+  const [tools, setTools] = useState<ToolInfo[]>([])
+  const [behaviour, setBehaviourDraft] = useState<Behaviour>(DEFAULT_BEHAVIOUR)
   const updater = useUpdater()
 
   useEffect(() => {
@@ -49,10 +59,11 @@ export function SettingsDialog({ open, onClose }: Props) {
     setTheme(getThemePreference())
     setBar(getBarLayout())
     setZoomDraft(getZoom())
+    setBehaviourDraft(getBehaviour())
     engine
-      .config()
-      .then(setCfg)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "config failed"))
+      .tools()
+      .then(setTools)
+      .catch(() => setTools([]))
     engine
       .vsCode()
       .then(setVs)
@@ -64,14 +75,36 @@ export function SettingsDialog({ open, onClose }: Props) {
       .catch(() => setVersion(null))
   }, [engine, open])
 
+  // The identity fields show one scope at a time, so re-read when it flips.
+  // The read is cancelled on the way out: flipping twice quickly (or React's
+  // double-mount in dev) otherwise lets the earlier answer land last and
+  // show the other scope's values, or blank the fields altogether.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setCfg(null)
+    engine
+      .config(scope)
+      .then((c) => {
+        if (!cancelled) setCfg(c)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "config failed")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [engine, open, scope])
+
   async function onSave() {
     if (saving) return
     setSaving(true)
     setError(null)
     try {
-      if (cfg) setCfg(await engine.saveConfig(cfg))
+      if (cfg) setCfg(await engine.saveConfig({ ...cfg, global: scope === "global" }))
       // Local preferences apply only once the Git config write succeeded, so
       // a failed save leaves nothing half-applied.
+      setBehaviour(behaviour)
       setThemePreference(theme)
       setBarLayout(bar)
       setZoom(zoom)
@@ -89,6 +122,16 @@ export function SettingsDialog({ open, onClose }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "vscode apply failed")
     }
+  }
+
+  // Says where the values on screen actually come from, so "This
+  // repository" showing a name set globally is not mistaken for a local one.
+  const scopeHint = (which: "local" | "global", config: GitConfig | null): string => {
+    if (which === "global") return "Saved to your global Git config, for every repository."
+    const inherited = config?.userNameOrigin && config.userNameOrigin !== "local"
+    return inherited
+      ? `Saved to this repository only. The name in use comes from your ${config?.userNameOrigin} config until you set one here.`
+      : "Saved to this repository only."
   }
 
   const section = (title: string, hint?: string) => (
@@ -115,7 +158,7 @@ export function SettingsDialog({ open, onClose }: Props) {
             label="Appearance"
             value={theme}
             onChange={(e) => setTheme(e.target.value as ThemePreference)}
-            inputProps={{ "aria-label": "Appearance" }}
+            inputProps={{ "aria-label": "Appearance", "data-testid": "settings-appearance" }}
           >
             <MenuItem value="system">System</MenuItem>
             <MenuItem value="light">Light</MenuItem>
@@ -129,7 +172,7 @@ export function SettingsDialog({ open, onClose }: Props) {
             label="Command bar"
             value={bar}
             onChange={(e) => setBar(e.target.value as BarLayout)}
-            inputProps={{ "aria-label": "Command bar" }}
+            inputProps={{ "aria-label": "Command bar", "data-testid": "settings-bar-layout" }}
           >
             <MenuItem value="rail">In the left rail</MenuItem>
             <MenuItem value="top">In the title bar</MenuItem>
@@ -148,16 +191,29 @@ export function SettingsDialog({ open, onClose }: Props) {
           </Button>
         </Typography>
 
-        {section(
-          "Git identity",
-          "Saved to this repository only. Shown values may be inherited from your global Git config.",
-        )}
+        {section("Git identity", scopeHint(scope, cfg))}
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={scope}
+          onChange={(_, v: "local" | "global" | null) => v && setScope(v)}
+          data-testid="settings-identity-scope"
+          sx={{ alignSelf: "flex-start" }}
+        >
+          <ToggleButton value="local" data-testid="settings-scope-local">
+            This repository
+          </ToggleButton>
+          <ToggleButton value="global" data-testid="settings-scope-global">
+            All repositories
+          </ToggleButton>
+        </ToggleButtonGroup>
         <TextField
           label="User name"
           margin="dense"
           value={cfg?.userName ?? ""}
           disabled={!cfg}
           onChange={(e) => setCfg((c) => (c ? { ...c, userName: e.target.value } : c))}
+          slotProps={{ htmlInput: { "data-testid": "settings-user-name" } }}
         />
         <TextField
           label="Email"
@@ -165,6 +221,7 @@ export function SettingsDialog({ open, onClose }: Props) {
           value={cfg?.userEmail ?? ""}
           disabled={!cfg}
           onChange={(e) => setCfg((c) => (c ? { ...c, userEmail: e.target.value } : c))}
+          slotProps={{ htmlInput: { "data-testid": "settings-user-email" } }}
         />
         <FormControl margin="dense" disabled={!cfg}>
           <InputLabel id="crlf-label">Line endings</InputLabel>
@@ -173,6 +230,7 @@ export function SettingsDialog({ open, onClose }: Props) {
             label="Line endings"
             value={cfg?.autoCrlf ?? ""}
             onChange={(e) => setCfg((c) => (c ? { ...c, autoCrlf: String(e.target.value) } : c))}
+            inputProps={{ "aria-label": "Line endings", "data-testid": "settings-autocrlf" }}
           >
             <MenuItem value="">Git default (core.autocrlf unset)</MenuItem>
             <MenuItem value="true">CRLF in the working tree, LF in commits (true)</MenuItem>
@@ -182,6 +240,7 @@ export function SettingsDialog({ open, onClose }: Props) {
         </FormControl>
 
         {section("Tools")}
+        <ToolsSection tools={tools} cfg={cfg} onChange={(patch) => setCfg((c) => (c ? { ...c, ...patch } : c))} />
         <Typography variant="body2" color="text.secondary">
           VS Code: {vs?.found ? vs.path : "not found"}
         </Typography>
@@ -193,6 +252,9 @@ export function SettingsDialog({ open, onClose }: Props) {
             Open logs folder
           </Button>
         )}
+
+        {section("Behaviour", "This app, every repository.")}
+        <BehaviourSection value={behaviour} onChange={(patch) => setBehaviourDraft((b) => ({ ...b, ...patch }))} />
 
         {section("Updates", version ? `PowerGit v${version}` : "PowerGit")}
         <UpdatesSection updater={updater} />

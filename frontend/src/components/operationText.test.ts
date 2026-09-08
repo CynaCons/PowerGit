@@ -71,7 +71,9 @@ describe("operationCaption and sequencerOpOf", () => {
     expect(operationCaption(null)).toBeNull()
     expect(operationCaption(status())).toBeNull()
     expect(operationCaption(status({ state: "merging" }))).toBe("MERGING")
-    expect(operationCaption(status({ state: "rebasing" }, { kind: "rebasing", step: 2, total: 5 }))).toBe("REBASING 2/5")
+    expect(operationCaption(status({ state: "rebasing" }, { kind: "rebasing", step: 2, total: 5 }))).toBe(
+      "REBASING 2/5",
+    )
   })
 
   it("routes continue and abort to the sequencer only for the sequencer's own operations", () => {

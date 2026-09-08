@@ -33,6 +33,7 @@ import { setStateSampler } from "./diagnostics"
 import { buildFrontendDump, takeSnapshot } from "./diagnostics/snapshot"
 import { describeThrown } from "./engine"
 import { withArtificialRows } from "./graph/artificial"
+import { useAutoFetch } from "./hooks/useAutoFetch"
 import { useHeartbeat } from "./hooks/useHeartbeat"
 import { getThemePreference } from "./theme/appearance"
 import { getZoom } from "./theme/zoom"
@@ -78,6 +79,8 @@ export default function App({ base }: { base: EngineClient }) {
     handleFailure: session.handleFailure,
   })
   const { busy, jobLabel, runJob } = jobs
+  // Background fetch on the interval from Settings, Behaviour (v0.15.0).
+  useAutoFetch({ client, live, busy, status, defaultRemote, refresh })
   const dialogs = useDialogs()
   const { open, hotkeysEnabled } = dialogs
   // useGitActions rebuilds its closures every render; hand memoised children
