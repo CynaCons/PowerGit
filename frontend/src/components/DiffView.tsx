@@ -103,7 +103,12 @@ function parseGutterLines(text: string): GutterLine[] {
  * the diff's line indexes. Plain rendering stays until the tokens arrive
  * and whenever they cannot (unknown language, oversized diff).
  */
-function useDiffTokens(text: string, lines: GutterLine[], path: string, mode: "light" | "dark"): Map<number, Token[]> | null {
+function useDiffTokens(
+  text: string,
+  lines: GutterLine[],
+  path: string,
+  mode: "light" | "dark",
+): Map<number, Token[]> | null {
   const [tokens, setTokens] = useState<{ key: string; map: Map<number, Token[]> } | null>(null)
   const key = `${mode}|${path}|${text}`
   useEffect(() => {

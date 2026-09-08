@@ -200,7 +200,11 @@ const DARK_THEME = "dark-plus"
  * views): one token list per line, colours from VS Code's Light+ or Dark+
  * theme. Same limits and same null-means-plain contract as highlightToHtml.
  */
-export async function tokenizeLines(code: string, lang: string | null, mode: "light" | "dark"): Promise<Token[][] | null> {
+export async function tokenizeLines(
+  code: string,
+  lang: string | null,
+  mode: "light" | "dark",
+): Promise<Token[][] | null> {
   if (!lang) return null
   if (code.length > MAX_HIGHLIGHT_CHARS) return null
   let lines = 1

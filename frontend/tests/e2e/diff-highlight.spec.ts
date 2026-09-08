@@ -41,7 +41,10 @@ test.describe("syntax highlighting in the diff view", () => {
     writeFileSync(join(repoDir, "notes.unknownext"), "plain words here\n")
     git(repoDir, "add", "-A")
     git(repoDir, "commit", "-q", "-m", "first")
-    writeFileSync(join(repoDir, "a.ts"), 'export const a = 1\nexport function hello(name: string): string {\n  return "hi " + name\n}\n')
+    writeFileSync(
+      join(repoDir, "a.ts"),
+      'export const a = 1\nexport function hello(name: string): string {\n  return "hi " + name\n}\n',
+    )
     writeFileSync(join(repoDir, "notes.unknownext"), "plain words here\nmore plain words\n")
     git(repoDir, "add", "-A")
     git(repoDir, "commit", "-q", "-m", "second")
@@ -62,9 +65,9 @@ test.describe("syntax highlighting in the diff view", () => {
     await page.getByTestId("file-list-row").filter({ hasText: "a.ts" }).click()
     const view = page.getByTestId("diff-view")
     await expect(view.locator(".diff-token").first()).toBeVisible()
-    const colors = await view.locator(".diff-row-added .diff-token").evaluateAll((els) =>
-      Array.from(new Set(els.map((e) => (e as HTMLElement).style.color))),
-    )
+    const colors = await view
+      .locator(".diff-row-added .diff-token")
+      .evaluateAll((els) => Array.from(new Set(els.map((e) => (e as HTMLElement).style.color))))
     expect(colors.length).toBeGreaterThan(1)
     await expect(view.locator(".diff-row-added").first()).toHaveCSS("background-color", /rgba\(24, 145, 0/)
 
