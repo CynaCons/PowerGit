@@ -115,3 +115,26 @@ jobs:
         shell: bash
         run: mkdir -p binaries && touch binaries/powergit-engine-x86_64-pc-windows-msvc.exe
       - run: cargo test --lib
+
+  shell-linux:
+    # The shell has Linux-only code (desktop_integration.rs, the WebKitGTK
+    # crash hook in crash_hooks.rs, the DMA-BUF switch in main.rs) that the
+    # Windows job never compiles; release.yml only finds a break at tag time.
+    name: rust shell tests (linux)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: frontend/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - name: webkit2gtk and friends
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+      - name: placeholder sidecar
+        run: mkdir -p binaries && touch binaries/powergit-engine-x86_64-unknown-linux-gnu
+      - run: cargo test --lib
