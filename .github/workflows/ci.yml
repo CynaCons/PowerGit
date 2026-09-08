@@ -120,7 +120,11 @@ jobs:
     # The shell has Linux-only code (desktop_integration.rs, the WebKitGTK
     # crash hook in crash_hooks.rs, the DMA-BUF switch in main.rs) that the
     # Windows job never compiles; release.yml only finds a break at tag time.
-    name: rust shell tests (linux)
+    # Manual only (owner 2026-09-08: keep heavy jobs off the push CI): run
+    # it from the Actions tab when Linux-only shell code changed and no
+    # local Linux toolchain is at hand.
+    name: rust shell tests (linux, manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     defaults:
       run:
