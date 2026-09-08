@@ -83,13 +83,14 @@ must be writable); the portable zip is replaced by hand.
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.14.1 adds the diagnostic
-snapshot (rail button, plus a shell watchdog that writes it on its own when
-the window stops responding and points to it on the next launch), pending
-changes as Working directory / Index rows on top of HEAD reviewable from the
-main view, and floating option bars that stay open. It builds on v0.14.0's
-in-app updates, branch-history highlight, tag glyphs, merge diffs and the
-full-window commit dialog.
+Tracked openly in [PLAN.md](PLAN.md). Release v0.14.3 fixes the Linux
+freeze class where the window went black while the app still reacted (a
+paint heartbeat, self-recovery by reloading the view, a native restart
+dialog, WebKitGTK's DMA-BUF renderer off), lists recent repositories right
+after launch with a cross to remove one, and reshapes the grid: resizable
+columns, a scrollbar for wide graphs, branch lines that run through the
+pending rows, and syntax-highlighted diffs. It builds on v0.14.1's
+diagnostic snapshot and watchdog and v0.14.0's in-app updates.
 Parked: worktrees and hotkey remapping UI.
 
 ## Development
