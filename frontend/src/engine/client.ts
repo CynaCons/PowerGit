@@ -254,6 +254,12 @@ export class EngineClient {
     return json<RepoInfo[]>(await this.get(`/repos/recents`))
   }
 
+  /** Removes one root from the recents list for good (v0.14.2). */
+  async forgetRecent(root: string): Promise<void> {
+    const res = await this.request(`/repos/recents?root=${encodeURIComponent(root)}`, { method: "DELETE" })
+    if (!res.ok) await json(res)
+  }
+
   // ---- reads (abortable: latest request wins) ---------------------------
 
   async revisions(max = 800, skip = 0, signal?: AbortSignal): Promise<RevisionDto[]> {

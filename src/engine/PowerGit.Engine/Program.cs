@@ -113,6 +113,18 @@ app.MapGet("/repos/current", (RepoRegistry repos) =>
 
 app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
 
+// The cross on a Recents card (v0.14.2): forget one root. Idempotent.
+app.MapDelete("/repos/recents", (string root) =>
+{
+    if (string.IsNullOrWhiteSpace(root))
+    {
+        return Results.Json(new ErrorResponse("root is required"), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    RecentsStore.Forget(root);
+    return Results.NoContent();
+});
+
 app.MapGet("/repos", (RepoRegistry repos) => Results.Ok(repos.List()));
 
 // Lifecycle facts per session (last use, busy, watcher count): what the

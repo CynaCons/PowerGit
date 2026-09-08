@@ -86,7 +86,19 @@ export async function openLogsFolder(): Promise<void> {
   await openPath(dir)
 }
 
-export type Incident = { at: string; snapshot: string }
+/** `kind`: "script" (no heartbeat), "paint" (beats but no frames), "crash" (web process died); "" from v0.14.1 files. */
+export type Incident = { at: string; snapshot: string; kind?: string }
+
+export function describeIncident(kind: string | undefined): string {
+  switch (kind) {
+    case "paint":
+      return "PowerGit's window stopped updating"
+    case "crash":
+      return "PowerGit's page process crashed"
+    default:
+      return "PowerGit stopped responding"
+  }
+}
 
 /** The incident the watchdog recorded during the previous run, once. */
 export async function lastIncident(): Promise<Incident | null> {

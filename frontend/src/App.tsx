@@ -42,7 +42,7 @@ import { getZoom } from "./theme/zoom"
 // session derives the repo-bound one every component reads via useEngine().
 export default function App({ base }: { base: EngineClient }) {
   const session = useEngineSession(base)
-  const { view, state, client, engineError, setEngineError, recents, demo } = session
+  const { view, state, client, engineError, setEngineError, recents, forgetRecent, demo } = session
   const { live, offline, repo } = view
   const history = useHistory({ client, demo, live, setEngineError, onFailure: session.handleFailure })
   const { rows: engineRows, selectedSha, setSelectedSha, loadingTail, loaded, historyNote } = history
@@ -372,6 +372,7 @@ export default function App({ base }: { base: EngineClient }) {
           actions={actions}
           repo={repo}
           recents={recents}
+          onForgetRecent={forgetRecent}
           repoState={repoState}
           jobs={jobs}
         />

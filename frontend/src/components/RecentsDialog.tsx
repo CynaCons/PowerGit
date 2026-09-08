@@ -1,9 +1,11 @@
+import CloseIcon from "@mui/icons-material/Close"
 import Box from "@mui/material/Box"
 import Card from "@mui/material/Card"
 import CardActionArea from "@mui/material/CardActionArea"
 import CardContent from "@mui/material/CardContent"
 import Dialog from "@mui/material/Dialog"
 import DialogTitle from "@mui/material/DialogTitle"
+import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
 import type { RepoInfo } from "../engine"
 
@@ -12,23 +14,25 @@ type Props = {
   onClose: () => void
   recents: RepoInfo[]
   onPick: (path: string) => void
+  /** The cross at a card's top right (v0.14.2): drop it from the list for good. */
+  onForget?: (root: string) => void
 }
 
-export function RecentsDialog({ open, onClose, recents, onPick }: Props) {
+export function RecentsDialog({ open, onClose, recents, onPick, onForget }: Props) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Recent repositories</DialogTitle>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2, p: 2 }}>
         {recents.length === 0 && <Typography color="text.secondary">No recent repositories yet.</Typography>}
         {recents.map((r) => (
-          <Card key={r.root} variant="outlined">
+          <Card key={r.root} variant="outlined" sx={{ position: "relative" }} data-testid="recent-card">
             <CardActionArea
               onClick={() => {
                 onPick(r.root)
                 onClose()
               }}
             >
-              <CardContent>
+              <CardContent sx={{ pr: 5 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   {r.name}
                 </Typography>
@@ -44,6 +48,21 @@ export function RecentsDialog({ open, onClose, recents, onPick }: Props) {
                 </Typography>
               </CardContent>
             </CardActionArea>
+            {onForget && (
+              <IconButton
+                size="small"
+                aria-label={`Remove ${r.name} from recent repositories`}
+                title="Remove from recent repositories"
+                data-testid="recent-forget"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onForget(r.root)
+                }}
+                sx={{ position: "absolute", top: 4, right: 4, color: "text.secondary" }}
+              >
+                <CloseIcon fontSize="inherit" />
+              </IconButton>
+            )}
           </Card>
         ))}
       </Box>

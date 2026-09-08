@@ -60,8 +60,13 @@ ancestors and the first-parent line, and turns the ring or the dimming off.
 Rail → **Diagnostic snapshot** (above Settings) writes a zip next to the
 logs with the app and engine logs, the engine's state and the page's own
 diagnostics; attach it to your report. Should the window ever stop
-responding, the app's shell notices within 15 seconds, writes the same
-snapshot on its own, and tells you where it is on the next launch.
+responding, or stop redrawing while the app still reacts to clicks, the
+app's shell notices within about 20 seconds, writes the same snapshot on
+its own, reloads the view, and if that does not bring the picture back,
+asks in a native dialog whether to restart. The next launch says what
+happened and where the snapshot is. On Linux the shell starts WebKitGTK
+without its DMA-BUF renderer, the usual cause of black, non-redrawing
+windows; set `POWERGIT_KEEP_DMABUF=1` to keep the default renderer.
 Settings → Tools → Open logs folder shows the files.
 
 ## Updating

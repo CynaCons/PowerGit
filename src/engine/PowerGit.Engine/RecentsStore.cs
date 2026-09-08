@@ -61,6 +61,16 @@ public static class RecentsStore
         }
     }
 
+    /// <summary>Removes one entry for good (the cross on a Recents card, v0.14.2).</summary>
+    public static void Forget(string root)
+    {
+        lock (Gate)
+        {
+            List<RepoInfo> list = [.. Prune(ReadUnlocked()).Where(r => !string.Equals(r.Root, root, StringComparison.OrdinalIgnoreCase))];
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(list, Json));
+        }
+    }
+
     /// <summary>Drops entries whose root directory is gone (deleted fixtures, unplugged drives).</summary>
     private static List<RepoInfo> Prune(List<RepoInfo> list)
     {

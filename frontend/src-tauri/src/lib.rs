@@ -2,6 +2,7 @@
 // unit-test it; only the call in setup() is Linux-only.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod desktop_integration;
+mod crash_hooks;
 mod snapshot;
 mod tinyhttp;
 mod watchdog;
@@ -47,12 +48,16 @@ struct EngineState {
     /// mistaken for a crash.
     exiting: Mutex<bool>,
     /// v0.14.1 diagnostics: the webview's own log beside engine.log, the
-    /// last heartbeat the page sent (None until the first), whether the
-    /// watchdog currently considers the page unresponsive, and when this
-    /// shell started.
+    /// last heartbeat the page sent (None until the first), the last frame
+    /// the page painted as reported by that heartbeat (None while the
+    /// window is hidden; v0.14.2), the watchdog's memory, the platform's
+    /// crash report if any (consumed by the watchdog), and when this shell
+    /// started.
     frontend_log: Mutex<Option<File>>,
     last_beat: Mutex<Option<Instant>>,
-    unresponsive_since: Mutex<Option<Instant>>,
+    last_paint: Mutex<Option<Instant>>,
+    watchdog: Mutex<watchdog::Status>,
+    crashed: Mutex<Option<String>>,
     started: Instant,
 }
 
@@ -61,6 +66,9 @@ struct EngineState {
 struct Incident {
     at: String,
     snapshot: String,
+    /// "script", "paint" or "crash" (watchdog::Stall); absent in v0.14.1 files.
+    #[serde(default)]
+    kind: String,
 }
 
 #[derive(serde::Serialize)]
@@ -101,11 +109,71 @@ fn engine_log_path(state: tauri::State<EngineState>) -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-/// Tauri command: the page beats every 2 s; silence is what the watchdog
-/// (watchdog.rs) turns into an incident.
+/// Tauri command: the page beats every 2 s and says how long ago it last
+/// painted a frame (None while hidden). Silence, or beats without frames,
+/// is what the watchdog (watchdog.rs) turns into an incident.
 #[tauri::command]
-fn heartbeat(state: tauri::State<EngineState>) {
-    *state.last_beat.lock().expect("beat mutex poisoned") = Some(Instant::now());
+fn heartbeat(state: tauri::State<EngineState>, frame_age_ms: Option<f64>) {
+    let now = Instant::now();
+    *state.last_beat.lock().expect("beat mutex poisoned") = Some(now);
+    *state.last_paint.lock().expect("paint mutex poisoned") = frame_age_ms
+        .filter(|ms| ms.is_finite() && *ms >= 0.0)
+        .map(|ms| now - Duration::from_secs_f64(ms / 1000.0));
+}
+
+/// The platform said the web process died (crash_hooks.rs): remembered for
+/// the watchdog's next tick, which reloads the webview at once.
+fn note_crash(app: &AppHandle, what: String) {
+    let state = app.state::<EngineState>();
+    log_line(&state, &what);
+    *state.crashed.lock().expect("crash mutex poisoned") = Some(what);
+}
+
+/// How long ago the page painted, as far as the shell knows.
+fn paint_age(state: &EngineState) -> Option<Duration> {
+    state
+        .last_paint
+        .lock()
+        .expect("paint mutex poisoned")
+        .map(|p| p.elapsed())
+}
+
+/// The native "restart?" dialog: it is drawn by the OS, not the webview,
+/// so it shows even when the page is a black rectangle.
+fn ask_restart(app: &AppHandle, why: &str) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    let handle = app.clone();
+    app.dialog()
+        .message(format!(
+            "PowerGit's window stopped updating ({why}) and reloading it did not help. \
+             A diagnostic snapshot was saved next to the logs.\n\n\
+             Restart PowerGit now? Your repository stays open."
+        ))
+        .title("PowerGit is not responding")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Restart PowerGit".into(),
+            "Keep waiting".into(),
+        ))
+        .show(move |restart| {
+            if restart {
+                let state = handle.state::<EngineState>();
+                log_line(&state, "user chose to restart after the watchdog dialog");
+                handle.restart();
+            }
+        });
+}
+
+/// The native "snapshot saved" note for a page that cannot paint its own
+/// dialog (v0.14.2, owner: "can't use the Diagnostic snapshot button, it's
+/// not responsive" — the button worked, the result never showed).
+fn tell_snapshot_path(app: &AppHandle, path: &str) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+    app.dialog()
+        .message(format!("Diagnostic snapshot saved:\n{path}"))
+        .title("PowerGit")
+        .kind(MessageDialogKind::Info)
+        .show(|_| {});
 }
 
 /// Tauri command: the page streams its diagnostics here so they exist on
@@ -126,7 +194,15 @@ fn log_frontend(state: tauri::State<EngineState>, lines: Vec<String>) {
 /// without a responsive page).
 #[tauri::command]
 fn diagnostic_snapshot(app: AppHandle, frontend: String) -> Result<String, String> {
-    write_snapshot(&app, frontend, "button")
+    let path = write_snapshot(&app, frontend, "button")?;
+    // The page asked, so its script runs; if it has not painted for a while
+    // the in-page dialog will never show — say it natively instead.
+    let stalled = paint_age(&app.state::<EngineState>())
+        .is_some_and(|a| a >= watchdog::PAINT_THRESHOLD);
+    if stalled {
+        tell_snapshot_path(&app, &path);
+    }
+    Ok(path)
 }
 
 /// Tauri command: the incident the watchdog recorded during the previous
@@ -168,12 +244,35 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
         .expect("beat mutex poisoned")
         .map(|b| format!("{:.1}s ago", b.elapsed().as_secs_f64()))
         .unwrap_or_else(|| "never".into());
-    let unresponsive = state
-        .unresponsive_since
+    let paint = paint_age(&state)
+        .map(|a| format!("{:.1}s ago", a.as_secs_f64()))
+        .unwrap_or_else(|| "unknown (hidden or never)".into());
+    let unresponsive = {
+        let w = state.watchdog.lock().expect("watchdog mutex poisoned");
+        match w.stalled {
+            Some((kind, since)) => format!(
+                "{} stall for {:.0}s{}{}",
+                kind.describe(),
+                since.elapsed().as_secs_f64(),
+                if w.reloaded_at.is_some() { ", webview reloaded" } else { "" },
+                if w.asked { ", restart dialog shown" } else { "" }
+            ),
+            None => "no".into(),
+        }
+    };
+    let crashed = state
+        .crashed
         .lock()
-        .expect("watchdog mutex poisoned")
-        .map(|t| format!("{:.0}s", t.elapsed().as_secs_f64()))
+        .expect("crash mutex poisoned")
+        .clone()
         .unwrap_or_else(|| "no".into());
+    // The display stack on Linux is where the v0.14.2 freeze lives; these
+    // are the facts the next report needs (see docs/agents/memories/diagnostics.md).
+    let env_fact = |name: &str| std::env::var(name).unwrap_or_else(|_| "<unset>".into());
+    let nvidia = fs::read_to_string("/proc/driver/nvidia/version")
+        .ok()
+        .and_then(|s| s.lines().next().map(str::to_owned))
+        .unwrap_or_else(|| "none".into());
     let child_pid = state
         .child
         .lock()
@@ -199,7 +298,22 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
         ("engine pid", child_pid),
         ("engine restarts in window", restarts.to_string()),
         ("last webview heartbeat", beat_age),
-        ("webview unresponsive for", unresponsive),
+        ("last webview frame", paint),
+        ("webview stalled", unresponsive),
+        ("web process crash", crashed),
+        ("XDG_SESSION_TYPE", env_fact("XDG_SESSION_TYPE")),
+        ("WAYLAND_DISPLAY", env_fact("WAYLAND_DISPLAY")),
+        ("GDK_BACKEND", env_fact("GDK_BACKEND")),
+        (
+            "WEBKIT_DISABLE_DMABUF_RENDERER",
+            env_fact("WEBKIT_DISABLE_DMABUF_RENDERER"),
+        ),
+        (
+            "WEBKIT_DISABLE_COMPOSITING_MODE",
+            env_fact("WEBKIT_DISABLE_COMPOSITING_MODE"),
+        ),
+        ("LIBGL_ALWAYS_SOFTWARE", env_fact("LIBGL_ALWAYS_SOFTWARE")),
+        ("nvidia driver", nvidia),
     ]);
     let mut parts = vec![
         snapshot::Part::text("shell.txt", facts),
@@ -270,29 +384,42 @@ fn spawn_watchdog(handle: AppHandle) {
             if *state.exiting.lock().expect("exiting flag poisoned") {
                 return;
             }
-            let age = state
-                .last_beat
-                .lock()
-                .expect("beat mutex poisoned")
-                .map(|b| b.elapsed());
-            let unresponsive = state
-                .unresponsive_since
-                .lock()
-                .expect("watchdog mutex poisoned")
-                .is_some();
-            match watchdog::step(age, unresponsive) {
-                watchdog::Transition::None => {}
-                watchdog::Transition::BecameUnresponsive => {
-                    *state
-                        .unresponsive_since
-                        .lock()
-                        .expect("watchdog mutex poisoned") = Some(Instant::now());
+            let obs = watchdog::Observation {
+                beat_age: state
+                    .last_beat
+                    .lock()
+                    .expect("beat mutex poisoned")
+                    .map(|b| b.elapsed()),
+                paint_age: paint_age(&state),
+                crashed: state
+                    .crashed
+                    .lock()
+                    .expect("crash mutex poisoned")
+                    .take()
+                    .is_some(),
+            };
+            let action = watchdog::step(
+                obs,
+                &mut state.watchdog.lock().expect("watchdog mutex poisoned"),
+                Instant::now(),
+            );
+            match action {
+                watchdog::Action::None => {}
+                watchdog::Action::Stalled(kind) => {
+                    let secs = |d: Option<Duration>| d.map(|a| a.as_secs_f64()).unwrap_or(0.0);
                     log_line(
                         &state,
-                        &format!(
-                            "webview unresponsive: no heartbeat for {:.0}s",
-                            age.map(|a| a.as_secs_f64()).unwrap_or(0.0)
-                        ),
+                        &match kind {
+                            watchdog::Stall::Script => format!(
+                                "webview unresponsive: no heartbeat for {:.0}s",
+                                secs(obs.beat_age)
+                            ),
+                            watchdog::Stall::Paint => format!(
+                                "webview not painting: script beats but no frame for {:.0}s",
+                                secs(obs.paint_age)
+                            ),
+                            watchdog::Stall::Crash => "webview process crashed".into(),
+                        },
                     );
                     match write_snapshot(&handle, String::new(), "watchdog") {
                         Ok(path) => {
@@ -300,6 +427,7 @@ fn spawn_watchdog(handle: AppHandle) {
                                 let incident = Incident {
                                     at: timestamp(),
                                     snapshot: path,
+                                    kind: kind.describe().into(),
                                 };
                                 if let Ok(text) = serde_json::to_string(&incident) {
                                     let _ = fs::write(dir.join("incident.json"), text);
@@ -309,21 +437,40 @@ fn spawn_watchdog(handle: AppHandle) {
                         Err(e) => log_line(&state, &format!("watchdog snapshot failed: {e}")),
                     }
                 }
-                watchdog::Transition::Recovered => {
-                    let since = state
-                        .unresponsive_since
+                watchdog::Action::Reload => {
+                    log_line(&state, "watchdog: reloading the webview");
+                    // A reload starts a fresh page: forget the stale
+                    // frame so the new page gets its full threshold.
+                    *state.last_paint.lock().expect("paint mutex poisoned") = None;
+                    match handle.get_webview_window("main") {
+                        Some(w) => {
+                            if let Err(e) = w.reload() {
+                                log_line(&state, &format!("watchdog: reload failed: {e}"));
+                            }
+                        }
+                        None => log_line(&state, "watchdog: no main window to reload"),
+                    }
+                }
+                watchdog::Action::AskRestart => {
+                    let why = state
+                        .watchdog
                         .lock()
                         .expect("watchdog mutex poisoned")
-                        .take();
-                    if let Some(t) = since {
-                        log_line(
-                            &state,
-                            &format!(
-                                "webview responsive again after {:.0}s",
-                                t.elapsed().as_secs_f64()
-                            ),
-                        );
-                    }
+                        .stalled
+                        .map(|(k, _)| k.describe())
+                        .unwrap_or("stall");
+                    log_line(&state, "watchdog: still stalled after reload, asking to restart");
+                    ask_restart(&handle, why);
+                }
+                watchdog::Action::Recovered(kind, took) => {
+                    log_line(
+                        &state,
+                        &format!(
+                            "webview responsive again after {:.0}s ({} stall)",
+                            took.as_secs_f64(),
+                            kind.describe()
+                        ),
+                    );
                 }
             }
         }
@@ -619,7 +766,9 @@ pub fn run() {
                 exiting: Mutex::new(false),
                 frontend_log: Mutex::new(frontend_log),
                 last_beat: Mutex::new(None),
-                unresponsive_since: Mutex::new(None),
+                last_paint: Mutex::new(None),
+                watchdog: Mutex::new(watchdog::Status::default()),
+                crashed: Mutex::new(None),
                 started: Instant::now(),
             });
 
@@ -642,6 +791,7 @@ pub fn run() {
 
             spawn_engine(app.handle().clone());
             spawn_watchdog(app.handle().clone());
+            crash_hooks::install(app.handle(), note_crash);
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -726,7 +876,9 @@ mod tests {
             exiting: Mutex::new(false),
             frontend_log: Mutex::new(None),
             last_beat: Mutex::new(None),
-            unresponsive_since: Mutex::new(None),
+            last_paint: Mutex::new(None),
+            watchdog: Mutex::new(watchdog::Status::default()),
+            crashed: Mutex::new(None),
             started: Instant::now(),
         }
     }

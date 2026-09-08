@@ -1,7 +1,7 @@
 import Alert from "@mui/material/Alert"
 import Button from "@mui/material/Button"
 import { useEffect, useState } from "react"
-import { lastIncident, revealInFolder, type Incident } from "../diagnostics/snapshot"
+import { describeIncident, lastIncident, revealInFolder, type Incident } from "../diagnostics/snapshot"
 import { copyToClipboard } from "./clipboard"
 
 // Shown once, on the launch after the watchdog caught the webview not
@@ -39,7 +39,7 @@ export function IncidentBanner() {
         </>
       }
     >
-      PowerGit stopped responding on {when}. A diagnostic snapshot was saved; please attach it to your report.
+      {describeIncident(incident.kind)} on {when}. A diagnostic snapshot was saved; please attach it to your report.
     </Alert>
   )
 }

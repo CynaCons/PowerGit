@@ -48,4 +48,30 @@ public sealed class RecentsStoreTests
         Assert.Contains(list, r => r.Root == alive);
         Directory.Delete(alive, recursive: true);
     }
+
+    [Fact]
+    public void Forget_removes_one_entry_and_keeps_the_rest()
+    {
+        string keep = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"powergit-keep-{Guid.NewGuid():N}");
+        string drop = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"powergit-drop-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(keep);
+        Directory.CreateDirectory(drop);
+        try
+        {
+            RecentsStore.Remember(new RepoInfo("keep", keep, "main", "k1"));
+            RecentsStore.Remember(new RepoInfo("drop", drop, "main", "d1"));
+
+            RecentsStore.Forget(drop);
+            RecentsStore.Forget(drop); // idempotent
+
+            IReadOnlyList<RepoInfo> list = RecentsStore.List();
+            Assert.DoesNotContain(list, r => r.Root == drop);
+            Assert.Contains(list, r => r.Root == keep);
+        }
+        finally
+        {
+            Directory.Delete(keep, recursive: true);
+            Directory.Delete(drop, recursive: true);
+        }
+    }
 }

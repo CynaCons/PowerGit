@@ -192,7 +192,39 @@ export function useEngineSession(base: EngineClient) {
 
   const retry = useCallback(() => dispatch({ type: "retry" }), [])
 
+  // Recents live on the engine's disk (recents.json); the page used to ask
+  // for them only after a repository had loaded, so the dialog said "No
+  // recent repositories yet" right after launch (owner, 2026-09-08: "seem
+  // not persistent"). Ask as soon as the engine is live.
+  useEffect(() => {
+    if (!view.live || demo) return
+    let cancelled = false
+    base
+      .recents()
+      .then((list) => {
+        if (!cancelled) setRecents(list)
+      })
+      .catch((e) => report("warn", "recents", describeThrown(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [view.live, base, demo])
+
+  const forgetRecent = useCallback(
+    async (root: string) => {
+      setRecents((list) => list.filter((r) => r.root !== root))
+      try {
+        await base.forgetRecent(root)
+        setRecents(await base.recents())
+      } catch (e) {
+        report("warn", "recents", describeThrown(e))
+      }
+    },
+    [base],
+  )
+
   return {
+    forgetRecent,
     state,
     view,
     dispatch: dispatch as (e: SessionEvent) => void,

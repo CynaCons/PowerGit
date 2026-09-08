@@ -525,6 +525,36 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Owner ticks: pending changes show as Working directory / Index rows on top of HEAD and are reviewable in the Diff tab from the main view. [agent: owner-release-2026-09-07]
 - [x] Owner ticks: the diff context lines can be changed from the floating bar without it disappearing. [agent: owner-release-2026-09-07]
 
+### v0.14.2 — Freeze on Linux — paint watchdog, self-recovery, WebKitGTK renderer workaround (current) (ACTIVE)
+> A frozen picture with a live script is the WebKitGTK compositor, not the page. Detect it (a paint heartbeat driven by requestAnimationFrame), recover from the shell (reload the webview, then a native dialog that can save a snapshot and restart even when the webview is black), hook the platform crash signals, and set the WebKitGTK environment that is the known fix for black views after idle.
+**Goal:** Owner (2026-09-08, Linux AppImage, Ubuntu, WebKitGTK): "the app froze while I wasn't using it. None of the buttons work, the only responsive thing is Open repository (system picker). The window moves and resizes, the content is frozen, some areas are black and not redrawn. Can't use the Diagnostic snapshot button." Snapshot snapshot-2026-09-08T07-23-57 shows three button presses that all reached the shell with a heartbeat 0.3 s old: script alive, painting dead, watchdog silent. Engine idle at 6 requests/min, no long tasks, no errors.
+- [x] Read the owner's snapshot (snapshot-2026-09-08T07-23-57): three button presses reached the shell with a heartbeat 0.3 s old, no watchdog line, engine idle, no long tasks — script alive, paint dead, WebKitGTK on Ubuntu.
+- [x] Paint heartbeat: `useHeartbeat` requests one animation frame per beat and reports `frameAgeMs` (null while hidden); `heartbeat` command records `last_paint`; `frameAge` unit-tested.
+- [x] Watchdog state machine (`watchdog.rs`): script / paint / crash stalls → snapshot + incident with `kind`, reload the webview after 20 s (a crash at once), native "Restart PowerGit / Keep waiting" dialog 30 s after a reload that did not bring frames back, recovery logged with the stall kind. Cargo tests for each path.
+- [x] Platform crash hooks (`crash_hooks.rs`): WebKitGTK `web-process-terminated` and WebView2 `ProcessFailed` feed the watchdog as a crash.
+- [x] Snapshot button with a dead picture: the shell shows the saved path in a native dialog when the page has not painted for 20 s (owner: "can't use the Diagnostic snapshot button").
+- [x] `shell.txt` gains the display facts the next Linux report needs: last frame age, stall state, crash report, XDG_SESSION_TYPE, WAYLAND_DISPLAY, GDK_BACKEND, the WEBKIT_* switches, LIBGL_ALWAYS_SOFTWARE, NVIDIA driver line.
+- [x] Linux: `main.rs` sets WEBKIT_DISABLE_DMABUF_RENDERER=1 before WebKit starts unless already set or POWERGIT_KEEP_DMABUF=1 (the documented fix for black, non-redrawing WebKitGTK views).
+- [x] Incident banner names the stall kind (window stopped updating / page process crashed / stopped responding).
+- [x] Drill on Windows dev app: stub requestAnimationFrame so frames stop → engine.log shows the paint stall, the snapshot, the reload, and recovery; a 20 s busy loop still yields the script stall.
+- [x] Docs: diagnostics memory (paint heartbeat, recovery ladder, Linux env switch, reading the new shell.txt lines), README "If something goes wrong".
+- [ ] Owner: on the Linux AppImage, the freeze after idle no longer happens, or when it does the window comes back on its own (reload) and engine.log names the stall; the snapshot button answers with a native dialog if the picture is dead.
+- [x] Owner 2026-09-08: "recent repositories seem not persistent" — they are on disk (engine `recents.json`), but the page only asks for them after a repository has loaded, so the Recents dialog is empty at startup. Fetch them as soon as the session is live and after every open/remember.
+- [x] Recents dialog: a small cross at the top right of each card removes the entry (engine `DELETE /repos/recents?root=`, `RecentsStore.Forget`), with a test.
+- [ ] Owner: the Recents dialog lists the previous repositories right after launch, and the cross removes one for good.
+
+### v0.14.3 — Graph grid polish — continuous lines through pending rows, resizable columns, wide-graph scrollbar, syntax highlighting
+> Placeholder iteration recorded so the requests are not lost; to be detailed when it starts.
+**Goal:** Owner (2026-09-08): the Working directory / Index rows "kill" the other branches' lines; the main grid columns should be resizable; a graph wider than its column gets a discreet horizontal scrollbar with Shift+wheel; the diff and commit views show plain text and should have language detection with syntax highlighting from a public library.
+
+### v0.15.0 — Git Extensions parity — right-click menu, merge / rebase / conflict resolution, settings
+> Placeholder iteration; needs its own plan session with owner decisions (in-app conflict editor vs mergetool hand-off, interactive rebase scope, which settings).
+**Goal:** Owner (2026-09-08): "massive changes: the right-click menu will be upgraded; we will integrate merges, rebase and conflict resolution by reintegrating what Git Extensions does natively; we will enhance the settings menu."
+
+### v0.15.1 — Graph search — find or filter from the top bar
+> Placeholder; design later.
+**Goal:** Owner (2026-09-08): "in the top bar, when in the graph view, there shall be a search function, with either the option to find or to filter. This will be a complicated feature, we will design and implement in a second time."
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
@@ -547,3 +577,10 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - History streaming owns the main thread: on a 17k-commit repository each 1000-row page append costs a 150-400 ms long task for ~15 s after boot (dev; less in production), which delays clicks made during that window (diff-latency.spec measures steady state only). Move the append/layout merge off the main thread or chunk it (requestIdleCallback / smaller batches) and assert with the spec run before settle. [agent: claude]
 - Large first diffs render slowly: DiffView renders plain rows below VIRTUALIZE_MIN_LINES=2000, so a 1500-line first diff (PLAN.md) costs a 400 ms render in dev / ~120 ms in production on selection. Lower the threshold (~300 lines) once the specs that read the full diff text are adapted, and measure with diff-latency.spec's worst-case row. [agent: claude]
 - Engine: details + changes on one selection spawn three git processes concurrently (show -s, diff-tree, show -p) and each takes 120-200 ms under contention vs 80-100 ms solo. Options: fold the details into /changes (one request, still concurrent), or a long-lived `git cat-file --batch` for commit metadata. [agent: claude]
+- Owner 2026-09-08: freeze while idle — window moves/resizes, content black and not redrawn, buttons dead, only the native Open-repository picker works, snapshot button unresponsive. Watchdog did not catch it: the script heartbeat keeps beating when only compositing/painting dies. Next: paint heartbeat (rAF) + platform crash hooks (WebView2 ProcessFailed, WebKitGTK web-process-terminated) + shell-side recovery (webview reload, native dialog with snapshot + restart) + Linux WEBKIT_DISABLE_DMABUF_RENDERER workaround.
+- Owner 2026-09-08: Working directory / Index pseudo-rows break the other branches' lines through those rows — lines must pass through continuously.
+- Owner 2026-09-08: resizable columns in the main graph grid.
+- Owner 2026-09-08: graph column wider than its space — discreet horizontal scrollbar at the column bottom, Shift+wheel scrolls it.
+- Owner 2026-09-08: syntax highlighting with language detection in the diff and commit views (public library).
+- Owner 2026-09-08: top-bar search in the graph view, find or filter (design later).
+- Owner 2026-09-08: upgraded right-click menu; merge, rebase and conflict resolution as Git Extensions does natively; enhanced settings.

@@ -21,6 +21,7 @@ export type AppDialogsProps = {
   actions: GitActions
   repo: RepoInfo | null
   recents: RepoInfo[]
+  onForgetRecent?: (root: string) => void
   repoState: Pick<RepoState, "status" | "setStatus" | "refs" | "branchNames" | "dirty" | "refresh" | "openFolder">
   jobs: Jobs
 }
@@ -28,7 +29,7 @@ export type AppDialogsProps = {
 // Every modal surface of the shell, driven by the single DialogState. The
 // always-mounted MUI dialogs (commit, settings, recents, stash) get an
 // `open` flag so their exit transitions play; the rest mount on demand.
-export function AppDialogs({ dialogs, actions, repo, recents, repoState, jobs }: AppDialogsProps) {
+export function AppDialogs({ dialogs, actions, repo, recents, onForgetRecent, repoState, jobs }: AppDialogsProps) {
   const { dialog, open, close } = dialogs
   const { status, setStatus, refs, branchNames, dirty, refresh, openFolder } = repoState
   const ctxTarget = dialog.kind === "context" ? dialog.target : null
@@ -65,6 +66,7 @@ export function AppDialogs({ dialogs, actions, repo, recents, repoState, jobs }:
           focusGrid()
         }}
         recents={recents}
+        onForget={onForgetRecent}
         onPick={(p) => {
           if (p) void openFolder(p)
         }}
