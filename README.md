@@ -99,14 +99,15 @@ must be writable); the portable zip is replaced by hand.
 
 ## Status & roadmap
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.14.3 fixes the Linux
-freeze class where the window went black while the app still reacted (a
-paint heartbeat, self-recovery by reloading the view, a native restart
-dialog, WebKitGTK's DMA-BUF renderer off), lists recent repositories right
-after launch with a cross to remove one, and reshapes the grid: resizable
-columns, a scrollbar for wide graphs, branch lines that run through the
-pending rows, and syntax-highlighted diffs. It builds on v0.14.1's
-diagnostic snapshot and watchdog and v0.14.0's in-app updates.
+Tracked openly in [PLAN.md](PLAN.md). Release v0.15.0 brings Git
+Extensions' own operations into the app: merge, rebase (including
+interactive), cherry-pick and revert now stop on a conflict instead of
+undoing themselves, with a banner that offers Resolve, Continue, Skip and
+Abort, and a resolve dialog that takes either side or opens your merge
+tool. The commit menu is the full Git Extensions one, settings gained
+identity scopes, tool pickers and switchable confirmations, and a git
+console at the bottom shows every command PowerGit runs. It builds on
+v0.14.3's grid work and v0.14.1's diagnostic snapshot and watchdog.
 Parked: worktrees and hotkey remapping UI.
 
 ## Development
