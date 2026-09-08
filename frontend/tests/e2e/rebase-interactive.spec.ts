@@ -9,6 +9,13 @@ import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, w
 // an `edit` line stopping the rebase for an amend.
 
 test.describe("interactive rebase", () => {
+  // Each step here is several engine round trips, and every engine call
+  // spawns a handful of git processes (the operation, then status, the
+  // operation state, the unmerged list). On Windows that is seconds, not
+  // milliseconds, so these tests get Playwright's slow budget rather than
+  // racing the default one.
+  test.slow()
+
   let repoDir: string
   let previousRepo: string | null = null
 

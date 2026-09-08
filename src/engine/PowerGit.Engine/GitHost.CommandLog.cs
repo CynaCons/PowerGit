@@ -46,11 +46,18 @@ public sealed partial class GitHost
     /// </summary>
     internal void RecordCommand(IReadOnlyList<string> args, int exitCode, long durationMs, string? stdOut, string? stdErr)
     {
-        string output = GitCommandSanitizer.Text(Combine(stdOut, stdErr));
-        bool truncated = output.Length > CommandLogEntryChars;
+        // Cut to what the console will keep BEFORE sanitizing. `git log` for
+        // the graph and `git diff` on a large file produce hundreds of
+        // kilobytes, and running the credential regexes over text that is
+        // about to be discarded cost every read a measurable slice of its
+        // latency (v0.15.0: it pushed click-to-diff past its budget).
+        // Truncating first is safe: a secret past the cut is not stored.
+        string combined = Combine(Cap(stdOut), Cap(stdErr));
+        bool truncated = combined.Length > CommandLogEntryChars;
+        string output = GitCommandSanitizer.Text(truncated ? combined[..CommandLogEntryChars] : combined);
         if (truncated)
         {
-            output = string.Concat(output.AsSpan(0, CommandLogEntryChars), TruncationMarker);
+            output += TruncationMarker;
         }
 
         lock (_commandLogLock)
@@ -92,6 +99,10 @@ public sealed partial class GitHost
                 : [.. _commandLog.Where(e => e.Id > after.Value)];
         }
     }
+
+    /// <summary>Enough of one stream to fill the entry on its own, no more.</summary>
+    private static string? Cap(string? text)
+        => text is not null && text.Length > CommandLogEntryChars ? text[..CommandLogEntryChars] : text;
 
     private static string Combine(string? stdOut, string? stdErr)
     {
