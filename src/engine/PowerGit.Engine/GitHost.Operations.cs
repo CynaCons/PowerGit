@@ -86,6 +86,8 @@ public sealed partial class GitHost
         {
             throw new InvalidOperationException("Failed to start git difftool.");
         }
+
+        RecordDetached([.. psi.ArgumentList], DetachedToolNote);
     }
 
     private bool IsDirty(string root)
@@ -257,6 +259,8 @@ public sealed partial class GitHost
         {
             throw new InvalidOperationException("Failed to start git difftool.");
         }
+
+        RecordDetached([.. psi.ArgumentList], DetachedToolNote);
     }
 
     /// <summary>

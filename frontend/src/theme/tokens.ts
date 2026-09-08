@@ -61,6 +61,18 @@ export type Tokens = {
   /** v0.15.0: "C" is an unmerged (conflicted) path. */
   fileStatus: Record<"A" | "M" | "D" | "R" | "U" | "C" | "other", string>
   status: { ok: string; warn: string; error: string }
+  /** Git console dock line and panel (v0.15.1): a dark surface in BOTH
+   *  themes, the way a browser's docked console is. */
+  console: {
+    bg: string
+    /** The ~22 px dock line, a step above the panel so the two read apart. */
+    lineBg: string
+    text: string
+    meta: string
+    border: string
+    ok: string
+    fail: string
+  }
   graph: {
     /** Git Extensions AppColor.GraphBranch1–7 (light) — parity, do not tune. */
     lanes: readonly [string, string, string, string, string, string, string]
@@ -122,6 +134,15 @@ export const light: Tokens = {
   },
   // MUI's own defaults, spelled out so dark can override them.
   status: { ok: "#2e7d32", warn: "#ed6c02", error: "#d32f2f" },
+  console: {
+    bg: "#12171e",
+    lineBg: "#1b222b",
+    text: "#e6e9ef",
+    meta: "#9aa6b4",
+    border: "#2a3340",
+    ok: "#5ee38a",
+    fail: "#ff8a80",
+  },
   graph: {
     lanes: ["#f064a0", "#78b4e6", "#24c221", "#a078f0", "#dd3228", "#1ac6a6", "#e7b00f"],
     nonRelative: "#a0a0a0",
@@ -181,6 +202,15 @@ export const dark: Tokens = {
     other: "#a3abb8",
   },
   status: { ok: "#5ee38a", warn: "#fbbf24", error: "#ff8a80" },
+  console: {
+    bg: "#0d1116",
+    lineBg: "#141b23",
+    text: "#e6e9ef",
+    meta: "#98a4b3",
+    border: "#2a3340",
+    ok: "#5ee38a",
+    fail: "#ff8a80",
+  },
   graph: {
     // Same hues as the GE set, lifted where a lane fell under 3:1 against
     // the dark surface (red, purple) so a branch line never disappears.
@@ -256,6 +286,13 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-status-ok": t.status.ok,
     "--pg-status-warn": t.status.warn,
     "--pg-status-error": t.status.error,
+    "--pg-console-bg": t.console.bg,
+    "--pg-console-line-bg": t.console.lineBg,
+    "--pg-console-text": t.console.text,
+    "--pg-console-meta": t.console.meta,
+    "--pg-console-border": t.console.border,
+    "--pg-console-ok": t.console.ok,
+    "--pg-console-fail": t.console.fail,
     "--pg-lane-non-relative": t.graph.nonRelative,
     "--pg-lane-head": t.graph.headOutline,
     "--pg-row-height": `${metrics.rowHeight}px`,

@@ -558,6 +558,8 @@ public sealed partial class GitHost
         {
             throw new InvalidOperationException("Failed to start git mergetool.");
         }
+
+        RecordDetached([.. psi.ArgumentList], DetachedToolNote);
     }
 
     // ------------------------------------------------------ compare / archive
@@ -673,6 +675,7 @@ public sealed partial class GitHost
 
         Process process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start git archive.");
         process.BeginErrorReadLine();
+        RecordDetached([.. psi.ArgumentList], "(streamed to the download; exit code not observed)");
         return new ProcessOutputStream(process);
     }
 
