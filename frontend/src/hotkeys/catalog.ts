@@ -29,14 +29,16 @@ export type CommandId =
   | "browse.focusPrevTab"
   | "browse.refresh"
   | "browse.gitBash"
+  | "browse.gitConsole"
   | "diff.stageSelected"
   | "diff.unstageSelected"
   | "commit.refresh"
 
 export type CommandDef = {
   id: CommandId
-  /** Git Extensions Command enum name, for tests and the remapping UI. */
-  ge: string
+  /** Git Extensions Command enum name, for tests and the remapping UI.
+   *  Null for a command GE has no equivalent of (v0.15.1: the Git console). */
+  ge: string | null
   scope: Scope
   chord: Chord | null
   available: boolean
@@ -175,6 +177,9 @@ export const CATALOG: CommandDef[] = [
   // Menu accelerator, not HotkeySettings — GE refreshToolStripMenuItem.ShortcutKeys = F5.
   { id: "browse.refresh", ge: "Refresh", scope: "browse", chord: chord("F5"), available: true },
   { id: "browse.gitBash", ge: "GitBash", scope: "browse", chord: chord("G", { ctrl: true }), available: false },
+  // v0.15.1: PowerGit's own. Ctrl+` is the docked-console chord every
+  // browser and VS Code already use, and Git Extensions has no equivalent.
+  { id: "browse.gitConsole", ge: null, scope: "browse", chord: chord("`", { ctrl: true }), available: true },
 
   { id: "diff.stageSelected", ge: "StageSelectedFile", scope: "commit", chord: chord("S"), available: true },
   { id: "diff.unstageSelected", ge: "UnStageSelectedFile", scope: "commit", chord: chord("U"), available: true },

@@ -4,6 +4,8 @@ import { BottomPanel } from "./components/BottomPanel"
 import { CommandBar } from "./components/CommandBar"
 import { AppDialogs } from "./components/dialogs/AppDialogs"
 import { ErrorBanner } from "./components/ErrorBanner"
+import { GitConsole } from "./components/GitConsole"
+import { toggleGitConsole } from "./components/gitConsoleState"
 import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
 import { JobPanel } from "./components/JobPanel"
 import { NavRail } from "./components/NavRail"
@@ -222,6 +224,7 @@ export default function App({ base }: { base: EngineClient }) {
       "browse.refresh": () => {
         if (live) void refresh().catch(() => undefined)
       },
+      "browse.gitConsole": () => toggleGitConsole(),
     } satisfies Partial<Record<CommandId, () => void>>,
     hotkeysEnabled,
   )
@@ -400,6 +403,10 @@ export default function App({ base }: { base: EngineClient }) {
           onOpenJobs={() => jobs.setPanelOpen(true)}
           onOpenRecovery={() => setRecoveryOpen(true)}
         />
+        {/* Last row of the column: the panel shortens the graph instead of
+            covering it, and neither it nor the dock line ever sits over the
+            status bar. It mounts the failure card too (same buffer). */}
+        <GitConsole client={client} live={live} />
 
         <AppDialogs
           dialogs={dialogs}

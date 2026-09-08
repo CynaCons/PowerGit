@@ -33,6 +33,15 @@ describe("semantic visual tokens", () => {
     // lane is 2.22:1 on white, so use a visible-graphic floor below WCAG's
     // text threshold while requiring the primary/focus graphics above.
     for (const lane of t.graph.lanes) expect(contrast(lane, t.surface)).toBeGreaterThanOrEqual(1.9)
+    // The Git console is dark in both themes, so its own text is measured
+    // against its own surfaces, never against the app's.
+    expect(contrast(t.console.text, t.console.bg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.console.text, t.console.lineBg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.console.meta, t.console.bg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.console.meta, t.console.lineBg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.console.fail, t.console.bg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.console.fail, t.console.lineBg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.console.ok, t.console.bg)).toBeGreaterThanOrEqual(4.5)
   })
 
   test("CSS variables cover every runtime semantic family", () => {

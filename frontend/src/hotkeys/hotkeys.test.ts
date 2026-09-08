@@ -83,6 +83,22 @@ test("U unstages only when a file list is focused", () => {
   expect(resolveHotkey("commit", chord("U"), { editing: true, multiLine: true, fileListFocused: false })).toBeNull()
 })
 
+test("Ctrl+` toggles the Git console, a PowerGit command with no GE twin", () => {
+  const def = CATALOG.find((c) => c.id === "browse.gitConsole")
+  expect(def?.available).toBe(true)
+  expect(def?.ge ?? null).toBeNull()
+  expect(chordsEqual(def!.chord!, chord("`", { ctrl: true }))).toBe(true)
+  expect(formatChord(def!.chord!)).toBe("Ctrl+`")
+  expect(fromEvent(fakeEvent("`", { ctrl: true }))).toEqual(chord("`", { ctrl: true }))
+  expect(
+    resolveHotkey("browse", chord("`", { ctrl: true }), { editing: false, multiLine: false, fileListFocused: false }),
+  ).toBe("browse.gitConsole")
+  // It must still work while a text field has focus — it is not a text key.
+  expect(
+    resolveHotkey("browse", chord("`", { ctrl: true }), { editing: true, multiLine: true, fileListFocused: false }),
+  ).toBe("browse.gitConsole")
+})
+
 test("GE default chords we claim", () => {
   const want: Record<string, Chord> = {
     "browse.commit": chord("Space", { ctrl: true }),
