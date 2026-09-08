@@ -42,7 +42,16 @@ pub enum Stall {
     Paint,
     /// The platform reported the web process gone.
     Crash,
+    /// The user said so (v0.15.0): the snapshot button pressed twice in a
+    /// row while the page reports frames. Nothing the shell measures can
+    /// see a GTK presentation failure, so the ladder runs on trust: reload
+    /// at once, and clear after FORCED_CLEAR unless a further press asks
+    /// for the restart dialog.
+    Forced,
 }
+
+/// How long a forced stall stays recorded after its reload.
+pub const FORCED_CLEAR: Duration = Duration::from_secs(60);
 
 impl Stall {
     pub fn describe(self) -> &'static str {
@@ -50,6 +59,28 @@ impl Stall {
             Stall::Script => "script",
             Stall::Paint => "paint",
             Stall::Crash => "crash",
+            Stall::Forced => "forced",
+        }
+    }
+}
+
+/// The user's second press: records a forced stall and asks for the
+/// reload right away. A third press while the forced stall stands asks for
+/// the restart dialog instead (once).
+pub fn force(status: &mut Status, now: Instant) -> Action {
+    match status.stalled {
+        Some((Stall::Forced, _)) if status.reloaded_at.is_some() && !status.asked => {
+            status.asked = true;
+            Action::AskRestart
+        }
+        Some((Stall::Forced, _)) => Action::None,
+        _ => {
+            *status = Status {
+                stalled: Some((Stall::Forced, now)),
+                reloaded_at: Some(now),
+                asked: false,
+            };
+            Action::Reload
         }
     }
 }
@@ -101,6 +132,13 @@ pub fn step(obs: Observation, status: &mut Status, now: Instant) -> Action {
     let stalled_now = obs.crashed || script || paint;
 
     match status.stalled {
+        // A forced stall is not measurable: it simply expires.
+        Some((Stall::Forced, since)) => {
+            if now.saturating_duration_since(since) >= FORCED_CLEAR {
+                *status = Status::default();
+            }
+            Action::None
+        }
         None if !stalled_now => Action::None,
         None => {
             let kind = if obs.crashed {
@@ -201,6 +239,22 @@ mod tests {
         };
         assert_eq!(step(crashed, &mut s, t0), Action::Stalled(Stall::Crash));
         assert_eq!(step(crashed, &mut s, t0 + INTERVAL), Action::Reload);
+    }
+
+    #[test]
+    fn a_forced_stall_reloads_at_once_then_asks_on_the_next_press_and_expires() {
+        let t0 = Instant::now();
+        let mut s = Status::default();
+        assert_eq!(force(&mut s, t0), Action::Reload);
+        // Healthy measurements do not clear it early.
+        assert_eq!(step(obs(1, Some(0)), &mut s, t0 + INTERVAL), Action::None);
+        assert!(s.is_stalled());
+        assert_eq!(force(&mut s, t0 + Duration::from_secs(10)), Action::AskRestart);
+        assert_eq!(force(&mut s, t0 + Duration::from_secs(12)), Action::None);
+        assert_eq!(step(obs(1, Some(0)), &mut s, t0 + FORCED_CLEAR), Action::None);
+        assert!(!s.is_stalled());
+        // After it expired a new double press starts over.
+        assert_eq!(force(&mut s, t0 + FORCED_CLEAR + INTERVAL), Action::Reload);
     }
 
     #[test]

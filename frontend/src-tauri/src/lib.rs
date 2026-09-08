@@ -58,8 +58,15 @@ struct EngineState {
     last_paint: Mutex<Option<Instant>>,
     watchdog: Mutex<watchdog::Status>,
     crashed: Mutex<Option<String>>,
+    /// Recent snapshot-button presses (v0.15.0): two within PRESS_WINDOW
+    /// mean the user cannot see the page's answer.
+    presses: Mutex<Vec<Instant>>,
     started: Instant,
 }
+
+/// Presses of the snapshot button closer together than this count as one
+/// "the display is dead" signal.
+const PRESS_WINDOW: Duration = Duration::from_secs(15);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -129,6 +136,30 @@ fn note_crash(app: &AppHandle, what: String) {
     *state.crashed.lock().expect("crash mutex poisoned") = Some(what);
 }
 
+/// The WebKitGTK the shell links against (Linux); the platform's name elsewhere.
+fn webkit_version() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        // SAFETY: plain version getters, no state.
+        unsafe {
+            format!(
+                "webkitgtk {}.{}.{}",
+                webkit2gtk::ffi::webkit_get_major_version(),
+                webkit2gtk::ffi::webkit_get_minor_version(),
+                webkit2gtk::ffi::webkit_get_micro_version()
+            )
+        }
+    }
+    #[cfg(windows)]
+    {
+        "webview2".into()
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        "wkwebview".into()
+    }
+}
+
 /// How long ago the page painted, as far as the shell knows.
 fn paint_age(state: &EngineState) -> Option<Duration> {
     state
@@ -195,14 +226,65 @@ fn log_frontend(state: tauri::State<EngineState>, lines: Vec<String>) {
 #[tauri::command]
 fn diagnostic_snapshot(app: AppHandle, frontend: String) -> Result<String, String> {
     let path = write_snapshot(&app, frontend, "button")?;
+    let state = app.state::<EngineState>();
     // The page asked, so its script runs; if it has not painted for a while
     // the in-page dialog will never show — say it natively instead.
-    let stalled = paint_age(&app.state::<EngineState>())
-        .is_some_and(|a| a >= watchdog::PAINT_THRESHOLD);
-    if stalled {
+    let stalled = paint_age(&state).is_some_and(|a| a >= watchdog::PAINT_THRESHOLD);
+    // v0.15.0: the owner pressed the button four times in two seconds on a
+    // frozen window whose frames the shell still saw as fine. A second
+    // press inside PRESS_WINDOW is the user telling us the display is dead:
+    // reload the webview; a third press asks natively whether to restart.
+    let now = Instant::now();
+    let repeated = {
+        let mut presses = state.presses.lock().expect("press mutex poisoned");
+        presses.retain(|t| now.duration_since(*t) < PRESS_WINDOW);
+        presses.push(now);
+        presses.len()
+    };
+    if repeated >= 2 {
+        log_line(
+            &state,
+            &format!("snapshot button pressed {repeated} times in {}s: treating the display as dead", PRESS_WINDOW.as_secs()),
+        );
+        let action = watchdog::force(&mut state.watchdog.lock().expect("watchdog mutex poisoned"), now);
+        apply_watchdog_action(&app, action);
+    }
+    if stalled || repeated >= 2 {
         tell_snapshot_path(&app, &path);
     }
     Ok(path)
+}
+
+/// The side effects of a watchdog decision (shared by the timer loop and
+/// the forced path).
+fn apply_watchdog_action(app: &AppHandle, action: watchdog::Action) {
+    let state = app.state::<EngineState>();
+    match action {
+        watchdog::Action::None | watchdog::Action::Stalled(_) | watchdog::Action::Recovered(..) => {}
+        watchdog::Action::Reload => {
+            log_line(&state, "watchdog: reloading the webview");
+            *state.last_paint.lock().expect("paint mutex poisoned") = None;
+            match app.get_webview_window("main") {
+                Some(w) => {
+                    if let Err(e) = w.reload() {
+                        log_line(&state, &format!("watchdog: reload failed: {e}"));
+                    }
+                }
+                None => log_line(&state, "watchdog: no main window to reload"),
+            }
+        }
+        watchdog::Action::AskRestart => {
+            let why = state
+                .watchdog
+                .lock()
+                .expect("watchdog mutex poisoned")
+                .stalled
+                .map(|(k, _)| k.describe())
+                .unwrap_or("stall");
+            log_line(&state, "watchdog: still stalled after reload, asking to restart");
+            ask_restart(app, why);
+        }
+    }
 }
 
 /// Tauri command: the incident the watchdog recorded during the previous
@@ -313,6 +395,10 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
             env_fact("WEBKIT_DISABLE_COMPOSITING_MODE"),
         ),
         ("LIBGL_ALWAYS_SOFTWARE", env_fact("LIBGL_ALWAYS_SOFTWARE")),
+        ("POWERGIT_WAYLAND", env_fact("POWERGIT_WAYLAND")),
+        ("POWERGIT_KEEP_DMABUF", env_fact("POWERGIT_KEEP_DMABUF")),
+        ("POWERGIT_KEEP_COMPOSITING", env_fact("POWERGIT_KEEP_COMPOSITING")),
+        ("webkit", webkit_version()),
         ("nvidia driver", nvidia),
     ]);
     let mut parts = vec![
@@ -419,6 +505,7 @@ fn spawn_watchdog(handle: AppHandle) {
                                 secs(obs.paint_age)
                             ),
                             watchdog::Stall::Crash => "webview process crashed".into(),
+                            watchdog::Stall::Forced => "display declared dead by the user".into(),
                         },
                     );
                     match write_snapshot(&handle, String::new(), "watchdog") {
@@ -437,30 +524,8 @@ fn spawn_watchdog(handle: AppHandle) {
                         Err(e) => log_line(&state, &format!("watchdog snapshot failed: {e}")),
                     }
                 }
-                watchdog::Action::Reload => {
-                    log_line(&state, "watchdog: reloading the webview");
-                    // A reload starts a fresh page: forget the stale
-                    // frame so the new page gets its full threshold.
-                    *state.last_paint.lock().expect("paint mutex poisoned") = None;
-                    match handle.get_webview_window("main") {
-                        Some(w) => {
-                            if let Err(e) = w.reload() {
-                                log_line(&state, &format!("watchdog: reload failed: {e}"));
-                            }
-                        }
-                        None => log_line(&state, "watchdog: no main window to reload"),
-                    }
-                }
-                watchdog::Action::AskRestart => {
-                    let why = state
-                        .watchdog
-                        .lock()
-                        .expect("watchdog mutex poisoned")
-                        .stalled
-                        .map(|(k, _)| k.describe())
-                        .unwrap_or("stall");
-                    log_line(&state, "watchdog: still stalled after reload, asking to restart");
-                    ask_restart(&handle, why);
+                watchdog::Action::Reload | watchdog::Action::AskRestart => {
+                    apply_watchdog_action(&handle, action)
                 }
                 watchdog::Action::Recovered(kind, took) => {
                     log_line(
@@ -769,6 +834,7 @@ pub fn run() {
                 last_paint: Mutex::new(None),
                 watchdog: Mutex::new(watchdog::Status::default()),
                 crashed: Mutex::new(None),
+                presses: Mutex::new(Vec::new()),
                 started: Instant::now(),
             });
 
@@ -879,6 +945,7 @@ mod tests {
             last_paint: Mutex::new(None),
             watchdog: Mutex::new(watchdog::Status::default()),
             crashed: Mutex::new(None),
+            presses: Mutex::new(Vec::new()),
             started: Instant::now(),
         }
     }

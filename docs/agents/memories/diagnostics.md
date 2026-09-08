@@ -62,14 +62,36 @@ on Linux. Settings → Tools → "Open logs folder" opens it. Files:
 
 ## Linux display stack
 
-`main.rs` sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` before WebKit starts
-(unless already set, or `POWERGIT_KEEP_DMABUF=1`). Black or frozen
-WebKitGTK views after idle on NVIDIA and some Wayland sessions are the
-documented symptom of that renderer, and this is its documented switch.
+`main.rs` sets, before WebKit starts and unless the variable is already
+set: `WEBKIT_DISABLE_DMABUF_RENDERER=1` (v0.14.2; keep the default with
+`POWERGIT_KEEP_DMABUF=1`) and `WEBKIT_DISABLE_COMPOSITING_MODE=1`
+(v0.15.0; `POWERGIT_KEEP_COMPOSITING=1`). The second one came from the
+snapshot of 2026-09-08 10:35: v0.14.3, DMA-BUF already off, heartbeat
+0.4 s, **frames still firing 2.4 s ago**, four button presses in two
+seconds — the web process rendered, the GTK side presenting the frames
+was dead. The container harness (docker/appimage-check/launch.sh) has
+always run with compositing mode off and never showed a black window.
+
+The AppImage runs through XWayland on a Wayland session: tauri-bundler's
+GTK hook (linuxdeploy-plugin-gtk) exports `GDK_BACKEND=x11`
+unconditionally. `POWERGIT_WAYLAND=1` removes it (only when
+`WAYLAND_DISPLAY` is set) so GTK talks Wayland directly; opt-in because
+the frameless title bar's drag/resize under Wayland is unverified.
+
 `shell.txt` records the session type, Wayland display, GDK backend, the
-WEBKIT_* switches, LIBGL_ALWAYS_SOFTWARE and the NVIDIA driver line so a
-report says which stack the freeze happened on. Next step if a paint
-stall still appears with DMA-BUF off: `WEBKIT_DISABLE_COMPOSITING_MODE=1`.
+WEBKIT_* switches, the POWERGIT_* switches, the WebKitGTK version,
+LIBGL_ALWAYS_SOFTWARE and the NVIDIA driver line.
+
+## The user as detector (v0.15.0)
+
+Nothing the shell measures can see a GTK presentation failure, but the
+user can: they press the snapshot button again. `diagnostic_snapshot`
+keeps the press times; a second press within 15 s logs "snapshot button
+pressed N times ...: treating the display as dead", `watchdog::force`
+records a *forced* stall and reloads the webview at once, and the saved
+path is shown natively from the second press on. A third press while the
+forced stall stands shows the native restart dialog. The forced stall
+expires 60 s after its reload (the measurements cannot confirm or deny it).
 
 ## Reading a snapshot
 
