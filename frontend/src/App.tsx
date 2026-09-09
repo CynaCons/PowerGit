@@ -5,7 +5,7 @@ import { CommandBar } from "./components/CommandBar"
 import { AppDialogs } from "./components/dialogs/AppDialogs"
 import { ErrorBanner } from "./components/ErrorBanner"
 import { GitConsole } from "./components/GitConsole"
-import { toggleGitConsole } from "./components/gitConsoleState"
+import { openConsoleTab, toggleGitConsole } from "./components/gitConsoleState"
 import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
 import { JobPanel } from "./components/JobPanel"
 import { NavRail } from "./components/NavRail"
@@ -228,6 +228,7 @@ export default function App({ base }: { base: EngineClient }) {
         if (live) void refresh().catch(() => undefined)
       },
       "browse.gitConsole": () => toggleGitConsole(),
+      "browse.appLog": () => openConsoleTab("app"),
     } satisfies Partial<Record<CommandId, () => void>>,
     hotkeysEnabled,
   )

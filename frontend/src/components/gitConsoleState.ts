@@ -8,10 +8,19 @@ import { useSyncExternalStore } from "react"
 // The dock line itself is never hidden — it is the resting surface — so the
 // only thing stored is the panel.
 
-export type GitConsoleState = { open: boolean; height: number }
+/**
+ * Which log the panel shows (v0.15.3). Owner, after the WebKitGTK inspector
+ * would not open on Ubuntu: "give me a button in the settings to open that
+ * drawer." A second drawer at the bottom would fight this one for the same
+ * edge, so the app log is a tab here instead — one surface, one hotkey, and
+ * Settings just opens it on this tab.
+ */
+export type ConsoleTab = "git" | "app"
+
+export type GitConsoleState = { open: boolean; height: number; tab: ConsoleTab }
 
 export const GIT_CONSOLE_KEY = "pg.console"
-export const DEFAULT_GIT_CONSOLE: GitConsoleState = { open: false, height: 180 }
+export const DEFAULT_GIT_CONSOLE: GitConsoleState = { open: false, height: 180, tab: "git" }
 
 const MIN_HEIGHT = 96
 const MAX_HEIGHT = 480
@@ -24,6 +33,7 @@ export function parseGitConsoleState(raw: string | null): GitConsoleState {
     return {
       open: typeof o.open === "boolean" ? o.open : DEFAULT_GIT_CONSOLE.open,
       height: Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(height))),
+      tab: o.tab === "app" || o.tab === "git" ? o.tab : DEFAULT_GIT_CONSOLE.tab,
     }
   } catch {
     return DEFAULT_GIT_CONSOLE
@@ -47,7 +57,7 @@ export function getGitConsoleState(): GitConsoleState {
 
 export function setGitConsoleState(patch: Partial<GitConsoleState>) {
   const next = { ...state, ...patch }
-  if (next.open === state.open && next.height === state.height) return
+  if (next.open === state.open && next.height === state.height && next.tab === state.tab) return
   state = next
   try {
     window.localStorage.setItem(GIT_CONSOLE_KEY, JSON.stringify(next))
@@ -59,6 +69,11 @@ export function setGitConsoleState(patch: Partial<GitConsoleState>) {
 
 export function toggleGitConsole() {
   setGitConsoleState({ open: !state.open })
+}
+
+/** Settings ▸ Tools ▸ Open app log, and anything else that wants it in view. */
+export function openConsoleTab(tab: ConsoleTab) {
+  setGitConsoleState({ open: true, tab })
 }
 
 function subscribe(listener: () => void): () => void {

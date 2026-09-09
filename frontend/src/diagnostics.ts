@@ -24,6 +24,8 @@ const MAX_LONG_TASKS = 40
 const FLUSH_MS = 2000
 const LONG_TASK_MS = 200
 const SAMPLE_MS = 60_000
+/** One console argument list, capped: a dumped object must not flush the ring. */
+const MAX_CONSOLE_CHARS = 2000
 
 const entries: DiagnosticEntry[] = []
 const longTasks: LongTask[] = []
@@ -33,6 +35,87 @@ let activity = "idle"
 let pending: string[] = []
 let flushTimer: number | undefined
 let sampler: (() => Record<string, unknown>) | null = null
+
+// v0.15.3 (owner: "then I can log the console and stuff", and the WebKitGTK
+// inspector would not open on Ubuntu). The ring only ever wrote *to* the
+// console; now it also reads *from* it, so the drawer shows what devtools
+// would have. `echo` keeps the real methods: report() writes through these,
+// never through the replacements, which is what stops the recursion.
+type ConsoleMethod = "log" | "info" | "warn" | "error" | "debug"
+const CONSOLE_METHODS: readonly ConsoleMethod[] = ["log", "info", "warn", "error", "debug"]
+const CONSOLE_LEVEL: Record<ConsoleMethod, DiagnosticLevel> = {
+  log: "info",
+  info: "info",
+  debug: "info",
+  warn: "warn",
+  error: "error",
+}
+type ConsoleMethods = Record<ConsoleMethod, (...args: unknown[]) => void>
+
+/**
+ * The console methods as they were when capture was installed, or null while
+ * nothing is captured. Snapshotting here rather than at module load matters:
+ * `report` must echo through whatever `captureConsole` displaced, and undoing
+ * capture must put back exactly what it found.
+ */
+let echoed: ConsoleMethods | null = null
+
+function echoTo(method: ConsoleMethod, message: string): void {
+  const target = echoed ? echoed[method] : (console[method] as ConsoleMethods[ConsoleMethod])
+  target.call(console, message)
+}
+
+/** One console argument as text; an object that will not stringify still says something. */
+function describeArg(arg: unknown): string {
+  if (typeof arg === "string") return arg
+  if (arg instanceof Error) return `${arg.name}: ${arg.message}`
+  if (arg === null || arg === undefined || typeof arg !== "object") return String(arg)
+  try {
+    return JSON.stringify(arg) ?? String(arg)
+  } catch {
+    return Object.prototype.toString.call(arg)
+  }
+}
+
+export function formatConsoleArgs(args: readonly unknown[]): string {
+  const text = args.map(describeArg).join(" ")
+  return text.length > MAX_CONSOLE_CHARS ? `${text.slice(0, MAX_CONSOLE_CHARS)}…` : text
+}
+
+let capturing = false
+let inCapture = false
+
+/** Mirrors console.* into the ring. Idempotent; returns the undo for tests. */
+export function captureConsole(): () => void {
+  if (capturing || typeof console === "undefined") return () => undefined
+  capturing = true
+  // The raw methods, not bound copies: undo must put back the very functions
+  // it found, or a spy installed around us cannot recognise its own.
+  const originals = {} as ConsoleMethods
+  for (const method of CONSOLE_METHODS) {
+    originals[method] = console[method] as ConsoleMethods[ConsoleMethod]
+  }
+  echoed = originals
+  for (const method of CONSOLE_METHODS) {
+    console[method] = (...args: unknown[]) => {
+      originals[method].apply(console, args)
+      // `report` echoes errors through `echoed`, so it cannot land back here;
+      // the guard covers anything else that logs while we are reporting.
+      if (inCapture) return
+      inCapture = true
+      try {
+        report(CONSOLE_LEVEL[method], "console", formatConsoleArgs(args))
+      } finally {
+        inCapture = false
+      }
+    }
+  }
+  return () => {
+    for (const method of CONSOLE_METHODS) console[method] = originals[method]
+    echoed = null
+    capturing = false
+  }
+}
 
 function queueLine(line: string): void {
   if (!isTauriShell()) return
@@ -56,7 +139,11 @@ export function report(level: DiagnosticLevel, source: string, message: string):
   const at = new Date().toISOString()
   entries.push({ at, level, source, message })
   if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES)
-  if (level === "error") console.error(`[powergit] ${source}: ${message}`)
+  snapshot = [...entries]
+  // The echo goes to the *original* console: once captureConsole() has
+  // replaced console.error, echoing through the replacement would re-enter
+  // report() for every entry it makes.
+  if (level === "error") echoTo("error", `[powergit] ${source}: ${message}`)
   queueLine(`${at} [${level}] ${source}: ${message}`)
   for (const l of listeners) {
     try {
@@ -70,7 +157,7 @@ export function report(level: DiagnosticLevel, source: string, message: string):
 /** Persist transition evidence without waiting for a background timer. */
 export function reportTransition(source: string, message: string): void {
   report("info", source, message)
-  console.info(`[powergit] ${source}: ${message}`)
+  echoTo("info", `[powergit] ${source}: ${message}`)
   window.clearTimeout(flushTimer)
   void flush()
 }
@@ -89,8 +176,18 @@ export function setStateSampler(fn: (() => Record<string, unknown>) | null): voi
   sampler = fn
 }
 
+/**
+ * A new array each time the ring changes, and the *same* one in between.
+ *
+ * v0.15.3: this used to return the live `entries`, which is mutated in place.
+ * `useSyncExternalStore` compares snapshots by reference, so the app log
+ * rendered once and then froze — four entries in the ring, one on screen.
+ * Reassigning here is what makes the view live.
+ */
+let snapshot: readonly DiagnosticEntry[] = []
+
 export function diagnosticsSnapshot(): readonly DiagnosticEntry[] {
-  return entries
+  return snapshot
 }
 
 export function subscribeDiagnostics(listener: () => void): () => void {
@@ -108,7 +205,12 @@ export function getEngineLogPath(): string | null {
 
 export function formatDiagnostics(): string {
   const head = engineLogPath ? `engine log: ${engineLogPath}\n` : ""
-  return head + entries.map((e) => `${e.at} [${e.level}] ${e.source}: ${e.message}`).join("\n")
+  const body = entries.map((e) => `${e.at} [${e.level}] ${e.source}: ${e.message}`).join("\n")
+  // The long tasks live in their own buffer; a copied dump that omitted them
+  // would lose the one sensor that says the page was busy rather than dead.
+  if (longTasks.length === 0) return head + body
+  const tasks = longTasks.map((t) => `${t.at} [perf] long task ${t.ms} ms during ${t.activity}`).join("\n")
+  return `${head}${body}\n\nlong tasks:\n${tasks}`
 }
 
 let installed = false
@@ -117,6 +219,7 @@ let installed = false
 export function installDiagnostics(): void {
   if (installed || typeof window === "undefined") return
   installed = true
+  captureConsole()
   window.addEventListener("error", (ev) => {
     report("error", "window.error", ev.message || String(ev.error ?? "unknown error"))
   })

@@ -30,6 +30,7 @@ export type CommandId =
   | "browse.refresh"
   | "browse.gitBash"
   | "browse.gitConsole"
+  | "browse.appLog"
   | "diff.stageSelected"
   | "diff.unstageSelected"
   | "commit.refresh"
@@ -180,6 +181,15 @@ export const CATALOG: CommandDef[] = [
   // v0.15.1: PowerGit's own. Ctrl+` is the docked-console chord every
   // browser and VS Code already use, and Git Extensions has no equivalent.
   { id: "browse.gitConsole", ge: null, scope: "browse", chord: chord("`", { ctrl: true }), available: true },
+  // v0.15.3: the same panel on its app-log tab, for when the platform
+  // inspector will not open (owner, Ubuntu).
+  {
+    id: "browse.appLog",
+    ge: null,
+    scope: "browse",
+    chord: chord("`", { ctrl: true, shift: true }),
+    available: true,
+  },
 
   { id: "diff.stageSelected", ge: "StageSelectedFile", scope: "commit", chord: chord("S"), available: true },
   { id: "diff.unstageSelected", ge: "UnStageSelectedFile", scope: "commit", chord: chord("U"), available: true },

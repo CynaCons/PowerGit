@@ -49,3 +49,13 @@ Identity, line endings, default editor/diff/merge. Feature tag: `SET`.
 | SRS-SET-042 | Each entry shall be capped, and the output cut before it is scanned, so logging does not lengthen a read. | `git log` and `git diff` produce hundreds of kilobytes per call. | Test | `CommandLogTests` |
 | SRS-SET-043 | The log shall be reachable without covering the work: one line at the bottom of the window, opening to a panel on demand or with a shortcut. | Owner: Git Extensions' popup "is too intrusive". | Demo | `GitConsole` |
 | SRS-SET-044 | A git command that fails shall say so without being looked for, once, and shall not require dismissing. | The one case where the user should not have to go hunting. | Test | `git-console.spec.ts` |
+
+## The app log (v0.15.3)
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-SET-045 | The app shall show its own diagnostic ring on demand — errors, focus and visibility transitions, refresh timings and long tasks — without any platform inspector. | Owner, Ubuntu AppImage: "the fix in 0.15.2 to show the debugger panel did not work." The WebKitGTK inspector may refuse to open, and the ring was rendered only by the recovery panel, i.e. only once the app was already broken. | Test | `AppLogView`, `app-log.spec.ts` |
+| SRS-SET-046 | Every `console.log`, `info`, `warn`, `error` and `debug` call shall be recorded in that ring, and shall still reach the real console. | Owner: "then I can log the console and stuff." The ring only ever wrote to the console; it never read from it. | Test | `captureConsole`, `diagnostics.console.test.ts` |
+| SRS-SET-047 | Recording the console shall not recurse, and undoing it shall restore the exact functions it replaced. | `report` echoes errors to `console.error`; echoing through the replacement would report each entry for ever. | Test | `diagnostics.console.test.ts` |
+| SRS-SET-048 | The app log shall be reachable from Settings and from a shortcut, and shall share the git console's surface rather than opening a second panel at the same edge. | Owner asked for "a button in the settings to open that drawer"; two drawers would compete for one edge. | Test | `open-app-log`, `browse.appLog` |
+| SRS-SET-049 | Asking for the platform inspector shall report what happened instead of silently doing nothing, and the attempt and its outcome shall be written to the shell log. | The v0.15.2 button returned no result, so an inspector that declined to open looked identical to a dead button. | Demo | `open_devtools`, `devtools-note` |

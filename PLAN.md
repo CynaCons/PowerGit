@@ -586,6 +586,14 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Full gates before the tag (codex shipped focused checks only): engine 113/113, cargo 21/21, vitest 161/161, e2e 118/118, resolution 20/20, eslint + tsc clean, check-version 0.15.2. Visual baselines refreshed onto the new history and reviewed (dialog-settings deliberately untouched: its "engine 0.14.3" text is below the 2 % tolerance). Packaged zip smoke-tested from a clean extract with WEBVIEW2 CDP attached: sidecar /health 0.15.2, recents load with no repository open (the fix, on the real artifact), opening one renders 26 rows, no console errors. [agent: claude]
 - [x] Cleared 187 leftover pg-commit-reliability-* fixture repositories from the user's Temp directory; 13 of them held slots in the real recents.json because an engine was started by hand without POWERGIT_DATA_DIR (the v0.13.21 guard lives in npm run engine, not in a bare dotnet run). RecentsStore's prune-on-read then reduced the packaged app's list to PowerGit alone, confirming that guard still works. [agent: claude]
 
+### v0.15.3 — Read the console without WebKit's inspector
+**Goal:** Owner (2026-09-09): "the fix in 0.15.2 to show the debugger panel did not work. Give me a 15.3 very quickly with a button in the settings to open that drawer." The v0.15.2 button exists and the devtools feature is compiled in, so the inspector is failing silently on the owner's Ubuntu: `open_devtools` returns no Result, so nothing reports why. Make that failure speak, and stop depending on WebKit's inspector — PowerGit already keeps a 200-entry diagnostic ring but only RecoveryPanel renders it (and only when the app is already broken), and console.* is written to the console, never captured from it.
+- [ ] Capture console.log/info/warn/error/debug into the diagnostic ring, forwarding to the real console and guarding the re-entrancy report() already creates; per-message cap so one huge object cannot flush the ring.
+- [ ] Diagnostics drawer in the shape of the approved git console: live ring, level chips, filter, Copy all, long tasks and the log path, with Open logs folder. Settings button plus a hotkey.
+- [ ] open_devtools returns a Result and logs the attempt, the frontend propagates it, and Settings shows why the inspector did not open instead of a dead button.
+- [ ] Gates and release: vitest for the capture, e2e for the drawer, cargo for the command; packaged build checked by hand; docs (diagnostics memory, README) and SRS-SET-045.
+- [ ] Owner 2026-09-09: "the fix in 0.15.2 to show the debugger panel did not work." Awaiting owner verification on Ubuntu that the drawer shows the console without the inspector.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content

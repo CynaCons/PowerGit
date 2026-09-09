@@ -71,6 +71,9 @@ export type Tokens = {
     meta: string
     border: string
     ok: string
+    /** v0.15.3: the app log's warnings. Green would read as success and the
+     *  fail red would overstate them, so the console gains its own amber. */
+    warn: string
     fail: string
   }
   graph: {
@@ -141,6 +144,7 @@ export const light: Tokens = {
     meta: "#9aa6b4",
     border: "#2a3340",
     ok: "#5ee38a",
+    warn: "#f5b942",
     fail: "#ff8a80",
   },
   graph: {
@@ -209,6 +213,7 @@ export const dark: Tokens = {
     meta: "#98a4b3",
     border: "#2a3340",
     ok: "#5ee38a",
+    warn: "#f5b942",
     fail: "#ff8a80",
   },
   graph: {
@@ -292,6 +297,7 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-console-meta": t.console.meta,
     "--pg-console-border": t.console.border,
     "--pg-console-ok": t.console.ok,
+    "--pg-console-warn": t.console.warn,
     "--pg-console-fail": t.console.fail,
     "--pg-lane-non-relative": t.graph.nonRelative,
     "--pg-lane-head": t.graph.headOutline,

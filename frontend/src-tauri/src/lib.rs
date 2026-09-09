@@ -117,9 +117,32 @@ fn engine_log_path(state: tauri::State<EngineState>) -> Option<String> {
 }
 
 /// Open the inspector for the requesting window, including release builds.
+///
+/// v0.15.3 (owner, Ubuntu AppImage: "the fix in 0.15.2 to show the debugger
+/// panel did not work"): this returned `()`, so a WebKitGTK inspector that
+/// declines to appear reported nothing and the button looked dead. It now
+/// answers, and the attempt is logged either way — `engine.log` shows the
+/// press even when no window opens, which is itself the diagnosis.
 #[tauri::command]
-fn open_devtools(window: tauri::WebviewWindow) {
+fn open_devtools(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    log_line(&app.state::<EngineState>(), "developer tools requested");
     window.open_devtools();
+    // `open_devtools` returns nothing, so whether it worked has to be asked
+    // afterwards — and asked *late*. The WebKitGTK inspector attaches
+    // asynchronously, so reading `is_devtools_open` on this line would report
+    // a failure on machines where it is merely still opening. The verdict
+    // goes to engine.log rather than back to the caller for the same reason:
+    // a wrong error message is worse than the silence it replaces.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(1500));
+        let open = window.is_devtools_open();
+        log_line(
+            &handle.state::<EngineState>(),
+            &format!("developer tools open={open}"),
+        );
+    });
+    Ok(())
 }
 
 #[tauri::command]

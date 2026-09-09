@@ -76,9 +76,14 @@ export async function revealInFolder(path: string): Promise<void> {
   await revealItemInDir(path)
 }
 
-/** Open the platform inspector in a release or development shell. */
+/**
+ * Open the platform inspector in a release or development shell.
+ *
+ * Rejects when the shell could not open it (v0.15.3): the caller shows why,
+ * because a silent no-op is what sent the owner back to us in the first place.
+ */
 export async function openDeveloperTools(): Promise<void> {
-  if (!isTauriShell()) return
+  if (!isTauriShell()) throw new Error("Developer tools need the desktop app")
   const { invoke } = await import("@tauri-apps/api/core")
   await invoke("open_devtools")
 }

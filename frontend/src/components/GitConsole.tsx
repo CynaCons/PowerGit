@@ -10,7 +10,9 @@ import { shortcutLabel } from "../hotkeys"
 import { useGitLog } from "../hooks/useGitLog"
 import { copyToClipboard } from "./clipboard"
 import { GitFailureCard } from "./GitFailureCard"
-import { setGitConsoleState, toggleGitConsole, useGitConsoleState } from "./gitConsoleState"
+import { AppLogView } from "./AppLogView"
+import { copyAppLogText, filterDiagnostics, useDiagnostics } from "./appLogModel"
+import { setGitConsoleState, toggleGitConsole, useGitConsoleState, type ConsoleTab } from "./gitConsoleState"
 import {
   copyAllText,
   entryOutput,
@@ -34,7 +36,7 @@ import {
  * read the same rolling buffer and one poll must feed them.
  */
 export function GitConsole({ client, live }: { client: EngineClient; live: boolean }) {
-  const { open, height } = useGitConsoleState()
+  const { open, height, tab } = useGitConsoleState()
   const feed = useGitLog({ client, live, open })
   const { entries, last, refresh } = feed
   // The badge counts real failures, not the engine's probes: `rev-parse
@@ -53,7 +55,7 @@ export function GitConsole({ client, live }: { client: EngineClient; live: boole
       data-open={open ? "true" : "false"}
       sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}
     >
-      {open && <GitConsolePanel entries={entries} height={height} />}
+      {open && <GitConsolePanel entries={entries} height={height} tab={tab} />}
       <ButtonBase
         data-testid="git-console-dock"
         onClick={() => toggleGitConsole()}
@@ -126,11 +128,20 @@ export function GitConsole({ client, live }: { client: EngineClient; live: boole
   )
 }
 
-function GitConsolePanel({ entries, height }: { entries: GitLogEntry[]; height: number }) {
-  const [query, setQuery] = useState("")
+function GitConsolePanel({ entries, height, tab }: { entries: GitLogEntry[]; height: number; tab: ConsoleTab }) {
+  // One filter box per tab: switching tabs should not carry "fatal" over to
+  // a log where it means nothing.
+  const [queries, setQueries] = useState<Record<ConsoleTab, string>>({ git: "", app: "" })
+  const query = queries[tab]
+  const setQuery = (q: string) => setQueries((all) => ({ ...all, [tab]: q }))
+  const diagnostics = useDiagnostics()
   const shown = useMemo(() => filterEntries(entries, query), [entries, query])
+  const shownApp = useMemo(() => filterDiagnostics(diagnostics, query), [diagnostics, query])
   const listRef = useRef<HTMLDivElement | null>(null)
   const newestId = entries.length > 0 ? entries[entries.length - 1].id : 0
+  const app = tab === "app"
+  const total = app ? diagnostics.length : entries.length
+  const count = app ? shownApp.length : shown.length
 
   // Newest last, so the console follows the tail the way a terminal does —
   // but only when the user is already at the bottom, otherwise reading an
@@ -168,15 +179,15 @@ function GitConsolePanel({ entries, height }: { entries: GitLogEntry[]; height: 
           flexShrink: 0,
         }}
       >
-        <Box component="span" sx={{ fontSize: 11, fontWeight: 700, color: "var(--pg-console-meta)" }}>
-          GIT CONSOLE
-        </Box>
+        <ConsoleTabButton tab="git" active={!app} label="GIT" />
+        <ConsoleTabButton tab="app" active={app} label="APP LOG" />
+        <Box component="span" sx={{ width: 4 }} />
         {/* A bare input, not InputBase: the console is its own dark surface
             and a test needs the testid on the element it types into. */}
         <Box
           component="input"
           data-testid="git-console-filter"
-          aria-label="Filter git commands"
+          aria-label={app ? "Filter the app log" : "Filter git commands"}
           placeholder="Filter"
           value={query}
           onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
@@ -198,13 +209,13 @@ function GitConsolePanel({ entries, height }: { entries: GitLogEntry[]; height: 
           }}
         />
         <Box component="span" data-testid="git-console-shown" sx={{ fontSize: 11, color: "var(--pg-console-meta)" }}>
-          {`${shown.length}/${entries.length}`}
+          {`${count}/${total}`}
         </Box>
-        <Tooltip title="Copy the whole console">
+        <Tooltip title={app ? "Copy the whole app log" : "Copy the whole console"}>
           <ButtonBase
             data-testid="git-console-copy"
-            aria-label="Copy the whole console"
-            onClick={() => void copyToClipboard(copyAllText(shown))}
+            aria-label={app ? "Copy the whole app log" : "Copy the whole console"}
+            onClick={() => void copyToClipboard(app ? copyAppLogText(shownApp) : copyAllText(shown))}
             sx={consoleIconSx}
           >
             <ContentCopyIcon sx={{ fontSize: 14 }} />
@@ -219,21 +230,51 @@ function GitConsolePanel({ entries, height }: { entries: GitLogEntry[]; height: 
           <CloseIcon sx={{ fontSize: 14 }} />
         </ButtonBase>
       </Box>
-      <Box
-        ref={listRef}
-        role="log"
-        sx={{ flex: 1, minHeight: 0, overflow: "auto", fontFamily: "var(--pg-font-mono)", fontSize: 11 }}
-      >
-        {shown.length === 0 && (
-          <Box data-testid="git-console-empty" sx={{ p: 1, color: "var(--pg-console-meta)" }}>
-            {entries.length === 0 ? "No git commands yet this session." : "Nothing matches that filter."}
-          </Box>
-        )}
-        {shown.map((entry) => (
-          <ConsoleRow key={entry.id} entry={entry} />
-        ))}
-      </Box>
+      {app ? (
+        <AppLogView entries={diagnostics} query={query} />
+      ) : (
+        <Box
+          ref={listRef}
+          role="log"
+          sx={{ flex: 1, minHeight: 0, overflow: "auto", fontFamily: "var(--pg-font-mono)", fontSize: 11 }}
+        >
+          {shown.length === 0 && (
+            <Box data-testid="git-console-empty" sx={{ p: 1, color: "var(--pg-console-meta)" }}>
+              {entries.length === 0 ? "No git commands yet this session." : "Nothing matches that filter."}
+            </Box>
+          )}
+          {shown.map((entry) => (
+            <ConsoleRow key={entry.id} entry={entry} />
+          ))}
+        </Box>
+      )}
     </Box>
+  )
+}
+
+/** GIT | APP LOG. The active one is bright; the other reads as a control. */
+function ConsoleTabButton({ tab, active, label }: { tab: ConsoleTab; active: boolean; label: string }) {
+  return (
+    <ButtonBase
+      data-testid={`console-tab-${tab}`}
+      aria-pressed={active}
+      onClick={() => setGitConsoleState({ tab })}
+      sx={{
+        flexShrink: 0,
+        px: 0.75,
+        height: 18,
+        borderRadius: 0.5,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: 0.4,
+        color: active ? "var(--pg-console-text)" : "var(--pg-console-meta)",
+        bgcolor: active ? "var(--pg-console-line-bg)" : "transparent",
+        "&:hover": { color: "var(--pg-console-text)" },
+        "&:focus-visible": { outline: "var(--pg-focus-ring-w) solid var(--pg-focus-ring)" },
+      }}
+    >
+      {label}
+    </ButtonBase>
   )
 }
 

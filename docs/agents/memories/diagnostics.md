@@ -112,6 +112,40 @@ preserving logs before switching to another window. Inspect engine.log and
 frontend.log even if the console remains silent. Existing automatic watchdog
 recovery remains enabled and can reload the page while investigating.
 
+## The app log (v0.15.3)
+
+The inspector is not the only way to read the console any more, and on the
+owner's Ubuntu it was not a way at all: `Settings -> Tools -> Open developer
+tools` shipped in v0.15.2 with Tauri's `devtools` feature compiled in, and
+the WebKitGTK inspector still did not appear. The command returned `()`, so
+nothing reported why.
+
+Now: the git console panel has two tabs, **GIT** and **APP LOG**. The app tab
+renders the diagnostic ring live -- errors, unhandled rejections, focus and
+visibility transitions, numbered refresh start/end timings, long tasks, and
+every `console.*` call. `Settings -> Tools -> Open app log` opens it, so does
+Ctrl+Shift+backtick. It needs no inspector and works identically on every
+platform.
+
+Two things to know if you touch this:
+
+- `captureConsole()` snapshots the console methods **at install time**, not at
+  module load, and `report` echoes errors through that snapshot. Echoing
+  through the replacement would report every entry for ever. Undo restores the
+  raw functions it found, not bound copies, so a spy around it still
+  recognises its own.
+- `diagnosticsSnapshot()` returns a **fresh array whenever the ring changes**.
+  It used to return the live `entries`, which is mutated in place -- and since
+  `useSyncExternalStore` and `useMemo` both compare by reference, the panel
+  rendered once and froze (four entries held, one shown). Do not "optimise"
+  that copy away.
+
+`open_devtools` still asks for the inspector, logs `developer tools requested`,
+and 1.5 s later logs `developer tools open=true|false`. The check is late and
+only logged on purpose: WebKitGTK attaches asynchronously, so reading it
+inline would report a failure on machines where it merely had not finished,
+and a wrong error is worse than the silence it replaces.
+
 ## Snapshot interpretation
 
 Start with `shell.txt` (last heartbeat vs last frame: a fresh beat with an

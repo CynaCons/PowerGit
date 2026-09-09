@@ -15,7 +15,7 @@ import Typography from "@mui/material/Typography"
 import ToggleButton from "@mui/material/ToggleButton"
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup"
 import { useEffect, useRef, useState } from "react"
-import { useEngine, type GitConfig, type ToolInfo, type VsCodeInfo } from "../engine"
+import { describeThrown, useEngine, type GitConfig, type ToolInfo, type VsCodeInfo } from "../engine"
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
 import { ZOOM_DEFAULT, getZoom, setZoom, stepZoom, zoomPercent } from "../theme/zoom"
@@ -23,6 +23,7 @@ import { openAppLocation, openDeveloperTools, openLogsFolder } from "../diagnost
 import { useUpdater } from "../hooks/useUpdater"
 import { isTauriShell } from "../shell"
 import { DEFAULT_BEHAVIOUR, getBehaviour, setBehaviour, type Behaviour } from "../theme/behaviour"
+import { openConsoleTab } from "./gitConsoleState"
 import { BehaviourSection } from "./settings/BehaviourSection"
 import { ToolsSection } from "./settings/ToolsSection"
 import { progressPercent, progressText } from "../updates/updateMachine"
@@ -38,6 +39,7 @@ type Props = { open: boolean; onClose: () => void }
 export function SettingsDialog({ open, onClose }: Props) {
   const engine = useEngine()
   const [cfg, setCfg] = useState<GitConfig | null>(null)
+  const [devtools, setDevtools] = useState<{ failed: boolean; message?: string } | null>(null)
   const [vs, setVs] = useState<VsCodeInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -256,14 +258,43 @@ export function SettingsDialog({ open, onClose }: Props) {
         <Button disabled={!vs?.found} onClick={onApplyVsCode} sx={{ alignSelf: "flex-start" }}>
           Use VS Code as editor / diff / merge
         </Button>
+        {/* v0.15.3, owner: the WebKitGTK inspector would not open on Ubuntu
+            and the button said nothing. The app log needs no inspector, so it
+            comes first; "Open developer tools" now reports why it failed. */}
+        <Button
+          onClick={() => {
+            openConsoleTab("app")
+            onClose()
+          }}
+          sx={{ alignSelf: "flex-start" }}
+          data-testid="open-app-log"
+        >
+          Open app log
+        </Button>
         {isTauriShell() && (
           <Button
-            onClick={() => void openDeveloperTools()}
+            onClick={() => {
+              setDevtools(null)
+              openDeveloperTools()
+                .then(() => setDevtools({ failed: false }))
+                .catch((e: unknown) => setDevtools({ failed: true, message: describeThrown(e) }))
+            }}
             sx={{ alignSelf: "flex-start" }}
             data-testid="open-devtools"
           >
             Open developer tools
           </Button>
+        )}
+        {devtools && (
+          <Typography
+            data-testid="devtools-note"
+            variant="caption"
+            color={devtools.failed ? "error" : "text.secondary"}
+          >
+            {devtools.failed
+              ? `${devtools.message} — use Open app log instead.`
+              : "Asked the system for the inspector. If no window appeared, it is unavailable here: use Open app log, which needs none."}
+          </Typography>
         )}
         {isTauriShell() && (
           <Button onClick={() => void openLogsFolder()} sx={{ alignSelf: "flex-start" }} data-testid="open-logs-folder">

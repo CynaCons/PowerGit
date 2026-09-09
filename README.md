@@ -122,6 +122,14 @@ Recent repositories now load even when no repository is open after restart.
 Settings → Updates → Open app location reveals the running AppImage. Updates
 replace it in place, so its filename may still contain the original version.
 
+v0.15.3 stops that inspector being the only way in. The console at the bottom
+of the window has a second tab, **APP LOG**, showing what PowerGit recorded
+about itself: errors, focus and visibility changes, refresh timings, long
+tasks and every `console.*` call, with a filter and Copy all. Open it from
+Settings → Tools → Open app log, or press Ctrl+Shift+`. It needs no developer
+tools and behaves the same on every platform. "Open developer tools" now says
+whether the inspector actually opened instead of doing nothing visible.
+
 ## Development
 
 Windows dev machine; .NET 10 SDK, Node 22, Rust.
