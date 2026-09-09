@@ -96,6 +96,9 @@ test.describe("merge with conflicts", () => {
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
 
     await page.getByTestId("merge-button").click()
+    // Wait for the branch list before changing options; its initial load
+    // initializes the dialog defaults.
+    await page.getByTestId("merge-branch").selectOption("topic")
     await page.getByTestId("merge-ff-only").click()
     await page.getByTestId("merge-confirm").click()
 

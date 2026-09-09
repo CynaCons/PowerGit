@@ -227,7 +227,9 @@ public sealed partial class GitHost
         {
             ["GIT_SEQUENCE_EDITOR"] = $"f(){{ cp \"$1\" '{ShellPath(capture)}'; exit 1; }}; f",
         };
-        List<string> args = ["rebase", "-i", "--autostash"];
+        // The UI expects subjects, regardless of the user's instructionFormat
+        // or Git versions whose default includes a comment prefix.
+        List<string> args = ["-c", "rebase.instructionFormat=%s", "rebase", "-i", "--autostash"];
         if (request.Autosquash)
         {
             args.Add("--autosquash");

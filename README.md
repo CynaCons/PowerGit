@@ -118,6 +118,10 @@ events, page visibility changes and refresh timings are also saved beside the
 existing snapshots (Settings → Tools → Open logs folder). This release adds
 evidence gathering; the freeze is still under investigation.
 
+Recent repositories now load even when no repository is open after restart.
+Settings → Updates → Open app location reveals the running AppImage. Updates
+replace it in place, so its filename may still contain the original version.
+
 ## Development
 
 Windows dev machine; .NET 10 SDK, Node 22, Rust.

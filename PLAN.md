@@ -576,11 +576,13 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 > Placeholder; design later.
 **Goal:** Owner (2026-09-08): "in the top bar, when in the graph view, there shall be a search function, with either the option to find or to filter. This will be a complicated feature, we will design and implement in a second time."
 
-### v0.15.2 — Ubuntu freeze diagnostics: inspector and focus timeline (current) (ACTIVE)
-**Goal:** Ship release-enabled inspector and durable focus/visibility/refresh diagnostics. Light focused testing per owner (2026-09-09). Instrumentation only; freeze remains awaiting Ubuntu reproduction and owner verification.
-- [ ] Enable developer tools in release builds, a Settings action and POWERGIT_DEVTOOLS=1 startup option; verify available docking behavior.
-- [ ] Record native focus transitions independently of the page, immediate page focus/visibility logs, and correlated refresh start/end durations.
-- [ ] Run focused diagnostics checks and build validation; document limits and prepare v0.15.2 release.
+### v0.15.2 — Ubuntu freeze diagnostics: inspector and focus timeline (2026-09-09) (COMPLETE)
+**Goal:** Ship release-enabled inspector, durable focus/visibility/refresh diagnostics, recent repositories on startup without an open session, and an app-location action. Light focused testing per owner (2026-09-09). Freeze remains under investigation; recent-list fix awaits owner verification.
+- [x] Enable developer tools in release builds, a Settings action and POWERGIT_DEVTOOLS=1 startup option; verify available docking behavior. [agent: codex]
+- [x] Record native focus transitions independently of the page, immediate page focus/visibility logs, and correlated refresh start/end durations. [agent: codex]
+- [x] Run focused diagnostics checks and build validation; document limits and prepare v0.15.2 release. [agent: codex]
+- [x] Clear pre-existing CI blockers: command-log truncation marker, Git-version-dependent rebase subject formatting, merge test branch-loading race, and scroll-viewport clipping assertion; run focused checks. [agent: codex]
+- [x] Investigate Ubuntu AppImage recent repositories disappearing after app restart; add a failing persistence regression before fixing, and expose/document the running AppImage location. Owner verification remains open separately. [agent: codex]
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
@@ -611,3 +613,4 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - Owner 2026-09-08: top-bar search in the graph view, find or filter (design later).
 - Owner 2026-09-08: upgraded right-click menu; merge, rebase and conflict resolution as Git Extensions does natively; enhanced settings.
 - [ ] Owner 2026-09-09: "whenever the windows loses focus on my ubuntu, it usually end up in a freeze." v0.15.2 adds investigation tools only; root cause and fix awaiting Ubuntu reproduction and owner verification. [agent: codex]
+- [ ] Owner 2026-09-09: on Ubuntu AppImage, "open recent repos" works only until app close/reopen. Reproduction/fix under v0.15.2; awaiting owner verification after release. [agent: codex]

@@ -83,6 +83,13 @@ export async function openDeveloperTools(): Promise<void> {
   await invoke("open_devtools")
 }
 
+/** Reveal the actual AppImage, not its temporary mounted executable. */
+export async function openAppLocation(): Promise<void> {
+  if (!isTauriShell()) return
+  const { invoke } = await import("@tauri-apps/api/core")
+  await revealInFolder(await invoke<string>("app_location"))
+}
+
 /** The log directory (shell only), for Settings → Open logs folder. */
 export async function openLogsFolder(): Promise<void> {
   if (!isTauriShell()) return

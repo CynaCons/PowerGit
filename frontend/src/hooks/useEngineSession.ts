@@ -195,9 +195,11 @@ export function useEngineSession(base: EngineClient) {
   // Recents live on the engine's disk (recents.json); the page used to ask
   // for them only after a repository had loaded, so the dialog said "No
   // recent repositories yet" right after launch (owner, 2026-09-08: "seem
-  // not persistent"). Ask as soon as the engine is live.
+  // not persistent"). `live` means a repository is open, not just that the
+  // engine is reachable: recents must also load in the no-repository phase.
+  const canLoadRecents = view.live || phase === "no-repository"
   useEffect(() => {
-    if (!view.live || demo) return
+    if (!canLoadRecents || demo) return
     let cancelled = false
     base
       .recents()
@@ -208,7 +210,7 @@ export function useEngineSession(base: EngineClient) {
     return () => {
       cancelled = true
     }
-  }, [view.live, base, demo])
+  }, [canLoadRecents, base, demo])
 
   const forgetRecent = useCallback(
     async (root: string) => {

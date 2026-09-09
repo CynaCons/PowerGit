@@ -122,6 +122,17 @@ fn open_devtools(window: tauri::WebviewWindow) {
     window.open_devtools();
 }
 
+#[tauri::command]
+fn app_location() -> Result<String, String> {
+    #[cfg(target_os = "linux")]
+    if let Some(path) = std::env::var_os("APPIMAGE").filter(|p| !p.is_empty()) {
+        return Ok(PathBuf::from(path).to_string_lossy().into_owned());
+    }
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| e.to_string())
+}
+
 /// Tauri command: the page beats every 2 s and says how long ago it last
 /// painted a frame (None while hidden). Silence, or beats without frames,
 /// is what the watchdog (watchdog.rs) turns into an incident.
@@ -378,6 +389,9 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
             format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
         ),
         ("shell pid", std::process::id().to_string()),
+        ("app location", app_location().unwrap_or_else(|e| e)),
+        ("XDG_DATA_HOME", env_fact("XDG_DATA_HOME")),
+        ("POWERGIT_DATA_DIR", env_fact("POWERGIT_DATA_DIR")),
         (
             "uptime",
             format!("{:.0}s", state.started.elapsed().as_secs_f64()),
@@ -818,6 +832,7 @@ pub fn run() {
             heartbeat,
             log_frontend,
             open_devtools,
+            app_location,
             diagnostic_snapshot,
             last_incident,
             log_dir

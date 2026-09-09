@@ -53,8 +53,9 @@ public sealed partial class GitHost
         // latency (v0.15.0: it pushed click-to-diff past its budget).
         // Truncating first is safe: a secret past the cut is not stored.
         string combined = Combine(Cap(stdOut), Cap(stdErr));
-        bool truncated = combined.Length > CommandLogEntryChars;
-        string output = GitCommandSanitizer.Text(truncated ? combined[..CommandLogEntryChars] : combined);
+        bool truncated = stdOut?.Length > CommandLogEntryChars || stdErr?.Length > CommandLogEntryChars
+            || combined.Length > CommandLogEntryChars;
+        string output = GitCommandSanitizer.Text(combined[..Math.Min(combined.Length, CommandLogEntryChars)]);
         if (truncated)
         {
             output += TruncationMarker;

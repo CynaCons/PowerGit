@@ -462,7 +462,11 @@ test("settings labels are never clipped by the dialog content edge", async ({ pa
     let checked = 0
     for (const label of await labels.all()) {
       const box = (await label.boundingBox())!
-      const visible = box.y + box.height > top && box.y < bottom
+      const field = await label.locator("..").boundingBox()
+      // A field partially below the scroll viewport is naturally clipped.
+      // Check labels whose whole field is visible, including the first
+      // field's floating label at the content's top edge.
+      const visible = field !== null && field.y >= top && field.y + field.height <= bottom
       if (!visible) continue
       checked++
       // Measure how much of the label is actually inside the content box

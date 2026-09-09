@@ -6,7 +6,7 @@ anything. When that's the case, I don't have a way to bring back the logs."
 ## Where things live
 
 The shell's log directory is Tauri's `app_log_dir()`:
-`%APPDATA%\com.cynacons.powergit\logs` on Windows,
+`%LOCALAPPDATA%\com.cynacons.powergit\logs` on Windows,
 `$XDG_DATA_HOME/com.cynacons.powergit/logs` (default `~/.local/share/...`)
 on Linux. Settings → Tools → "Open logs folder" opens it. Files:
 
@@ -93,8 +93,6 @@ records a *forced* stall and reloads the webview at once, and the saved
 path is shown natively from the second press on. A third press while the
 forced stall stands shows the native restart dialog. The forced stall
 expires 60 s after its reload (the measurements cannot confirm or deny it).
-
-## Reading a snapshot
 
 ## Focus-loss investigation (2026-09-09, v0.15.2)
 

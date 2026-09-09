@@ -19,7 +19,7 @@ import { useEngine, type GitConfig, type ToolInfo, type VsCodeInfo } from "../en
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
 import { ZOOM_DEFAULT, getZoom, setZoom, stepZoom, zoomPercent } from "../theme/zoom"
-import { openDeveloperTools, openLogsFolder } from "../diagnostics/snapshot"
+import { openAppLocation, openDeveloperTools, openLogsFolder } from "../diagnostics/snapshot"
 import { useUpdater } from "../hooks/useUpdater"
 import { isTauriShell } from "../shell"
 import { DEFAULT_BEHAVIOUR, getBehaviour, setBehaviour, type Behaviour } from "../theme/behaviour"
@@ -275,6 +275,7 @@ export function SettingsDialog({ open, onClose }: Props) {
         <BehaviourSection value={behaviour} onChange={(patch) => setBehaviourDraft((b) => ({ ...b, ...patch }))} />
 
         {section("Updates", version ? `PowerGit v${version}` : "PowerGit")}
+        {isTauriShell() && <Button onClick={() => void openAppLocation()}>Open app location</Button>}
         <UpdatesSection updater={updater} />
       </DialogContent>
       <DialogActions>
