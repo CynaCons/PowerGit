@@ -5,10 +5,10 @@ mod desktop_integration;
 mod crash_hooks;
 mod snapshot;
 mod tinyhttp;
+mod logwriter;
 mod watchdog;
 
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -41,7 +41,9 @@ struct EngineState {
     /// Timestamped sidecar stderr + exit status, kept on disk for the
     /// recovery panel (v0.13.11). None when the log dir is unavailable.
     log_path: Option<PathBuf>,
-    log: Mutex<Option<File>>,
+    /// Both log files, owned by a writer thread (v0.15.4): logging must never
+    /// block its caller, because one caller is the main loop.
+    logger: logwriter::Logger,
     /// Restart bookkeeping: (count in the current window, window start).
     restarts: Mutex<(u32, Instant)>,
     /// Set on ExitRequested so a Terminated event during shutdown is not
@@ -53,7 +55,6 @@ struct EngineState {
     /// window is hidden; v0.14.2), the watchdog's memory, the platform's
     /// crash report if any (consumed by the watchdog), and when this shell
     /// started.
-    frontend_log: Mutex<Option<File>>,
     last_beat: Mutex<Option<Instant>>,
     last_paint: Mutex<Option<Instant>>,
     watchdog: Mutex<watchdog::Status>,
@@ -251,12 +252,8 @@ fn tell_snapshot_path(app: &AppHandle, path: &str) {
 /// disk when the page itself can no longer show them.
 #[tauri::command]
 fn log_frontend(state: tauri::State<EngineState>, lines: Vec<String>) {
-    let mut guard = state.frontend_log.lock().expect("frontend log poisoned");
-    if let Some(file) = guard.as_mut() {
-        for line in lines {
-            let _ = writeln!(file, "{line}");
-        }
-        let _ = file.flush();
+    for line in lines {
+        state.logger.write(logwriter::Target::Frontend, line);
     }
 }
 
@@ -360,6 +357,10 @@ fn log_dir_path(app: &AppHandle) -> Result<PathBuf, String> {
 fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<String, String> {
     let state = app.state::<EngineState>();
     let dir = log_dir_path(app)?;
+    // Logging is asynchronous since v0.15.4, so the zip would otherwise miss
+    // whatever is still queued — including the lines that explain the press.
+    // Bounded: a stuck writer must not stop the snapshot being written.
+    state.logger.sync(Duration::from_secs(2));
     let beat_age = state
         .last_beat
         .lock()
@@ -661,14 +662,12 @@ fn timestamp() -> String {
 }
 
 /// Appends one line to the engine log (and mirrors it to stdout for `tauri dev`).
+/// Queues one line for engine.log. Never touches the disk on this thread:
+/// the `RunEvent` closure calls this on the main loop (v0.15.4).
 fn log_line(state: &EngineState, line: &str) {
-    println!("[engine] {line}");
-    if let Ok(mut guard) = state.log.lock() {
-        if let Some(file) = guard.as_mut() {
-            let _ = writeln!(file, "{} {line}", timestamp());
-            let _ = file.flush();
-        }
-    }
+    state
+        .logger
+        .write(logwriter::Target::Engine, format!("{} {line}", timestamp()));
 }
 
 /// Decides whether the sidecar may be restarted now (v0.13.11): one bounded
@@ -871,10 +870,9 @@ pub fn run() {
                 token,
                 child: Mutex::new(None),
                 log_path,
-                log: Mutex::new(log),
+                logger: logwriter::Logger::start(log, frontend_log),
                 restarts: Mutex::new((0, Instant::now())),
                 exiting: Mutex::new(false),
-                frontend_log: Mutex::new(frontend_log),
                 last_beat: Mutex::new(None),
                 last_paint: Mutex::new(None),
                 watchdog: Mutex::new(watchdog::Status::default()),
@@ -928,6 +926,8 @@ pub fn run() {
             }
             let state = app_handle.state::<EngineState>();
             *state.exiting.lock().expect("exiting flag poisoned") = true;
+            // Queued lines would die with the process otherwise (v0.15.4).
+            state.logger.sync(Duration::from_secs(1));
             let Some(child) = state.child.lock().expect("engine state mutex poisoned").take() else {
                 return;
             };
@@ -997,10 +997,9 @@ mod tests {
             token: String::new(),
             child: Mutex::new(None),
             log_path: None,
-            log: Mutex::new(None),
+            logger: logwriter::Logger::disabled(),
             restarts: Mutex::new((0, Instant::now())),
             exiting: Mutex::new(false),
-            frontend_log: Mutex::new(None),
             last_beat: Mutex::new(None),
             last_paint: Mutex::new(None),
             watchdog: Mutex::new(watchdog::Status::default()),

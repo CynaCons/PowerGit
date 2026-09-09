@@ -9,6 +9,25 @@ string engineVersion = typeof(Program).Assembly
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+// v0.15.4: quieten the framework. ASP.NET Core's default Information level
+// logs three lines per request, the shell forwards every one of them to
+// engine.log, and the app polls /gitlog every 2 s — so the file grew past
+// 9 000 lines in a session and the diagnostics we actually read (sidecar
+// state, watchdog decisions, focus transitions) were buried in it, with a
+// flush to disk behind each. Our own lines stay; the framework's chatter
+// only appears when something is wrong. POWERGIT_LOG_LEVEL=Information
+// restores the full firehose when a request trace is what you need.
+string frameworkLevel = Environment.GetEnvironmentVariable("POWERGIT_LOG_LEVEL") ?? "Warning";
+if (Enum.TryParse(frameworkLevel, ignoreCase: true, out LogLevel parsedLevel))
+{
+    // Only the per-request chatter. Microsoft.Hosting.Lifetime keeps its
+    // Information level on purpose: "Now listening on: http://..." is the
+    // line that proves the engine bound its port, and the shell's log is
+    // where we look when it did not.
+    builder.Logging.AddFilter("Microsoft.AspNetCore", parsedLevel);
+    builder.Logging.AddFilter("System.Net.Http", parsedLevel);
+}
+
 string? url = Environment.GetEnvironmentVariable("POWERGIT_ENGINE_URL");
 if (!string.IsNullOrWhiteSpace(url))
 {

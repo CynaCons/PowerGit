@@ -37,24 +37,24 @@ on Linux. Settings → Tools → "Open logs folder" opens it. Files:
   since v0.14.2 each beat carries `frameAgeMs`: how long ago the page's
   one-animation-frame-per-beat request was painted (null while hidden).
   The shell checks every 5 s. Three stalls (`watchdog::Stall`):
-  - `script`: 15 s without a beat → "webview unresponsive: no heartbeat
-    for N s".
-  - `paint`: beats arrive but no frame for 20 s while visible → "webview
-    not painting: script beats but no frame for N s". This is the owner's
-    Linux freeze (2026-09-08): window moves, page reacts, picture frozen
-    and black.
-  - `crash`: the platform said so (`crash_hooks.rs`: WebKitGTK
-    `web-process-terminated`, WebView2 `ProcessFailed`) → "webview
-    process crashed".
-  Every stall writes the automatic snapshot and `incident.json` with a
-  `kind`. Then the recovery ladder: 20 s into the stall (at once for a
-  crash) "watchdog: reloading the webview" (`WebviewWindow::reload`,
-  the engine session survives); 30 s after a reload that did not bring
-  frames back, a native dialog "Restart PowerGit / Keep waiting"
-  (`ask_restart`, drawn by the OS so it shows over a black webview;
-  `AppHandle::restart` on yes). Recovery logs "webview responsive again
-  after N s (<kind> stall)". A page that never beat (still booting) is
-  not an incident. `watchdog.rs::step` is the pure state machine.
+    - `script`: 15 s without a beat → "webview unresponsive: no heartbeat
+      for N s".
+    - `paint`: beats arrive but no frame for 20 s while visible → "webview
+      not painting: script beats but no frame for N s". This is the owner's
+      Linux freeze (2026-09-08): window moves, page reacts, picture frozen
+      and black.
+    - `crash`: the platform said so (`crash_hooks.rs`: WebKitGTK
+      `web-process-terminated`, WebView2 `ProcessFailed`) → "webview
+      process crashed".
+      Every stall writes the automatic snapshot and `incident.json` with a
+      `kind`. Then the recovery ladder: 20 s into the stall (at once for a
+      crash) "watchdog: reloading the webview" (`WebviewWindow::reload`,
+      the engine session survives); 30 s after a reload that did not bring
+      frames back, a native dialog "Restart PowerGit / Keep waiting"
+      (`ask_restart`, drawn by the OS so it shows over a black webview;
+      `AppHandle::restart` on yes). Recovery logs "webview responsive again
+      after N s (<kind> stall)". A page that never beat (still booting) is
+      not an incident. `watchdog.rs::step` is the pure state machine.
 - Snapshot button with a dead picture: `diagnostic_snapshot` shows the
   saved path in a native dialog when the page has not painted for 20 s,
   because its own dialog would never appear (the owner pressed the
@@ -89,7 +89,7 @@ Nothing the shell measures can see a GTK presentation failure, but the
 user can: they press the snapshot button again. `diagnostic_snapshot`
 keeps the press times; a second press within 15 s logs "snapshot button
 pressed N times ...: treating the display as dead", `watchdog::force`
-records a *forced* stall and reloads the webview at once, and the saved
+records a _forced_ stall and reloads the webview at once, and the saved
 path is shown natively from the second press on. A third press while the
 forced stall stands shows the native restart dialog. The forced stall
 expires 60 s after its reload (the measurements cannot confirm or deny it).
@@ -145,6 +145,64 @@ and 1.5 s later logs `developer tools open=true|false`. The check is late and
 only logged on purpose: WebKitGTK attaches asynchronously, so reading it
 inline would report a failure on machines where it merely had not finished,
 and a wrong error is worse than the silence it replaces.
+
+## The freeze is in the UI process, not the page (v0.15.4)
+
+Owner, 2026-09-09: "when the crash happens, even the developper panels does
+not refresh!!!" That is the most informative sentence we have about this bug.
+
+The WebKitGTK inspector is a **separate web view driven by the same GTK main
+loop** as the window. If the inspector also stops updating, the web content
+is not what is stuck -- the UI process's main loop is. This fits everything
+else: black areas that never repaint when the window is moved, and the
+snapshot of 2026-09-08 showing the page still firing animation-frame
+callbacks 2.4 s earlier. Content alive, presentation dead.
+
+**Consequence: no in-app surface can diagnose this.** Not the snapshot
+button, not the recovery panel, not v0.15.3's app log. They all render
+through the loop that has stopped. Only two channels survive: files already
+flushed to disk, and other processes.
+
+### What we changed in our own code
+
+Logging used to do `writeln!` + `flush()` while holding `Mutex<Option<File>>`,
+on whichever thread called it -- and one caller is the `RunEvent` closure,
+i.e. the run loop, on the main thread, on **every window focus change**
+(added in v0.15.2, in the code investigating focus freezes). The sidecar's
+stdout task takes the same lock for every line the engine prints, and the
+engine printed a line per HTTP request. So a focus change could park the main
+loop behind another thread's flush.
+
+`logwriter.rs` now owns both files on its own thread; `log_line` is a channel
+send. Nothing that logs touches the disk on the caller's thread. `sync()` is
+the only blocking call and exists for snapshots and shutdown -- never call it
+from the main loop. The engine's framework logging also drops to Warning
+(`POWERGIT_LOG_LEVEL=Information` restores it), which removed the per-request
+churn behind all of it.
+
+This is a real defect fixed on the evidence. It is **not** proven to be the
+owner's freeze, which predates v0.15.2 -- do not write it up as the cause.
+
+### Capturing the next one
+
+`scripts/freeze-dump.sh`, run from a terminal **while the window is frozen**.
+It reads `/proc` for every PowerGit process: per-thread state and `wchan`,
+which needs no debugger and no root, plus backtraces when `eu-stack` or `gdb`
+is present, whether the sidecar still answers `/health`, and the log tails.
+
+Read `threads.txt` first. The main thread's `wchan` is the answer:
+
+| wchan                              | meaning                                    |
+| ---------------------------------- | ------------------------------------------ |
+| `futex_wait_queue`                 | waiting on a lock -- someone else holds it |
+| `wait_on_page_bit`, `io_schedule`  | blocked on disk                            |
+| `poll_schedule_timeout`, `ep_poll` | idle in the event loop; healthy            |
+| `do_wait`, `hrtimer_nanosleep`     | sleeping; healthy                          |
+
+If the engine still answers while the window is dead, the freeze is confined
+to the UI process. Tested on Ubuntu against a process deliberately blocked on
+a mutex: it reported `futex_wait_queue` for the main thread. The debugger
+branch is untested -- no debugger was installable in the test environment.
 
 ## Snapshot interpretation
 

@@ -8,7 +8,7 @@ PowerGit keeps everything that makes Git Extensions great — especially its
 revision graph — and rebuilds the way it looks and feels: a React + Material UI
 running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 
-> **Scope of this fork:** we are building a *new frontend*, not rewriting git
+> **Scope of this fork:** we are building a _new frontend_, not rewriting git
 > plumbing. Git Extensions is the **behavioural reference**, not shared code:
 > the engine is a small `net10.0` host around the git CLI, and the lane
 > layout is a TypeScript reimplementation of GE's `RevisionGraph`, verified
@@ -20,12 +20,12 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 
 ## Why
 
-| | Git Extensions (WinForms) | PowerGit |
-|---|---|---|
-| UI toolkit | Windows Forms | React + Material, Tauri shell |
-| Platform | Windows only | Windows today, Linux target |
-| Install | Heavy installer | Portable zip — one exe + one sidecar |
-| Graph | The gold standard | Reimplemented lane layout, GE colours, golden-tested against GE, virtualized |
+|            | Git Extensions (WinForms) | PowerGit                                                                     |
+| ---------- | ------------------------- | ---------------------------------------------------------------------------- |
+| UI toolkit | Windows Forms             | React + Material, Tauri shell                                                |
+| Platform   | Windows only              | Windows today, Linux target                                                  |
+| Install    | Heavy installer           | Portable zip — one exe + one sidecar                                         |
+| Graph      | The gold standard         | Reimplemented lane layout, GE colours, golden-tested against GE, virtualized |
 
 ## Highlights
 
@@ -121,6 +121,20 @@ evidence gathering; the freeze is still under investigation.
 Recent repositories now load even when no repository is open after restart.
 Settings → Updates → Open app location reveals the running AppImage. Updates
 replace it in place, so its filename may still contain the original version.
+
+**If the window freezes on Linux, run this from a terminal while it is still
+frozen** — nothing inside the app can report it, because the inspector and
+the app's own panels are drawn by the same main loop that has stopped:
+
+```
+bash freeze-dump.sh
+```
+
+It is attached to each release. It reads `/proc` for the app's threads, asks
+whether the engine is still answering, collects the logs, and writes one
+`.tar.gz` to send back. Nothing is killed or modified. Install `elfutils` or
+`gdb` first for full backtraces; without either it still reports what every
+thread is waiting on, which is usually enough.
 
 v0.15.3 stops that inspector being the only way in. The console at the bottom
 of the window has a second tab, **APP LOG**, showing what PowerGit recorded
