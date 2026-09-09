@@ -588,11 +588,12 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 
 ### v0.15.3 — Read the console without WebKit's inspector
 **Goal:** Owner (2026-09-09): "the fix in 0.15.2 to show the debugger panel did not work. Give me a 15.3 very quickly with a button in the settings to open that drawer." The v0.15.2 button exists and the devtools feature is compiled in, so the inspector is failing silently on the owner's Ubuntu: `open_devtools` returns no Result, so nothing reports why. Make that failure speak, and stop depending on WebKit's inspector — PowerGit already keeps a 200-entry diagnostic ring but only RecoveryPanel renders it (and only when the app is already broken), and console.* is written to the console, never captured from it.
-- [ ] Capture console.log/info/warn/error/debug into the diagnostic ring, forwarding to the real console and guarding the re-entrancy report() already creates; per-message cap so one huge object cannot flush the ring.
-- [ ] Diagnostics drawer in the shape of the approved git console: live ring, level chips, filter, Copy all, long tasks and the log path, with Open logs folder. Settings button plus a hotkey.
-- [ ] open_devtools returns a Result and logs the attempt, the frontend propagates it, and Settings shows why the inspector did not open instead of a dead button.
-- [ ] Gates and release: vitest for the capture, e2e for the drawer, cargo for the command; packaged build checked by hand; docs (diagnostics memory, README) and SRS-SET-045.
+- [x] Capture console.log/info/warn/error/debug into the diagnostic ring, forwarding to the real console and guarding the re-entrancy report() already creates; per-message cap so one huge object cannot flush the ring.
+- [x] Diagnostics drawer in the shape of the approved git console: live ring, level chips, filter, Copy all, long tasks and the log path, with Open logs folder. Settings button plus a hotkey.
+- [x] open_devtools returns a Result and logs the attempt, the frontend propagates it, and Settings shows why the inspector did not open instead of a dead button.
+- [x] Gates and release: vitest for the capture, e2e for the drawer, cargo for the command; packaged build checked by hand; docs (diagnostics memory, README) and SRS-SET-045.
 - [ ] Owner 2026-09-09: "the fix in 0.15.2 to show the debugger panel did not work." Awaiting owner verification on Ubuntu that the drawer shows the console without the inspector.
+- [x] Two bugs the build surfaced, both of which would have made the tab useless: diagnosticsSnapshot() returned the live mutated ring, so useSyncExternalStore and useMemo saw no change and the panel froze at its first render (a screenshot caught 1 of 4 entries showing) — it now returns a fresh array per entry, with a test; and warnings rendered in console.ok, the green the git log uses for a command that succeeded, so the console surface gained its own amber. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
