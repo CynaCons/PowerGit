@@ -76,6 +76,13 @@ export async function revealInFolder(path: string): Promise<void> {
   await revealItemInDir(path)
 }
 
+/** Open the platform inspector in a release or development shell. */
+export async function openDeveloperTools(): Promise<void> {
+  if (!isTauriShell()) return
+  const { invoke } = await import("@tauri-apps/api/core")
+  await invoke("open_devtools")
+}
+
 /** The log directory (shell only), for Settings → Open logs folder. */
 export async function openLogsFolder(): Promise<void> {
   if (!isTauriShell()) return

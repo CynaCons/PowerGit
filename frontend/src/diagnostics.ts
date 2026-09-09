@@ -13,6 +13,7 @@
  * 60 s sample of memory and state.
  */
 import { isTauriShell } from "./shell"
+import { invoke } from "@tauri-apps/api/core"
 
 export type DiagnosticLevel = "info" | "warn" | "error"
 export type DiagnosticEntry = { at: string; level: DiagnosticLevel; source: string; message: string }
@@ -45,7 +46,6 @@ async function flush(): Promise<void> {
   pending = []
   if (lines.length === 0) return
   try {
-    const { invoke } = await import("@tauri-apps/api/core")
     await invoke("log_frontend", { lines })
   } catch {
     // An older shell or a dying one: the in-memory ring still has them.
@@ -65,6 +65,14 @@ export function report(level: DiagnosticLevel, source: string, message: string):
       // a broken listener must not stop the others
     }
   }
+}
+
+/** Persist transition evidence without waiting for a background timer. */
+export function reportTransition(source: string, message: string): void {
+  report("info", source, message)
+  console.info(`[powergit] ${source}: ${message}`)
+  window.clearTimeout(flushTimer)
+  void flush()
 }
 
 /** What the app is doing right now, named in long-task reports. */
@@ -118,6 +126,11 @@ export function installDiagnostics(): void {
     report("error", "unhandledrejection", msg)
   })
   report("info", "session", `started ${navigator.userAgent}`)
+  const transition = (event: Event) =>
+    reportTransition("window", `${event.type} focused=${document.hasFocus()} visibility=${document.visibilityState}`)
+  window.addEventListener("focus", transition)
+  window.addEventListener("blur", transition)
+  document.addEventListener("visibilitychange", transition)
   // Long tasks: Chromium (WebView2) supports the entry type; WebKitGTK does
   // not, and observe() then throws, which is fine.
   try {

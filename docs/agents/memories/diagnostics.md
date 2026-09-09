@@ -67,9 +67,10 @@ set: `WEBKIT_DISABLE_DMABUF_RENDERER=1` (v0.14.2; keep the default with
 `POWERGIT_KEEP_DMABUF=1`) and `WEBKIT_DISABLE_COMPOSITING_MODE=1`
 (v0.15.0; `POWERGIT_KEEP_COMPOSITING=1`). The second one came from the
 snapshot of 2026-09-08 10:35: v0.14.3, DMA-BUF already off, heartbeat
-0.4 s, **frames still firing 2.4 s ago**, four button presses in two
-seconds — the web process rendered, the GTK side presenting the frames
-was dead. The container harness (docker/appimage-check/launch.sh) has
+0.4 s, **animation callbacks still firing 2.4 s ago**, four button presses in two
+seconds. This suggests a presentation failure, but a requestAnimationFrame
+callback does not prove pixels were rendered or presented. The container
+harness (docker/appimage-check/launch.sh) has
 always run with compositing mode off and never showed a black window.
 
 The AppImage runs through XWayland on a Wayland session: tauri-bundler's
@@ -94,6 +95,26 @@ forced stall stands shows the native restart dialog. The forced stall
 expires 60 s after its reload (the measurements cannot confirm or deny it).
 
 ## Reading a snapshot
+
+## Focus-loss investigation (2026-09-09, v0.15.2)
+
+Owner: "whenever the windows loses focus on my ubuntu, it usually end up in a freeze."
+This is a trigger to investigate, not a confirmed root cause or fixed defect.
+Native window focus changes are flushed to engine.log independently of page
+JavaScript. Page focus/blur/visibility changes and numbered refresh start/end
+durations are sent immediately to frontend.log and printed in the console.
+Focus regain triggers a full repository refresh; focus loss itself does not.
+
+Release builds enable the platform inspector: Settings → Tools → Open developer
+tools, or launch `POWERGIT_DEVTOOLS=1 ./PowerGit_0.15.2_amd64.AppImage`
+(substitute the actual downloaded filename). Use the inspector's docking controls
+to select the right side if supported by the installed WebKitGTK, or detach it.
+Docking is platform-controlled, not forced by PowerGit. Open Console and enable
+preserving logs before switching to another window. Inspect engine.log and
+frontend.log even if the console remains silent. Existing automatic watchdog
+recovery remains enabled and can reload the page while investigating.
+
+## Snapshot interpretation
 
 Start with `shell.txt` (last heartbeat vs last frame: a fresh beat with an
 old frame is a paint stall; "webview stalled" says whether the watchdog

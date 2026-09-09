@@ -19,7 +19,7 @@ import { useEngine, type GitConfig, type ToolInfo, type VsCodeInfo } from "../en
 import { getBarLayout, setBarLayout, type BarLayout } from "../theme/barLayout"
 import { getThemePreference, setThemePreference, type ThemePreference } from "../theme/appearance"
 import { ZOOM_DEFAULT, getZoom, setZoom, stepZoom, zoomPercent } from "../theme/zoom"
-import { openLogsFolder } from "../diagnostics/snapshot"
+import { openDeveloperTools, openLogsFolder } from "../diagnostics/snapshot"
 import { useUpdater } from "../hooks/useUpdater"
 import { isTauriShell } from "../shell"
 import { DEFAULT_BEHAVIOUR, getBehaviour, setBehaviour, type Behaviour } from "../theme/behaviour"
@@ -256,6 +256,15 @@ export function SettingsDialog({ open, onClose }: Props) {
         <Button disabled={!vs?.found} onClick={onApplyVsCode} sx={{ alignSelf: "flex-start" }}>
           Use VS Code as editor / diff / merge
         </Button>
+        {isTauriShell() && (
+          <Button
+            onClick={() => void openDeveloperTools()}
+            sx={{ alignSelf: "flex-start" }}
+            data-testid="open-devtools"
+          >
+            Open developer tools
+          </Button>
+        )}
         {isTauriShell() && (
           <Button onClick={() => void openLogsFolder()} sx={{ alignSelf: "flex-start" }} data-testid="open-logs-folder">
             Open logs folder

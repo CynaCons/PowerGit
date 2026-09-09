@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { report } from "../diagnostics"
+import { report, reportTransition } from "../diagnostics"
 import { changeKindOf, describeThrown, type ChangeKind, type RefTree, type RepoStatus, type StashInfo } from "../engine"
 import { syntheticRefTree, syntheticStatus } from "../graph/synthetic"
 import type { EngineSession } from "./useEngineSession"
@@ -39,12 +39,16 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   // 500 ms, so a shorter tail would let echoes through.
   const inFlight = useRef(0)
   const muteUntil = useRef(0)
+  const refreshSequence = useRef(0)
   const refresh = useCallback(
     async (scope?: RefreshScope) => {
       if (!client.hasRepo) return
       inFlight.current++
       setRefreshing(true)
       const s = scope ?? { revisions: true, refs: true, status: true, stashes: true }
+      const id = ++refreshSequence.current
+      const started = performance.now()
+      reportTransition("refresh", `${id} start scope=${JSON.stringify(s)}`)
       const jobs: Promise<unknown>[] = []
       let firstError: string | null = null
       const fail = (what: string) => (e: unknown) => {
@@ -67,6 +71,10 @@ export function useRepoState({ session, history }: RepoStateDeps) {
         inFlight.current--
         setRefreshing(false)
         muteUntil.current = Date.now() + ECHO_MS
+        reportTransition(
+          "refresh",
+          `${id} end ms=${Math.round(performance.now() - started)} failed=${firstError !== null}`,
+        )
       }
       if (firstError) throw new Error(firstError)
     },
@@ -194,7 +202,9 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     if (!live || !client.hasRepo) return
     const quiet = () => inFlight.current > 0 || Date.now() < muteUntil.current
     const onFocus = () => {
-      if (!quiet()) void refresh().catch(() => undefined)
+      const skipped = quiet()
+      reportTransition("refresh", `focus/visible trigger skipped=${skipped}`)
+      if (!skipped) void refresh().catch(() => undefined)
     }
     const onVisible = () => {
       if (document.visibilityState === "visible") onFocus()

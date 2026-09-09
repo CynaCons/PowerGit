@@ -110,6 +110,14 @@ console at the bottom shows every command PowerGit runs. It builds on
 v0.14.3's grid work and v0.14.1's diagnostic snapshot and watchdog.
 Parked: worktrees and hotkey remapping UI.
 
+v0.15.2 adds diagnostics for the Ubuntu focus-loss freeze: Settings → Tools →
+Open developer tools opens the inspector in release builds. To open it at launch,
+run `POWERGIT_DEVTOOLS=1 ./YourDownloaded.AppImage`. Choose right-side docking
+if available in the inspector, open Console and preserve logs. Native focus
+events, page visibility changes and refresh timings are also saved beside the
+existing snapshots (Settings → Tools → Open logs folder). This release adds
+evidence gathering; the freeze is still under investigation.
+
 ## Development
 
 Windows dev machine; .NET 10 SDK, Node 22, Rust.

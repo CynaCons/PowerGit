@@ -116,6 +116,12 @@ fn engine_log_path(state: tauri::State<EngineState>) -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
+/// Open the inspector for the requesting window, including release builds.
+#[tauri::command]
+fn open_devtools(window: tauri::WebviewWindow) {
+    window.open_devtools();
+}
+
 /// Tauri command: the page beats every 2 s and says how long ago it last
 /// painted a frame (None while hidden). Silence, or beats without frames,
 /// is what the watchdog (watchdog.rs) turns into an incident.
@@ -811,6 +817,7 @@ pub fn run() {
             engine_log_path,
             heartbeat,
             log_frontend,
+            open_devtools,
             diagnostic_snapshot,
             last_incident,
             log_dir
@@ -858,11 +865,26 @@ pub fn run() {
             spawn_engine(app.handle().clone());
             spawn_watchdog(app.handle().clone());
             crash_hooks::install(app.handle(), note_crash);
+            if std::env::var("POWERGIT_DEVTOOLS").as_deref() == Ok("1") {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                    log_line(&state, "developer tools requested at startup");
+                }
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building PowerGit")
         .run(|app_handle, event| {
+            // Native events survive a stalled page and are flushed to disk.
+            if let RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Focused(focused),
+                ..
+            } = &event {
+                let state = app_handle.state::<EngineState>();
+                log_line(&state, &format!("window {label} focused={focused}"));
+            }
             if !matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
                 return;
             }
