@@ -1,5 +1,10 @@
 # Diagnostics: logs, the snapshot package and the watchdog (v0.14.1)
 
+> The Ubuntu freeze itself — every report, what the evidence supports,
+> what each release changed and what is still unknown — is written up in
+> [docs/ubuntu-freeze.md](../../ubuntu-freeze.md). This file is the
+> reference for the machinery.
+
 Owner report: "sometimes after a while the app freezes. Can't click on
 anything. When that's the case, I don't have a way to bring back the logs."
 
