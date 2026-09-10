@@ -186,13 +186,46 @@ public sealed partial class GitHost
         return new RemoteInfoDto(name, url);
     }
 
+    /// <summary>Which of the three diffs a reset undoes (v0.15.5).</summary>
+    public enum ResetScope
+    {
+        /// <summary>Index and working tree back to HEAD (Git Extensions "Reset file(s) to HEAD").</summary>
+        Head,
+
+        /// <summary>Working tree back to the index. Staged changes survive.</summary>
+        Worktree,
+
+        /// <summary>Index back to HEAD. The file on disk is not touched.</summary>
+        Index,
+    }
+
+    /// <summary>Parses the wire value of <see cref="ResetScope"/>; anything else is a 400.</summary>
+    public static ResetScope ParseResetScope(string? scope)
+    {
+        return (scope ?? "head").Trim().ToLowerInvariant() switch
+        {
+            "" or "head" => ResetScope.Head,
+            "worktree" => ResetScope.Worktree,
+            "index" => ResetScope.Index,
+            _ => throw new InvalidOperationException($"unknown reset scope '{scope}' (head, worktree or index)"),
+        };
+    }
+
     /// <summary>
     /// Git Extensions FormCommit "Reset file(s) to HEAD" (v0.13.14): the index
     /// entry and the working-tree file go back to HEAD. A path HEAD does not
     /// know (untracked, or added only in the index) has nothing to go back to
     /// and is deleted, which is what GE does after its confirmation prompt.
+    ///
+    /// v0.15.5 narrows it, because the Browse diff view resets "what the user
+    /// is looking at" (owner) and the whole-way-to-HEAD reset is wrong there:
+    /// on a Working directory row it would silently throw away staged changes
+    /// that row never showed. <see cref="ResetScope.Worktree"/> restores the
+    /// file from the index, <see cref="ResetScope.Index"/> only unstages.
+    /// Untracked paths are deleted under every scope: git holds no copy, so
+    /// there is nothing else a reset could mean.
     /// </summary>
-    public void ResetFiles(IReadOnlyList<string> paths)
+    public void ResetFiles(IReadOnlyList<string> paths, ResetScope scope = ResetScope.Head)
     {
         string root = RequireRoot();
         foreach (string path in paths)
@@ -208,25 +241,98 @@ public sealed partial class GitHost
                 continue;
             }
 
-            CommandResult inHead = Run(root, "cat-file", "-e", $"HEAD:{path}");
-            if (inHead.ExitCode == 0)
+            // Each scope restores from a different source, so each has its own
+            // idea of "there is nothing to restore from". A staged deletion is
+            // the case that catches you: no index entry, but HEAD still has
+            // the file, so it is untracked to the working tree and perfectly
+            // ordinary to the index.
+            bool inIndex = Run(root, "ls-files", "--error-unmatch", "--", path).ExitCode == 0;
+            bool inHead = InHead(root, path);
+
+            switch (scope)
             {
-                CommandResult unstage = Run(root, "reset", "-q", "HEAD", "--", path);
-                CommandResult restore = Run(root, "checkout", "-q", "HEAD", "--", path);
-                if (restore.ExitCode != 0)
+                case ResetScope.Worktree when inIndex:
                 {
-                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(restore.StdErr) ? unstage.StdErr.Trim() : restore.StdErr.Trim());
+                    // `checkout -- <path>` (not `restore`, which needs git
+                    // 2.23) copies the index entry over the working file and
+                    // leaves the index alone.
+                    CommandResult restore = Run(root, "checkout", "-q", "--", path);
+                    if (restore.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException(Explain(restore, "reset working tree"));
+                    }
+
+                    break;
                 }
-            }
-            else
-            {
-                Run(root, "rm", "-f", "-q", "--cached", "--", path);
-                if (File.Exists(full))
+
+                case ResetScope.Worktree:
                 {
-                    File.Delete(full);
+                    // No index entry: the index says this file should not
+                    // exist, whether it was never added or its deletion is
+                    // staged. Matching the index means deleting it.
+                    Delete(full);
+                    break;
+                }
+
+                case ResetScope.Index when inHead:
+                {
+                    CommandResult unstage = Run(root, "reset", "-q", "HEAD", "--", path);
+                    if (unstage.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException(Explain(unstage, "unstage"));
+                    }
+
+                    break;
+                }
+
+                case ResetScope.Index:
+                {
+                    // A staged add (or a repository whose first commit is
+                    // still pending): unstaging means dropping the index
+                    // entry, which leaves the file on disk as untracked.
+                    Run(root, "rm", "-f", "-q", "--cached", "--", path);
+                    break;
+                }
+
+                case ResetScope.Head when !inHead:
+                {
+                    // HEAD has nothing to restore, so a reset to HEAD deletes.
+                    Run(root, "rm", "-f", "-q", "--cached", "--", path);
+                    Delete(full);
+                    break;
+                }
+
+                default:
+                {
+                    CommandResult reset = Run(root, "reset", "-q", "HEAD", "--", path);
+                    CommandResult checkout = Run(root, "checkout", "-q", "HEAD", "--", path);
+                    if (checkout.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException(string.IsNullOrWhiteSpace(checkout.StdErr) ? reset.StdErr.Trim() : checkout.StdErr.Trim());
+                    }
+
+                    break;
                 }
             }
         }
+    }
+
+    private bool InHead(string root, string path)
+    {
+        return Run(root, "cat-file", "-e", $"HEAD:{path}").ExitCode == 0;
+    }
+
+    private static void Delete(string full)
+    {
+        if (File.Exists(full))
+        {
+            File.Delete(full);
+        }
+    }
+
+    private static string Explain(CommandResult result, string what)
+    {
+        return string.IsNullOrWhiteSpace(result.StdErr) ? $"{what} failed" : result.StdErr.Trim();
     }
 
     /// <summary>Open the difftool on a working-tree path: index vs HEAD when staged, worktree vs index otherwise.</summary>
@@ -263,19 +369,44 @@ public sealed partial class GitHost
         RecordDetached([.. psi.ArgumentList], DetachedToolNote);
     }
 
+    /// <summary>Largest patch accepted by <see cref="ApplyPatch"/>, in UTF-16 chars (v0.15.5).</summary>
+    /// <remarks>
+    /// Twice the ceiling on a diff handed to the UI, which is where every
+    /// patch the app builds comes from. Before this the route validated
+    /// nothing at all and would write any body to disk and hand it to git.
+    /// </remarks>
+    public const int MaxPatchChars = 2 * MaxDiffChars;
+
     /// <summary>
     /// `git apply` of a patch the UI synthesized from selected diff lines
     /// (frontend/src/patch/partial.ts), Git Extensions' "Stage / Reset
     /// selected lines". The patch goes through a temp file (the runner has no
     /// stdin). Whitespace warnings are silenced; a non-applying hunk is an
     /// error with git's own message, nothing is applied partially.
+    ///
+    /// v0.15.5: <paramref name="index"/> and <paramref name="threeWay"/> for
+    /// undoing a selection taken from a commit — Git Extensions' FileViewer
+    /// runs `git apply --3way --index` there, so the undo lands in the working
+    /// tree and the index together, and survives the file having moved on
+    /// since that commit (3-way falls back to merging against the recorded
+    /// blobs instead of failing on drifted context).
     /// </summary>
-    public void ApplyPatch(string patch, bool cached, bool reverse)
+    public void ApplyPatch(string patch, bool cached, bool reverse, bool index = false, bool threeWay = false)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(patch))
         {
             throw new InvalidOperationException("patch is empty");
+        }
+
+        if (patch.Length > MaxPatchChars)
+        {
+            throw new InvalidOperationException($"patch is too large ({patch.Length} chars, limit {MaxPatchChars})");
+        }
+
+        if (cached && index)
+        {
+            throw new InvalidOperationException("cached and index are mutually exclusive");
         }
 
         string file = Path.Combine(Path.GetTempPath(), $"powergit-{Guid.NewGuid():N}.patch");
@@ -286,6 +417,16 @@ public sealed partial class GitHost
             if (cached)
             {
                 args.Add("--cached");
+            }
+
+            if (index)
+            {
+                args.Add("--index");
+            }
+
+            if (threeWay)
+            {
+                args.Add("--3way");
             }
 
             if (reverse)

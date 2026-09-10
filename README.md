@@ -49,6 +49,12 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
   graph snapshots; smooth up to thousands of commits.
 - **Everything in reach** — commit details, changed files, the full repo tree
   at any revision, unified diffs with context/full-file/whitespace options.
+- **Undo from where you are reading** — right-click a file in the diff view,
+  or select lines inside the diff, and reset them. Reset means the diff on
+  screen and nothing more: on Working directory it restores from the index, so
+  staged work survives; on Index it unstages and leaves the file alone; on a
+  commit it reverses that change into the working tree and stages it, without
+  touching history. Every one of them says what survives before it runs.
 - **Real staging** — FormCommit-style window: unstaged │ staged │ diff │
   message, multi-select, right-click stage/delete/gitignore (with preview).
 - **Branch operations with GE guards** — checkout, reset, rebase from the

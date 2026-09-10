@@ -20,14 +20,33 @@ export type PatchBase = "old" | "new"
 
 export type Eligibility = { ok: true } | { ok: false; reason: string }
 
+/** What else, besides the text itself, can make a diff unpatchable (v0.15.5). */
+export type EligibilityContext = {
+  /** The engine cut the text (DiffDto.truncated): the hunks are incomplete. */
+  truncated?: boolean
+  /** The diff was produced with -w, so its context does not match the file. */
+  ignoreWhitespace?: boolean
+}
+
 const HUNK = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
 
 export function isChangeLine(line: string): boolean {
   return (line.startsWith("+") && !line.startsWith("+++")) || (line.startsWith("-") && !line.startsWith("---"))
 }
 
-/** Whether line-level staging/reset makes sense for this diff text. */
-export function partialEligibility(text: string): Eligibility {
+/**
+ * Whether line-level staging/reset makes sense for this diff.
+ *
+ * v0.15.5 added the second argument, closing two gaps that produced text
+ * `git apply` cannot use: a diff the engine truncated at MaxDiffChars/MaxLines
+ * ends mid-hunk, and a diff taken with -w (Diff options -> ignore whitespace)
+ * has context lines that do not match the file on disk. Both used to build a
+ * patch and fail in the engine with git's own message.
+ */
+export function partialEligibility(text: string, context: EligibilityContext = {}): Eligibility {
+  if (context.truncated) return { ok: false, reason: "diff is truncated: the whole file only" }
+  if (context.ignoreWhitespace)
+    return { ok: false, reason: "whitespace is ignored in this diff: turn that off to select lines" }
   const head = text.split("\n").slice(0, 8)
   if (head.some((l) => l.startsWith("Binary files") || l === "Binary file (not shown)")) {
     return { ok: false, reason: "binary file" }

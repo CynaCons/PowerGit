@@ -53,6 +53,15 @@ export type IgnorePreview = { pattern: string; files: string[]; count: number }
 
 export type DiffOptions = { context: number; ws: boolean; full: boolean }
 
+/**
+ * Which diff a file reset undoes (v0.15.5). The Browse panel shows three of
+ * them and "reset" means undoing the one on screen: "head" sends index and
+ * working tree back to HEAD (Git Extensions' "Reset file(s) to HEAD"),
+ * "worktree" restores the file from the index and leaves staged work alone,
+ * "index" unstages and leaves the file on disk untouched.
+ */
+export type ResetScope = "head" | "worktree" | "index"
+
 /** One round trip per selection: the changed files plus the first file's diff. */
 export type CommitChanges = { files: FileChange[]; firstDiff: DiffDto | null }
 

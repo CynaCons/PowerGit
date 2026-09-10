@@ -14,6 +14,9 @@ export function DiffPane({
   onOptions,
   onRetry,
   onOpenDifftool,
+  selection,
+  onLineClick,
+  onLineContextMenu,
 }: {
   diff: Loadable<DiffDto>
   busy: boolean
@@ -22,6 +25,10 @@ export function DiffPane({
   onOptions: (o: DiffOptions) => void
   onRetry: () => void
   onOpenDifftool?: () => void
+  /** Line selection for reset (v0.15.5); DiffView has taken these since v0.13.14. */
+  selection?: Set<number>
+  onLineClick?: (index: number, e: React.MouseEvent) => void
+  onLineContextMenu?: (index: number, e: React.MouseEvent) => void
 }) {
   return (
     <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -38,7 +45,14 @@ export function DiffPane({
         }}
       >
         {diff.kind === "ready" ? (
-          <DiffView diff={diff.value} onRetry={onRetry} onOpenDifftool={onOpenDifftool} />
+          <DiffView
+            diff={diff.value}
+            onRetry={onRetry}
+            onOpenDifftool={onOpenDifftool}
+            selection={selection}
+            onLineClick={onLineClick}
+            onLineContextMenu={onLineContextMenu}
+          />
         ) : diff.kind === "error" ? (
           <ErrorState message={diff.message} onRetry={onRetry} testid="diff-error" />
         ) : (diff.kind === "loading" || file) && busy ? (

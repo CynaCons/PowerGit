@@ -356,7 +356,7 @@ repo.MapPost("/files/reset", (FilesResetRequest body, GitHost git) =>
 {
     try
     {
-        git.ResetFiles(body.Paths);
+        git.ResetFiles(body.Paths, GitHost.ParseResetScope(body.Scope));
         return Results.Ok(git.GetStatus());
     }
     catch (Exception ex)
@@ -369,7 +369,7 @@ repo.MapPost("/patch", (ApplyPatchRequest body, GitHost git) =>
 {
     try
     {
-        git.ApplyPatch(body.Patch, body.Cached, body.Reverse);
+        git.ApplyPatch(body.Patch, body.Cached, body.Reverse, body.Index, body.ThreeWay);
         return Results.Ok(git.GetStatus());
     }
     catch (Exception ex)

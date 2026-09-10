@@ -24,6 +24,7 @@ import type {
   RemoteInfo,
   RepoInfo,
   RepoStatus,
+  ResetScope,
   RevisionDto,
   ToolInfo,
   SessionInfo,
@@ -381,20 +382,35 @@ export class EngineClient {
 
   // ---- mutations --------------------------------------------------------
 
-  /** Apply a synthesized (partial) patch: stage (cached), unstage (cached + reverse) or reset lines in the working tree (reverse). */
-  async applyPatch(patch: string, options: { cached?: boolean; reverse?: boolean }): Promise<RepoStatus> {
+  /**
+   * Apply a synthesized (partial) patch: stage (cached), unstage (cached +
+   * reverse) or reset lines in the working tree (reverse). v0.15.5 adds
+   * `index` + `threeWay` for undoing a selection taken from a commit, which
+   * must land in the working tree and the index and survive context drift.
+   */
+  async applyPatch(
+    patch: string,
+    options: { cached?: boolean; reverse?: boolean; index?: boolean; threeWay?: boolean },
+  ): Promise<RepoStatus> {
     return json<RepoStatus>(
       await this.post(`${this.repoPath()}/patch`, {
         patch,
         cached: options.cached ?? false,
         reverse: options.reverse ?? false,
+        index: options.index ?? false,
+        threeWay: options.threeWay ?? false,
       }),
     )
   }
 
-  /** Discard index + working-tree changes of `paths` (GE "Reset file(s) to HEAD"); untracked ones are deleted. */
-  async resetFiles(paths: string[]): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/files/reset`, { paths }))
+  /**
+   * Discard changes of `paths`; untracked ones are deleted (git holds no copy).
+   * `scope` says which diff is being undone (v0.15.5): "head" is GE's "Reset
+   * file(s) to HEAD", "worktree" restores from the index and keeps staged work,
+   * "index" unstages and leaves the file on disk.
+   */
+  async resetFiles(paths: string[], scope: ResetScope = "head"): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/files/reset`, { paths, scope }))
   }
 
   /** External difftool on a working-tree file (index vs HEAD when staged). */

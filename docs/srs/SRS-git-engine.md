@@ -41,6 +41,10 @@ Traces up to: [PRD.md](../../PRD.md) §4; memory `docs/agents/memories/git-exten
 | SRS-ENG-037 | The engine shall open the repository's configured mergetool for a conflicted path, and shall say so plainly when no mergetool is configured. | Resolution outside the app is a first-class path. | Test | `POST /mergetool` |
 | SRS-ENG-038 | The engine shall return the changed files, and the diff of one file, between two commits or between a commit and the working tree. | The Compare submenu. | Test | `GET /compare` |
 | SRS-ENG-039 | The engine shall stream an archive of a commit in zip or tar.gz. | GE's Archive command. | Test | `GET /commits/{id}/archive` |
+| SRS-ENG-040 | A file reset shall take a scope: the whole way to HEAD, the working tree only (restored from the index), or the index only (leaving the file on disk). | The diff view resets what the user is looking at, and only one of the three matches each row. | Test | `POST /files/reset` `scope`, `ResetTests` |
+| SRS-ENG-041 | A path git does not track shall be deleted by a reset under every scope, since no scope has a source to restore it from. | Owner's choice for new files, and the only honest reading of "reset" for content git never saw. | Test | `ResetTests` |
+| SRS-ENG-042 | Applying a patch shall optionally target the index together with the working tree, and shall optionally use a 3-way merge against the blobs the patch records. | Undoing a selection taken from a commit must land staged and must survive the file having moved on since. | Test | `POST /patch` `index`, `threeWay`, `ResetTests` |
+| SRS-ENG-043 | The engine shall refuse a patch larger than its ceiling, and shall refuse index and cached together, before running git. | The route previously validated nothing and would write any request body to disk. | Test | `ResetTests` |
 
 ## Windows isolation
 

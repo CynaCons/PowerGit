@@ -149,6 +149,36 @@ public sealed class SessionTests : IClassFixture<WebApplicationFactory<Program>>
         await client.DeleteAsync($"/repos/{sid}");
     }
 
+    [Fact]
+    public async Task Files_reset_scope_reaches_the_host_and_a_bad_one_is_a_400()
+    {
+        // v0.15.5: the Browse diff view resets "what the user is looking at",
+        // so the route carries which of the three diffs is on screen. The
+        // Working directory row must not destroy staged work.
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = TempRepo.Create("main");
+        string file = Path.Combine(repo.Dir, "a.txt");
+        File.WriteAllText(file, "a\nstaged\n");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+        await client.PostAsJsonAsync($"/repos/{sid}/stage", new { paths = new[] { "a.txt" } });
+        File.WriteAllText(file, "a\nstaged\nunstaged\n");
+
+        HttpResponseMessage res = await client.PostAsJsonAsync(
+            $"/repos/{sid}/files/reset", new { paths = new[] { "a.txt" }, scope = "worktree" });
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        // The unstaged line is gone; the staged one is still staged.
+        // core.autocrlf may rewrite the endings, so compare content only.
+        Assert.Equal("a|staged", File.ReadAllText(file).TrimEnd('\r', '\n').Replace("\r\n", "\n").Replace("\n", "|"));
+        RepoStatusDto? status = await res.Content.ReadFromJsonAsync<RepoStatusDto>();
+        Assert.NotNull(status);
+        Assert.Contains(status.Staged, f => f.Path == "a.txt");
+
+        res = await client.PostAsJsonAsync(
+            $"/repos/{sid}/files/reset", new { paths = new[] { "a.txt" }, scope = "everything" });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        await client.DeleteAsync($"/repos/{sid}");
+    }
+
     private sealed class TempRepo : IDisposable
     {
         public string Dir { get; }

@@ -22,10 +22,10 @@ import { useGitActions } from "./hooks/useGitActions"
 import { useHistory } from "./hooks/useHistory"
 import { useJobs } from "./hooks/useJobs"
 import { useRepoState } from "./hooks/useRepoState"
+import { useZoomHotkeys } from "./hooks/useZoomHotkeys"
 import { useStable } from "./hooks/useStable"
 import { prefetchCommit } from "./engine/commitCache"
 import { useHotkeyLayer, type CommandId } from "./hotkeys"
-import { zoomIn, zoomOut, zoomReset } from "./theme"
 import { useBarLayout } from "./theme/barLayout"
 import { TitleStrip } from "./components/TitleStrip"
 import { CommandRail } from "./components/CommandRail"
@@ -69,6 +69,7 @@ export default function App({ base }: { base: EngineClient }) {
   const current = selected >= 0 ? rows[selected] : undefined
   const headId = useMemo(() => engineRows.find((r) => r.isHead)?.rev.id ?? null, [engineRows])
   useHeartbeat()
+  useZoomHotkeys()
   // Tag chips on graph rows get a tag glyph (v0.14.0, owner: "tags should
   // be having a different little icon"); names come from the ref tree.
   const tagNames = useMemo(() => (refs?.tags ?? []).map((t) => t.name), [refs])
@@ -144,32 +145,6 @@ export default function App({ base }: { base: EngineClient }) {
     mergeRef: (name: string) => actions.openMerge(name),
     rebaseOnto: (name: string) => open({ kind: "rebase", onto: name }),
   })
-
-  // Browser/WebView zoom is deliberately app-scoped so it never changes the
-  // surrounding Tauri page or breaks portal anchoring. Handle all common
-  // keyboard layouts (Ctrl+= emits '+' on some and '=' on others).
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
-      if (event.key === "+" || event.key === "=" || event.code === "Equal") {
-        event.preventDefault()
-        zoomIn()
-      } else if (event.key === "-" || event.code === "Minus") {
-        event.preventDefault()
-        zoomOut()
-      } else if (event.key === "0" || event.code === "Digit0" || event.code === "Numpad0") {
-        event.preventDefault()
-        // Zoom owns Ctrl+0; stop the hotkey layer (also on window/capture)
-        // from running a second action on the same keystroke.
-        event.stopImmediatePropagation()
-        zoomReset()
-      }
-    }
-    // Capture so Chromium/WebView cannot swallow Ctrl+0 as "reset browser zoom"
-    // before the application handler runs.
-    window.addEventListener("keydown", onKeyDown, true)
-    return () => window.removeEventListener("keydown", onKeyDown, true)
-  }, [])
 
   const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
 
@@ -393,6 +368,7 @@ export default function App({ base }: { base: EngineClient }) {
                   height={bottomHeight}
                   tab={bottomTab}
                   onTab={setBottomTab}
+                  setStatus={repoState.setStatus}
                 />
               </Box>
             </Box>

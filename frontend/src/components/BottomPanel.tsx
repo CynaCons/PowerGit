@@ -1,21 +1,16 @@
-import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
-import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined"
 import Box from "@mui/material/Box"
-import IconButton from "@mui/material/IconButton"
-import Tooltip from "@mui/material/Tooltip"
 import LinearProgress from "@mui/material/LinearProgress"
 import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
 import Tabs from "@mui/material/Tabs"
-import Typography from "@mui/material/Typography"
 import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { CommitFileTree } from "./CommitFileTree"
-import { CompactFileList } from "./CompactFileList"
 import { SplitHandle } from "./SplitHandle"
 import { BlobPane } from "./BlobPane"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import { CommitDetailView } from "./CommitDetailView"
-import { DiffPane } from "./DiffPane"
+import { DiffTab, type DiffTabActions } from "./DiffTab"
+import type { BrowseRow } from "./browseReset"
 import type { Loadable } from "./loadable"
 import {
   describeThrown,
@@ -39,6 +34,9 @@ type Props = {
   height: number
   tab?: number
   onTab?: (tab: number) => void
+  /** Lets the Diff tab mutate (v0.15.5); omitted, the panel stays read-only.
+   *  A useState setter, so its identity is stable and memoisation holds. */
+  setStatus?: (status: RepoStatus) => void
 }
 
 import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
@@ -83,9 +81,10 @@ function useDelayed(pending: boolean, delayMs: number): boolean {
   return shown && pending
 }
 
-export function BottomPanel({ current, status, headId, onOpenCommit, height, tab: tabProp, onTab }: Props) {
+export function BottomPanel({ current, status, headId, onOpenCommit, height, tab: tabProp, onTab, setStatus }: Props) {
   const engine = useEngine()
   const pendingRow = useMemo(() => pendingOf(current, status), [current, status])
+  const actions: DiffTabActions | undefined = useMemo(() => (setStatus ? { setStatus } : undefined), [setStatus])
   const [tabState, setTabState] = useState(0)
   const tab = tabProp ?? tabState
   const setTab = onTab ?? setTabState
@@ -133,6 +132,13 @@ export function BottomPanel({ current, status, headId, onOpenCommit, height, tab
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   const commitId = current && current.rev.id.length >= 16 ? current.rev.id : null
+  // Which of the three diffs the Diff tab is showing, so "reset" there can
+  // mean the right git operation (v0.15.5, see browseReset.ts).
+  const browseRow: BrowseRow | null = pendingRow
+    ? { kind: pendingRow.kind }
+    : commitId
+      ? { kind: "commit", sha: commitId.slice(0, 7) }
+      : null
   // Pending rows: files come from the status, the diff from the worktree.
   const pendingDiff = usePendingDiff(pendingRow, pendingRow ? file : null, diffOpts)
   useEffect(() => {
@@ -335,75 +341,25 @@ export function BottomPanel({ current, status, headId, onOpenCommit, height, tab
             <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} busy={busy} />
           ))}
         {tab === 1 && (
-          <>
-            <Box
-              sx={{
-                width: filesWidth,
-                flexShrink: 0,
-                // The list scrolls inside; the mode button below is anchored
-                // to this box's visible bottom, not to the scrolled content
-                // (v0.14.1, owner: floating buttons that "disappear").
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                position: "relative",
-              }}
-            >
-              <CompactFileList
-                testid="file-list"
-                files={files}
-                tree={treeMode}
-                selectedPath={file}
-                emptyText="No files for this revision."
-                onSelect={(f) => setFile(f.path)}
-                onRowDoubleClick={(f) => openInDifftool(f.path)}
-              />
-              {diffToolError && (
-                <Typography
-                  data-testid="difftool-error"
-                  variant="caption"
-                  color="error"
-                  sx={{ px: 1, py: 0.5, flexShrink: 0 }}
-                >
-                  {diffToolError}
-                </Typography>
-              )}
-              {/* Owner (v0.13.16): "a floating transparent button to activate a
-                  mode 'hierarchical' view" — flat paths or a directory tree. */}
-              <Tooltip title={treeMode ? "Show full paths" : "Group by directory"} placement="left">
-                <IconButton
-                  size="small"
-                  data-testid="file-list-mode"
-                  aria-label={treeMode ? "Show full paths" : "Group by directory"}
-                  onClick={() => setTreeMode((t) => !t)}
-                  sx={{
-                    position: "absolute",
-                    right: 10,
-                    bottom: 8,
-                    bgcolor: "rgba(21, 83, 201, 0.10)",
-                    color: "primary.main",
-                    backdropFilter: "blur(4px)",
-                    WebkitBackdropFilter: "blur(4px)",
-                    border: 1,
-                    borderColor: "divider",
-                    "&:hover": { bgcolor: "rgba(21, 83, 201, 0.22)" },
-                  }}
-                >
-                  {treeMode ? <ViewListOutlinedIcon fontSize="small" /> : <AccountTreeOutlinedIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            </Box>
-            <SplitHandle {...splitHandleProps} />
-            <DiffPane
-              diff={pendingRow ? pendingDiff : diff}
-              busy={busy}
-              file={file}
-              options={diffOpts}
-              onOptions={setDiffOpts}
-              onRetry={reload}
-              onOpenDifftool={file ? () => openInDifftool(file) : undefined}
-            />
-          </>
+          <DiffTab
+            files={files}
+            selectedPath={file}
+            onSelect={setFile}
+            treeMode={treeMode}
+            onToggleTreeMode={() => setTreeMode((t) => !t)}
+            filesWidth={filesWidth}
+            splitHandleProps={splitHandleProps}
+            diff={pendingRow ? pendingDiff : diff}
+            busy={busy}
+            options={diffOpts}
+            onOptions={setDiffOpts}
+            onRetry={reload}
+            onOpenDifftool={openInDifftool}
+            difftoolError={diffToolError}
+            row={browseRow}
+            commitId={commitId}
+            actions={actions}
+          />
         )}
         {tab === 2 && (
           <>

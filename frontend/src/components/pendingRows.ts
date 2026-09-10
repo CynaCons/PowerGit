@@ -14,7 +14,9 @@ import type { Loadable } from "./loadable"
 
 // The bottom panel's data for the pending-change rows (v0.14.1): files come
 // from the status the app already holds, diffs from the worktree diff the
-// commit dialog uses. Review only; staging lives in the commit dialog.
+// commit dialog uses. Staging still lives in the commit dialog; since v0.15.5
+// the Diff tab can also reset what it is showing (see browseReset.ts), so
+// this is no longer a read-only surface.
 
 export type Pending = { kind: "worktree" | "index"; staged: boolean; files: FileChange[]; count: number } | null
 

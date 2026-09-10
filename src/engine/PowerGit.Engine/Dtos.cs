@@ -215,11 +215,24 @@ public sealed record FetchRequest(string Remote);
 
 public sealed record FilesDeleteRequest(string[] Paths);
 
-/// <summary>v0.13.14: discard working-tree and index changes of the given paths (Git Extensions "Reset file(s) to HEAD").</summary>
-public sealed record FilesResetRequest(string[] Paths);
+/// <summary>
+/// v0.13.14: discard changes of the given paths. v0.15.5 adds <paramref name="Scope"/>,
+/// because "reset" means whichever diff the user is looking at:
+/// <c>head</c> (the default, Git Extensions "Reset file(s) to HEAD") sends index and
+/// working tree back to HEAD; <c>worktree</c> restores the file from the index and
+/// leaves staged work alone; <c>index</c> unstages and leaves the file on disk.
+/// Untracked paths have nothing to go back to and are deleted under any scope.
+/// </summary>
+public sealed record FilesResetRequest(string[] Paths, string Scope = "head");
 
-/// <summary>v0.13.14: apply a (partial) unified diff. Cached targets the index (stage / unstage), Reverse undoes it (unstage with Cached, reset selected lines in the working tree without).</summary>
-public sealed record ApplyPatchRequest(string Patch, bool Cached = false, bool Reverse = false);
+/// <summary>
+/// v0.13.14: apply a (partial) unified diff. Cached targets the index (stage / unstage),
+/// Reverse undoes it (unstage with Cached, reset selected lines in the working tree
+/// without). v0.15.5 adds Index and ThreeWay for undoing a selection taken from a
+/// commit: it must land in the working tree AND the index, and must survive context
+/// drift since that commit (Git Extensions' `git apply --3way --index`).
+/// </summary>
+public sealed record ApplyPatchRequest(string Patch, bool Cached = false, bool Reverse = false, bool Index = false, bool ThreeWay = false);
 
 /// <summary>v0.13.14: open the external difftool on a working-tree file (index vs HEAD when <paramref name="Staged"/>).</summary>
 public sealed record WorkTreeDifftoolRequest(string Path, bool Staged = false);

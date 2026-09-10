@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { buildPartialPatch, partialEligibility, selectableIndices } from "./partial"
+import { APPLY } from "../hooks/useDiffLineSelection"
 
 // Owner: "select a piece of diff and reset it like we can in baseline Git
 // Extensions". Three changed lines; the owner selects two.
@@ -131,5 +132,70 @@ describe("eligibility", () => {
     expect(s.has(idx("-1"))).toBe(true)
     expect(s.has(idx("@@ -1,3 +1,3 @@"))).toBe(false)
     expect(s.has(idx("--- a/f.txt"))).toBe(false)
+  })
+})
+
+describe("eligibility outside the text (v0.15.5)", () => {
+  it("refuses a truncated diff: its hunks stop mid-file", () => {
+    const e = partialEligibility(DIFF, { truncated: true })
+    expect(e.ok).toBe(false)
+    expect(e.ok === false && e.reason).toContain("truncated")
+  })
+
+  it("refuses a -w diff: its context does not match the file on disk", () => {
+    const e = partialEligibility(DIFF, { ignoreWhitespace: true })
+    expect(e.ok).toBe(false)
+    expect(e.ok === false && e.reason).toContain("whitespace")
+  })
+
+  it("still passes a plain diff", () => {
+    expect(partialEligibility(DIFF, { truncated: false, ignoreWhitespace: false }).ok).toBe(true)
+  })
+})
+
+// The rule that decides `base`: a forward apply needs the target to equal the
+// patch's preimage, a --reverse apply needs it to equal the postimage. These
+// two tests are the check that caught the v0.15.5 unstage bug — base "old"
+// produced a postimage that is not the index, so git refused every partial
+// unstage with "patch does not apply".
+const body = (patch: string) => {
+  const rows = patch.split("\n")
+  return rows.slice(rows.findIndex((l) => l.startsWith("@@")) + 1)
+}
+const preimage = (patch: string) =>
+  body(patch)
+    .filter((l) => l.startsWith(" ") || l.startsWith("-"))
+    .map((l) => l.slice(1))
+const postimage = (patch: string) =>
+  body(patch)
+    .filter((l) => l.startsWith(" ") || l.startsWith("+"))
+    .map((l) => l.slice(1))
+
+describe("which side a partial patch describes", () => {
+  const sel = new Set([idx("-1"), idx("+1x")])
+
+  it('base "old" reproduces the old side, for a forward apply (stage)', () => {
+    const patch = buildPartialPatch(DIFF, sel, "old") ?? ""
+    expect(preimage(patch)).toEqual(["1", "2", "3"])
+  })
+
+  it('base "new" reproduces the new side, for a --reverse apply (reset, unstage, undo)', () => {
+    const patch = buildPartialPatch(DIFF, sel, "new") ?? ""
+    expect(postimage(patch)).toEqual(["1x", "2x", "3x"])
+  })
+
+  it("every --reverse action builds from the new side", () => {
+    const reverseBases = Object.entries(APPLY)
+      .filter(([, spec]) => spec.options.reverse)
+      .map(([action, spec]) => `${action}:${spec.base}`)
+    expect(reverseBases).toEqual(["unstage:new", "reset:new", "undo:new"])
+    // …and the one forward action from the old side.
+    expect(APPLY.stage.base).toBe("old")
+    expect(APPLY.stage.options.reverse).toBeUndefined()
+  })
+
+  it("undoing a commit's lines lands in the working tree and the index, 3-way", () => {
+    expect(APPLY.undo.options).toEqual({ reverse: true, index: true, threeWay: true })
+    expect(APPLY.unstage.options).toEqual({ cached: true, reverse: true })
   })
 })
