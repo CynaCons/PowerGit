@@ -25,6 +25,7 @@ import { isTauriShell } from "../shell"
 import { DEFAULT_BEHAVIOUR, getBehaviour, setBehaviour, type Behaviour } from "../theme/behaviour"
 import { openConsoleTab } from "./gitConsoleState"
 import { BehaviourSection } from "./settings/BehaviourSection"
+import { RecoverySection } from "./settings/RecoverySection"
 import { ToolsSection } from "./settings/ToolsSection"
 import { progressPercent, progressText } from "../updates/updateMachine"
 
@@ -301,6 +302,8 @@ export function SettingsDialog({ open, onClose }: Props) {
             Open logs folder
           </Button>
         )}
+        {/* v0.15.6: the recovery ladder for a frozen picture (Ubuntu). */}
+        <RecoverySection />
 
         {section("Behaviour", "This app, every repository.")}
         <BehaviourSection value={behaviour} onChange={(patch) => setBehaviourDraft((b) => ({ ...b, ...patch }))} />

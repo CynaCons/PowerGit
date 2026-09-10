@@ -1,8 +1,21 @@
 import { chord, formatChord, type Chord } from "./parse"
 
-export type Scope = "browse" | "commit" | "stash" | "dialog"
+/** `global` (v0.15.6): checked before the top layer in every phase, shell only. */
+export type Scope = "browse" | "commit" | "stash" | "dialog" | "global"
+
+export type RecoveryCommandId =
+  | "recovery.step1"
+  | "recovery.step2"
+  | "recovery.step3"
+  | "recovery.step4"
+  | "recovery.step5"
+  | "recovery.step6"
+  | "recovery.step7"
+  | "recovery.step8"
+  | "recovery.step9"
 
 export type CommandId =
+  | RecoveryCommandId
   | "browse.commit"
   | "browse.openRepo"
   | "browse.openSettings"
@@ -194,7 +207,29 @@ export const CATALOG: CommandDef[] = [
   { id: "diff.stageSelected", ge: "StageSelectedFile", scope: "commit", chord: chord("S"), available: true },
   { id: "diff.unstageSelected", ge: "UnStageSelectedFile", scope: "commit", chord: chord("U"), available: true },
   { id: "commit.refresh", ge: "Refresh", scope: "commit", chord: chord("F5"), available: true },
+
+  // v0.15.6 (Ubuntu freeze taskforce): Ctrl+Shift+F1..F9 ask the shell to
+  // run recovery step 1..9 (`recover` command) while the picture is frozen.
+  // IPC is proven alive during the freeze, so a keypress still gets through
+  // when nothing on screen does. Shell only; the browser ignores them.
+  ...recoveryCommands(),
 ]
+
+function recoveryCommands(): CommandDef[] {
+  return [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+    id: `recovery.step${n}` as RecoveryCommandId,
+    ge: null,
+    scope: "global",
+    chord: chord(`F${n}`, { ctrl: true, shift: true }),
+    available: true,
+  }))
+}
+
+/** The step number a recovery command stands for. */
+export function recoveryStepOf(id: CommandId): number | null {
+  const m = /^recovery\.step([1-9])$/.exec(id)
+  return m ? Number(m[1]) : null
+}
 
 export function commandsInScope(scope: Scope): CommandDef[] {
   return CATALOG.filter((c) => c.scope === scope)

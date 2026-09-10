@@ -39,7 +39,7 @@ test("IsTextEditKey port: S types, Ctrl+Space does not", () => {
 })
 
 test("available chords in a scope are unique", () => {
-  for (const scope of ["browse", "commit"] as const) {
+  for (const scope of ["browse", "commit", "global"] as const) {
     const bound = commandsInScope(scope).filter((c) => c.available && c.chord)
     for (let i = 0; i < bound.length; i++) {
       for (let j = i + 1; j < bound.length; j++) {
