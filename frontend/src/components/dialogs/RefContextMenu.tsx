@@ -48,7 +48,7 @@ const remoteOf = (name: string) => name.split("/")[0] ?? name
 function entries(target: RefMenuTarget, tree: boolean): Entry[] {
   const checkout: Entry = {
     action: "checkout",
-    label: target.kind === "tag" ? "Checkout Tag" : "Checkout Branch",
+    label: target.kind === "tag" ? "Checkout tag" : "Checkout branch",
     icon: <SwapHorizIcon fontSize="small" />,
     disabled: target.current,
   }
@@ -72,7 +72,7 @@ function entries(target: RefMenuTarget, tree: boolean): Entry[] {
         rebase,
         {
           action: "delete",
-          label: "Delete Branch…",
+          label: "Delete branch…",
           icon: <DeleteOutlineIcon fontSize="small" />,
           disabled: target.current,
         },
@@ -87,16 +87,16 @@ function entries(target: RefMenuTarget, tree: boolean): Entry[] {
           ? [
               {
                 action: "configure" as const,
-                label: "Configure Remote…",
+                label: "Configure remote…",
                 icon: <SettingsOutlinedIcon fontSize="small" />,
               },
             ]
           : []),
       ]
     case "tag":
-      return [checkout, { action: "delete", label: "Delete Tag…", icon: <DeleteOutlineIcon fontSize="small" /> }]
+      return [checkout, { action: "delete", label: "Delete tag…", icon: <DeleteOutlineIcon fontSize="small" /> }]
     case "submodule":
-      return [{ action: "open-submodule", label: "Open Submodule", icon: <FolderOutlinedIcon fontSize="small" /> }]
+      return [{ action: "open-submodule", label: "Open submodule", icon: <FolderOutlinedIcon fontSize="small" /> }]
   }
 }
 

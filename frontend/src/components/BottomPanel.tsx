@@ -362,7 +362,7 @@ export function BottomPanel({
         >
           <Tab label="Commit" />
           <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
-          <Tab label="File Tree" />
+          <Tab label="File tree" />
         </Tabs>
         {tab === 1 && (
           <ReviewBar

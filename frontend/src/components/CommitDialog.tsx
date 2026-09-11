@@ -11,6 +11,8 @@ import { describeThrown, isAbort, useEngine, type DiffDto, type DiffOptions, typ
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { IgnoreDialog } from "./IgnoreDialog"
+import { EmptyState } from "./AsyncState"
+import { Kbd } from "./Kbd"
 import { FileListBox, ListHeader } from "./CommitFileLists"
 import { CommitFileContextMenu } from "./CommitFileContextMenu"
 import { useCommitFiles } from "../hooks/useCommitFiles"
@@ -226,9 +228,7 @@ export function CommitDialog({
                 onClick={() => void stageSelection(false)}
               >
                 Stage
-                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
-                  {shortcutLabel("diff.stageSelected")}
-                </Typography>
+                <Kbd>{shortcutLabel("diff.stageSelected")}</Kbd>
               </Button>
               <Button
                 size="small"
@@ -247,9 +247,7 @@ export function CommitDialog({
                 onClick={() => void stageSelection(true)}
               >
                 Unstage
-                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
-                  {shortcutLabel("diff.unstageSelected")}
-                </Typography>
+                <Kbd>{shortcutLabel("diff.unstageSelected")}</Kbd>
               </Button>
               <Button
                 size="small"
@@ -307,7 +305,7 @@ export function CommitDialog({
                   onLineContextMenu={lines.openMenu}
                 />
               ) : (
-                <Typography color="text.secondary">Select a file to see its diff.</Typography>
+                <EmptyState text="Select a file to see its diff." testid="commit-diff-empty" />
               )}
             </Box>
             <DiffOptionsBar options={diffOpts} onChange={setDiffOpts} />

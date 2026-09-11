@@ -137,7 +137,7 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
   const nodes: MenuNode[] = [
     {
       id: "ctx-checkout",
-      label: "Checkout Branch…",
+      label: "Checkout branch…",
       icon: "checkout",
       shortcut: shortcutLabel("browse.checkoutBranch"),
       disabled: branches.length === 0,
@@ -156,7 +156,7 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
     },
     {
       id: "ctx-rebase",
-      label: "Rebase Current Branch onto Here…",
+      label: "Rebase current branch onto here…",
       icon: "rebase",
       shortcut: shortcutLabel("browse.rebase"),
       disabled: busy,
@@ -171,7 +171,7 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
     },
     {
       id: "ctx-reset",
-      label: "Reset Current Branch to Here…",
+      label: "Reset current branch to here…",
       icon: "reset",
       children: [
         { id: "ctx-reset-soft", label: "Soft — keep all changes staged", value: "soft" },
@@ -182,20 +182,20 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
 
     {
       id: "ctx-create-branch",
-      label: "Create Branch Here…",
+      label: "Create branch here…",
       icon: "branch",
       shortcut: shortcutLabel("browse.createBranch"),
       divider: true,
     },
     {
       id: "ctx-create-tag",
-      label: "Create Tag Here…",
+      label: "Create tag here…",
       icon: "tag",
       shortcut: shortcutLabel("browse.createTag"),
     },
     {
       id: "ctx-delete-branch",
-      label: "Delete Branch",
+      label: "Delete branch",
       icon: "delete",
       hidden: branches.length === 0,
       children: branches.map((b) => ({
@@ -208,14 +208,14 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
     },
     {
       id: "ctx-delete-tag",
-      label: "Delete Tag",
+      label: "Delete tag",
       icon: "delete",
       hidden: tags.length === 0,
       children: tags.map((t) => ({ id: `ctx-delete-tag-${t}`, label: t, value: t })),
     },
 
-    { id: "ctx-cherry-pick", label: "Cherry-pick Here…", icon: "cherryPick", divider: true },
-    { id: "ctx-revert", label: "Revert Commit…", icon: "revert" },
+    { id: "ctx-cherry-pick", label: "Cherry-pick here…", icon: "cherryPick", divider: true },
+    { id: "ctx-revert", label: "Revert commit…", icon: "revert" },
     {
       id: "ctx-fixup",
       label: `Create fixup commit for ${short}…`,

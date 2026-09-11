@@ -46,6 +46,15 @@ Which GE form each PowerGit surface answers to. GE's source is on the
 | `PatchManager` (synthesizing a patch from selected lines) | `frontend/src/patch/partial.ts`. Same idea on the engine's diff text; the one rule that matters is which side the patch describes — forward applies need the target to equal the preimage, `--reverse` applies the postimage |
 | — (PowerGit-only: review mode, v0.17) | `frontend/src/review/` (`reviewModel.ts` document + line keys, `reviewState.ts` toggle + session documents), tokens `review.*` / `--pg-review-*`, hotkey scope `review`. GE has no line-by-line review; the design is `docs/design/review-mode.md` |
 
+## Menu and dialog labels: parity is functional, the voice is the app's (v0.18.2)
+GE's menus are Title Case ("Checkout Branch...", "Create Tag Here...");
+PowerGit keeps the item, the order and the `ctx-*` id, and writes the label
+in the app's sentence case with the … character ("Checkout branch…",
+"Create tag here…", "Delete branch…", "Configure remote…", the
+"Checkout branch" dialog title). Do not copy a GE caption verbatim into
+`revisionMenuModel.ts` or `RefContextMenu.tsx`; match the voice of the
+labels around it.
+
 ## FileStatusList context menu → commit dialog file menu (v0.16.0)
 
 Owner: "on the left we have the files staged and unstaged. We need functional

@@ -5,7 +5,7 @@ import type { DiffDto } from "../engine"
 import { highlightToHtml, languageForPath } from "../highlight"
 import { codeSx, MONO_FONT } from "../theme"
 import { ContentNotice } from "./ContentNotice"
-import { LoadingState } from "./AsyncState"
+import { EmptyState, LoadingState } from "./AsyncState"
 import { VirtualLines } from "./VirtualLines"
 
 // Shared by both the plain-text and Shiki-highlighted render paths so
@@ -97,7 +97,7 @@ export function BlobPane({
     <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box sx={{ px: 1.5, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
         <Typography variant="caption" sx={{ fontFamily: MONO_FONT }}>
-          {path ?? "Select a file in the tree."}
+          {path ?? " "}
         </Typography>
       </Box>
       {blob && <ContentNotice dto={blob} onOpenDifftool={onOpenDifftool} onRetry={onRetry} />}
@@ -127,7 +127,11 @@ export function BlobPane({
       ) : path ? (
         <LoadingState label="Loading file…" testid="blob-loading" />
       ) : (
-        <Box data-testid="blob-pane" component="pre" sx={BLOB_PANE_SX} />
+        // No file yet (v0.18.2): the same centred, muted empty state the
+        // Diff tab shows, in the pane's place so the header keeps its line.
+        <Box data-testid="blob-pane" sx={{ flex: 1, minWidth: 0, bgcolor: "background.paper" }}>
+          <EmptyState text="Select a file in the tree." testid="blob-empty" />
+        </Box>
       )}
     </Box>
   )

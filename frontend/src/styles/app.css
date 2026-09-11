@@ -228,11 +228,12 @@ html {
 /* Review mode (v0.17.0, docs/design/review-mode.md §4, prototype
    docs/prototypes/review-mode.html): a mark cell inside the sticky gutter,
    drawn only on changed rows. Unreviewed: an amber ring and an amber stripe
-   on the code (green would read as "added"); ok: a filled primary-blue ring
-   with a white check; rejected: a filled red ring with a white ×, red
-   stripe. The cursor row takes the grid selection colour; a stripe stays
-   visible over it. The --pg-review-* variables come from theme/tokens.ts;
-   the fallbacks are the prototype's light values. */
+   on the code (green would read as "added"); ok: an outlined ring with the
+   check in the same colour, no fill (v0.18.2: a reviewed line is quiet, the
+   loud colours stay with unreviewed and rejected); rejected: a filled red
+   ring with a white ×, red stripe. The cursor row takes the grid selection
+   colour; a stripe stays visible over it. The --pg-review-* variables come
+   from theme/tokens.ts; the fallbacks are the prototype's light values. */
 .diff-row-mark {
   display: inline-block;
   flex-shrink: 0;
@@ -259,7 +260,7 @@ html {
 }
 .diff-row-review-ok .diff-row-mark::before {
   border-color: var(--pg-review-ok, var(--pg-primary, #1553c9));
-  background: var(--pg-review-ok, var(--pg-primary, #1553c9));
+  background: transparent;
 }
 .diff-row-review-ok .diff-row-mark::after {
   content: "";
@@ -269,7 +270,7 @@ html {
   width: 3px;
   height: 6px;
   box-sizing: border-box;
-  border: solid #fff;
+  border: solid var(--pg-review-ok, var(--pg-primary, #1553c9));
   border-width: 0 1.8px 1.8px 0;
   transform: rotate(45deg);
 }
