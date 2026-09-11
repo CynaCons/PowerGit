@@ -40,9 +40,73 @@ Which GE form each PowerGit surface answers to. GE's source is on the
 | `FormCommit` fixup/squash items | the commit dialog opened with a `fixup!` / `squash!` message |
 | The "Git command log" window | `GitConsole.tsx`: a dock line that opens a panel, rather than GE's separate window — the owner called that one "too intrusive" (see [git-command-log.md](git-command-log.md)) |
 | `FormSettings` Git config pages | `SettingsDialog.tsx` with `settings/ToolsSection` and `settings/BehaviourSection`; scopes are a toggle, not separate pages |
-| `FileStatusList` reset / delete items | `CommitFileContextMenu.tsx` in the commit dialog, `DiffContextMenus.tsx` in the Browse Diff tab. GE has one meaning of "reset to HEAD"; PowerGit needs three, because the Browse panel shows worktree-vs-index, index-vs-HEAD and commit-vs-parent in the same place (`browseReset.ts`, v0.15.5) |
+| `FileStatusList` reset / delete items | `CommitFileContextMenu.tsx` in the commit dialog (the full menu since v0.16.0, see below), `DiffContextMenus.tsx` in the Browse Diff tab. GE has one meaning of "reset to HEAD"; PowerGit needs three, because the Browse panel shows worktree-vs-index, index-vs-HEAD and commit-vs-parent in the same place (`browseReset.ts`, v0.15.5) |
 | `FileViewer` line staging / resetting (`ApplySelectedLines`) | `hooks/useDiffLineSelection.ts` + `DiffContextMenus.tsx`. GE's reverse apply on a revision is `git apply --3way --index --whitespace=nowarn`; PowerGit's engine takes the same flags on `POST /patch` |
 | `PatchManager` (synthesizing a patch from selected lines) | `frontend/src/patch/partial.ts`. Same idea on the engine's diff text; the one rule that matters is which side the patch describes — forward applies need the target to equal the preimage, `--reverse` applies the postimage |
+
+## FileStatusList context menu → commit dialog file menu (v0.16.0)
+
+Owner: "on the left we have the files staged and unstaged. We need functional
+parity with what GE has. Should be able to right click on my files and do
+operations on them." GE builds the menu in
+`src/app/GitUI/UserControls/FileStatusList.ContextMenu.cs`
+(`UpdateStatusOfMenuItems` = the visibility rules, `RevisionDiffController.cs`
+= the `ShouldShowMenu*` predicates) and orders it in
+`FileStatusList.Designer.cs` (`ItemContextMenu.Items.AddRange`). `FormCommit`
+uses that same control for both lists
+(`Unstaged.BindContextMenu(RescanChanges, canAutoRefresh: true, stage, null)`,
+`Staged.BindContextMenu(…, null, unstage)`), so the Unstaged list is GE's
+"work tree" selection (`IsAnyItemWorkTree`) and the Staged list its "index"
+selection (`IsAnyItemIndex`). PowerGit: `components/commitFileMenuModel.ts`
+(the item model, unit-tested), `CommitFileContextMenu.tsx` (drawing +
+dispatch), `commitFileMenuActions.ts`, `CommitFileMenuDialogs.tsx`, engine
+`GitHost.Files.cs` under `/files/*` (`FilesTests.cs`, SRS-ENG-044…048).
+
+GE order, item by item (separators are GE's `sep*` names):
+
+| GE item (`tsmi*`) | Shown when (GE) | PowerGit |
+|---|---|---|
+| Update / Reset / Stash / Commit submodule, `sepSubmodule` | selection is a submodule | **Hidden.** `GET /status` does not tell a submodule from a file (`--porcelain=v1`). Needs `--porcelain=v2` submodule fields first. |
+| Stage selected (bold) | any work-tree row | `ctx-stage-selected` "Stage file / N files", hotkey S; the dialog's own callback. Disabled on a hidden (flagged) row: `git add` refuses a skip-worktree path (exit 1) and silently skips an assume-unchanged one. |
+| Unstage selected (bold) | any index row | `ctx-stage-selected` "Unstage …", hotkey U |
+| — | (toolbar buttons in GE) | `ctx-stage-all` "Stage all / Unstage all": the task asked for selected *and* all in the menu. Own engine call (`POST /stage`). |
+| Reset file(s) to ▸ First: A `<rev>` / Second: B `<rev>` | any tracked row (`ShouldShowResetFileMenus`) | `ctx-reset-file` ▸ Unstaged: `ctx-reset-index` (GE "First: A Index" = engine scope `worktree`) and `ctx-reset-head` (scope `head`); Staged: `ctx-reset-head` only (GE "First: A HEAD"). Stays enabled for untracked rows: PowerGit deletes them on any reset (owner's choice, SRS-ENG-041), GE disables. |
+| Reset chunk of file… / Interactive add… | one work-tree file, not a submodule | **Hidden.** GE runs `git checkout -p` / `git add -p` in a console. PowerGit's equivalent is the diff's line selection: click / Ctrl / Shift on lines, right-click → `CommitDiffContextMenu` "Stage selected lines" / "Reset selected lines" (`useDiffLineSelection.ts`). The file menu cannot see that selection, so no item links to it. |
+| Cherry pick changes | revision diffs only (`!IsAnyItemWorkTree`) | n/a in the commit dialog (correctly hidden in GE too) |
+| `sepGit` | | divider above "Open with difftool" |
+| Open with difftool ▸ (First→Second, Second→Working dir, First→Working dir, remember/diff two) | any row | `ctx-difftool`, one item: for work-tree rows the only meaningful pair is index↔worktree (unstaged) or HEAD↔index (staged), which `POST /difftool/worktree` already does. Custom difftool list: not ported. |
+| Open working directory file | one file that exists | `ctx-open-file` "Open" → `POST /files/open` (OS handler: `UseShellExecute` / `xdg-open` / `open`) |
+| Open working directory file with… | one file that exists | `ctx-open-with` "Open with…" → prompt for a program (remembered in localStorage, shell: native picker) → `POST /files/open { with }`. GE opens the Windows "Open with" shell dialog (`OsShellUtil.OpenAs`), which has no cross-platform twin. |
+| Open this revision (temp file) / …with… | one file of a real revision (`!IsArtificial`) | n/a in the commit dialog (hidden in GE too) |
+| Edit working directory file | one file that exists | `ctx-edit-file` "Edit" → `POST /files/edit`: git's `core.editor` (Settings → Tools) when set and not a terminal editor, else the OS handler. GE opens its built-in `FormEditor`; PowerGit has none. |
+| Open in Visual Studio | VS installed | **Hidden.** Windows-only VS integration (`VisualStudioIntegration`), stays on Windows per this map. |
+| Save selected as… | real revision only | n/a in the commit dialog |
+| Rename / move | one tracked file, not a submodule | `ctx-move-file` "Rename / move…" → prompt → `POST /files/move` (`git mv`) |
+| Delete file | all selected exist, artificial revision | `ctx-delete-file` "Delete file / N files…", the dialog's own confirm + `POST /files/delete`; disabled when everything selected is already gone |
+| `sepFile` | | divider above "Copy path" |
+| Copy path(s) ▸ (relative POSIX / relative native / full native (bold) / full WSL / full Cygwin) | any row | `ctx-copy-path` ▸ `ctx-copy-full` (native separators, from `RepoInfo.root`), `ctx-copy-relative` (git's forward slashes). WSL/Cygwin flavours: not ported. |
+| Show in folder | any row whose file or parent exists | `ctx-show-in-folder` → Tauri `opener.revealItemInDir` (`diagnostics/snapshot.ts revealInFolder`), one call per selected file like GE. **Hidden in the browser** (`isTauriShell()` false): there is no file manager to reach from a web page. The contract's optional engine route `/files/reveal` was not added. |
+| `sepBrowse` | | (no visible item follows in the commit dialog, so no divider) |
+| Show in File tree, Filter in grid, Find in commit files using git-grep…, Show 'Find in commit files…' | Browse-tab binding only (`BindContextMenu` 9-arg overload) | n/a in the commit dialog (GE hides them there as well) |
+| File history | one tracked row | **Hidden.** GE opens `FormFileHistory` (a path-filtered log). PowerGit's history has no path filter yet (`GET /revisions` takes `max`/`skip` only; no `?path=` anywhere in the UI). Add it with the search/filter work in the backlog and wire `ctx-file-history` then. |
+| Blame | one tracked row | **Hidden.** No blame view in PowerGit yet. |
+| Find file… | any | **Hidden.** In-list search dialog; the commit lists are short and the Ctrl+F filter is backlog. |
+| `sepIgnore` | any work-tree row, or a tracked single file | divider above "Add to .gitignore…" |
+| Add file to .gitignore | any work-tree row, not a submodule | `ctx-ignore-file`, the dialog's own `IgnoreDialog` (one pattern at a time, so disabled on a multi-selection with a hint; GE's dialog takes several) — Unstaged list only, as in GE |
+| Add file to .git/info/exclude | same | `ctx-exclude-file`: one file → `IgnoreDialog target="exclude"` with the pattern anchored like GE (`/dir/file`); several → a confirmation listing the patterns → `POST /files/exclude`. The engine bumps its change stream because `.git/info` is outside the watched paths. |
+| Skip worktree (check) | work-tree rows with a tracked file | `ctx-skip-worktree` (`role=menuitemcheckbox`, `aria-checked`) → `POST /files/skip-worktree { paths, on }` |
+| Assume unchanged (check) | same | `ctx-assume-unchanged` → `POST /files/assume-unchanged` |
+| Stop tracking this file | one tracked file | `ctx-stop-tracking` → confirm → `POST /files/untrack` (`git rm --cached`) |
+| `sepScripts`, Run script | user scripts with `OnEvent == ShowInFileList` | **Hidden.** No script engine in PowerGit. |
+| (toolbar › Settings) Show skip-worktree files / Show assumed-unchanged files | | `ctx-show-skip-worktree` / `ctx-show-assume-unchanged` at the bottom of the menu, persisted (`powergit.commit.showHidden`). Git hides flagged files from `status`, so without these the file the user just flagged has no row to un-flag it from; the commit dialog has no list toolbar to put them in, and the menu is where the file just disappeared. The Unstaged list appends `GET /files/hidden` rows with git's `ls-files -v` letter (S / h / s) as the status. |
+| (toolbar › Settings) Show ignored files / Show untracked files | | not ported |
+
+Status changes made by the menu's own engine calls reach the dialog through
+the engine's change stream (index writes are watched; the exclude route bumps
+the version by hand), i.e. ~0.5–1 s later, unless `CommitDialog.tsx` passes
+the optional `onStatus` prop to `CommitFileContextMenu`, which then hands the
+answered status over at once (the pre-v0.16.0 items go through the dialog's
+callbacks and always refresh at once).
 
 ## Leave on Windows
 - `src/native/GitExtensionsShellEx/` Explorer extension.

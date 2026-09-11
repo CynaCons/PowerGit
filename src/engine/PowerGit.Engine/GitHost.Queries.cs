@@ -460,7 +460,9 @@ public sealed partial class GitHost
         string? upstream = up.ExitCode == 0 && !string.IsNullOrWhiteSpace(up.StdOut) ? up.StdOut.Trim() : null;
         (string state, RepoOperationDto? operation) = GetOperationState(root);
         ConflictFileDto[]? conflicts = unstaged.Any(f => f.Status == "C") ? [.. ListConflicts(root)] : null;
-        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind, upstream, state, operation, conflicts);
+        // v0.16.0: skip-worktree / assume-unchanged bits (GitHost.Files.cs).
+        StatusFileDto[] hidden = ApplyFileFlags(root, unstaged, staged);
+        return new RepoStatusDto(branch, unstaged.Count, staged.Count, [.. unstaged], [.. staged], ahead, behind, upstream, state, operation, conflicts, hidden);
     }
 
     private static bool IsUnmerged(char x, char y)

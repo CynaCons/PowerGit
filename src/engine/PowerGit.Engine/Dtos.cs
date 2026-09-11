@@ -52,7 +52,16 @@ public sealed record DiffDto(
 /// </summary>
 public sealed record CommitChangesDto(IReadOnlyList<FileChangeDto> Files, DiffDto? FirstDiff);
 
-public sealed record StatusFileDto(string Path, string Status, bool Staged);
+/// <summary>
+/// One row of the commit dialog's lists. v0.16.0 adds the two index bits Git
+/// Extensions' FileStatusList shows as check marks: <paramref name="SkipWorktree"/>
+/// (`git update-index --skip-worktree`) and <paramref name="AssumeUnchanged"/>
+/// (`--assume-unchanged`). Git hides such files from `status`, so they reach the
+/// UI through <see cref="RepoStatusDto.Hidden"/> (or `GET /files/hidden`) with
+/// git's own `ls-files -v` letter as <paramref name="Status"/>: "S" skip-worktree,
+/// "h" assume-unchanged, "s" both.
+/// </summary>
+public sealed record StatusFileDto(string Path, string Status, bool Staged, bool SkipWorktree = false, bool AssumeUnchanged = false);
 
 /// <summary>
 /// v0.15.0: one unmerged index entry as `git ls-files -u` reports it. Kind is
@@ -101,7 +110,10 @@ public sealed record RepoStatusDto(
     // A stopped operation is a state, not an error (Git Extensions parity).
     string State = "none",
     RepoOperationDto? Operation = null,
-    ConflictFileDto[]? Conflicts = null);
+    ConflictFileDto[]? Conflicts = null,
+    // v0.16.0: tracked files carrying skip-worktree / assume-unchanged that git
+    // therefore leaves out of `status`; never counted in UnstagedCount.
+    StatusFileDto[]? Hidden = null);
 
 public sealed record RefItemDto(string Name, string FullName, string Target, bool Current);
 
@@ -238,6 +250,18 @@ public sealed record ApplyPatchRequest(string Patch, bool Cached = false, bool R
 public sealed record WorkTreeDifftoolRequest(string Path, bool Staged = false);
 
 public sealed record IgnoreRequest(string Pattern);
+
+/// <summary>v0.16.0, `POST /files/open` and `/files/edit`: a working-tree path, optionally the program to open it with.</summary>
+public sealed record FilesOpenRequest(string Path, string? With = null);
+
+/// <summary>v0.16.0, `POST /files/skip-worktree` and `/files/assume-unchanged`: set (<paramref name="On"/>) or clear the index bit on the paths.</summary>
+public sealed record FilesFlagRequest(string[] Paths, bool On = true);
+
+/// <summary>v0.16.0, `POST /files/exclude` and `/files/untrack`: repository-relative paths.</summary>
+public sealed record FilesPathsRequest(string[] Paths);
+
+/// <summary>v0.16.0, `POST /files/move`: `git mv` one path to a new repository-relative path.</summary>
+public sealed record FilesMoveRequest(string Path, string NewPath);
 
 public sealed record IgnorePreviewDto(string Pattern, string[] Files, int Count);
 

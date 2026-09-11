@@ -391,6 +391,112 @@ repo.MapPost("/difftool/worktree", (WorkTreeDifftoolRequest body, GitHost git) =
     }
 });
 
+// v0.16.0: the commit dialog's file menu (Git Extensions FileStatusList).
+// Mutations answer with the fresh status like /files/reset and /stage do;
+// the launches answer { ok } as soon as the program is started.
+repo.MapPost("/files/open", (FilesOpenRequest body, GitHost git) =>
+{
+    try
+    {
+        git.OpenFile(body.Path, body.With);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/files/edit", (FilesOpenRequest body, GitHost git) =>
+{
+    try
+    {
+        git.EditFile(body.Path);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/files/skip-worktree", (FilesFlagRequest body, GitHost git) =>
+{
+    try
+    {
+        git.SetSkipWorktree(body.Paths, body.On);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/files/assume-unchanged", (FilesFlagRequest body, GitHost git) =>
+{
+    try
+    {
+        git.SetAssumeUnchanged(body.Paths, body.On);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/files/exclude", (FilesPathsRequest body, GitHost git) =>
+{
+    try
+    {
+        git.ExcludeFiles(body.Paths);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/files/untrack", (FilesPathsRequest body, GitHost git) =>
+{
+    try
+    {
+        git.StopTracking(body.Paths);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPost("/files/move", (FilesMoveRequest body, GitHost git) =>
+{
+    try
+    {
+        git.MoveFile(body.Path, body.NewPath);
+        return Results.Ok(git.GetStatus());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapGet("/files/hidden", (GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.ListHiddenFiles());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
 {
     try

@@ -76,7 +76,17 @@ export type DiffDto = {
   truncated: boolean
   truncatedReason: "size" | "lines" | null
 }
-export type StatusFile = { path: string; status: string; staged: boolean }
+/** v0.16.0: the two index bits Git Extensions shows as check marks. A file git
+ *  hides from `status` because of them arrives through `RepoStatus.hidden` (or
+ *  `GET /files/hidden`) with git's own `ls-files -v` letter as `status`: "S"
+ *  skip-worktree, "h" assume-unchanged, "s" both. Engines before v0.16.0 omit both. */
+export type StatusFile = {
+  path: string
+  status: string
+  staged: boolean
+  skipWorktree?: boolean
+  assumeUnchanged?: boolean
+}
 
 /** v0.15.0: the operation the repository is in the middle of. A stopped
  *  merge/rebase/cherry-pick/revert is a state, not an error (Git Extensions
@@ -137,6 +147,8 @@ export type RepoStatus = {
   state?: RepoOperationState
   operation?: RepoOperation | null
   conflicts?: ConflictFile[] | null
+  /** v0.16.0: skip-worktree / assume-unchanged files git leaves out of status; not counted above. */
+  hidden?: StatusFile[] | null
 }
 
 /** POST /merge (v0.15.0, Git Extensions FormMergeBranch). `squash` excludes
