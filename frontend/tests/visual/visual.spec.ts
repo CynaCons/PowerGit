@@ -83,12 +83,15 @@ test.describe("@dialogs", () => {
     await expect(page.getByTestId("commit-overlay")).toBeVisible()
     await expect(page).toHaveScreenshot("dialog-commit.png")
     await page.keyboard.press("Escape")
+    // Settings is a page since v0.18.0 (prototype A), captured with the
+    // rest of the shell around it.
     await page.keyboard.press("Control+Comma")
-    await expect(page.getByRole("dialog")).toBeVisible()
+    await expect(page.getByTestId("settings-page")).toBeVisible()
     // The identity fields stay disabled until the engine answers with this
     // repository's config; capturing before that gives a baseline of empty
     // boxes that would hide any later change to them.
     await expect(page.getByTestId("settings-user-name")).toBeEnabled()
-    await expect(page).toHaveScreenshot("dialog-settings.png")
+    await page.mouse.move(5, 5)
+    await expect(page).toHaveScreenshot("settings-page.png")
   })
 })

@@ -14,6 +14,7 @@ test("Settings exposes the desktop inspector action", async ({ page }) => {
     })
   })
   await page.getByTestId("settings-button").click()
+  await expect(page.getByTestId("settings-page")).toBeVisible()
   const button = page.getByTestId("open-devtools")
   await expect(button).toBeVisible()
   await button.click()

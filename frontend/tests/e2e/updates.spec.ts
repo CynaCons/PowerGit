@@ -19,7 +19,8 @@ test("check for updates, download with progress, restart", async ({ page }) => {
   await page.goto("/")
   await page.getByTestId("settings-button").click()
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
-  await expect(page.getByText(/^PowerGit v\d+\.\d+\.\d+$/)).toBeVisible()
+  // The version is the Updates row's title.
+  await expect(page.getByTestId("settings-section-updates").getByText(/^PowerGit v\d+\.\d+\.\d+$/)).toBeVisible()
 
   // Nothing happens on its own: no update text before the button.
   await expect(page.getByTestId("update-available")).toHaveCount(0)

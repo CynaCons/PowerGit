@@ -15,7 +15,7 @@ test("Escape after Ctrl+Comma returns focus to the grid so ArrowDown moves the s
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
 
   await page.keyboard.press("Escape")
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeHidden()
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeHidden()
 
   await page.keyboard.press("ArrowDown")
   await expect(rows.nth(1)).toHaveClass(/selected/)

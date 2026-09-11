@@ -141,7 +141,9 @@ test("settings opens from the navrail", async ({ page }) => {
   await page.goto("/")
   await page.getByTestId("settings-button").click()
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
-  await page.getByRole("button", { name: "Cancel" }).click()
+  await expect(page.getByTestId("settings-page")).toBeVisible()
+  await page.getByTestId("settings-back").click()
+  await expect(page.getByTestId("settings-page")).toHaveCount(0)
 })
 
 test("diff tab splits files and diff side by side", async ({ page }) => {
@@ -285,7 +287,8 @@ test("Ctrl+Comma opens settings", async ({ page }) => {
   await page.goto("/")
   await page.keyboard.press("Control+Comma")
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
-  await page.getByRole("button", { name: "Cancel" }).click()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toHaveCount(0)
 })
 
 test("F5 does not reload the SPA", async ({ page }) => {
@@ -436,46 +439,38 @@ test("grid Home/End/PageUp/PageDown move the selection", async ({ page }) => {
   await expect(selectedRow).toHaveAttribute("data-index", "0")
 })
 
-test("settings labels are never clipped by the dialog content edge", async ({ page }) => {
+test("settings labels are never clipped by the page list edge", async ({ page }) => {
   await page.goto("/")
   await page.getByTestId("settings-button").click()
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible()
 
-  const content = page.locator(".MuiDialogContent-root")
-  await expect(content).toBeVisible()
+  const list = page.getByTestId("settings-list")
+  await expect(list).toBeVisible()
 
-  // Every outlined field in the dialog carries a floating label subject to
-  // the same top-edge clip: identity (name, email, line endings), appearance
-  // (theme, command bar), the tools and the behaviour selects. The count is
-  // not pinned — the dialog grows — but there must be several, and none of
-  // them may be cut.
-  const labels = content.locator(".MuiFormControl-root .MuiInputLabel-root")
-  expect(await labels.count()).toBeGreaterThanOrEqual(5)
+  // Every row carries a title above its control (identity, appearance, the
+  // tools, the behaviour rows…). The count is not pinned — the page grows —
+  // but there must be several, and none of them may be cut by the list's
+  // edges while its row is on screen.
+  const labels = list.locator('[data-testid^="settings-row-"] > div:first-child')
+  expect(await labels.count()).toBeGreaterThanOrEqual(10)
 
-  // A label is clipped when it is cut by the content edge while its own field
-  // is on screen. A label that has simply scrolled out of view is not clipped,
-  // so only labels that overlap the visible content area are checked.
+  // A label is clipped when it is cut by the list edge while its own row
+  // is on screen. A label that has simply scrolled out of view is not
+  // clipped, so only labels whose whole row is inside the list are checked.
   async function assertNoLabelIsClipped() {
-    const contentBox = (await content.boundingBox())!
-    const top = contentBox.y
-    const bottom = contentBox.y + contentBox.height
+    const listBox = (await list.boundingBox())!
+    const top = listBox.y
+    const bottom = listBox.y + listBox.height
     let checked = 0
     for (const label of await labels.all()) {
       const box = (await label.boundingBox())!
-      const field = await label.locator("..").boundingBox()
-      // A field partially below the scroll viewport is naturally clipped.
-      // Check labels whose whole field is visible, including the first
-      // field's floating label at the content's top edge.
-      const visible = field !== null && field.y >= top && field.y + field.height <= bottom
+      const row = await label.locator("..").boundingBox()
+      const visible = row !== null && row.y >= top && row.y + row.height <= bottom
       if (!visible) continue
       checked++
-      // Measure how much of the label is actually inside the content box
-      // rather than demanding exact containment. The defect this guards
-      // (v0.4.7) cut a label in half; an outlined MUI label straddles its
-      // field's top border by design, and at some dialog positions layout
-      // rounding leaves it ~1px outside — 96% visible, indistinguishable to
-      // the eye, but a hard containment assertion fails intermittently on it
-      // and reports a clipping regression that is not there.
+      // Measure how much of the label is inside the list rather than
+      // demanding exact containment: the defect this guards (v0.4.7) cut a
+      // label in half, and layout rounding can leave one ~1px outside.
       const insideTop = Math.max(box.y, top)
       const insideBottom = Math.min(box.y + box.height, bottom)
       const visibleFraction = (insideBottom - insideTop) / box.height
@@ -484,29 +479,25 @@ test("settings labels are never clipped by the dialog content edge", async ({ pa
     expect(checked).toBeGreaterThan(0)
   }
 
-  // Unscrolled: this is the v0.4.7 regression — the first label sat under the
-  // DialogContent top padding and was cut in half. Pin scrollTop to 0 first:
-  // the dialog autofocuses its first input, and the browser's scroll-into-view
-  // can nudge the container by a pixel, which then reads as a 1px "clip" here.
-  // That is scrolling, not clipping — the very distinction this test exists to
-  // draw — so it must be removed rather than absorbed into a tolerance.
-  await content.evaluate((el) => {
+  // Unscrolled: the v0.4.7 regression was the first label sitting under the
+  // container's top padding, cut in half. Pin scrollTop to 0 first so a
+  // focus-driven nudge of the container cannot read as a 1px "clip".
+  await list.evaluate((el) => {
     el.scrollTop = 0
   })
   await assertNoLabelIsClipped()
 
-  // Scrolled to the bottom: the last field must be fully reachable. Labels the
+  // Scrolled to the bottom: the last row must be fully reachable. Labels the
   // user scrolled past sit legitimately above the box (that is scrolling, not
-  // clipping), so only the last one is asserted here — asserting all of them
-  // made this test pass or fail on whether the dialog happened to scroll.
-  await content.evaluate((el) => {
+  // clipping), so only the last one is asserted here.
+  await list.evaluate((el) => {
     el.scrollTop = el.scrollHeight
   })
-  const contentBox = (await content.boundingBox())!
+  const listBox = (await list.boundingBox())!
   const last = (await labels.last().boundingBox())!
   const lastInside =
-    (Math.min(last.y + last.height, contentBox.y + contentBox.height) - Math.max(last.y, contentBox.y)) / last.height
+    (Math.min(last.y + last.height, listBox.y + listBox.height) - Math.max(last.y, listBox.y)) / last.height
   expect(lastInside, "the last label is not fully reachable by scrolling").toBeGreaterThan(0.9)
 
-  await page.getByRole("button", { name: "Cancel" }).click()
+  await page.keyboard.press("Escape")
 })
