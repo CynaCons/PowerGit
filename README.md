@@ -91,9 +91,15 @@ as "the display is dead", reloads its view, and a third press offers a
 restart in a native dialog. On Linux the shell starts WebKitGTK without
 its DMA-BUF renderer and without accelerated compositing, the usual
 causes of black, non-redrawing windows (`POWERGIT_KEEP_DMABUF=1` and
-`POWERGIT_KEEP_COMPOSITING=1` restore the defaults; `POWERGIT_WAYLAND=1`
-runs on Wayland instead of XWayland). Settings → Tools → Open logs folder
-shows the files.
+`POWERGIT_KEEP_COMPOSITING=1` restore the defaults). On a Wayland session
+the AppImage now runs natively on Wayland instead of XWayland;
+`POWERGIT_X11=1` restores XWayland, and `POWERGIT_NO_FRAME_SYNC=1` turns
+off X11 frame synchronisation there. If the picture ever freezes while the
+app still reacts, `Ctrl+Shift+F3`, `Ctrl+Shift+F6` and `Ctrl+Shift+F8`
+(also in Settings → Tools → Recovery experiments) try to bring it back,
+and `scripts/freeze-dump.sh` collects a report from a terminal — see
+`docs/ubuntu-freeze.md`. Settings → Tools → Open logs folder shows the
+files.
 
 ## Updating
 
@@ -129,18 +135,21 @@ Settings → Updates → Open app location reveals the running AppImage. Updates
 replace it in place, so its filename may still contain the original version.
 
 **If the window freezes on Linux, run this from a terminal while it is still
-frozen** — nothing inside the app can report it, because the inspector and
-the app's own panels are drawn by the same main loop that has stopped:
+frozen** — the app keeps running underneath (its main loop, page and engine
+were all alive in every captured freeze); what stops is the window being
+painted, so the picture has to be examined from outside:
 
 ```
 bash freeze-dump.sh
 ```
 
 It is attached to each release. It reads `/proc` for the app's threads, asks
-whether the engine is still answering, collects the logs, and writes one
-`.tar.gz` to send back. Nothing is killed or modified. Install `elfutils` or
-`gdb` first for full backtraces; without either it still reports what every
-thread is waiting on, which is usually enough.
+whether the engine is still answering, collects the logs and the shell's
+`probe.txt`, records the display stack (backend, frame-sync state, compositor
+log, WebKitGTK and mutter versions), and writes one `.tar.gz` to send back.
+Nothing is killed or modified. `bash freeze-dump.sh recover 3` asks the
+frozen app to run a recovery step (`3`, `6`, `8` first). Install `elfutils`
+or `gdb` first for full backtraces.
 
 v0.15.3 stops that inspector being the only way in. The console at the bottom
 of the window has a second tab, **APP LOG**, showing what PowerGit recorded
