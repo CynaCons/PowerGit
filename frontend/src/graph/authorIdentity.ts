@@ -6,6 +6,8 @@
 // data-palette to them. Memoised per name: the grid renders thousands of
 // rows and the same handful of authors.
 
+import type { GraphRow } from "./types"
+
 export type AuthorPalette = "local" | "remote" | "tag" | "stash" | "head" | "extra"
 
 const PALETTES: readonly AuthorPalette[] = ["local", "remote", "tag", "stash", "head", "extra"]
@@ -52,4 +54,16 @@ export function authorIdentity(author: string): AuthorIdentity {
     cache.set(author, id)
   }
   return id
+}
+
+/** The pill's "n of N": n = loaded rows by `author`, N = loaded rows with an author (pending rows have none). */
+export function countAuthor(rows: GraphRow[], author: string | null): { n: number; total: number } {
+  let n = 0
+  let total = 0
+  for (const row of rows) {
+    if (!row.rev.author) continue
+    total++
+    if (row.rev.author === author) n++
+  }
+  return { n, total }
 }
