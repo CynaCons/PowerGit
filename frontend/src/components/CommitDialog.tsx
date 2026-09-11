@@ -11,6 +11,7 @@ import { describeThrown, isAbort, useEngine, type DiffDto, type DiffOptions, typ
 import { DiffOptionsBar } from "./DiffOptionsBar"
 import { DiffView } from "./DiffView"
 import { IgnoreDialog } from "./IgnoreDialog"
+import { EmptyState } from "./AsyncState"
 import { Kbd } from "./Kbd"
 import { FileListBox, ListHeader } from "./CommitFileLists"
 import { CommitFileContextMenu } from "./CommitFileContextMenu"
@@ -304,7 +305,7 @@ export function CommitDialog({
                   onLineContextMenu={lines.openMenu}
                 />
               ) : (
-                <Typography color="text.secondary">Select a file to see its diff.</Typography>
+                <EmptyState text="Select a file to see its diff." testid="commit-diff-empty" />
               )}
             </Box>
             <DiffOptionsBar options={diffOpts} onChange={setDiffOpts} />
