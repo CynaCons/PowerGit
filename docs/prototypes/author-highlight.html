@@ -1,0 +1,358 @@
+<title>PowerGit Author Highlight</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee; --shadow: 0 14px 40px rgba(16, 24, 39, 0.22);
+    --lane0: #1553c9; --lane1: #059669; --lane2: #a16207;
+    /* the ref-badge pairs from theme/tokens.ts, reused as the author palette */
+    --a1-bg: #eff6ff; --a1-fg: #2563eb;
+    --a2-bg: #ecfdf5; --a2-fg: #059669;
+    --a3-bg: #f5f3ff; --a3-fg: #6d28d9;
+    --a4-bg: #fef9c3; --a4-fg: #a16207;
+    --a5-bg: #fef2f2; --a5-fg: #dc2626;
+    --a6-bg: #f3f4f6; --a6-fg: #6b7280;
+    --faded: #9aa6b4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #60a5fa;
+      --page: #0c1117; --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+      --lane0: #60a5fa; --lane1: #34d399; --lane2: #e0a83a;
+      --a1-bg: #1f3a5f; --a1-fg: #bfdbfe; --a2-bg: #0b3d2e; --a2-fg: #86efac; --a3-bg: #2e1f5e; --a3-fg: #ddd6fe;
+      --a4-bg: #3f2a06; --a4-fg: #fde68a; --a5-bg: #4a1d1d; --a5-fg: #fecaca; --a6-bg: #2c3239; --a6-fg: #c5cbd3;
+      --faded: #5f6b7a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #60a5fa;
+    --page: #0c1117; --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+    --lane0: #60a5fa; --lane1: #34d399; --lane2: #e0a83a;
+    --a1-bg: #1f3a5f; --a1-fg: #bfdbfe; --a2-bg: #0b3d2e; --a2-fg: #86efac; --a3-bg: #2e1f5e; --a3-fg: #ddd6fe;
+    --a4-bg: #3f2a06; --a4-fg: #fde68a; --a5-bg: #4a1d1d; --a5-fg: #fecaca; --a6-bg: #2c3239; --a6-fg: #c5cbd3;
+    --faded: #5f6b7a;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  .top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .switch { display: flex; gap: 4px; margin-left: auto; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 5px 11px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 5px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 22px 20px 48px; }
+  .lead { max-width: 76ch; margin: 0 auto 16px; color: var(--text-2); }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .lead kbd { font: inherit; font-size: 12px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); }
+
+  /* ---------- the grid, as app.css lays it out ---------- */
+  .win { width: 1140px; max-width: 100%; height: 640px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); display: grid; grid-template-rows: 30px 1fr; position: relative; }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--meta); }
+  .grid { display: grid; grid-template-rows: 28px 1fr; min-height: 0; position: relative; }
+  .ghead, .row { display: grid; grid-template-columns: 300px 1fr 190px 130px 84px; align-items: center; }
+  .ghead { font-size: 12px; font-weight: 500; color: var(--meta); border-bottom: 1px solid var(--border-soft); padding-right: 16px; }
+  .ghead > div { padding-left: 8px; border-left: 1px solid var(--border-soft); height: 100%; display: flex; align-items: center; }
+  .ghead > div:first-child { border-left: 0; }
+  .gbody { overflow: auto; position: relative; }
+  .row { height: 28px; border-left: 2px solid transparent; padding-right: 16px; cursor: default; position: relative; }
+  .row > .cell { height: 100%; display: flex; align-items: center; padding-left: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row:hover:not(.selected) > .cell { background: var(--hover); }
+  .row.selected { border-left-color: var(--sel-border); }
+  .row.selected > .cell { background: var(--sel-bg); }
+  .row.selected .lane { background: var(--sel-bg); }
+  .msg { color: var(--text); }
+  .author, .date, .sha { color: var(--meta); font-size: 12px; }
+  .sha { font-family: Consolas, "Cascadia Mono", monospace; }
+  .chip { display: inline-block; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 8px; margin-right: 6px; font-weight: 600; }
+  .chip.local { background: var(--a1-bg); color: var(--a1-fg); }
+  .chip.remote { background: var(--a2-bg); color: var(--a2-fg); }
+  .chip.tag { background: var(--a3-bg); color: var(--a3-fg); }
+  .chip.head { background: var(--a5-bg); color: var(--a5-fg); }
+  /* the graph column: lanes drawn in CSS, nodes as discs, in the lane colours */
+  .lane { position: relative; height: 100%; }
+  .lane i { position: absolute; top: 0; bottom: 0; width: 2px; }
+  .lane .l0 { left: 15px; background: var(--lane0); }
+  .lane .l1 { left: 31px; background: var(--lane1); }
+  .lane .l1.in { top: 14px; } .lane .l1.out { bottom: 14px; }
+  .lane .l1.merge { top: 14px; bottom: 14px; }
+  .lane b { position: absolute; top: 9px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--surface); }
+  .lane b.n0 { left: 11px; background: var(--lane0); }
+  .lane b.n1 { left: 27px; background: var(--lane1); }
+  .lane b.head { box-shadow: 0 0 0 2px var(--lane0); }
+  .lane .j { position: absolute; left: 16px; width: 16px; height: 14px; border-left: 0; border-color: var(--lane1); border-style: solid; border-width: 0; }
+  .lane .j.top { top: 0; border-bottom: 2px solid var(--lane1); border-right: 2px solid var(--lane1); border-radius: 0 0 8px 0; }
+  .lane .j.bot { bottom: 0; border-top: 2px solid var(--lane1); border-right: 2px solid var(--lane1); border-radius: 0 8px 0 0; }
+
+  /* ---------- the floating options pill (GraphOptionsBar) ---------- */
+  .pill { position: absolute; left: 10px; bottom: 10px; z-index: 5; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.14); font-size: 12px; }
+  .pill .sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+  .pill .lbl { color: var(--meta); }
+  .pill .who { font-weight: 600; }
+  .pill .cnt { color: var(--meta); }
+  .pill .tog { border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; background: var(--surface); cursor: pointer; color: var(--text-2); }
+  .pill .tog.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .pill svg { width: 16px; height: 16px; color: var(--meta); }
+
+  /* ---------- A · identity discs ---------- */
+  .disc { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 9.5px; font-weight: 700; letter-spacing: 0.02em; margin-right: 7px; flex: none; }
+  .pa .row .author { color: var(--text-2); }
+  .pa .row.same .disc { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--primary); }
+  .pa .row.same .author { color: var(--text); font-weight: 600; }
+  /* ---------- B · focus: the others fade ---------- */
+  .pb .row.other .msg, .pb .row.other .author, .pb .row.other .date, .pb .row.other .sha { color: var(--faded); }
+  .pb .row.other .chip { opacity: 0.55; }
+  .pb .row.same .author { color: var(--text); font-weight: 600; }
+  .pb .row.same .author::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: var(--primary); margin-right: 7px; flex: none; }
+  /* ---------- C · ruler: margin tick + scroll strip ---------- */
+  .pc .row.same .lane::before { content: ""; position: absolute; left: 2px; top: 8px; width: 3px; height: 12px; border-radius: 2px; background: var(--primary); }
+  .pc .row.same .author { color: var(--primary); font-weight: 600; }
+  .ruler { position: absolute; right: 0; top: 28px; bottom: 0; width: 10px; background: var(--sunken); border-left: 1px solid var(--border-soft); display: none; }
+  .pc .ruler { display: block; }
+  .ruler i { position: absolute; left: 2px; right: 2px; height: 3px; border-radius: 1px; background: var(--primary); }
+  .ruler .view { position: absolute; left: 0; right: 0; background: var(--hover); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+  /* ---------- notes ---------- */
+  .notes { width: 1140px; max-width: 100%; margin: 26px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .note { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .note.pick { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+  .note h3 { margin: 0 0 2px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .note h3 .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--primary); color: var(--on-primary); }
+  .note .who { color: var(--meta); font-size: 12px; margin: 0 0 10px; }
+  .note dl { margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 6px 10px; font-size: 12.5px; }
+  .note dt { color: var(--meta); } .note dd { margin: 0; color: var(--text-2); } .note dd b { color: var(--text); font-weight: 600; }
+  .verdict { width: 1140px; max-width: 100%; margin: 14px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; color: var(--text-2); }
+  .verdict h3 { margin: 0 0 6px; font-size: 14px; } .verdict p { margin: 0 0 6px; max-width: 92ch; } .verdict b { color: var(--text); font-weight: 600; }
+</style>
+
+<header class="top">
+  <div><h1>Author highlight — three ways</h1><div class="sub">Click any row to select it; the highlight follows that commit's author. Try a row by Constantin (most of the history) and one by Ines (two commits).</div></div>
+  <nav class="switch" role="tablist"><button data-proto="a" class="on">A · Identity</button><button data-proto="b">B · Focus</button><button data-proto="c">C · Ruler</button></nav>
+  <div class="theme" role="group" aria-label="Theme"><button data-theme-pick="system" class="on">System</button><button data-theme-pick="light">Light</button><button data-theme-pick="dark">Dark</button></div>
+</header>
+<main>
+  <div class="lead" id="lead"></div>
+  <section class="win" id="win">
+    <div class="titlebar">PowerGit — powergit</div>
+    <div class="grid">
+      <div class="ghead"><div>Graph</div><div>Message</div><div>Author</div><div>Date</div><div>SHA</div></div>
+      <div class="gbody" id="gbody"></div>
+      <div class="ruler" id="ruler"></div>
+    </div>
+    <div class="pill" id="pill"></div>
+  </section>
+  <section class="notes" id="notes"></section>
+  <section class="verdict" id="verdict"></section>
+</main>
+
+<script>
+(function () {
+  // ---------- a 60-commit history with four authors ----------
+  const AUTHORS = {
+    cc: { name: "Constantin Chabirand", ini: "CC", pal: 1 },
+    ml: { name: "Mara Lindqvist", ini: "ML", pal: 3 },
+    tw: { name: "Tomasz Wierzba", ini: "TW", pal: 2 },
+    io: { name: "Ines Oyelaran", ini: "IO", pal: 4 },
+  }
+  const M = [
+    ["cc", "chore(plan): review mode continues as major v0.19", ["local:powergit", "head:HEAD"]],
+    ["cc", "chore(release): v0.18.0", ["tag:v0.18.0"]],
+    ["cc", "fix(settings): a Git key set at this scope says \"set here\""],
+    ["ml", "Merge branch 'wt/v18-settings' into powergit"],
+    ["ml", "docs(agents): the settings page memory, and the GE map's settings line"],
+    ["ml", "test(settings): specs for the page, the owner's sentences"],
+    ["ml", "feat(settings): the settings page in place of the graph"],
+    ["ml", "feat(settings): catalog, SettingRow, SettingsSection and the Git config queue"],
+    ["ml", "refactor(shell): one PanelSplitter for the Browse and file-history views"],
+    ["cc", "chore(plan): v0.18 settings page — prototype A chosen"],
+    ["cc", "chore(release): v0.17.0", ["tag:v0.17.0"]],
+    ["tw", "feat(review): mark lines in the Diff tab — button, keys, bar, cursor"],
+    ["tw", "feat(diff): review marks, cursor and a focusable surface behind a review prop"],
+    ["tw", "feat(hotkeys): review scope, surface gate, and a layer stack that falls through"],
+    ["cc", "feat(theme): review token family, exported as --pg-review-*"],
+    ["cc", "feat(review): document model and window store for review mode"],
+    ["cc", "design(review-mode): the three owner calls decided"],
+    ["io", "plan(v0.17): review mode — design document and five iterations"],
+    ["cc", "docs(prototype): review mode with ok/rejected cycle, slash commands"],
+    ["cc", "docs(prototype): review mode moves with arrows and vim j/k"],
+    ["cc", "chore(release): v0.16.0", ["tag:v0.16.0", "remote:origin/powergit"]],
+    ["cc", "fix(tree): the working directory row loads HEAD's blob"],
+    ["ml", "feat(tree): show file history from the file tree"],
+    ["cc", "fix(commit-menu): exclude dialog waits for the in-flight preview"],
+    ["tw", "feat(history): FormFileHistory — revisions with --follow"],
+    ["cc", "feat(console): a bottom console you can read — pinned running row"],
+    ["cc", "fix(engine): untracked diff exits 1 by design — verdict Ok"],
+    ["cc", "feat(diff): select text for copy in the diff view"],
+    ["cc", "feat(commit): GE-parity file context menus in the commit window"],
+    ["ml", "feat(commit): resizable commit window with a close button"],
+    ["cc", "chore(release): v0.15.7", ["tag:v0.15.7"]],
+    ["cc", "fix(shell): presentation stall needs focus; ages from focus time"],
+    ["cc", "chore(release): v0.15.6", ["tag:v0.15.6"]],
+    ["cc", "feat(shell): Wayland by default; POWERGIT_X11=1 opts out"],
+    ["tw", "feat(shell): recovery ladder — nine steps, Ctrl+Shift+F1..F9"],
+    ["cc", "feat(shell): paint probes — frame clock, draw timestamps, liveness"],
+    ["io", "docs: write up the Ubuntu freeze investigation"],
+    ["cc", "chore(plan): record the two CI failures that predate v0.15.5"],
+    ["cc", "chore(plan): record the v0.15.5 gates"],
+    ["cc", "feat(diff): reset a file or selected lines from the Browse diff view"],
+    ["ml", "fix(shell): keep the main loop off the disk"],
+    ["cc", "feat(shell): capture a freeze from outside — freeze-dump.sh"],
+    ["cc", "chore(release): v0.15.5", ["tag:v0.15.5"]],
+    ["cc", "feat(console): the app log without WebKit's inspector"],
+    ["tw", "fix(settings): Open developer tools reports why it failed"],
+    ["cc", "feat(graph): search — find or filter from the top bar (design)"],
+    ["cc", "feat(settings): behaviour and confirmations, tools, identity scope"],
+    ["cc", "chore(release): v0.15.0", ["tag:v0.15.0"]],
+    ["ml", "feat(updater): check for updates, download and restart"],
+    ["cc", "feat(theme): one place for a colour literal — tokens.ts"],
+    ["cc", "fix(grid): selected commit keeps its graph node"],
+    ["cc", "chore(release): v0.14.1", ["tag:v0.14.1"]],
+    ["cc", "feat(rail): diagnostic snapshot above Settings"],
+    ["tw", "feat(graph): floating options pill — ring, dim others"],
+    ["cc", "feat(refs): tag chips get the tag glyph"],
+    ["cc", "chore(release): v0.14.0", ["tag:v0.14.0"]],
+    ["cc", "feat(status): bottom status bar — branch, ahead/behind, dirty"],
+    ["cc", "feat(fonts): VS Code's font stack"],
+    ["cc", "feat(blob): syntax highlighting via Shiki"],
+    ["cc", "chore(release): v0.13.13", ["tag:v0.13.13"]],
+  ]
+  // side branch spans on lane 1 (merge at the row before the span)
+  const SIDE = [[4, 8], [22, 24], [28, 29], [40, 40], [47, 47]]
+  const inSide = (i) => SIDE.find(([a, b]) => i >= a && i <= b)
+  const mergeAt = (i) => SIDE.some(([a]) => a - 1 === i)
+  const endAt = (i) => SIDE.some(([, b]) => b + 1 === i)
+  const when = (i) => { const d = new Date(Date.UTC(2026, 8, 11, 21, 40) - i * 5.3 * 3600e3); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}` }
+  const sha = (i) => ((0x9e3779b1 * (i + 7)) >>> 0).toString(16).padStart(8, "0").slice(0, 7)
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
+
+  const rows = M.map(([a, msg, refs], i) => ({ i, a, msg, refs: refs || [] }))
+  let selected = 4 // a Mara commit: the minority case first
+  let proto = "a"
+  const opts = { a: { mark: true }, b: { dim: true }, c: { mark: true } }
+
+  const gbody = document.getElementById("gbody"), ruler = document.getElementById("ruler"), pill = document.getElementById("pill"), win = document.getElementById("win")
+
+  function lane(i) {
+    const side = inSide(i)
+    let h = `<i class="l0"></i>`
+    if (side) {
+      const [a, b] = side
+      h += `<i class="l1 ${i === a && i === b ? "merge" : i === a ? "in" : i === b ? "out" : ""}"></i><b class="n1"></b>`
+    } else {
+      h += `<b class="n0 ${i === 0 ? "head" : ""}"></b>`
+      if (mergeAt(i)) h += `<span class="j bot"></span>`
+      if (endAt(i)) h += `<span class="j top"></span>`
+    }
+    return h
+  }
+  function chips(refs) {
+    return refs.map((r) => { const [k, v] = r.split(":"); return `<span class="chip ${k}">${esc(v)}</span>` }).join("")
+  }
+  function render() {
+    const who = rows[selected].a
+    const same = rows.filter((r) => r.a === who).length
+    win.className = `win p${proto}`
+    gbody.innerHTML = rows.map((r) => {
+      const A = AUTHORS[r.a]
+      const cls = ["row", r.i === selected ? "selected" : "", r.a === who ? "same" : "other"].join(" ")
+      const disc = proto === "a" ? `<span class="disc" style="background:var(--a${A.pal}-bg);color:var(--a${A.pal}-fg)">${A.ini}</span>` : ""
+      return `<div class="${cls}" data-i="${r.i}">
+        <div class="lane">${lane(r.i)}</div>
+        <div class="cell msg">${chips(r.refs)}${esc(r.msg)}</div>
+        <div class="cell author">${disc}${esc(A.name)}</div>
+        <div class="cell date">${when(r.i)}</div>
+        <div class="cell sha">${sha(r.i)}</div>
+      </div>`
+    }).join("")
+    // C: the ruler maps every loaded row, not just the visible ones
+    if (proto === "c") {
+      const H = ruler.clientHeight || 580
+      ruler.innerHTML = rows.filter((r) => r.a === who).map((r) => `<i style="top:${(r.i / rows.length) * H}px"></i>`).join("") + `<div class="view" id="rview"></div>`
+      placeView()
+    } else ruler.innerHTML = ""
+    const A = AUTHORS[who]
+    const icon = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="3"/><path d="M2.5 14a5.5 5.5 0 0 1 11 0"/></svg>'
+    const toggles = proto === "b"
+      ? `<button class="tog ${opts.b.dim ? "on" : ""}" data-opt="dim">Dim others</button>`
+      : `<button class="tog ${opts[proto].mark ? "on" : ""}" data-opt="mark">Mark</button>`
+    pill.innerHTML = `<span class="lbl">Checked-out branch</span><span class="tog">All ancestors ▾</span><span class="tog">Ring</span><span class="tog">Dim others</span>
+      <span class="sep"></span>${icon}<span class="lbl">Author</span><span class="who">${esc(A.name)}</span><span class="cnt">${same} of ${rows.length}</span>${toggles}`
+    // the opt-in: with the toggle off nothing marks (the memory's rule)
+    if ((proto === "b" && !opts.b.dim) || (proto !== "b" && !opts[proto].mark)) {
+      gbody.querySelectorAll(".row").forEach((el) => el.classList.remove("same", "other"))
+      ruler.innerHTML = ""
+    }
+  }
+  function placeView() {
+    const v = document.getElementById("rview"); if (!v) return
+    const H = ruler.clientHeight, total = gbody.scrollHeight, top = gbody.scrollTop, vis = gbody.clientHeight
+    v.style.top = `${(top / total) * H}px`; v.style.height = `${(vis / total) * H}px`
+  }
+  gbody.addEventListener("click", (e) => { const r = e.target.closest(".row"); if (!r) return; selected = Number(r.dataset.i); const st = gbody.scrollTop; render(); gbody.scrollTop = st })
+  gbody.addEventListener("scroll", placeView)
+  pill.addEventListener("click", (e) => { const b = e.target.closest("[data-opt]"); if (!b) return; opts[proto][b.dataset.opt] = !opts[proto][b.dataset.opt]; const st = gbody.scrollTop; render(); gbody.scrollTop = st })
+
+  const LEAD = {
+    a: `<p><b>A — Identity.</b> Every author gets a small initials disc in the Author column, coloured from the ref-badge palette the app already has, so runs of one author are visible even with nothing selected. Selecting a commit puts a ring on that author's discs and bolds the name; the graph options pill says who and how many. Nothing fades, nothing touches the row background. Turn <kbd>Mark</kbd> off in the pill and the discs stay — they are identity, not highlight.</p>`,
+    b: `<p><b>B — Focus.</b> No discs. With <kbd>Dim others</kbd> on, every row not by the selected author fades to the muted text colour (colour only, never the background, so the selection stays untouched and WebKitGTK repaints), and the author's rows carry a small blue tick before the name. Select a Constantin commit: the few rows that are <i>not</i> his stand out instead — the dominant-author case reads as "what did the others do".</p>`,
+    c: `<p><b>C — Ruler.</b> A tick in the graph margin on each of the author's rows, the name in blue, and a ruler at the right edge of the grid that maps <i>every loaded commit</i> of that author — like VS Code's find marks on the scrollbar — with the viewport shown as a band. Scroll the grid: the band moves, the ticks stay. Answers "where else did they commit" without leaving the row you are on.</p>`,
+  }
+  document.getElementById("notes").innerHTML = `
+    <div class="note"><h3><span class="tag">A</span>Identity</h3><p class="who">Discs always on, a ring on selection</p>
+      <dl><dt>Dominant author</dt><dd>His discs are everywhere, so the ring says little; the <b>other</b> authors' colours are what you read. Works, but the signal is the palette, not the selection.</dd>
+      <dt>Rare author</dt><dd>Ringed discs jump out; the count in the pill confirms.</dd>
+      <dt>Cost</dt><dd>Adds 25 px to a column that is already tight under 1200 px; a colour per author needs a stable hash and a palette that stays apart from the graph lanes and the ref chips.</dd>
+      <dt>WebKitGTK</dt><dd>Safe: discs are static DOM, the ring is a box-shadow on a class with explicit colour.</dd></dl></div>
+    <div class="note pick"><h3><span class="tag">B</span>Focus</h3><p class="who">Others fade, the author's rows keep their ink</p>
+      <dl><dt>Dominant author</dt><dd><b>The one that works both ways</b>: select Constantin and the twelve rows by someone else are the only muted-vs-inked difference on screen — the exceptions surface.</dd>
+      <dt>Rare author</dt><dd>Two rows in full ink in a sea of grey; unmistakable.</dd>
+      <dt>Cost</dt><dd>Smallest: one class per row and a colour rule; the tick is a pseudo-element. Same device as the pill's existing "Dim others" for the branch, so the vocabulary is already there.</dd>
+      <dt>WebKitGTK</dt><dd>Safe by construction: the class changes <b>color</b>, which is exactly the signal the engine needed last time; the background never moves.</dd></dl></div>
+    <div class="note"><h3><span class="tag">C</span>Ruler</h3><p class="who">Margin ticks and a scroll ruler over the loaded history</p>
+      <dl><dt>Dominant author</dt><dd>The ruler fills solid — honest ("almost everything") but not useful; the ticks are on nearly every row.</dd>
+      <dt>Rare author</dt><dd>Best of the three for <b>finding</b>: the ruler shows the two commits 300 rows down before you scroll.</dd>
+      <dt>Cost</dt><dd>The ruler needs the loaded rows' authors (already in memory) and a resize observer; the margin tick is a canvas or pseudo-element in the graph column, where the selection band already paints.</dd>
+      <dt>WebKitGTK</dt><dd>Safe; the ruler is its own element outside the rows.</dd></dl></div>`
+  document.getElementById("verdict").innerHTML = `<h3>My call</h3>
+    <p><b>B, with C's ruler as its second toggle.</b> B is the only treatment that still says something when one author wrote most of the history — which is this repository, and most repositories the owner opens — and it costs one class per row. The ruler is what makes the rare-author case a navigation aid rather than a decoration; it sits outside the rows, so it cannot collide with the selection or the canvas. Both live in the graph options pill under an "Author" group beside the branch group, off by default, remembered (the memory's rule after v0.12.3: opt-in, never the row background).</p>
+    <p>A's discs are a different feature — author identity at rest — worth keeping in mind for a later "avatars" iteration, but they widen the Author column and add a per-author palette that has to stay apart from lanes and chips; not the answer to "highlight this author".</p>`
+
+  function pick(p) {
+    proto = p
+    document.querySelectorAll(".switch button").forEach((b) => b.classList.toggle("on", b.dataset.proto === p))
+    document.getElementById("lead").innerHTML = LEAD[p]
+    render()
+    try { localStorage.setItem("pg.author-proto", p) } catch (_) {}
+  }
+  document.querySelectorAll(".switch button").forEach((b) => b.addEventListener("click", () => pick(b.dataset.proto)))
+  document.querySelectorAll(".theme button").forEach((b) => b.addEventListener("click", () => {
+    const t = b.dataset.themePick
+    document.querySelectorAll(".theme button").forEach((x) => x.classList.toggle("on", x === b))
+    if (t === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t)
+  }))
+  let initial = "a"
+  try { initial = localStorage.getItem("pg.author-proto") || "a" } catch (_) {}
+  pick(LEAD[initial] ? initial : "a")
+  window.addEventListener("resize", () => { if (proto === "c") render() })
+})()
+</script>
