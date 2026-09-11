@@ -8,10 +8,12 @@ import type { HighlightScope } from "./ancestry"
 //          branch's mainline only (its commits and the merges into it)
 //   ring   thin outline on every highlighted node, HEAD's device
 //   dim    everything outside the history in the non-relative grey
+//   authorMark  (v0.18.1) ring the selected author's discs and bold the
+//          name on every loaded row by that author; off keeps the discs
 
-export type GraphOptions = { scope: HighlightScope; ring: boolean; dim: boolean }
+export type GraphOptions = { scope: HighlightScope; ring: boolean; dim: boolean; authorMark: boolean }
 export const GRAPH_OPTIONS_KEY = "pg.graph"
-export const DEFAULT_GRAPH_OPTIONS: GraphOptions = { scope: "all", ring: true, dim: true }
+export const DEFAULT_GRAPH_OPTIONS: GraphOptions = { scope: "all", ring: true, dim: true, authorMark: true }
 
 export function parseGraphOptions(raw: string | null): GraphOptions {
   if (!raw) return DEFAULT_GRAPH_OPTIONS
@@ -21,6 +23,7 @@ export function parseGraphOptions(raw: string | null): GraphOptions {
       scope: o.scope === "first-parent" ? "first-parent" : "all",
       ring: typeof o.ring === "boolean" ? o.ring : DEFAULT_GRAPH_OPTIONS.ring,
       dim: typeof o.dim === "boolean" ? o.dim : DEFAULT_GRAPH_OPTIONS.dim,
+      authorMark: typeof o.authorMark === "boolean" ? o.authorMark : DEFAULT_GRAPH_OPTIONS.authorMark,
     }
   } catch {
     return DEFAULT_GRAPH_OPTIONS
@@ -44,7 +47,13 @@ export function getGraphOptions(): GraphOptions {
 
 export function setGraphOptions(patch: Partial<GraphOptions>) {
   const next = { ...options, ...patch }
-  if (next.scope === options.scope && next.ring === options.ring && next.dim === options.dim) return
+  if (
+    next.scope === options.scope &&
+    next.ring === options.ring &&
+    next.dim === options.dim &&
+    next.authorMark === options.authorMark
+  )
+    return
   options = next
   try {
     window.localStorage.setItem(GRAPH_OPTIONS_KEY, JSON.stringify(next))
