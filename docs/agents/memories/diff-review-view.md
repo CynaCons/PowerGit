@@ -36,3 +36,11 @@ from the row to the nearest ancestor with `overflow-y: auto|scroll` that
 actually overflows, adjusting `scrollTop` by hand and vertically only:
 `scrollIntoView({ block: "nearest" })` also pulls the horizontal scroll
 back to the row's left edge, undoing a scroll to the right on long lines.
+
+## The ok mark is quiet, the bar has no pill (v0.18.2)
+`.diff-row-review-ok .diff-row-mark` is an outlined ring in `--pg-review-ok`
+with the check in the same colour and no fill; the loud colours stay with
+todo (amber ring + stripe) and rejected (filled red). `ReviewBar.tsx` has
+no background box and no capitals: "Reviewing" / "Review complete" at
+weight 600 in the amber / blue, beside the tabs; meter and counts as
+before. `review-mode.spec.ts` asserts the sentence-case labels.

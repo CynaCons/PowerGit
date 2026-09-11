@@ -4,11 +4,12 @@ import { progressOf, type RowKeys } from "../hooks/useDiffReview"
 import { useReviewDoc, useReviewMode } from "../review/reviewState"
 
 // The review bar (v0.17.0, docs/design/review-mode.md §4, the prototype's
-// `.review-bar`): REVIEWING / REVIEW COMPLETE, a 160 px meter and the
-// counts for the file on screen. Whole-review counts, the file pills and
-// the Review file / Start over / Finish review buttons come with v0.19.0
-// and v0.19.2. Renders nothing while review mode is off or the row's key
-// is not known yet.
+// `.review-bar`): "Reviewing" / "Review complete", a 160 px meter and the
+// counts for the file on screen. v0.18.2 dropped the pill background and
+// the capitals: the label sits beside the tabs in its own colour, no box.
+// Whole-review counts, the file pills and the Review file / Start over /
+// Finish review buttons come with v0.19.0 and v0.19.2. Renders nothing
+// while review mode is off or the row's key is not known yet.
 
 export function ReviewBar({
   reviewKey,
@@ -35,10 +36,7 @@ export function ReviewBar({
         flexShrink: 0,
         ml: "auto",
         mr: 1,
-        px: 1.25,
         py: 0.5,
-        borderRadius: 1,
-        bgcolor: "var(--pg-review-todo-bg, #fdf3e0)",
         color: "text.primary",
       }}
     >
@@ -48,13 +46,11 @@ export function ReviewBar({
         sx={{
           fontSize: 12,
           fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
           lineHeight: 1.4,
           color: complete ? "var(--pg-review-ok, #1553c9)" : "var(--pg-review-todo, #b7791f)",
         }}
       >
-        {complete ? "REVIEW COMPLETE" : "REVIEWING"}
+        {complete ? "Review complete" : "Reviewing"}
       </Typography>
       <Box
         role="progressbar"

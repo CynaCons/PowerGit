@@ -91,7 +91,7 @@ test.describe("review mode in the Diff tab", () => {
       await expect(pane.locator("[data-review]")).toHaveCount(2)
       const label = page.getByTestId("diff-review-label")
       const count = page.getByTestId("diff-review-count")
-      await expect(label).toHaveText("REVIEWING")
+      await expect(label).toHaveText("Reviewing")
       await expect(count).toHaveText("0 / 2 lines")
       // The toggle put the focus in the diff: Space marks the first change.
       await page.keyboard.press("Space")
@@ -104,14 +104,14 @@ test.describe("review mode in the Diff tab", () => {
       await page.keyboard.press("x")
       await expect(second).toHaveAttribute("data-review", "rejected")
       await expect(count).toHaveText("2 / 2 lines · 1 rejected")
-      await expect(label).toHaveText("REVIEW COMPLETE")
+      await expect(label).toHaveText("Review complete")
 
       // Space on a rejected line returns it to unreviewed (no Start over
       // yet), and n finds it again from elsewhere.
       await page.keyboard.press("Space")
       await expect(second).toHaveAttribute("data-review", "todo")
       await expect(count).toHaveText("1 / 2 lines")
-      await expect(label).toHaveText("REVIEWING")
+      await expect(label).toHaveText("Reviewing")
       await page.keyboard.press("k")
       await expect(second).not.toHaveClass(/diff-row-cursor/)
       await page.keyboard.press("n")
