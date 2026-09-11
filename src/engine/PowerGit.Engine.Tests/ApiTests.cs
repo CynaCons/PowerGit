@@ -163,6 +163,29 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(5, (await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?max=10"))!.Length);
     }
 
+    // v0.16.0: the File Tree's blob for the Working directory / Index rows.
+    [Fact]
+    public async Task Blob_worktree_route_serves_the_disk_or_the_index_and_refuses_a_path_escape()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Write("a.txt", "a\nstaged\n");
+        repo.Run("add", "a.txt");
+        repo.Write("a.txt", "a\nstaged\nunstaged\n");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        HttpResponseMessage disk = await client.GetAsync($"/repos/{sid}/blob/worktree?path=a.txt");
+        disk.EnsureSuccessStatusCode();
+        Assert.Equal("a\nstaged\nunstaged\n", (await disk.Content.ReadFromJsonAsync<DiffDto>())?.Text);
+
+        HttpResponseMessage index = await client.GetAsync($"/repos/{sid}/blob/worktree?path=a.txt&staged=true");
+        index.EnsureSuccessStatusCode();
+        Assert.Equal("a\nstaged\n", (await index.Content.ReadFromJsonAsync<DiffDto>())?.Text);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/repos/{sid}/blob/worktree?path=..%2Foutside.txt")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/repos/{sid}/blob/worktree?path=")).StatusCode);
+    }
+
     // v0.15.0 sequencer routes. Every one of these runs against a throwaway
     // TempRepo, never the real work tree.
     [Fact]

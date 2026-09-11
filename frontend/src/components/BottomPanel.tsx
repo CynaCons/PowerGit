@@ -264,15 +264,24 @@ export function BottomPanel({
     return () => ctrl.abort()
   }, [engine, commitId, file, diffOpts, tab, reloadTick])
 
+  // The File Tree's blob: the commit's, or for a pending-change row (whose
+  // tree is HEAD's, see CommitFileTree below) the file on disk (Working
+  // directory) or in the index (Index), as Git Extensions' FileViewer reads
+  // its artificial revisions. Owner (2026-09-11): "accessing a file in the
+  // file tree when selecting the working directory pseudo commit doesn't
+  // load." A primitive, not pendingRow: a status poll must not refetch.
+  const pendingKind = pendingRow?.kind ?? null
   useEffect(() => {
-    if (!commitId || !treeFile) {
+    if (!treeFile || (!commitId && !pendingKind)) {
       setBlob({ kind: "idle" })
       return
     }
     const ctrl = new AbortController()
     setBlob({ kind: "loading" })
-    engine
-      .blob(commitId, treeFile, ctrl.signal)
+    const request = commitId
+      ? engine.blob(commitId, treeFile, ctrl.signal)
+      : engine.workTreeBlob(treeFile, pendingKind === "index", ctrl.signal)
+    request
       .then((b) => {
         if (!ctrl.signal.aborted) setBlob({ kind: "ready", value: b })
       })
@@ -281,7 +290,7 @@ export function BottomPanel({
           setBlob({ kind: "error", message: `open failed: ${describeThrown(e)}` })
       })
     return () => ctrl.abort()
-  }, [engine, commitId, treeFile, reloadTick])
+  }, [engine, commitId, pendingKind, treeFile, reloadTick])
 
   // The file Ctrl+Shift+H opens the history of: the Diff tab's selection or
   // the File Tree's; nothing on the Commit tab.

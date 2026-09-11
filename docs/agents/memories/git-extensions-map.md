@@ -132,13 +132,31 @@ no refetch.
 | `FormFileHistory` window; `Text = "File History - path (name at revision)"` (`SetTitle`) | `components/FileHistoryView.tsx` in the content column (`data-testid="file-history"`), header "File history" + `fileHistoryTitle(path, at)` |
 | `followFileHistoryToolStripMenuItem` "Detect and follow renames" (`AppSettings.FollowRenamesInFileHistory`), `followFileHistoryRenamesToolStripMenuItem` "exact renames and copies only" (enabled when following), `showFullHistoryToolStripMenuItem` "Show full history", `simplifyMergesToolStripMenuItem` "Simplify merges" (enabled with full history) | the four header check boxes `file-history-follow` / `-exact` / `-full` / `-simplify`, same enable rules, remembered in `localStorage` `powergit.fileHistory.options` (`fileHistoryModel.ts`); a change reloads the list (`useHistory` with a new `filter`) |
 | `toolStripSplitLoad` "Load file history" (+ "Load history on show", "Load blame on show") | `file-history-reload`; the list always loads on show |
-| `tabControl1`: `CommitInfoTabPage`, `DiffTab`, `ViewTab`, `BlameTab`; `UpdateSelectedFileViewers` removes Commit/View/Blame for an artificial row, Diff/View/Blame when the file is not in the revision, and loads only the selected tab | `fileHistoryTabs(row, path)`: Commit + Diff + View for a commit, Diff alone for a pending row, no View for a folder; only the visible tab requests (`/commits/{id}` for Commit, `/commits/{id}/diff?path=<name at commit>` or `/diff/worktree` for Diff, `/commits/{id}/blob` for View). **Blame: not ported** (no blame view in PowerGit yet; `toolStripBlameOptions` and its nine settings go with it). |
+| `tabControl1`: `CommitInfoTabPage`, `DiffTab`, `ViewTab`, `BlameTab`; `UpdateSelectedFileViewers` removes Commit/View/Blame for an artificial row, Diff/View/Blame when the file is not in the revision, and loads only the selected tab | `fileHistoryTabs(row, path)`: Commit + Diff + View for a commit, Diff + View for a pending row (View is a PowerGit addition there, see the next section; GE drops it for artificial rows), no View for a folder; only the visible tab requests (`/commits/{id}` for Commit, `/commits/{id}/diff?path=<name at commit>` or `/diff/worktree` for Diff, `/commits/{id}/blob` or `/blob/worktree` for View). **Blame: not ported** (no blame view in PowerGit yet; `toolStripBlameOptions` and its nine settings go with it). |
 | Artificial commits in the grid (the file is modified in the work tree / index) | `withArtificialRows(rows, counts, anchor)`: the pending rows sit on HEAD when it is in the list, else on the newest commit that touched the path (the `anchor` parameter, added for this) |
 | `FileHistoryContextMenu` on the grid: Copy to clipboard ▸, Open with difftool (F3), Difftool selected ↔ local, Save as, Manipulate commit ▸ (Revert, Cherry pick), the two follow toggles | the main grid's `RevisionContextMenu` (a superset: checkout, reset, create branch/tag, cherry-pick, revert, compare, archive…) and `RefContextMenu`, through `hooks/useGridMenus.ts`; the follow toggles are in the header. Save as, Difftool selected ↔ local: not ported. |
 | Escape in any viewer closes the form (`EscapePressed += Close`) | Escape anywhere in the view (`onKeyDown` on its root; MUI menus and dialogs stop their own Escape first) and the header's X (`file-history-close`) → `useFileHistory.close` + `focusGrid()` |
 | Opened from `FileStatusList` (Browse Diff tab, File tree tab, FormCommit lists) with the selected revision, or with `showBlame` | `CommitFileTree.tsx` menu (`ctx-tree-file-history`, folders as `path/`), `DiffContextMenus.tsx` (`ctx-diff-file-history`), `commitFileMenuModel.ts` (`ctx-file-history`, the commit dialog closes first), and `browse.fileHistory` = Ctrl+Shift+H on the file the bottom panel has selected (`useFileHistory.openSelected`; GE's bare `H` is not bound). The commit the panel showed is preselected when it is in the list (`FileHistoryTarget.sha`). |
 | Hotkey `RevisionGridControl.Command.ResetRevisionPathFilter` = Ctrl+Shift+H (clears the grid's path filter) | not bound as such; PowerGit's Ctrl+Shift+H opens the file history (owner's ask) and Escape clears it |
 
+## File Tree and blob of the artificial rows (v0.16.0)
+
+Owner (2026-09-11): "accessing a file in the file tree when selecting the
+working directory pseudo commit doesn't load. It should load the latest
+commit on that branch on which the working directory is based." The
+`WORKTREE` / `INDEX` ids of `graph/artificial.ts` are not git objects:
+`/commits/WORKTREE/tree` and `/blob` answer 400 ("Not a valid object
+name"), and `BottomPanel` only requested a blob for a real commit, so the
+pane stayed on "Loading file..." forever. GE's resolution:
+
+| Git Extensions | PowerGit |
+|---|---|
+| `GitModule.GetTree(commitId)` for `IsArtificial`: `git ls-files --stage` (the index, `--cached` for IndexId) instead of `ls-tree` | The tree is **HEAD's**: `BottomPanel` passes `headId` to `CommitFileTree` for a pending row (`/commits/<head>/tree`). Files only in the index or untracked are not listed (GE lists staged adds); a later iteration can fold `status` into the tree. |
+| `FileViewer.ViewGitItemAsync`: `WorkTreeId` -> `ViewFileAsync` reads the file from disk; `IndexId` -> the blob id from `ls-files --stage`, `GetFileText(blobId)` | `GET /repos/{id}/blob/worktree?path=&staged=` (`GitHost.GetWorkTreeBlob`): `staged=true` is `git show :path`; else the bytes on disk through `ResolveInRoot` (never outside the repository), capped at `MaxBlobBytes`, NUL means binary, `BoundLines` as `/blob`. Client `workTreeBlob`; `BottomPanel` and `FileHistoryView` pick it when the row is artificial. Never read the disk from React. |
+| `FormFileHistory.UpdateSelectedFileViewers`: no View tab for an artificial row | View kept for a pending row, reading the same route (the owner's ask covers the file history's pending row). |
+
+Spec: `frontend/tests/e2e/file-tree-worktree.spec.ts`; xunit
+`QueryTests.GetWorkTreeBlob_*`, `ApiTests.Blob_worktree_route_*`.
 ## Leave on Windows
 - `src/native/GitExtensionsShellEx/` Explorer extension.
 - `externals/conemu-inside` terminal.

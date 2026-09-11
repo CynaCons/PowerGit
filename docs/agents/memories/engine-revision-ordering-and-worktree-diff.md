@@ -64,3 +64,8 @@ never calls it: its effects guard `if (id.length < 16) return` before
 fetching, so it only ever diffs real commit SHAs via `fetchDiff`/`GetDiff`
 (`git show`), never the working tree. No frontend changes were needed for
 the untracked-file fix.
+
+Stale since v0.14.1: `components/pendingRows.ts` (`usePendingDiff`) calls
+`/diff/worktree` for the Working directory / Index rows of the bottom panel,
+and since v0.16.0 `BottomPanel` / `FileHistoryView` read those rows' files
+through `/blob/worktree` (see git-extensions-map.md).

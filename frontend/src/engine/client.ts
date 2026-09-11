@@ -352,6 +352,18 @@ export class EngineClient {
     )
   }
 
+  /** The file as the pending-change rows see it (v0.16.0): on disk for the
+   *  Working directory row, in the index for the Index row (`staged`). The
+   *  File Tree of those rows lists HEAD's tree, so this is what a click on
+   *  one of its files shows. */
+  async workTreeBlob(path: string, staged = false, signal?: AbortSignal): Promise<DiffDto> {
+    return json<DiffDto>(
+      await this.get(`${this.repoPath()}/blob/worktree?path=${encodeURIComponent(path)}&staged=${staged}`, {
+        signal,
+      }),
+    )
+  }
+
   async workTreeDiff(
     path: string,
     staged = false,

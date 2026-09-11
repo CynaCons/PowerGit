@@ -179,6 +179,8 @@ export function FileHistoryView({
   const [reloadTick, setReloadTick] = useState(0)
   const commitId = current && !current.artificial ? current.rev.id : null
   const pendingStaged = current?.artificial === "index"
+  // Primitives for the effects: `current` is rebuilt on every status poll.
+  const pending = current?.artificial !== undefined
 
   // Only the visible tab loads (GE UpdateSelectedFileViewers); latest
   // selection wins through the abort.
@@ -215,12 +217,16 @@ export function FileHistoryView({
     return () => ctrl.abort()
   }, [engine, tab, current, path, at, pendingStaged, diffOpts, reloadTick])
 
+  // View: the blob at the commit, or for a pending row the file on disk /
+  // in the index, as the main File Tree shows it for that row.
   useEffect(() => {
-    if (tab !== "view" || !commitId) return
+    if (tab !== "view" || (!commitId && !pending)) return
     const ctrl = new AbortController()
     setBlob({ kind: "loading" })
-    engine
-      .blob(commitId, at, ctrl.signal)
+    const request = commitId
+      ? engine.blob(commitId, at, ctrl.signal)
+      : engine.workTreeBlob(at, pendingStaged, ctrl.signal)
+    request
       .then((b) => {
         if (!ctrl.signal.aborted) setBlob({ kind: "ready", value: b })
       })
@@ -229,7 +235,7 @@ export function FileHistoryView({
           setBlob({ kind: "error", message: `open failed: ${describeThrown(e)}` })
       })
     return () => ctrl.abort()
-  }, [engine, tab, commitId, at, reloadTick])
+  }, [engine, tab, commitId, pending, pendingStaged, at, reloadTick])
 
   const reload = () => setReloadTick((t) => t + 1)
   const openDifftool = () => {

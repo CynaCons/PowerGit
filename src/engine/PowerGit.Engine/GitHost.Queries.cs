@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace PowerGit.Engine;
 
 public sealed partial class GitHost
@@ -491,6 +493,60 @@ public sealed partial class GitHost
         }
 
         return BoundLines(path, result.StdOut, bytes, result.StdOutTruncated || bytes > MaxBlobBytes ? "size" : null);
+    }
+
+    /// <summary>
+    ///  The file as the pending-change rows see it (v0.16.0, owner: "accessing
+    ///  a file in the file tree when selecting the working directory pseudo
+    ///  commit doesn't load"). Git Extensions' FileViewer reads the working
+    ///  tree from disk for its WorkTree revision and the index blob for its
+    ///  Index revision; same here: <paramref name="staged"/> is `git show
+    ///  :path`, otherwise the bytes on disk, bounded like any blob (size cap,
+    ///  line cap, NUL means binary). The path must stay inside the repository.
+    /// </summary>
+    public DiffDto GetWorkTreeBlob(string path, bool staged, CancellationToken ct = default)
+    {
+        if (staged)
+        {
+            return GetBlob("", path, ct);
+        }
+
+        string root = RequireRoot();
+        string full = ResolveInRoot(root, path);
+        if (Directory.Exists(full))
+        {
+            throw new InvalidOperationException($"{path} is a directory");
+        }
+
+        if (!File.Exists(full))
+        {
+            throw new InvalidOperationException($"{path} does not exist in the working tree");
+        }
+
+        using FileStream stream = new(full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        long bytes = stream.Length;
+        int take = (int)Math.Min(bytes, MaxBlobBytes);
+        byte[] buffer = new byte[take];
+        int read = 0;
+        while (read < take)
+        {
+            ct.ThrowIfCancellationRequested();
+            int n = stream.Read(buffer, read, take - read);
+            if (n <= 0)
+            {
+                break;
+            }
+
+            read += n;
+        }
+
+        if (Array.IndexOf(buffer, (byte)0, 0, read) >= 0)
+        {
+            return new DiffDto(path, "Binary file (not shown)", true, bytes);
+        }
+
+        string text = Encoding.UTF8.GetString(buffer, 0, read);
+        return BoundLines(path, text, bytes, bytes > MaxBlobBytes ? "size" : null);
     }
 
     public DiffDto GetWorkTreeDiff(string path, bool staged, int context = 3, bool ignoreWhitespace = false, bool fullFile = false, CancellationToken ct = default)

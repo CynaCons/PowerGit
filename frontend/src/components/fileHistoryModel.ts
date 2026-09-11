@@ -71,12 +71,14 @@ export function fileHistoryFilter(path: string, options: FileHistoryOptions): Re
 export type FileHistoryTab = "commit" | "diff" | "view"
 
 /** The tabs GE shows for the selected row (UpdateSelectedFileViewers): a
- *  pending-change row has no commit and no blob, so Diff alone; a folder has
- *  no blob to view; a commit gets Commit, Diff and View. Blame is not here
- *  because PowerGit has no blame view yet. */
+ *  pending-change row has no commit, so no Commit tab; a folder has no blob
+ *  to view; a commit gets Commit, Diff and View. A pending row keeps View
+ *  (GE drops it there): it shows the file as the row sees it, on disk or in
+ *  the index, like the main File Tree does for that row (owner, 2026-09-11).
+ *  Blame is not here because PowerGit has no blame view yet. */
 export function fileHistoryTabs(row: GraphRow | undefined, path: string): FileHistoryTab[] {
   if (!row) return ["commit", "diff", "view"]
-  if (row.artificial) return ["diff"]
+  if (row.artificial) return isFolderPath(path) ? ["diff"] : ["diff", "view"]
   if (isFolderPath(path)) return ["commit", "diff"]
   return ["commit", "diff", "view"]
 }

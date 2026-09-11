@@ -151,6 +151,49 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void GetWorkTreeBlob_reads_the_disk_for_the_working_tree_and_the_index_when_staged()
+    {
+        // v0.16.0, owner: "accessing a file in the file tree when selecting
+        // the working directory pseudo commit doesn't load." The pending rows'
+        // File Tree is HEAD's; a file's content is the disk (Working
+        // directory) or the index (Index), as Git Extensions' FileViewer
+        // reads its WorkTree and Index revisions.
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        repo.Write("a.txt", "a\nstaged\n");
+        RunGit(repo.Dir, "add", "a.txt");
+        repo.Write("a.txt", "a\nstaged\nunstaged\n");
+
+        DiffDto disk = host.GetWorkTreeBlob("a.txt", staged: false);
+        Assert.False(disk.Binary);
+        Assert.False(disk.Truncated);
+        Assert.Equal("a\nstaged\nunstaged\n", disk.Text);
+        Assert.Equal(disk.Text.Length, disk.SizeBytes);
+
+        DiffDto index = host.GetWorkTreeBlob("a.txt", staged: true);
+        Assert.False(index.Binary);
+        Assert.Equal("a\nstaged\n", index.Text);
+
+        // The commit the rows are based on is untouched by either.
+        Assert.Equal("a\n", host.GetBlob("HEAD", "a.txt").Text);
+
+        // Untracked: on the disk, not in the index.
+        repo.Write("new.txt", "brand new\n");
+        Assert.Equal("brand new\n", host.GetWorkTreeBlob("new.txt", staged: false).Text);
+        Assert.Throws<InvalidOperationException>(() => host.GetWorkTreeBlob("new.txt", staged: true));
+
+        // Binary is detected like a blob; a missing file, a directory and a
+        // path outside the repository are refused.
+        File.WriteAllBytes(Path.Combine(repo.Dir, "bin.dat"), [0x00, 0x01, 0x02]);
+        Assert.True(host.GetWorkTreeBlob("bin.dat", staged: false).Binary);
+        Assert.Throws<InvalidOperationException>(() => host.GetWorkTreeBlob("missing.txt", staged: false));
+        Assert.Throws<InvalidOperationException>(() => host.GetWorkTreeBlob(".git", staged: false));
+        Assert.Throws<InvalidOperationException>(() => host.GetWorkTreeBlob("../outside.txt", staged: false));
+    }
+
+    [Fact]
     public void GetRefs_lists_heads()
     {
         GitHost host = Opened();

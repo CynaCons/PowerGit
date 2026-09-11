@@ -347,6 +347,30 @@ repo.MapGet("/diff/worktree", (string path, bool staged, GitHost git, int? conte
     }
 });
 
+// The File Tree's blob for the pending-change rows (v0.16.0): the file on
+// disk (Working directory) or in the index (staged=true), like GE's
+// FileViewer for its artificial revisions. Same shape as /commits/{id}/blob.
+repo.MapGet("/blob/worktree", (string path, bool? staged, GitHost git, HttpContext ctx) =>
+{
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        return Results.BadRequest(new ErrorResponse("path is required"));
+    }
+
+    try
+    {
+        return Results.Ok(git.GetWorkTreeBlob(path, staged ?? false, ctx.RequestAborted));
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.StatusCode(499);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapPost("/files/delete", (FilesDeleteRequest body, GitHost git) =>
 {
     try

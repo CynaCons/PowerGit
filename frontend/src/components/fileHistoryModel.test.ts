@@ -70,10 +70,11 @@ describe("fileHistoryFilter", () => {
 })
 
 describe("tabs", () => {
-  it("offers Commit, Diff and View for a commit, Diff alone for a pending row, no View for a folder", () => {
+  it("offers Commit, Diff and View for a commit, Diff and View for a pending row, no View for a folder", () => {
     expect(fileHistoryTabs(row("c1"), "a.ts")).toEqual(["commit", "diff", "view"])
-    expect(fileHistoryTabs(row("WORKTREE", undefined, "worktree"), "a.ts")).toEqual(["diff"])
-    expect(fileHistoryTabs(row("INDEX", undefined, "index"), "a.ts")).toEqual(["diff"])
+    expect(fileHistoryTabs(row("WORKTREE", undefined, "worktree"), "a.ts")).toEqual(["diff", "view"])
+    expect(fileHistoryTabs(row("INDEX", undefined, "index"), "a.ts")).toEqual(["diff", "view"])
+    expect(fileHistoryTabs(row("WORKTREE", undefined, "worktree"), "src/")).toEqual(["diff"])
     expect(fileHistoryTabs(row("c1"), "src/")).toEqual(["commit", "diff"])
     expect(fileHistoryTabs(undefined, "a.ts")).toEqual(["commit", "diff", "view"])
   })
