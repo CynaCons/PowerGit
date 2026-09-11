@@ -110,6 +110,27 @@ html {
   background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
 }
 
+/* The selected commit's author on every loaded row by that author (v0.18.1,
+   class author-same computed in RevisionGrid's row render): a primary ring
+   on the disc and the name in text colour at weight 600. Colour-only marks
+   on the author cell — the row background belongs to the selection
+   (v0.12.3, three owner reports), and a class toggled at runtime sets
+   `color` explicitly, the repaint signal WebKitGTK needed last time
+   (docs/agents/memories/webkitgtk-css.md). `.grid-row` in the selector
+   outranks the theme's `.grid-row .author` weight (theme/index.ts); the
+   selected row carries the class too and keeps its own colours because the
+   `.grid-row.selected` rules below come after. */
+.grid-row.author-same .author-disc {
+  box-shadow:
+    0 0 0 2px var(--pg-surface, #fff),
+    0 0 0 3.5px var(--pg-primary, #1553c9);
+}
+.grid-row.author-same .author {
+  color: var(--pg-text, #101827);
+  font-weight: 600;
+  opacity: 1;
+}
+
 .grid-row.selected {
   background: transparent;
   border-left-color: var(--pg-grid-sel-border, #2563eb);
@@ -429,26 +450,6 @@ html {
 .author-disc[data-palette="extra"] {
   background: var(--pg-ref-extra-bg, #f3f4f6);
   color: var(--pg-ref-extra-fg, #6b7280);
-}
-
-/* The selected commit's author on every loaded row by that author (class
-   author-same, computed in RevisionGrid's row render): a primary ring on
-   the disc and the name in text colour at weight 600. Colour-only marks on
-   the author cell — the row background belongs to the selection (v0.12.3,
-   three owner reports), and a class toggled at runtime sets `color`
-   explicitly, the repaint signal WebKitGTK needed last time
-   (docs/agents/memories/webkitgtk-css.md). The selected row carries the
-   class too and keeps its own colours: `.grid-row.selected .author` is the
-   more specific rule. */
-.author-same .author-disc {
-  box-shadow:
-    0 0 0 2px var(--pg-surface, #fff),
-    0 0 0 3.5px var(--pg-primary, #1553c9);
-}
-.author-same .author {
-  color: var(--pg-text, #101827);
-  font-weight: 600;
-  opacity: 1;
 }
 
 .mono,
