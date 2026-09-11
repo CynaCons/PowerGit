@@ -13,10 +13,12 @@ export type NavRailProps = {
   onOpenRepo: () => void
   onRecents: () => void
   onSettings: () => void
+  /** The settings page is open: the gear shows it (v0.18.2). */
+  settingsOpen: boolean
   onSnapshot: () => void
 }
 
-export function NavRail({ repoName, onOpenRepo, onRecents, onSettings, onSnapshot }: NavRailProps) {
+export function NavRail({ repoName, onOpenRepo, onRecents, onSettings, settingsOpen, onSnapshot }: NavRailProps) {
   return (
     <Box
       component="nav"
@@ -77,7 +79,13 @@ export function NavRail({ repoName, onOpenRepo, onRecents, onSettings, onSnapsho
         </IconButton>
       </Tooltip>
       <Tooltip title={`Settings (${shortcutLabel("browse.openSettings")})`} placement="right">
-        <IconButton onClick={onSettings} sx={{ borderRadius: 2 }} data-testid="settings-button" aria-label="Settings">
+        <IconButton
+          onClick={onSettings}
+          aria-pressed={settingsOpen}
+          sx={{ borderRadius: 2, ...(settingsOpen && { bgcolor: "action.selected", color: "primary.main" }) }}
+          data-testid="settings-button"
+          aria-label="Settings"
+        >
           <SettingsOutlinedIcon fontSize="small" />
         </IconButton>
       </Tooltip>

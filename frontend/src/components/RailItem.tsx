@@ -29,6 +29,8 @@ export type Item = {
   shortcut?: string
   primary?: boolean
   badge?: number
+  /** v0.18.2: the row's page is open (Settings) — aria-pressed and the selected tint. */
+  pressed?: boolean
   onClick: () => void
   menu?: ReactNode
 }
@@ -114,6 +116,7 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
             <ButtonBase
               data-testid={item.testid}
               aria-label={item.label}
+              aria-pressed={item.pressed}
               aria-haspopup={item.menu ? "menu" : undefined}
               title={expanded ? hint : undefined}
               disabled={item.disabled}
@@ -147,7 +150,8 @@ export function RailItem({ item, expanded }: { item: Item; expanded: boolean }) 
                 gap: stacked ? 0.25 : 1.25,
                 px: "11px",
                 borderRadius: 1.5,
-                color: item.disabled ? "text.disabled" : "text.primary",
+                color: item.disabled ? "text.disabled" : item.pressed ? "primary.main" : "text.primary",
+                bgcolor: item.pressed ? "action.selected" : undefined,
                 "& .MuiSvgIcon-root": { fontSize: 18 },
                 "&:hover": { bgcolor: "action.hover" },
                 "&.Mui-focusVisible": { boxShadow: "inset 0 0 0 1px var(--pg-focus-ring, #1553c9)" },

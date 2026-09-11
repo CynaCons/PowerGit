@@ -15,6 +15,9 @@ import { isShown, type SettingId } from "./settingsCatalog"
 // (v0.13.18) now applies as it is made, and the row's Reset is the way
 // back.
 
+// The zoom stepper's − / + are IconButton-sized (28 × 28), not text-wide.
+const STEP_SX = { minWidth: 28, width: 28, height: 28, p: 0 } as const
+
 export function AppearanceSection({ visible }: { visible: Set<SettingId> | null }) {
   const theme = useThemePreference()
   const bar = useBarLayout()
@@ -61,17 +64,37 @@ export function AppearanceSection({ visible }: { visible: Set<SettingId> | null 
         changed={zoom !== ZOOM_DEFAULT}
         onReset={() => setZoom(ZOOM_DEFAULT)}
       >
+        {/* v0.18.2: the stepper as in the prototype — 28 px square − / +
+            with the percentage between, Reset as a text button. */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Button size="small" variant="outlined" onClick={() => setZoom(stepZoom(zoom, -1))} aria-label="Zoom out">
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setZoom(stepZoom(zoom, -1))}
+            aria-label="Zoom out"
+            sx={STEP_SX}
+          >
             −
           </Button>
           <Typography sx={{ minWidth: 44, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
             {zoomPercent(zoom)}
           </Typography>
-          <Button size="small" variant="outlined" onClick={() => setZoom(stepZoom(zoom, 1))} aria-label="Zoom in">
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setZoom(stepZoom(zoom, 1))}
+            aria-label="Zoom in"
+            sx={STEP_SX}
+          >
             +
           </Button>
-          <Button size="small" onClick={() => setZoom(ZOOM_DEFAULT)} aria-label="Reset zoom" sx={{ ml: 0.5 }}>
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => setZoom(ZOOM_DEFAULT)}
+            aria-label="Reset zoom"
+            sx={{ ml: 0.5 }}
+          >
             Reset
           </Button>
         </Box>

@@ -277,6 +277,7 @@ export default function App({ base }: { base: EngineClient }) {
               onOpenRepo={chrome.openRepo}
               onRecents={chrome.openRecents}
               onSettings={chrome.openSettings}
+              settingsOpen={settings.open}
               onSnapshot={chrome.openSnapshot}
               live={live}
               dirty={dirty}
@@ -296,6 +297,7 @@ export default function App({ base }: { base: EngineClient }) {
               onOpenRepo={chrome.openRepo}
               onRecents={chrome.openRecents}
               onSettings={chrome.openSettings}
+              settingsOpen={settings.open}
               onSnapshot={chrome.openSnapshot}
             />
           )}

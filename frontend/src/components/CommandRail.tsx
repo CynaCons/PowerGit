@@ -27,9 +27,19 @@ export type CommandRailProps = CommandDeps & {
   onOpenRepo: () => void
   onRecents: () => void
   onSettings: () => void
+  /** The settings page is open: the gear shows it (v0.18.2). */
+  settingsOpen: boolean
 }
 
-export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, onSnapshot, ...deps }: CommandRailProps) {
+export function CommandRail({
+  repoName,
+  onOpenRepo,
+  onRecents,
+  onSettings,
+  settingsOpen,
+  onSnapshot,
+  ...deps
+}: CommandRailProps) {
   const commands = useCommandItems(deps)
   const [expanded, setExpanded] = useState(readExpanded)
   const toggle = () => {
@@ -139,6 +149,7 @@ export function CommandRail({ repoName, onOpenRepo, onRecents, onSettings, onSna
           icon: <SettingsOutlinedIcon />,
           testid: "settings-button",
           shortcut: shortcutLabel("browse.openSettings"),
+          pressed: settingsOpen,
           onClick: onSettings,
         }}
         expanded={expanded}
