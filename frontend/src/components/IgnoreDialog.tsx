@@ -6,7 +6,7 @@ import DialogContent from "@mui/material/DialogContent"
 import DialogTitle from "@mui/material/DialogTitle"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useEngine, type IgnorePreview } from "../engine"
 import { MONO_FONT } from "../theme"
 
@@ -26,6 +26,12 @@ export function IgnoreDialog({ open, initialPattern, target = "gitignore", onClo
   const [pattern, setPattern] = useState(initialPattern)
   const [preview, setPreview] = useState<IgnorePreview | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The preview in flight, if any. The engine runs one operation per
+  // repository at a time, so a confirm that lands while the preview is still
+  // running is refused with "Repository is busy" and the dialog stays open
+  // (seen on CI-speed runs, v0.16.0). Confirm waits for it instead.
+  const inflight = useRef<Promise<unknown> | null>(null)
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -41,7 +47,8 @@ export function IgnoreDialog({ open, initialPattern, target = "gitignore", onClo
     }
     let cancelled = false
     const t = setTimeout(() => {
-      engine
+      debounce.current = null
+      const request = engine
         .previewIgnore(pattern)
         .then((p) => {
           if (!cancelled) setPreview(p)
@@ -49,15 +56,27 @@ export function IgnoreDialog({ open, initialPattern, target = "gitignore", onClo
         .catch((e: unknown) => {
           if (!cancelled) setError(e instanceof Error ? e.message : "preview failed")
         })
+        .finally(() => {
+          if (inflight.current === request) inflight.current = null
+        })
+      inflight.current = request
     }, 250)
+    debounce.current = t
     return () => {
       cancelled = true
       clearTimeout(t)
+      if (debounce.current === t) debounce.current = null
     }
   }, [engine, open, pattern])
 
   async function confirm() {
     try {
+      // A preview about to start would collide with the write the same way.
+      if (debounce.current) {
+        clearTimeout(debounce.current)
+        debounce.current = null
+      }
+      if (inflight.current) await inflight.current
       await onConfirm(pattern.trim())
       onClose()
     } catch (e) {
