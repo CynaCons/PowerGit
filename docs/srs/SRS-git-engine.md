@@ -46,6 +46,18 @@ Traces up to: [PRD.md](../../PRD.md) §4; memory `docs/agents/memories/git-exten
 | SRS-ENG-042 | Applying a patch shall optionally target the index together with the working tree, and shall optionally use a 3-way merge against the blobs the patch records. | Undoing a selection taken from a commit must land staged and must survive the file having moved on since. | Test | `POST /patch` `index`, `threeWay`, `ResetTests` |
 | SRS-ENG-043 | The engine shall refuse a patch larger than its ceiling, and shall refuse index and cached together, before running git. | The route previously validated nothing and would write any request body to disk. | Test | `ResetTests` |
 
+## Commit dialog file menu (v0.16.0)
+
+Git Extensions' `FileStatusList` context menu, as the engine serves it under `/files/*`.
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-ENG-044 | The engine shall set and clear the skip-worktree and assume-unchanged index bits on given tracked paths, and shall refuse an untracked path or one outside the working tree. | GE "Skip worktree" / "Assume unchanged" check items. | Test | `POST /files/skip-worktree`, `/files/assume-unchanged`, `FilesTests` |
+| SRS-ENG-045 | The repository status shall carry both bits on every listed row and shall list, separately from the unstaged and staged rows and without counting them, the flagged tracked paths git leaves out of `status`; the same list shall be available on its own. | Git hides such files by design; the UI needs them to show the check marks and to let the user clear the bit again (GE "Show skip-worktree files"). | Test | `RepoStatusDto.Hidden`, `StatusFileDto.SkipWorktree/AssumeUnchanged`, `GET /files/hidden`, `FilesTests` |
+| SRS-ENG-046 | The engine shall append given patterns to the repository's `info/exclude`, each on its own line, and shall bump the change stream since that file is outside the watched paths. | GE "Add file to .git/info/exclude"; the Unstaged list must drop the file without waiting for the next poll. | Test | `POST /files/exclude`, `FilesTests` |
+| SRS-ENG-047 | The engine shall open a working-tree file with the OS default handler or with a named program, and shall open it for editing with git's `core.editor` when one is set (falling back to the OS handler for terminal editors), refusing paths that do not exist or escape the working tree and reporting a program that fails to start. | GE "Open working directory file" / "with..." / "Edit working directory file". | Test | `POST /files/open`, `/files/edit`, `FilesTests` |
+| SRS-ENG-048 | The engine shall stop tracking given paths (`git rm --cached`, files kept on disk) and shall rename or move one path through `git mv`, refusing an existing target. | GE "Stop tracking this file" and "Rename / move". | Test | `POST /files/untrack`, `/files/move`, `FilesTests` |
+
 ## Windows isolation
 
 | ID | Requirement | Rationale | Verification | Trace |

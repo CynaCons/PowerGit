@@ -13,13 +13,15 @@ import { MONO_FONT } from "../theme"
 type Props = {
   open: boolean
   initialPattern: string
+  /** v0.16.0: the same dialog writes `.git/info/exclude` (GE FormAddToGitIgnore's localExclude). */
+  target?: "gitignore" | "exclude"
   onClose: () => void
   onConfirm: (pattern: string) => Promise<void>
 }
 
 // Mirrors Git Extensions' "Add to .gitignore" dialog: pattern edit plus a
 // live preview of the files that would be ignored, with a match count.
-export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props) {
+export function IgnoreDialog({ open, initialPattern, target = "gitignore", onClose, onConfirm }: Props) {
   const engine = useEngine()
   const [pattern, setPattern] = useState(initialPattern)
   const [preview, setPreview] = useState<IgnorePreview | null>(null)
@@ -64,8 +66,8 @@ export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" data-testid="ignore-dialog">
-      <DialogTitle>Add to .gitignore</DialogTitle>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" data-testid="ignore-dialog" data-target={target}>
+      <DialogTitle>{target === "exclude" ? "Add to .git/info/exclude" : "Add to .gitignore"}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         <TextField
           data-testid="ignore-pattern"
@@ -77,7 +79,9 @@ export function IgnoreDialog({ open, initialPattern, onClose, onConfirm }: Props
           autoFocus
         />
         <Typography variant="body2" color="text.secondary">
-          {preview ? `${preview.count} existing file(s) will be ignored:` : "Preview loads as you type."}
+          {preview
+            ? `${preview.count} existing file(s) will be ignored${target === "exclude" ? " in this clone only" : ""}:`
+            : "Preview loads as you type."}
         </Typography>
         <Box
           data-testid="ignore-preview"
