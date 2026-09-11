@@ -7,7 +7,6 @@ import type { RepoState } from "../../hooks/useRepoState"
 import { CommitDialog } from "../CommitDialog"
 import { RecentsDialog } from "../RecentsDialog"
 import { RemoteDialog } from "../RemoteDialog"
-import { SettingsDialog } from "../SettingsDialog"
 import { StashDialog } from "../StashDialog"
 import { CheckoutBranchDialog } from "./CheckoutBranchDialog"
 import { CompareDialog } from "./CompareDialog"
@@ -36,8 +35,9 @@ export type AppDialogsProps = {
 }
 
 // Every modal surface of the shell, driven by the single DialogState. The
-// always-mounted MUI dialogs (commit, settings, recents, stash) get an
-// `open` flag so their exit transitions play; the rest mount on demand.
+// always-mounted MUI dialogs (commit, recents, stash) get an `open` flag so
+// their exit transitions play; the rest mount on demand. Settings is not a
+// dialog since v0.18.0: it is a page in App.tsx (settings/SettingsView).
 export function AppDialogs({
   dialogs,
   actions,
@@ -73,13 +73,6 @@ export function AppDialogs({
         onFileHistory={onFileHistory}
       />
 
-      <SettingsDialog
-        open={dialog.kind === "settings"}
-        onClose={() => {
-          close("settings")
-          focusGrid()
-        }}
-      />
       <RecentsDialog
         open={dialog.kind === "recents"}
         onClose={() => {
