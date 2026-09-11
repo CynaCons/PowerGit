@@ -282,6 +282,43 @@ fi
   fi
 } > "$OUT/versions.txt" 2>&1
 
+# ------------------------------------------------------------- system pressure
+# The 2026-09-10 22:10 capture showed every thread of the UI process AND the
+# web process stopped for 22 s, then resuming together: not GTK, the whole
+# process starved or stopped. Memory/IO pressure and the kernel log say which.
+{
+  say "--- /proc/pressure (avg10 avg60 avg300 = % of time stalled) ---"
+  for p in memory io cpu; do
+    if [ -r "/proc/pressure/$p" ]; then
+      say "$p:"; cat "/proc/pressure/$p"
+    else
+      say "$p: (no PSI on this kernel)"
+    fi
+  done
+  say "--- free -m ---"
+  free -m 2>&1 || say "(free not available)"
+  say "--- loadavg ---"
+  cat /proc/loadavg 2>/dev/null
+  say "--- thread scheduler state per PowerGit process (T/t = stopped, D = disk wait) ---"
+  for pid in "${PIDS[@]}"; do
+    [ -d "/proc/$pid/task" ] || continue
+    say "pid $pid ($(cat "/proc/$pid/comm" 2>/dev/null)):"
+    for t in /proc/"$pid"/task/*; do
+      st=$(awk '/^State:/ {print $2}' "$t/status" 2>/dev/null)
+      printf '%s %s %s\n' "$(basename "$t")" "$st" "$(cat "$t/comm" 2>/dev/null)"
+    done | awk '{ c[$2]++; if ($2 ~ /^[TtD]$/) bad = bad "  " $1 " " $2 " " $3 "\n" }
+               END { for (s in c) printf "  state %s: %d thread(s)\n", s, c[s]; if (bad != "") printf "  stopped or in disk wait:\n%s", bad }'
+  done
+  say "--- kernel log, last 5 min (OOM, hung tasks, I/O errors) ---"
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl -k --since "-5min" --no-pager 2>&1 | tail -n 40 || say "(journalctl -k failed)"
+  elif command -v dmesg >/dev/null 2>&1; then
+    dmesg 2>&1 | tail -n 40
+  else
+    say "(no journalctl or dmesg)"
+  fi
+} > "$OUT/pressure.txt" 2>&1
+
 # --------------------------------------------------------------------- logs
 if [ -d "$LOGDIR" ]; then
   say "logs: $LOGDIR"

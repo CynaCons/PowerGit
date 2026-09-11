@@ -31,6 +31,7 @@ Nothing equivalent has been reported on Windows.
 | 2026-09-09 | "whenever the windows loses focus on my ubuntu, it usually end up in a freeze." | v0.15.1 |
 | 2026-09-09 | "when the crash happens, even the developper panels does not refresh!!!" | v0.15.3 |
 | 2026-09-10 | Same shape on v0.15.5 (no capture) | v0.15.5 |
+| 2026-09-11 | Snapshot handed over "from an earlier crash": the watchdog capture of 2026-09-10 22:10 (v0.15.4), see §2 | v0.15.4 |
 
 The shape is consistent across all of them:
 
@@ -82,6 +83,44 @@ cycling; what is dead is presentation of the main window's WebKitWebView.*
 Scope caveat, kept honest: "loop alive" is **proven** for the two captures
 (v0.14.1, v0.14.3) and **inferred** for v0.15.1–v0.15.5 (same shape, no
 capture).
+
+### The third capture: `snapshot-2026-09-10T22-10-36` (v0.15.4, XWayland, WebKitGTK 2.50.4)
+
+Handed over on 2026-09-11. Written by the **script watchdog**, not by a
+press, and it holds the logs of four sessions from that evening. Two
+different things are in it.
+
+**The sessions the owner ended.** Three sessions ended within seconds or
+minutes of the owner coming back to the window (restart 4 s after focus at
+20:19:45; a restart with no focus event at 20:47:37; a hard kill 3.4 min after
+focus at 21:31). In every one the page ran its 10 s status refresh **without
+a single gap for the whole 26–40 min it sat in the background**, and on
+focus it received the event, ran a full refresh and got the engine's answer
+in 98 ms / 827 ms. Script, IPC and engine all alive when the owner found the
+window dead: the same shape as the first two captures, now on WebKitGTK
+2.50.4. Nothing here argues against H1.
+
+**The watchdog event itself (22:10:14 → 22:10:35).** In the background, 28 s
+after focus loss, with visibility still `visible`: **22 s during which nothing
+ran** — no heartbeat, no page timer (the 10 s refresh due at 22:10:24 fired at
+22:10:35.94), no animation frame (21.6 s old), and the shell's own watchdog
+thread missed its 5 s tick (it reported "22s" at 22:10:35.93 instead of
+"18s" at 22:10:32). Everything resumed inside the same 30 ms with no focus
+or visibility event, and the refresh then completed normally. Wall clock
+and monotonic clock agree on 22 s, so it was not a suspend. **This is not a
+frame-clock stall**: a frozen GdkFrameClock does not stop JavaScript timers
+or a tokio thread. It is the whole UI process *and* the web process being
+stopped or starved for 22 s — memory or I/O pressure on the machine (the
+AppImage pages its code in through FUSE, so a thrashing machine stalls every
+thread that touches a cold page) or a stop signal. The owner never saw this
+one; it healed itself.
+
+What v0.15.6 will show for each: the killed-session kind is where native
+Wayland and the recovery ladder apply. The 22 s kind will be logged as a
+`script` stall **and** a `loop` stall within the same second — read that pair
+as "the process as a whole stopped", not as a parked GTK loop. `freeze-dump.sh`
+now records `/proc/pressure/*`, `free -m`, the kernel log tail and each
+thread's scheduler state so the next one names its cause.
 
 ### What this file used to claim, and why each claim was wrong
 
