@@ -623,7 +623,7 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] Recovery-experiment ladder the owner drives during a freeze, each step distinct and numbered in engine.log (queue draw, thaw updates, hide/show, 1px resize, webview reload, new window), reachable from the page and from a native fallback. [agent: claude]
 - [ ] Owner ticks: next freeze reported with the engine.log recovery numbers and, if possible, a freeze-dump capture. [agent: claude]
 - [x] Native Wayland is the default on a Wayland session (POWERGIT_X11=1 keeps XWayland), and POWERGIT_NO_FRAME_SYNC=1 disables GTK's X11 frame sync: the two switches that discriminate H1 (GdkFrameClock frozen waiting for _NET_WM_FRAME_DRAWN under XWayland). Linux compile gate run in WSL (cargo check + cargo test --lib). [agent: claude]
-- [ ] Taskforce finding to fix later: the v0.15.4 AppImage bundles WebKitGTK but not gst-plugins-base (libgstallocators-1.0.so.0 missing on a bare Ubuntu), so it does not start without the system package; either bundle the libs or document the dependency (docker/appimage-check should cover a container without libgstreamer-plugins-base1.0-0). [agent: claude]
+- [x] Taskforce finding, resolved as by-design: the AppImage does not bundle gst-plugins-base (the WSLg reproduction failed on libgstallocators-1.0.so.0) because release.yml runs inspect-appimage.sh --fix --strict, which deliberately strips the host-provided families including GStreamer; every desktop Ubuntu ships them with GNOME, and the launch matrix on stock 22.04/24.04/26.04 passes. Only a bare container or a stripped WSL lacks them; documented in the taskforce report, no packaging change. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
