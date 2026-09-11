@@ -26,6 +26,8 @@ import {
 } from "./commitFilesLayout"
 import { CommitDiffContextMenu } from "./CommitDiffContextMenu"
 import { useDiffLineSelection } from "../hooks/useDiffLineSelection"
+import { CommitWindowFrame } from "./commit-window/CommitWindowFrame"
+import { commitPaperSx, useCommitDialogSize } from "./commit-window/useCommitDialogSize"
 
 type Props = {
   open: boolean
@@ -47,6 +49,7 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
   const { filesWidth, setFilesWidth, commitWidth, treeMode, toggleTree } = useCommitFilesLayout()
   const engine = useEngine()
   const zoom = useZoom()
+  const frame = useCommitDialogSize()
   const [diff, setDiff] = useState<DiffDto | null>(null)
   const [diffOpts, setDiffOpts] = useState<DiffOptions>({ context: 3, ws: false, full: false })
   // The dialog stays mounted across repository switches. Keep each mode's
@@ -161,24 +164,20 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
       }}
       maxWidth={false}
       data-testid="commit-overlay"
-      slotProps={{
-        paper: {
-          sx: {
-            // v0.14.0 (owner: the commit panel "takes only part of the
-            // application space"): nearly the whole window, like Git
-            // Extensions' FormCommit maximised.
-            width: `calc((100vw - 32px) / ${zoom})`,
-            maxWidth: `calc((100vw - 32px) / ${zoom})`,
-            height: `calc((100vh - 32px) / ${zoom})`,
-            maxHeight: `calc((100vh - 32px) / ${zoom})`,
-            margin: `${16 / zoom}px`,
-            display: "flex",
-            flexDirection: "column",
-          },
-        },
-      }}
+      // Near-full by default (v0.14.0); resized and remembered by the frame (v0.16.0).
+      slotProps={{ paper: { sx: commitPaperSx(zoom) } }}
     >
-      <DialogContent ref={contentRef} sx={{ display: "flex", gap: 1, p: 2, flex: 1, minHeight: 0, overflow: "hidden" }}>
+      <CommitWindowFrame
+        title={amend ? "Amend commit" : "Commit"}
+        geometry={frame.geometry}
+        disabled={pending}
+        onClose={onClose}
+        onResize={frame.commit}
+      />
+      <DialogContent
+        ref={contentRef}
+        sx={{ display: "flex", gap: 1, p: 2, pt: 1.5, flex: 1, minHeight: 0, overflow: "hidden" }}
+      >
         <Box
           data-testid="commit-files-column"
           sx={{
