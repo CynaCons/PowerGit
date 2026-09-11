@@ -49,6 +49,56 @@ export const APPLY: Record<LineAction, { base: PatchBase; options: ApplyOptions 
 
 export type ApplyOptions = { cached?: boolean; reverse?: boolean; index?: boolean; threeWay?: boolean }
 
+/** The modifier state of a row click, as `selectionAfterClick` reads it off the MouseEvent. */
+export type ClickKeys = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }
+export type LineSelectionState = { lineSel: Set<number>; anchor: number }
+
+/**
+ * The line selection after a click on row `index`, or null when the click
+ * changes nothing. Click selects the row, Ctrl+click toggles it, Shift+click
+ * ranges from the anchor over the selectable rows (hunk bodies), and
+ * Ctrl+Shift+click adds that range to what is already selected.
+ *
+ * `dragged` (v0.16.0, owner: "it's missing the ability to select text for
+ * copy-paste"): the rows take plain mouse text selection again, and a
+ * press-drag-release across the text ends in a click event on the row the
+ * button went up on. That click is the end of the drag, not a line pick, and
+ * the line selection stays as it was. The caller decides what a drag is
+ * (DiffView: the pointer moved between press and release AND text is
+ * selected); a click on already-selected text moves nothing and still picks
+ * the line, even though Chromium dispatches the click before it collapses
+ * that selection.
+ */
+export function selectionAfterClick(
+  state: LineSelectionState,
+  index: number,
+  selectable: ReadonlySet<number>,
+  keys: ClickKeys,
+  dragged: boolean,
+): LineSelectionState | null {
+  if (dragged || !selectable.has(index)) return null
+  const { lineSel, anchor } = state
+  if (keys.shiftKey && anchor >= 0) {
+    const [lo, hi] = [Math.min(anchor, index), Math.max(anchor, index)]
+    const next = new Set(keys.ctrlKey || keys.metaKey ? lineSel : [])
+    for (let i = lo; i <= hi; i++) if (selectable.has(i)) next.add(i)
+    return { lineSel: next, anchor }
+  }
+  if (keys.ctrlKey || keys.metaKey) {
+    const next = new Set(lineSel)
+    if (next.has(index)) next.delete(index)
+    else next.add(index)
+    return { lineSel: next, anchor: index }
+  }
+  return { lineSel: new Set([index]), anchor: index }
+}
+
+/** Whether the mouse has left a non-empty text selection in the document (false outside a browser). */
+export function hasTextSelection(doc: Pick<Document, "getSelection"> | undefined = globalThis.document): boolean {
+  const sel = doc?.getSelection()
+  return sel !== null && sel !== undefined && !sel.isCollapsed && sel.toString().length > 0
+}
+
 // Line selection in the commit dialog's diff (v0.13.14). Owner: "in the
 // commit view, we can select a piece of diff and reset it like we can in
 // baseline Git Extensions." Click selects a row, Ctrl+click toggles,
@@ -97,23 +147,13 @@ export function useDiffLineSelection({
     ? partialEligibility(diff.text, { truncated: diff.truncated, ...context })
     : ({ ok: false, reason: "no diff" } as const)
 
-  function clickLine(index: number, e: React.MouseEvent) {
-    if (!selectable.has(index)) return
-    if (e.shiftKey && anchor.current >= 0) {
-      const [lo, hi] = [Math.min(anchor.current, index), Math.max(anchor.current, index)]
-      const next = new Set(e.ctrlKey || e.metaKey ? lineSel : [])
-      for (let i = lo; i <= hi; i++) if (selectable.has(i)) next.add(i)
-      setLineSel(next)
-    } else if (e.ctrlKey || e.metaKey) {
-      const next = new Set(lineSel)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
-      setLineSel(next)
-      anchor.current = index
-    } else {
-      setLineSel(new Set([index]))
-      anchor.current = index
-    }
+  /** `moved`: the pointer travelled between press and release (DiffView measures it). */
+  function clickLine(index: number, e: React.MouseEvent, moved = false) {
+    const dragged = moved && hasTextSelection()
+    const next = selectionAfterClick({ lineSel, anchor: anchor.current }, index, selectable, e, dragged)
+    if (!next) return
+    setLineSel(next.lineSel)
+    anchor.current = next.anchor
   }
 
   function openMenu(index: number, e: React.MouseEvent) {
@@ -126,12 +166,10 @@ export function useDiffLineSelection({
   }
 
   /**
-   * The selected rows as they appear, in file order, "+"/"-" markers kept.
-   *
-   * Line selection sets `user-select: none` on the rows (app.css
-   * .diff-row-selectable), so dragging across the diff no longer selects its
-   * text. Copying has to have another home, or enabling selection would take
-   * a capability away (v0.15.5).
+   * The selected rows as they appear, in file order, "+"/"-" markers kept:
+   * the Browse diff's "Copy selected lines" menu item (v0.15.5). Plain
+   * Ctrl+C over a mouse text selection is DiffView's copy handler, which
+   * strips the markers (v0.16.0).
    */
   function selectedText(): string {
     return [...lineSel]
