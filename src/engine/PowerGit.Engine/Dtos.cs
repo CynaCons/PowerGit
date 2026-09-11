@@ -297,7 +297,8 @@ public sealed record StashRequest(string? Message, bool KeepIndex = false, bool 
 
 public sealed record StashApplyRequest(string Reference, bool Pop = false);
 
-public sealed record DifftoolRequest(string Commit, string Path);
+/// <summary><c>Local</c> (v0.16.0): the commit's file against the working tree instead of its parent.</summary>
+public sealed record DifftoolRequest(string Commit, string Path, bool Local = false);
 
 /// <summary>409 body: a mutation collided with a running operation on the same session (v0.13.6).</summary>
 public sealed record BusyResponse(string Error, string Running);

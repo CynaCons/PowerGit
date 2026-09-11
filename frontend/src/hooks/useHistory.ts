@@ -49,7 +49,12 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   const historyCompleteRef = useRef(false)
   const histGen = useRef(0)
   const revCount = useRef(0)
-  const extendRun = useRef<Promise<void> | null>(null)
+  // The tail run in flight, keyed by the generation it loads for: a reset
+  // or reload bumps the generation, and a run of an older one is never
+  // handed out again (v0.16.0 review, finding 5: the file history's eager
+  // extension after a filter change used to attach to the previous
+  // filter's aborted run and load nothing).
+  const extendRun = useRef<{ gen: number; run: Promise<void> } | null>(null)
   // Every in-flight page request of the current generation; a reload or a
   // repo switch aborts them so the engine kills the corresponding git log.
   const inflight = useRef<AbortController | null>(null)
@@ -169,12 +174,17 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   // callers (scroll, ref jump, autofill) share the in-flight run.
   const extendHistory = useCallback(
     (targetCount: number): Promise<void> => {
-      if (extendRun.current) return extendRun.current
-      if (historyCompleteRef.current) return Promise.resolve()
       const gen = histGen.current
+      if (extendRun.current?.gen === gen) return extendRun.current.run
+      if (historyCompleteRef.current) return Promise.resolve()
       const cap = Math.min(targetCount, HARD_CEILING)
       setLoadingTail(true)
-      const run = (async () => {
+      // The slot is taken before the run starts: with nothing left to load
+      // below the cap the run ends synchronously, and its finally must find
+      // its own entry to clear.
+      const entry = { gen, run: Promise.resolve() }
+      extendRun.current = entry
+      entry.run = (async () => {
         try {
           while (revCount.current < cap && histGen.current === gen && !historyCompleteRef.current) {
             const skip = revCount.current
@@ -202,12 +212,15 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
           // Tail loading is best-effort; the next scroll or refresh retries.
           if (!isAbort(e)) onFailure(e, "history tail")
         } finally {
-          extendRun.current = null
-          setLoadingTail(false)
+          // Only the run that is still current clears the slot: a superseded
+          // one must not drop the run that replaced it, nor its spinner.
+          if (extendRun.current === entry) {
+            extendRun.current = null
+            setLoadingTail(false)
+          }
         }
       })()
-      extendRun.current = run
-      return run
+      return entry.run
     },
     [fetchPage, onFailure],
   )
@@ -243,6 +256,8 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   const resetHistory = useCallback(() => {
     histGen.current += 1
     abortInflight()
+    extendRun.current = null
+    setLoadingTail(false)
     revCount.current = 0
     revisionsRef.current = []
     historyCompleteRef.current = false

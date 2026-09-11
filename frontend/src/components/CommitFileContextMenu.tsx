@@ -149,6 +149,9 @@ export function CommitFileContextMenu({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<FilePending | null>(null)
   const [root, setRoot] = useState<{ engine: string; root: string } | null>(null)
+  // The request behind `root` while it is in flight, so a click that comes
+  // before the answer waits for it instead of asking again or doing without.
+  const rootRequest = useRef<{ engine: string; promise: Promise<string> } | null>(null)
 
   // "Copy full path" and "Show in folder" need the working tree's root; one
   // request the first time the menu opens on this repository.
@@ -156,12 +159,13 @@ export function CommitFileContextMenu({
     if (!open || !engine.repoId || root?.engine === engine.repoId) return
     let cancelled = false
     const id = engine.repoId
-    engine
-      .repoInfo(id)
-      .then((info) => {
-        if (!cancelled && info) setRoot({ engine: id, root: info.root })
-      })
-      .catch(() => undefined)
+    const promise = engine.repoInfo(id).then((info) => {
+      if (!info) throw new Error("no repository open")
+      if (!cancelled) setRoot({ engine: id, root: info.root })
+      return info.root
+    })
+    rootRequest.current = { engine: id, promise }
+    promise.catch(() => undefined)
     return () => {
       cancelled = true
     }
@@ -191,8 +195,10 @@ export function CommitFileContextMenu({
 
   const fail = (what: string) => (e: unknown) => setError(`${what}: ${describeThrown(e)}`)
   const done = (status: RepoStatus) => onStatus?.(status)
+  const knownRoot = root?.engine === engine.repoId ? root.root : null
   const resolveRoot = async (): Promise<string> => {
-    if (root?.engine === engine.repoId) return root.root
+    if (knownRoot) return knownRoot
+    if (rootRequest.current?.engine === engine.repoId) return rootRequest.current.promise
     const info = engine.repoId ? await engine.repoInfo(engine.repoId) : null
     if (!info) throw new Error("no repository open")
     return info.root
@@ -204,10 +210,17 @@ export function CommitFileContextMenu({
     switch (node.id) {
       case "ctx-copy-relative":
         return actions.onCopyPath()
-      case "ctx-copy-full":
-        // The clipboard write must stay in the click's gesture, so the root
-        // is what the menu already knows; it is fetched as the menu opens.
-        return void copyToClipboard(files.map((f) => fullPath(root?.root, f.path)).join("\n"))
+      case "ctx-copy-full": {
+        // The clipboard write stays in the click's gesture when the root is
+        // already known (fetched as the menu opened). When it is not yet,
+        // the click waits for that fetch: a relative path in place of the
+        // full one was the v0.16.0 review's finding 3, and an unknown root
+        // is an error the user sees, never a silent fallback.
+        const paths = files.map((f) => f.path)
+        const copyFull = (r: string) => copyToClipboard(paths.map((p) => fullPath(r, p)).join("\n"))
+        if (knownRoot) return void copyFull(knownRoot)
+        return void resolveRoot().then(copyFull).catch(fail("copy full path"))
+      }
       case "ctx-show-in-folder":
         return void resolveRoot()
           .then((r) => Promise.all(files.map((f) => revealInFolder(fullPath(r, f.path)))))

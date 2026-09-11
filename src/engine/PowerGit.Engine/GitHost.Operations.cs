@@ -55,7 +55,13 @@ public sealed partial class GitHost
     ///  detached and not awaited: the tool (e.g. VS Code with --wait) can stay
     ///  open indefinitely, so the caller must not block on it.
     /// </summary>
-    public void OpenDifftool(string commit, string path)
+    /// <summary>
+    ///  <c>git difftool commit^ commit -- path</c>, or with <paramref name="local"/>
+    ///  <c>git difftool commit -- path</c>: the file at the commit against the
+    ///  working tree (Git Extensions' "Difftool selected &lt;-&gt; local" in
+    ///  the file history).
+    /// </summary>
+    public void OpenDifftool(string commit, string path, bool local = false)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(commit))
@@ -76,7 +82,10 @@ public sealed partial class GitHost
             CreateNoWindow = true,
         };
         psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";
-        foreach (string arg in new[] { "difftool", "--no-prompt", "-y", $"{commit}^", commit, "--", path })
+        string[] args = local
+            ? ["difftool", "--no-prompt", "-y", commit, "--", path]
+            : ["difftool", "--no-prompt", "-y", $"{commit}^", commit, "--", path];
+        foreach (string arg in args)
         {
             psi.ArgumentList.Add(arg);
         }

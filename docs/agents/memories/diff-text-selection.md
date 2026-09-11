@@ -42,3 +42,10 @@ than 2 px). `Control+C` reaches the `copy` event in headless Chromium; read
 the clipboard back with `navigator.clipboard.readText()` after
 `context.grantPermissions(["clipboard-read", "clipboard-write"])` (not on
 webkit, see e2e-shared-engine-serial.md).
+
+## Known limit: Ctrl+C sees only the mounted rows (v0.16.0 review, finding 6)
+Diffs above 200 lines are virtualised, and `DiffView.copyPlainText` walks
+the `.diff-row` elements that are in the DOM. A selection dragged past the
+virtualised window and copied with Ctrl+C yields the mounted intersection
+only. Recorded 2026-09-11, not fixed: the fix is to rebuild the text from
+the diff model over the selected row range, not from the elements.

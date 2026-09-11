@@ -24,6 +24,8 @@ export type MenuIcon =
   | "archive"
   | "browser"
   | "commit"
+  | "difftool"
+  | "manipulate"
 
 export type MenuNode = {
   id: string
@@ -38,7 +40,48 @@ export type MenuNode = {
   value?: string
   /** Why the item is disabled; shown as the item's title. */
   hint?: string
+  /** A check item (GE's "Detect and follow renames"); undefined on an ordinary item. */
+  checked?: boolean
   children?: MenuNode[]
+}
+
+/** The text a "Copy" child puts on the clipboard for one revision; `field` is the child's value. */
+export function revisionCopyText(
+  rev: { id: string; message: string; author: string; date: string },
+  field: string | undefined,
+): string {
+  switch (field) {
+    case "shortSha":
+      return rev.id.slice(0, 7)
+    case "message":
+      return rev.message
+    case "author":
+      return rev.author
+    case "date":
+      return rev.date
+    case "all":
+      return `${rev.id}\n${rev.author}\n${rev.date}\n${rev.message}`
+    default:
+      return rev.id
+  }
+}
+
+/** GE's CopyContextMenuItem: the "Copy" submenu of both grid menus. */
+export function copySubmenu(sha: string): MenuNode {
+  return {
+    id: "ctx-copy",
+    label: "Copy",
+    icon: "copy",
+    divider: true,
+    children: [
+      { id: "ctx-copy-sha", label: "SHA", value: "sha" },
+      { id: "ctx-copy-short-sha", label: `Short SHA (${shorten(sha)})`, value: "shortSha" },
+      { id: "ctx-copy-message", label: "Message", value: "message" },
+      { id: "ctx-copy-author", label: "Author", value: "author" },
+      { id: "ctx-copy-date", label: "Date", value: "date" },
+      { id: "ctx-copy-all", label: "All of it", value: "all", divider: true },
+    ],
+  }
 }
 
 export type RevisionMenuInput = {
@@ -212,20 +255,7 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
       ],
     },
 
-    {
-      id: "ctx-copy",
-      label: "Copy",
-      icon: "copy",
-      divider: true,
-      children: [
-        { id: "ctx-copy-sha", label: "SHA", value: "sha" },
-        { id: "ctx-copy-short-sha", label: `Short SHA (${short})`, value: "shortSha" },
-        { id: "ctx-copy-message", label: "Message", value: "message" },
-        { id: "ctx-copy-author", label: "Author", value: "author" },
-        { id: "ctx-copy-date", label: "Date", value: "date" },
-        { id: "ctx-copy-all", label: "All of it", value: "all", divider: true },
-      ],
-    },
+    copySubmenu(input.sha),
     { id: "ctx-archive", label: "Create archive…", icon: "archive" },
     {
       id: "ctx-open-browser",

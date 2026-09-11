@@ -666,8 +666,9 @@ export class EngineClient {
 
   /** Opens `path` at `commit` in the user's configured external diff tool.
    *  The engine launches the tool detached and responds immediately. */
-  async openDifftool(commit: string, path: string): Promise<void> {
-    await json<{ ok: boolean }>(await this.post(`${this.repoPath()}/difftool`, { commit, path }))
+  /** External difftool on a file at a commit: against its parent, or with `local` against the working tree. */
+  async openDifftool(commit: string, path: string, local = false): Promise<void> {
+    await json<{ ok: boolean }>(await this.post(`${this.repoPath()}/difftool`, { commit, path, local }))
   }
 
   // ---- network jobs -----------------------------------------------------

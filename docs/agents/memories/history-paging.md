@@ -34,3 +34,21 @@ nearest listed ancestor (verified on git 2.38.1: the rename commit's parent
 became the previous change, not the unrelated commit in between). Same as
 GE's `FilterInfo.GetRevisionFilter`. Do not drop it when touching the
 filtered log's arguments.
+
+## `extendRun` is keyed by generation (v0.16.0 review, finding 5)
+`resetHistory` bumps `histGen` and aborts the in-flight page, but the tail
+run's promise stayed in `extendRun` until its `finally` ran; a
+`reloadHistory` for the new filter that reached `extendHistory` first got
+the old promise back and loaded nothing. Now `extendRun` is
+`{ gen, run }`, `extendHistory` reuses it only for the current generation,
+`resetHistory` clears it, and a run's `finally` clears the slot only when
+the slot is still its own (a superseded run must not drop its successor
+or its spinner). `useHistory.test.ts` renders the hook (jsdom) and leaves a
+tail page unanswered while the filter changes.
+
+## Testing the hook: pass stable callbacks
+`extendHistory` / `reloadHistory` are memoised on `onFailure` and
+`setEngineError`. A harness that passes inline lambdas re-creates them
+every render, so a FileHistoryView-style "reset then reload" effect keyed
+on them loops forever (the first draft of `useHistory.test.ts` grew the
+fake client's call list until V8 ran out of heap at 4 GB). Hoist them.

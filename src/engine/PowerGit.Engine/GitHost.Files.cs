@@ -15,7 +15,13 @@ public sealed partial class GitHost
     /// <summary>
     ///  A repository-relative path made absolute, refused when it points
     ///  outside the working tree. Every route below takes paths from the UI,
-    ///  and "open this file" must never become "open any file".
+    ///  and "open this file" must never become "open any file". Two checks:
+    ///  the lexical one on the normalised path, with the file system's own
+    ///  case rule (a sibling <c>/tmp/Repo</c> is not <c>/tmp/repo</c> on
+    ///  Linux), then the same on the real path with every link followed, so
+    ///  <c>link -> /etc</c> inside the tree does not let <c>link/passwd</c>
+    ///  through. The lexical path is what comes back: it is the name the
+    ///  caller and git know the file by.
     /// </summary>
     internal static string ResolveInRoot(string root, string path)
     {
@@ -24,14 +30,108 @@ public sealed partial class GitHost
             throw new InvalidOperationException("path is required");
         }
 
-        string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string rootFull = WithTrailingSeparator(Path.GetFullPath(root));
         string full = Path.GetFullPath(Path.Combine(rootFull, path.Replace('/', Path.DirectorySeparatorChar)));
-        if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+        if (!full.StartsWith(rootFull, PathComparison))
+        {
+            throw new InvalidOperationException($"{path} is outside the repository");
+        }
+
+        string rootReal = WithTrailingSeparator(RealPath(rootFull));
+        string fullReal = WithTrailingSeparator(RealPath(full));
+        if (!fullReal.StartsWith(rootReal, PathComparison))
         {
             throw new InvalidOperationException($"{path} is outside the repository");
         }
 
         return full;
+    }
+
+    /// <summary>
+    ///  How two paths compare on this file system: case matters on Linux,
+    ///  not on Windows or macOS (their default file systems fold case).
+    /// </summary>
+    internal static StringComparison PathComparison
+        => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private static string WithTrailingSeparator(string path)
+        => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+    /// <summary>
+    ///  <paramref name="full"/> with every symbolic link, junction or other
+    ///  reparse point on it followed, for the part of it that exists; the
+    ///  missing tail (a file about to be created by <c>git mv</c>) is kept
+    ///  as given. <see cref="FileSystemInfo.ResolveLinkTarget"/> follows
+    ///  only the entry it is asked about, not the links in the directories
+    ///  above it, so this walks the path one component at a time from the
+    ///  drive or <c>/</c> and starts over from the target whenever it meets
+    ///  a link. A link that cannot be followed (dangling, cyclic, denied)
+    ///  is left in place: the OS will not open it either.
+    /// </summary>
+    internal static string RealPath(string full)
+    {
+        string? existing = full;
+        string tail = "";
+        while (existing is not null && !Directory.Exists(existing) && !File.Exists(existing))
+        {
+            string name = Path.GetFileName(existing);
+            if (name.Length == 0)
+            {
+                break;
+            }
+
+            tail = tail.Length == 0 ? name : Path.Combine(name, tail);
+            existing = Path.GetDirectoryName(existing);
+        }
+
+        if (existing is null)
+        {
+            return full;
+        }
+
+        string real = FollowLinks(existing, hops: 0);
+        return tail.Length == 0 ? real : Path.Combine(real, tail);
+    }
+
+    private static string FollowLinks(string existing, int hops)
+    {
+        string? drive = Path.GetPathRoot(existing);
+        if (string.IsNullOrEmpty(drive) || hops > 40)
+        {
+            return existing;
+        }
+
+        string[] parts = existing[drive.Length..].Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+        string current = drive;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            current = Path.Combine(current, parts[i]);
+            FileSystemInfo info = Directory.Exists(current) ? new DirectoryInfo(current) : new FileInfo(current);
+            string? target;
+            try
+            {
+                target = info.LinkTarget is null ? null : info.ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+            }
+            catch (IOException)
+            {
+                target = null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                target = null;
+            }
+
+            if (target is null)
+            {
+                continue;
+            }
+
+            string rest = string.Join(Path.DirectorySeparatorChar, parts[(i + 1)..]);
+            string rebuilt = Path.GetFullPath(rest.Length == 0 ? target : Path.Combine(target, rest));
+            return FollowLinks(rebuilt, hops + 1);
+        }
+
+        return current;
     }
 
     /// <summary>
