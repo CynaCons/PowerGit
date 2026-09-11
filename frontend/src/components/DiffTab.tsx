@@ -1,20 +1,23 @@
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined"
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined"
 import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { CompactFileList } from "./CompactFileList"
 import { ConfirmDialog } from "./dialogs/ConfirmDialog"
 import { DiffFileContextMenu, DiffLineContextMenu } from "./DiffContextMenus"
 import { DiffPane } from "./DiffPane"
+import type { DiffViewHandle } from "./DiffView"
 import { SplitHandle } from "./SplitHandle"
 import { copyToClipboard } from "./clipboard"
 import type { BrowseRow } from "./browseReset"
 import type { Loadable } from "./loadable"
 import { useEngine, type DiffDto, type DiffOptions, type FileChange, type RepoStatus } from "../engine"
 import { useBrowseReset, type BrowseResetNote } from "../hooks/useBrowseReset"
+import { useDiffReview, type RowKeys } from "../hooks/useDiffReview"
 
 // The bottom panel's Diff tab: the file list, the split handle and the diff,
 // plus (v0.15.5) the two right-click menus over them. Split out of
@@ -49,6 +52,8 @@ export function DiffTab({
   commitId,
   actions,
   onFileHistory,
+  reviewKey,
+  rowKeys,
 }: {
   files: FileChange[]
   selectedPath: string | null
@@ -71,6 +76,9 @@ export function DiffTab({
   actions?: DiffTabActions
   /** v0.16.0: GE FileStatusList "File history" on the list's menu. */
   onFileHistory?: (path: string) => void
+  /** Review mode (v0.17.0): the document key for the selected row (null while unknown) and the shown diff's row keys. */
+  reviewKey: string | null
+  rowKeys: RowKeys
 }) {
   const engine = useEngine()
   const [note, setNote] = useState<BrowseResetNote | null>(null)
@@ -86,6 +94,16 @@ export function DiffTab({
     onNote: setNote,
   })
   const enabled = actions !== undefined && row !== null
+  const diffRef = useRef<DiffViewHandle | null>(null)
+  const { reviewing, review, toggle } = useDiffReview({
+    reviewKey,
+    path: ready?.path ?? null,
+    rowKeys,
+    files,
+    selectedPath,
+    onSelect,
+    diffRef,
+  })
 
   return (
     <>
@@ -140,6 +158,44 @@ export function DiffTab({
             {note.text}
           </Typography>
         )}
+        {/* Review mode (v0.17.0): the round check left of the tree toggle,
+            docs/design/review-mode.md §4. Disabled until the row's key is
+            known (a pending row needs HEAD, which the history delivers). */}
+        <Tooltip
+          title={
+            reviewKey === null
+              ? row
+                ? "Review mode (history still loading)"
+                : "Review mode (select a revision)"
+              : reviewing
+                ? "Leave review mode"
+                : "Review mode"
+          }
+          placement="left"
+        >
+          <span style={{ position: "absolute", right: 10 + 30 + 6, bottom: 8 }}>
+            <IconButton
+              size="small"
+              data-testid="diff-review-toggle"
+              aria-label="Review mode"
+              aria-pressed={reviewing}
+              disabled={reviewKey === null}
+              onClick={toggle}
+              sx={{
+                bgcolor: reviewing ? "primary.main" : "rgba(21, 83, 201, 0.10)",
+                color: reviewing ? "primary.contrastText" : "primary.main",
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+                border: 1,
+                borderColor: reviewing ? "primary.main" : "divider",
+                "&:hover": { bgcolor: reviewing ? "primary.dark" : "rgba(21, 83, 201, 0.22)" },
+                "&.Mui-disabled": { color: "text.disabled", bgcolor: "rgba(21, 83, 201, 0.05)" },
+              }}
+            >
+              <TaskAltOutlinedIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
         {/* Owner (v0.13.16): "a floating transparent button to activate a
             mode 'hierarchical' view" — flat paths or a directory tree. */}
         <Tooltip title={treeMode ? "Show full paths" : "Group by directory"} placement="left">
@@ -177,6 +233,8 @@ export function DiffTab({
         selection={enabled ? reset.lines.lineSel : undefined}
         onLineClick={enabled ? reset.lines.clickLine : undefined}
         onLineContextMenu={enabled ? reset.lines.openMenu : undefined}
+        review={review}
+        diffRef={diffRef}
       />
       {enabled && row && (
         <>

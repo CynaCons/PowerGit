@@ -10,6 +10,7 @@ import { BlobPane } from "./BlobPane"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import { CommitDetailView } from "./CommitDetailView"
 import { DiffTab, type DiffTabActions } from "./DiffTab"
+import { ReviewBar } from "./ReviewBar"
 import type { BrowseRow } from "./browseReset"
 import type { Loadable } from "./loadable"
 import {
@@ -23,6 +24,7 @@ import {
   type RepoStatus,
 } from "../engine"
 import type { GraphRow } from "../graph/types"
+import { rowKeysOf, type RowKeys } from "../hooks/useDiffReview"
 
 type Props = {
   current: GraphRow | undefined
@@ -156,6 +158,14 @@ export function BottomPanel({
       : null
   // Pending rows: files come from the status, the diff from the worktree.
   const pendingDiff = usePendingDiff(pendingRow, pendingRow ? file : null, diffOpts)
+  const shownDiff = pendingRow ? pendingDiff : diff
+  // Review mode (v0.17.0): one document per commit, or per HEAD and pending
+  // row (docs/design/review-mode.md §1); null until HEAD is known. The row
+  // keys of the diff on screen feed the Diff tab's marks and the bar once,
+  // parsed from the text (memoised on it: a status poll refetches the same).
+  const reviewKey = commitId ?? (pendingRow && headId ? `${headId}-${pendingRow.kind}` : null)
+  const shownText = shownDiff.kind === "ready" ? shownDiff.value.text : null
+  const rowKeys = useMemo<RowKeys>(() => (shownText === null ? [] : rowKeysOf(shownText)), [shownText])
   useEffect(() => {
     if (!pendingRow) return
     setFiles(pendingRow.files)
@@ -344,21 +354,24 @@ export function BottomPanel({
       data-testid="bottom-panel"
       sx={{ height, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
     >
-      <Tabs
-        value={tab}
-        onChange={(_, v: number) => setTab(v)}
-        sx={{
-          px: 0.5,
-          minHeight: 34,
-          "& .MuiTab-root": { minHeight: 34, py: 0.5 },
-          borderBottom: 1,
-          borderColor: "divider",
-        }}
-      >
-        <Tab label="Commit" />
-        <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
-        <Tab label="File Tree" />
-      </Tabs>
+      <Box sx={{ display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v: number) => setTab(v)}
+          sx={{ px: 0.5, minHeight: 34, minWidth: 0, "& .MuiTab-root": { minHeight: 34, py: 0.5 } }}
+        >
+          <Tab label="Commit" />
+          <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
+          <Tab label="File Tree" />
+        </Tabs>
+        {tab === 1 && (
+          <ReviewBar
+            reviewKey={reviewKey}
+            path={shownDiff.kind === "ready" ? shownDiff.value.path : null}
+            rowKeys={rowKeys}
+          />
+        )}
+      </Box>
       <Box sx={{ height: 2, flexShrink: 0 }}>
         {busy && <LinearProgress data-testid="panel-busy" sx={{ height: 2 }} />}
       </Box>
@@ -381,7 +394,7 @@ export function BottomPanel({
             onToggleTreeMode={() => setTreeMode((t) => !t)}
             filesWidth={filesWidth}
             splitHandleProps={splitHandleProps}
-            diff={pendingRow ? pendingDiff : diff}
+            diff={shownDiff}
             busy={busy}
             options={diffOpts}
             onOptions={setDiffOpts}
@@ -392,6 +405,8 @@ export function BottomPanel({
             commitId={commitId}
             actions={actions}
             onFileHistory={fileHistory}
+            reviewKey={reviewKey}
+            rowKeys={rowKeys}
           />
         )}
         {tab === 2 && (

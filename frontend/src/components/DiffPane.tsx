@@ -1,8 +1,9 @@
 import Box from "@mui/material/Box"
+import type { RefObject } from "react"
 import type { DiffDto, DiffOptions } from "../engine"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import { DiffOptionsBar } from "./DiffOptionsBar"
-import { DiffView } from "./DiffView"
+import { DiffView, type DiffReviewProps, type DiffViewHandle } from "./DiffView"
 import type { Loadable } from "./loadable"
 
 // The Diff tab's right half (split out of BottomPanel.tsx for the lint size limit).
@@ -17,6 +18,8 @@ export function DiffPane({
   selection,
   onLineClick,
   onLineContextMenu,
+  review,
+  diffRef,
 }: {
   diff: Loadable<DiffDto>
   busy: boolean
@@ -29,6 +32,9 @@ export function DiffPane({
   selection?: Set<number>
   onLineClick?: (index: number, e: React.MouseEvent) => void
   onLineContextMenu?: (index: number, e: React.MouseEvent) => void
+  /** Review mode (v0.17.0): the marks and cursor, and the handle the review layer scrolls and focuses through. */
+  review?: DiffReviewProps
+  diffRef?: RefObject<DiffViewHandle | null>
 }) {
   return (
     <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -52,6 +58,8 @@ export function DiffPane({
             selection={selection}
             onLineClick={onLineClick}
             onLineContextMenu={onLineContextMenu}
+            review={review}
+            ref={diffRef}
           />
         ) : diff.kind === "error" ? (
           <ErrorState message={diff.message} onRetry={onRetry} testid="diff-error" />
