@@ -43,7 +43,10 @@ export function TitleStrip({
           <>
             {/* A hairline between the wordmark and the name (v0.18.2): the
                 repository reads as a location, not a second wordmark. */}
-            <Box sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 1.25, flexShrink: 0 }} data-tauri-drag-region />
+            <Box
+              sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 1.25, flexShrink: 0 }}
+              data-tauri-drag-region
+            />
             <Typography variant="body2" color="text.secondary" noWrap data-tauri-drag-region>
               {repoName}
             </Typography>
