@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report } from "../diagnostics"
-import { isAbort, type EngineClient } from "../engine"
+import { isAbort, type EngineClient, type RevisionFilter } from "../engine"
 import { createLayouter, layoutGraph, type GraphLayouter } from "../graph/layout"
 import { syntheticHistory } from "../graph/synthetic"
 import type { GraphRow, Revision } from "../graph/types"
@@ -23,13 +23,18 @@ export type HistoryDeps = {
   live: boolean
   setEngineError: (message: string | null) => void
   onFailure: (e: unknown, context: string) => string
+  /** v0.16.0: a path filter makes this the file history's list (same
+   *  paging, layout and selection; the engine rewrites parents so the
+   *  filtered commits still form one connected graph). Memoise it: a new
+   *  object is a new history. */
+  filter?: RevisionFilter
 }
 
 export type History = ReturnType<typeof useHistory>
 
 // Revision list, paging, lane layout (worker) and the SHA-keyed selection.
 // All revision mutations flow through reloadHistory/extendHistory.
-export function useHistory({ client, demo, live, setEngineError, onFailure }: HistoryDeps) {
+export function useHistory({ client, demo, live, setEngineError, onFailure, filter }: HistoryDeps) {
   const [revisions, setRevisions] = useState<Revision[]>([])
   const [historyComplete, setHistoryComplete] = useState(false)
   const [loadingTail, setLoadingTail] = useState(false)
@@ -153,11 +158,11 @@ export function useHistory({ client, demo, live, setEngineError, onFailure }: Hi
     (skip: number) => {
       const ctrl = new AbortController()
       inflight.current = ctrl
-      return client.revisions(PAGE, skip, ctrl.signal).finally(() => {
+      return client.revisions(PAGE, skip, ctrl.signal, filter).finally(() => {
         if (inflight.current === ctrl) inflight.current = null
       })
     },
-    [client],
+    [client, filter],
   )
 
   // Loads further history pages up to targetCount. Single-flight: concurrent
@@ -172,8 +177,16 @@ export function useHistory({ client, demo, live, setEngineError, onFailure }: Hi
       const run = (async () => {
         try {
           while (revCount.current < cap && histGen.current === gen && !historyCompleteRef.current) {
-            const page = await fetchPage(revCount.current)
+            const skip = revCount.current
+            const page = await fetchPage(skip)
             if (histGen.current !== gen) return
+            // A reload landed meanwhile and replaced the list (v0.16.0: seen
+            // when the file history's filter changed while its old rows
+            // were still on screen — the grid's near-end request and the
+            // reload both fetched page 0, and the second answer was
+            // appended to the first). Only an answer to the current tail
+            // extends it.
+            if (revCount.current !== skip) return
             if (page.length > 0) {
               revCount.current += page.length
               revisionsRef.current = [...revisionsRef.current, ...page.map(toRevision)]
@@ -267,9 +280,11 @@ export function useHistory({ client, demo, live, setEngineError, onFailure }: Hi
   )
 
   const onNearEnd = useCallback(() => {
-    if (demo || !live || historyComplete) return
+    // Not before the first page of this list is in: right after a reset the
+    // grid still shows the previous rows, and their end is not this list's.
+    if (demo || !live || !loaded || historyComplete) return
     void extendHistory(revCount.current + PAGE)
-  }, [demo, live, historyComplete, extendHistory])
+  }, [demo, live, loaded, historyComplete, extendHistory])
 
   return {
     rows,
