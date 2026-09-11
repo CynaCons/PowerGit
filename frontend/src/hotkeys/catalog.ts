@@ -1,7 +1,9 @@
 import { chord, formatChord, type Chord } from "./parse"
 
-/** `global` (v0.15.6): checked before the top layer in every phase, shell only. */
-export type Scope = "browse" | "commit" | "stash" | "dialog" | "global"
+/** `global` (v0.15.6): checked before the top layer in every phase, shell only.
+ *  `review` (v0.17.0): the review-mode layer over `browse` or `commit`; its
+ *  keys resolve only on the review surface (dispatch.ts). */
+export type Scope = "browse" | "commit" | "stash" | "dialog" | "global" | "review"
 
 export type RecoveryCommandId =
   | "recovery.step1"
@@ -14,8 +16,27 @@ export type RecoveryCommandId =
   | "recovery.step8"
   | "recovery.step9"
 
+/** Review mode (v0.17.0, docs/design/review-mode.md §3). PowerGit's own:
+ *  Git Extensions has no line-by-line review. */
+export type ReviewCommandId =
+  | "review.cycle"
+  | "review.reject"
+  | "review.down"
+  | "review.downArrow"
+  | "review.up"
+  | "review.upArrow"
+  | "review.bottom"
+  | "review.end"
+  | "review.home"
+  | "review.top"
+  | "review.nextUnreviewed"
+  | "review.nextFile"
+  | "review.prevFile"
+  | "review.command"
+
 export type CommandId =
   | RecoveryCommandId
+  | ReviewCommandId
   | "browse.commit"
   | "browse.openRepo"
   | "browse.openSettings"
@@ -225,7 +246,41 @@ export const CATALOG: CommandDef[] = [
   // IPC is proven alive during the freeze, so a keypress still gets through
   // when nothing on screen does. Shell only; the browser ignores them.
   ...recoveryCommands(),
+
+  // v0.17.0: review mode. Bare keys, so they resolve only while the review
+  // surface (`data-hotkey-surface="review"`) has the focus and never while
+  // typing — dispatch.ts gates the whole scope. Bare Space is bound nowhere
+  // else (commit is Ctrl+Space); j/k/x/n/g, `/` and Enter are free.
+  ...reviewCommands(),
 ]
+
+function reviewCommands(): CommandDef[] {
+  const def = (id: ReviewCommandId, c: Chord): CommandDef => ({
+    id,
+    ge: null,
+    scope: "review",
+    chord: c,
+    available: true,
+  })
+  return [
+    def("review.cycle", chord("Space")),
+    def("review.reject", chord("X")),
+    def("review.down", chord("J")),
+    def("review.downArrow", chord("ArrowDown")),
+    def("review.up", chord("K")),
+    def("review.upArrow", chord("ArrowUp")),
+    def("review.bottom", chord("G", { shift: true })),
+    def("review.end", chord("End")),
+    def("review.home", chord("Home")),
+    // gg: the handler keeps the timer; a single G alone does nothing.
+    def("review.top", chord("G")),
+    def("review.nextUnreviewed", chord("N")),
+    def("review.nextFile", chord("Enter")),
+    def("review.prevFile", chord("Enter", { shift: true })),
+    // Registered now so the chord is reserved; the handler arrives in v0.17.4.
+    def("review.command", chord("/")),
+  ]
+}
 
 function recoveryCommands(): CommandDef[] {
   return [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({

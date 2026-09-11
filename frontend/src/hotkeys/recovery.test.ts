@@ -15,7 +15,7 @@ function fakeEvent(key: string, mods: { ctrl?: boolean; shift?: boolean; alt?: b
   } as unknown as KeyboardEvent
 }
 
-const ctx = { editing: false, multiLine: false, fileListFocused: false }
+const ctx = { editing: false, multiLine: false, fileListFocused: false, reviewFocused: false }
 
 // v0.15.6: Ctrl+Shift+F1..F9 → recovery step 1..9, in the `global` scope.
 
@@ -45,6 +45,7 @@ test("the chords still fire while a text field has focus (not text keys)", () =>
       editing: true,
       multiLine: true,
       fileListFocused: false,
+      reviewFocused: false,
     }),
   ).toBe("recovery.step8")
 })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react"
 import { isTauriShell } from "../shell"
 import { HotkeyContext, type HotkeyApi, type Layer } from "./context"
-import { handleHotkey, type HandlerMap } from "./dispatch"
+import { dispatchLayers, handleHotkey, type HandlerMap } from "./dispatch"
 import { fromEvent } from "./parse"
 import { recoveryHandlers } from "./recovery"
 
@@ -22,9 +22,10 @@ export function HotkeyHost({ children }: { children: ReactNode }) {
         e.stopPropagation()
         return
       }
-      const top = stack.current[stack.current.length - 1]
-      if (!top) return
-      if (handleHotkey(e, top.scope, top.handlers.current)) {
+      // Then the layers, top to bottom (v0.17.0): the first that handles
+      // the key wins; one that does not — no hit, no handler, or a handler
+      // that returned false — passes it down. See dispatchLayers.
+      if (dispatchLayers(e, stack.current)) {
         e.preventDefault()
         e.stopPropagation()
       }

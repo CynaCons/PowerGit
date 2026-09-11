@@ -43,6 +43,7 @@ Which GE form each PowerGit surface answers to. GE's source is on the
 | `FileStatusList` reset / delete items | `CommitFileContextMenu.tsx` in the commit dialog (the full menu since v0.16.0, see below), `DiffContextMenus.tsx` in the Browse Diff tab. GE has one meaning of "reset to HEAD"; PowerGit needs three, because the Browse panel shows worktree-vs-index, index-vs-HEAD and commit-vs-parent in the same place (`browseReset.ts`, v0.15.5) |
 | `FileViewer` line staging / resetting (`ApplySelectedLines`) | `hooks/useDiffLineSelection.ts` + `DiffContextMenus.tsx`. GE's reverse apply on a revision is `git apply --3way --index --whitespace=nowarn`; PowerGit's engine takes the same flags on `POST /patch` |
 | `PatchManager` (synthesizing a patch from selected lines) | `frontend/src/patch/partial.ts`. Same idea on the engine's diff text; the one rule that matters is which side the patch describes — forward applies need the target to equal the preimage, `--reverse` applies the postimage |
+| — (PowerGit-only: review mode, v0.17) | `frontend/src/review/` (`reviewModel.ts` document + line keys, `reviewState.ts` toggle + session documents), tokens `review.*` / `--pg-review-*`, hotkey scope `review`. GE has no line-by-line review; the design is `docs/design/review-mode.md` |
 
 ## FileStatusList context menu → commit dialog file menu (v0.16.0)
 
