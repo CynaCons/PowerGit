@@ -197,6 +197,81 @@ html {
   background: var(--pg-grid-sel, #dbeafe);
 }
 
+/* Review mode (v0.17.0, docs/design/review-mode.md §4, prototype
+   docs/prototypes/review-mode.html): a mark cell inside the sticky gutter,
+   drawn only on changed rows. Unreviewed: an amber ring and an amber stripe
+   on the code (green would read as "added"); ok: a filled primary-blue ring
+   with a white check; rejected: a filled red ring with a white ×, red
+   stripe. The cursor row takes the grid selection colour; a stripe stays
+   visible over it. The --pg-review-* variables come from theme/tokens.ts;
+   the fallbacks are the prototype's light values. */
+.diff-row-mark {
+  display: inline-block;
+  flex-shrink: 0;
+  position: relative;
+  width: 20px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.diff-row-review-todo .diff-row-mark::before,
+.diff-row-review-ok .diff-row-mark::before,
+.diff-row-review-rejected .diff-row-mark::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 3.5px;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.6px solid var(--pg-review-todo, #b7791f);
+}
+.diff-row-review-todo .diff-row-text {
+  box-shadow: inset 3px 0 0 var(--pg-review-todo-stripe, #d99a2b);
+}
+.diff-row-review-ok .diff-row-mark::before {
+  border-color: var(--pg-review-ok, var(--pg-primary, #1553c9));
+  background: var(--pg-review-ok, var(--pg-primary, #1553c9));
+}
+.diff-row-review-ok .diff-row-mark::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 5.5px;
+  width: 3px;
+  height: 6px;
+  box-sizing: border-box;
+  border: solid #fff;
+  border-width: 0 1.8px 1.8px 0;
+  transform: rotate(45deg);
+}
+.diff-row-review-rejected .diff-row-mark::before {
+  border-color: var(--pg-review-rejected, var(--pg-diff-removed, #d3000b));
+  background: var(--pg-review-rejected, var(--pg-diff-removed, #d3000b));
+}
+.diff-row-review-rejected .diff-row-mark::after {
+  content: "×";
+  position: absolute;
+  left: 4px;
+  top: 3.5px;
+  width: 11px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.diff-row-review-rejected .diff-row-text {
+  box-shadow: inset 3px 0 0 var(--pg-review-rejected, var(--pg-diff-removed, #d3000b));
+}
+.diff-row-cursor,
+.diff-row-cursor:hover {
+  background: var(--pg-review-cursor-bg, var(--pg-grid-sel, #dbeafe));
+}
+
 .grid-tail {
   flex-shrink: 0;
   padding: 3px 16px;
