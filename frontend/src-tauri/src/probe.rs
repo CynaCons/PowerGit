@@ -108,6 +108,8 @@ pub struct Probe {
     toplevel_draw: Stamp,
     webview_draw: Stamp,
     mapped: AtomicBool,
+    focused: AtomicBool,
+    focused_since: Stamp,
     /// 0 unknown, 1 the tao main thread, 2 some other thread.
     draw_thread: AtomicU8,
     main_tid: AtomicU64,
@@ -130,6 +132,8 @@ impl Probe {
             toplevel_draw: Stamp::new(),
             webview_draw: Stamp::new(),
             mapped: AtomicBool::new(false),
+            focused: AtomicBool::new(false),
+            focused_since: Stamp::new(),
             draw_thread: AtomicU8::new(0),
             main_tid: AtomicU64::new(0),
             loop_tauri_done: Stamp::new(),
@@ -151,14 +155,42 @@ impl Probe {
         self.loop_glib_done.age(self.epoch)
     }
 
-    /// Age of the last GdkFrameClock after-paint, but only while the window
-    /// is mapped and the page reports frames (`page_frames`): an unmapped or
-    /// hidden window legitimately does not paint.
-    pub fn gdk_paint_age(&self, page_frames: bool) -> Option<Duration> {
-        if !self.mapped.load(Ordering::Relaxed) || !page_frames {
+    /// Native window focus, from the run loop's `Focused` event (lib.rs).
+    /// v0.15.6 fired a presentation stall 23 s after the owner switched away
+    /// on Wayland: the compositor stops frame callbacks for a surface it does
+    /// not show, so GTK legitimately paints nothing while the window is
+    /// hidden — and a hidden window is still mapped. Only a *focused* window
+    /// is known to be on screen, so the paint ages count from the later of
+    /// the last paint and the moment focus arrived.
+    pub fn set_focused(&self, focused: bool) {
+        self.focused.store(focused, Ordering::Relaxed);
+        if focused {
+            self.focused_since.set(self.epoch, Instant::now());
+        }
+    }
+
+    pub fn is_focused(&self) -> bool {
+        self.focused.load(Ordering::Relaxed)
+    }
+
+    /// How long `stamp` has gone unrefreshed while the window was observable:
+    /// None unless mapped and focused, else the age clipped at focus time.
+    fn observable_age(&self, stamp: &Stamp) -> Option<Duration> {
+        if !self.is_mapped() || !self.is_focused() {
             return None;
         }
-        self.after_paint.age(self.epoch)
+        let age = stamp.age(self.epoch)?;
+        let since_focus = self.focused_since.age(self.epoch).unwrap_or(age);
+        Some(age.min(since_focus))
+    }
+
+    /// Age of the last GdkFrameClock after-paint while the window is mapped,
+    /// focused and the page reports frames (`page_frames`); None otherwise.
+    pub fn gdk_paint_age(&self, page_frames: bool) -> Option<Duration> {
+        if !page_frames {
+            return None;
+        }
+        self.observable_age(&self.after_paint)
     }
 
     pub fn is_mapped(&self) -> bool {
@@ -168,12 +200,11 @@ impl Probe {
     /// Any age past its threshold: the liveness thread writes and logs faster.
     pub fn stale(&self, page_frames: bool) -> bool {
         let over = |a: Option<Duration>, t: Duration| a.is_some_and(|a| a >= t);
-        let mapped = self.is_mapped();
         over(self.loop_age(), LOOP_STALE)
             || over(self.loop_glib_age(), LOOP_STALE)
             || over(self.gdk_paint_age(page_frames), PAINT_STALE)
-            || (mapped && over(self.toplevel_draw.age(self.epoch), PAINT_STALE))
-            || (mapped && over(self.webview_draw.age(self.epoch), PAINT_STALE))
+            || over(self.observable_age(&self.toplevel_draw), PAINT_STALE)
+            || over(self.observable_age(&self.webview_draw), PAINT_STALE)
     }
 
     fn set_gdk_backend(&self, s: &str) {
@@ -214,7 +245,11 @@ impl Probe {
             self.after_paint_count.load(Ordering::Relaxed),
             secs(self.toplevel_draw.age(e)),
             secs(self.webview_draw.age(e)),
-            if self.is_mapped() { "mapped" } else { "unmapped" },
+            match (self.is_mapped(), self.is_focused()) {
+                (true, true) => "mapped+focused",
+                (true, false) => "mapped",
+                _ => "unmapped",
+            },
             secs(beat_age),
             secs(frame_age),
         )
@@ -234,6 +269,7 @@ impl Probe {
             ("toplevel_draw_age_s", num_s(self.toplevel_draw.age(e))),
             ("webview_draw_age_s", num_s(self.webview_draw.age(e))),
             ("window_mapped", self.is_mapped().to_string()),
+            ("window_focused", self.is_focused().to_string()),
             ("beat_age_s", num_s(beat_age)),
             ("frame_age_s", num_s(frame_age)),
             ("gdk_backend", Self::text(&self.gdk_backend)),
@@ -548,7 +584,7 @@ mod tests {
         assert!(!p.stale(true));
         assert_eq!(p.gdk_paint_age(true), None);
         let fields = p.fields(None, None);
-        assert_eq!(fields.len(), 15);
+        assert_eq!(fields.len(), 16);
         assert!(fields.iter().any(|(k, v)| *k == "window_mapped" && v == "false"));
         assert!(fields.iter().any(|(k, v)| *k == "draw_thread_is_main" && v == "n/a"));
     }
@@ -583,9 +619,33 @@ mod tests {
         p.after_paint.0.store(1, Ordering::Relaxed);
         assert_eq!(p.gdk_paint_age(true), None);
         p.mapped.store(true, Ordering::Relaxed);
+        // Mapped but unfocused (hidden behind another window on Wayland, where
+        // the compositor stops frame callbacks): never a stall.
+        assert_eq!(p.gdk_paint_age(true), None);
+        assert!(!p.stale(true));
+        p.focused.store(true, Ordering::Relaxed);
         assert_eq!(p.gdk_paint_age(false), None);
         assert!(p.gdk_paint_age(true).unwrap() >= PAINT_STALE);
         assert!(p.stale(true));
+    }
+
+    #[test]
+    fn paint_age_counts_from_the_moment_focus_arrived() {
+        // Hidden for a minute (no paints), then clicked: the compositor gets
+        // ~16 ms to paint before the age means anything, not zero.
+        let p = Probe {
+            epoch: Instant::now() - Duration::from_secs(60),
+            ..Probe::new(true)
+        };
+        p.after_paint.0.store(1, Ordering::Relaxed);
+        p.mapped.store(true, Ordering::Relaxed);
+        p.set_focused(true);
+        let age = p.gdk_paint_age(true).unwrap();
+        assert!(age < Duration::from_secs(1), "{age:?}");
+        assert!(!p.stale(true));
+        // Focus lost again: nothing is observable.
+        p.set_focused(false);
+        assert_eq!(p.gdk_paint_age(true), None);
     }
 
     #[test]

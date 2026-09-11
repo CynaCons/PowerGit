@@ -1012,6 +1012,9 @@ pub fn run() {
             } = &event {
                 let state = app_handle.state::<EngineState>();
                 log_line(&state, &format!("window {label} focused={focused}"));
+                if label == "main" {
+                    state.probe.set_focused(*focused);
+                }
             }
             if !matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
                 return;

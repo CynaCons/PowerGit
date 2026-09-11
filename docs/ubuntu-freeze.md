@@ -335,8 +335,11 @@ capture).
   the screen is dead (H2), loop stalled (H4).
 - **Two watchdog kinds that fit the evidence.** `Stall::Presentation`:
   beats fresh and page frames fresh but no GTK after-paint for 20 s while
-  mapped → "window not painting: page frames fresh but no GTK paint for
-  Ns", snapshot, incident kind `presentation`, then the normal ladder.
+  mapped and **focused** (v0.15.7; v0.15.6 gated on mapped alone and fired
+  23 s after every focus loss on Wayland, where a hidden surface gets no
+  frame callbacks) → "window not painting: page frames fresh but no GTK
+  paint for Ns", snapshot, incident kind `presentation`, then the normal
+  ladder.
   `Stall::Loop`: no main-thread round-trip for 15 s → "main loop
   unresponsive: no round-trip for Ns", snapshot and incident kind `loop`
   written from the liveness thread, never reload or restart-dialog (they

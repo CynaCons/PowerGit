@@ -54,9 +54,14 @@ on Linux. Settings → Tools → "Open logs folder" opens it. Files:
       in both captured freezes and this stall never tripped. It catches a
       web process that stopped rendering, nothing about presentation.
     - `presentation` (v0.15.6): beats fresh, page frames fresh, but no GDK
-      after-paint for 20 s while the window is mapped → "window not
+      after-paint for 20 s while the window is mapped **and has native
+      focus**, counted from the moment focus arrived (v0.15.7) → "window not
       painting: page frames fresh but no GTK paint for N s". This is the
-      shape of the owner's freeze under hypothesis H1.
+      shape of the owner's freeze under hypothesis H1. Focus, not mapped,
+      because on Wayland the compositor stops frame callbacks for a window
+      hidden behind another one, so GTK legitimately paints nothing while
+      the window stays mapped; v0.15.6 reported that as a stall 23 s after
+      every focus loss and reloaded the page in the background.
     - `loop` (v0.15.6): no main-thread round-trip for 15 s → "main loop
       unresponsive: no round-trip for N s". Snapshot and incident are
       written from the liveness thread; never reload or restart-dialog
