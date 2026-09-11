@@ -22,6 +22,9 @@ export function Kbd({ children }: { children: ReactNode }) {
         color: "text.secondary",
         ml: 0.75,
         verticalAlign: "middle",
+        // Inside a disabled button the key greys with its label (the look
+        // pass: a chip darker than "Stage" read as the live part).
+        ".Mui-disabled &": { color: "inherit" },
       }}
     >
       {children}
