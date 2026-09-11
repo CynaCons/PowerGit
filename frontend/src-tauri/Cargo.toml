@@ -31,6 +31,13 @@ tauri-plugin-opener = "2"
 # died" signal, handed to the watchdog. Versions follow what tauri links.
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2", features = ["v2_40"] }
+# v0.15.6 paint probe + recovery ladder (probe.rs, recovery.rs): the main
+# toplevel's GdkFrameClock, draw signals, X11 frame sync. Same versions tauri
+# links (already in Cargo.lock).
+gtk = "0.18"
+gdk = "0.18"
+gdkx11 = "0.18"
+libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

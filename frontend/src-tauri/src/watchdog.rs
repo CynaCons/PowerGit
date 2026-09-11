@@ -33,6 +33,13 @@ pub const RELOAD_AFTER: Duration = Duration::from_secs(20);
 pub const ASK_AFTER: Duration = Duration::from_secs(30);
 /// How often the shell looks.
 pub const INTERVAL: Duration = Duration::from_secs(5);
+/// v0.15.6: beats and page frames are fresh but GTK has not painted the
+/// mapped toplevel for this long (probe.rs after-paint): the presentation is
+/// dead while the page runs — the shape of the owner's Ubuntu freeze.
+pub const PRESENTATION_THRESHOLD: Duration = Duration::from_secs(20);
+/// v0.15.6: the liveness thread's round-trip through the main loop has not
+/// completed for this long: the loop itself is parked.
+pub const LOOP_THRESHOLD: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stall {
@@ -48,6 +55,13 @@ pub enum Stall {
     /// at once, and clear after FORCED_CLEAR unless a further press asks
     /// for the restart dialog.
     Forced,
+    /// v0.15.6: the page beats and reports frames, GTK does not paint the
+    /// mapped window (probe.rs). Runs the normal ladder.
+    Presentation,
+    /// v0.15.6: the main loop stopped completing round-trips. Reported
+    /// (snapshot + incident, from the liveness thread) and never reloaded or
+    /// asked about: both need the loop. Outranks every other kind.
+    Loop,
 }
 
 /// How long a forced stall stays recorded after its reload.
@@ -60,6 +74,8 @@ impl Stall {
             Stall::Paint => "paint",
             Stall::Crash => "crash",
             Stall::Forced => "forced",
+            Stall::Presentation => "presentation",
+            Stall::Loop => "loop",
         }
     }
 }
@@ -96,6 +112,13 @@ pub struct Observation {
     pub paint_age: Option<Duration>,
     /// The platform reported the web process crashed since the last step.
     pub crashed: bool,
+    /// v0.15.6: time since GTK last painted the mapped toplevel, only while
+    /// the page reports frames (None otherwise, or on platforms without the
+    /// probe).
+    pub gdk_paint_age: Option<Duration>,
+    /// v0.15.6: time since the liveness thread's last completed round-trip
+    /// through the main loop (None before the first).
+    pub loop_age: Option<Duration>,
 }
 
 /// The watchdog's memory between steps.
@@ -129,9 +152,28 @@ pub enum Action {
 pub fn step(obs: Observation, status: &mut Status, now: Instant) -> Action {
     let script = obs.beat_age.is_some_and(|a| a >= SCRIPT_THRESHOLD);
     let paint = obs.paint_age.is_some_and(|a| a >= PAINT_THRESHOLD);
-    let stalled_now = obs.crashed || script || paint;
+    let presentation = obs.gdk_paint_age.is_some_and(|a| a >= PRESENTATION_THRESHOLD);
+    let looped = obs.loop_age.is_some_and(|a| a >= LOOP_THRESHOLD);
+    let stalled_now = obs.crashed || script || paint || presentation || looped;
 
     match status.stalled {
+        // A parked loop: report it once, wait for it to come back. The
+        // ladder's reload and dialog both need the loop, so neither is tried.
+        Some((Stall::Loop, since)) => {
+            if looped {
+                Action::None
+            } else {
+                let took = now.saturating_duration_since(since);
+                *status = Status::default();
+                Action::Recovered(Stall::Loop, took)
+            }
+        }
+        _ if looped => {
+            status.stalled = Some((Stall::Loop, now));
+            status.reloaded_at = None;
+            status.asked = false;
+            Action::Stalled(Stall::Loop)
+        }
         // A forced stall is not measurable: it simply expires.
         Some((Stall::Forced, since)) => {
             if now.saturating_duration_since(since) >= FORCED_CLEAR {
@@ -145,8 +187,10 @@ pub fn step(obs: Observation, status: &mut Status, now: Instant) -> Action {
                 Stall::Crash
             } else if script {
                 Stall::Script
-            } else {
+            } else if paint {
                 Stall::Paint
+            } else {
+                Stall::Presentation
             };
             status.stalled = Some((kind, now));
             Action::Stalled(kind)
@@ -184,7 +228,48 @@ mod tests {
             beat_age: Some(Duration::from_secs(beat)),
             paint_age: paint.map(Duration::from_secs),
             crashed: false,
+            ..Observation::default()
         }
+    }
+
+    #[test]
+    fn gtk_not_painting_while_the_page_reports_frames_is_a_presentation_stall() {
+        let t0 = Instant::now();
+        let mut s = Status::default();
+        let o = Observation {
+            gdk_paint_age: Some(PRESENTATION_THRESHOLD),
+            ..obs(0, Some(0))
+        };
+        assert_eq!(step(o, &mut s, t0), Action::Stalled(Stall::Presentation));
+        assert_eq!(step(o, &mut s, t0 + RELOAD_AFTER), Action::Reload);
+        assert_eq!(
+            step(obs(0, Some(0)), &mut s, t0 + RELOAD_AFTER + Duration::from_secs(1)),
+            Action::Recovered(Stall::Presentation, RELOAD_AFTER + Duration::from_secs(1))
+        );
+        // Without the probe (Windows, or POWERGIT_PROBE_PAINT=0) nothing changes.
+        let mut s = Status::default();
+        assert_eq!(step(obs(0, Some(0)), &mut s, t0), Action::None);
+    }
+
+    #[test]
+    fn a_parked_loop_is_reported_once_never_reloaded_and_outranks_the_rest() {
+        let t0 = Instant::now();
+        let mut s = Status::default();
+        let o = Observation {
+            loop_age: Some(LOOP_THRESHOLD),
+            ..obs(30, Some(30))
+        };
+        assert_eq!(step(o, &mut s, t0), Action::Stalled(Stall::Loop));
+        assert_eq!(step(o, &mut s, t0 + RELOAD_AFTER), Action::None);
+        assert_eq!(step(o, &mut s, t0 + RELOAD_AFTER + ASK_AFTER), Action::None);
+        // A paint stall already on the ladder is overtaken by the loop stall.
+        let mut s = Status::default();
+        assert_eq!(step(obs(0, Some(30)), &mut s, t0), Action::Stalled(Stall::Paint));
+        assert_eq!(step(o, &mut s, t0 + Duration::from_secs(5)), Action::Stalled(Stall::Loop));
+        assert_eq!(
+            step(obs(0, Some(0)), &mut s, t0 + Duration::from_secs(9)),
+            Action::Recovered(Stall::Loop, Duration::from_secs(4))
+        );
     }
 
     #[test]
@@ -236,6 +321,7 @@ mod tests {
             beat_age: Some(Duration::from_secs(1)),
             paint_age: Some(Duration::ZERO),
             crashed: true,
+            ..Observation::default()
         };
         assert_eq!(step(crashed, &mut s, t0), Action::Stalled(Stall::Crash));
         assert_eq!(step(crashed, &mut s, t0 + INTERVAL), Action::Reload);
