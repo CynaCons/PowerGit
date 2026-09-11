@@ -21,7 +21,7 @@ import { setReviewMode, updateReviewDoc, useReviewDoc, useReviewMode } from "../
 // Review mode over one diff (v0.17.0, docs/design/review-mode.md §3): the
 // cursor, the marks, the `review` layer of hotkeys and the Enter /
 // Shift+Enter walk over the file list. The Diff tab owns it; the commit
-// dialog gets the same hook in v0.17.2. The document lives in reviewState
+// dialog gets the same hook in v0.19.1. The document lives in reviewState
 // (in memory this iteration) under the review key the caller derives from
 // the selected row; the marks are per key and path, so switching files and
 // back keeps them while the cursor starts over.
@@ -102,7 +102,7 @@ export function useDiffReview({
   // Where the cursor goes once the file Enter or n selected has loaded.
   const intent = useRef<Intent | null>(null)
   // Files opened under this key and how many changed lines each has, so n
-  // can tell a finished file from one never opened (v0.17.3 brings numstat
+  // can tell a finished file from one never opened (v0.19.2 brings numstat
   // and the counts for files not yet shown).
   const known = useRef(new Map<string, number>())
   useEffect(() => {
@@ -233,7 +233,7 @@ export function useDiffReview({
       "review.nextUnreviewed": jumpNext,
       "review.nextFile": () => gotoFile(1),
       "review.prevFile": () => gotoFile(-1),
-      // The command line arrives in v0.17.4; the chord is reserved.
+      // The command line arrives in v0.19.3; the chord is reserved.
       "review.command": () => false,
     },
     reviewing,

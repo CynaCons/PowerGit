@@ -8,8 +8,8 @@ import { emptyDoc, type ReviewDoc } from "./reviewModel"
 //
 // The toggle is per window and remembered, so a reviewer who turns it on
 // finds it on after a restart; it is shared by the Diff tab and the commit
-// dialog (v0.17.2). The documents live in memory for this iteration, keyed
-// by the review key (a commit sha, or `<HEAD>-worktree` / `-index`); v0.17.1
+// dialog (v0.19.1). The documents live in memory for this iteration, keyed
+// by the review key (a commit sha, or `<HEAD>-worktree` / `-index`); v0.19.0
 // loads and saves them through the engine.
 
 export const REVIEW_MODE_KEY = "pg.reviewMode"

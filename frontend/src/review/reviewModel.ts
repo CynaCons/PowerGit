@@ -133,7 +133,7 @@ export function withLine(doc: ReviewDoc, path: string, key: LineKey, state: Line
 }
 
 /**
- * Reads a document back (the file on disk in v0.17.1, or anything else that
+ * Reads a document back (the file on disk in v0.19.0, or anything else that
  * claims to be one). Tolerant: unknown keys at any level are ignored, a mark
  * or comment that is not one is dropped, the derived fields are recomputed
  * rather than trusted. Null for anything that is not a version-1 document

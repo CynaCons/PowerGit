@@ -149,16 +149,20 @@ Bare Space is not bound anywhere today (commit is Ctrl+Space); j/k/x/n/g,
 - `useReview({ engine, key })` loads on key change and saves debounced,
   latest-wins, like `usePendingDiff`.
 
-## 6. Iterations (PLAN.md major v0.17)
+## 6. Iterations (PLAN.md majors v0.17 and v0.19)
 
 1. **v0.17.0 Mark lines in the Diff tab** — in-memory, one file at a time:
-   marks, cursor, keys, bar, button. Usable the day it ships.
-2. **v0.17.1 The review survives** — engine routes and file, Review file
-   pane, Start over, exclude handling.
-3. **v0.17.2 The commit dialog** — same mode, shared key, dialog split.
-4. **v0.17.3 Whole-review progress** — numstat counts, file pills and
+   marks, cursor, keys, bar, button. Usable the day it ships (released
+   2026-09-11; v0.18.0, the settings page, shipped next, so the rest
+   continues as major v0.19).
+2. **v0.19.0 The review survives** — engine routes and file, Review file
+   pane, Start over, exclude handling, the Export button (owner, 2026-09-11:
+   Copy as Markdown / Copy JSON / Show review file / Save as…) and the
+   design pass (quiet ok mark, the bar without its pill).
+3. **v0.19.1 The commit dialog** — same mode, shared key, dialog split.
+4. **v0.19.2 Whole-review progress** — numstat counts, file pills and
    stripes, meter over all files, n and Enter across files, "complete".
-5. **v0.17.4 Comments and the slash command line** — command row, comment
+5. **v0.19.3 Comments and the slash command line** — command row, comment
    rows, "+" affordance, comments in the file and the bar.
 
 Each iteration ends with a symptom e2e in the owner's words and an owner

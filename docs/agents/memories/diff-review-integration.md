@@ -9,7 +9,7 @@ Captured 2026-09-11 by the INTEGRATION worker. Design: docs/design/review-mode.m
   worktree diff is free). Both go down to `DiffTab` and to `ReviewBar`.
 - `hooks/useDiffReview.ts` (called by `DiffTab`) owns the cursor, the marks,
   the `review` hotkey layer and Enter / Shift+Enter / n over the file list.
-  The commit dialog (v0.17.2) should call the same hook with its own lists.
+  The commit dialog (v0.19.1) should call the same hook with its own lists.
 - The row parser lives in `components/diffLines.ts` since v0.17.0; DiffView
   imports it. Do not add a lowercase function export to `DiffView.tsx`:
   `react-refresh/only-export-components` is an error.
@@ -23,7 +23,7 @@ Captured 2026-09-11 by the INTEGRATION worker. Design: docs/design/review-mode.m
   react.dev's "setState during render when a prop changed" pattern, not an
   effect, so there is no frame with a stale cursor.
 - `doc.changed` is the shown file's changed-line count this iteration
-  (whole-review counts arrive with numstat in v0.17.3). `n` across files uses
+  (whole-review counts arrive with numstat in v0.19.2). `n` across files uses
   a per-key cache of counts for files already opened; a file never opened
   under the key is assumed to have work.
 - The bar renders only on the Diff tab (`tab === 1`): on the other tabs the

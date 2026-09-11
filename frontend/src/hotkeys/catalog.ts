@@ -277,7 +277,7 @@ function reviewCommands(): CommandDef[] {
     def("review.nextUnreviewed", chord("N")),
     def("review.nextFile", chord("Enter")),
     def("review.prevFile", chord("Enter", { shift: true })),
-    // Registered now so the chord is reserved; the handler arrives in v0.17.4.
+    // Registered now so the chord is reserved; the handler arrives in v0.19.3.
     def("review.command", chord("/")),
   ]
 }

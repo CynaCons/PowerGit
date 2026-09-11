@@ -6,8 +6,8 @@ import { useReviewDoc, useReviewMode } from "../review/reviewState"
 // The review bar (v0.17.0, docs/design/review-mode.md §4, the prototype's
 // `.review-bar`): REVIEWING / REVIEW COMPLETE, a 160 px meter and the
 // counts for the file on screen. Whole-review counts, the file pills and
-// the Review file / Start over / Finish review buttons come with v0.17.1
-// and v0.17.3. Renders nothing while review mode is off or the row's key
+// the Review file / Start over / Finish review buttons come with v0.19.0
+// and v0.19.2. Renders nothing while review mode is off or the row's key
 // is not known yet.
 
 export function ReviewBar({
