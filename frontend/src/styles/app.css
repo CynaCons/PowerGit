@@ -162,6 +162,13 @@ html {
   color: var(--pg-text-meta, #475569);
   opacity: 1;
 }
+/* The selected row is by the marked author by definition: its name keeps
+   the selection's colour but the same weight as the other marked rows, so
+   it is not the one thin name in a bold column (looked at, v0.18.1). */
+.grid-row.selected.author-same .author {
+  color: var(--pg-text, #0f172a);
+  font-weight: 600;
+}
 
 /* DiffView rows (v0.13.14): plain elements, see DiffView.renderLine. */
 .diff-row {
