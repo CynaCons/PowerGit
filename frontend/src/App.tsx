@@ -11,8 +11,10 @@ import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
 import { JobPanel } from "./components/JobPanel"
 import { NavRail } from "./components/NavRail"
 import { OperationBanner } from "./components/OperationBanner"
+import { PanelSplitter } from "./components/PanelSplitter"
 import { RecoveryPanel } from "./components/RecoveryPanel"
 import { RepoTree } from "./components/RepoTree"
+import { SettingsView } from "./components/settings/SettingsView"
 import { StatusBar } from "./components/StatusBar"
 import { EngineProvider, type EngineClient } from "./engine"
 import { focusGrid } from "./hooks/focusGrid"
@@ -25,6 +27,7 @@ import { useGitActions } from "./hooks/useGitActions"
 import { useHistory } from "./hooks/useHistory"
 import { useJobs } from "./hooks/useJobs"
 import { useRepoState } from "./hooks/useRepoState"
+import { useSettingsPage } from "./hooks/useSettingsPage"
 import { useZoomHotkeys } from "./hooks/useZoomHotkeys"
 import { useStable } from "./hooks/useStable"
 import { prefetchCommit } from "./engine/commitCache"
@@ -92,6 +95,8 @@ export default function App({ base }: { base: EngineClient }) {
   // Git Extensions' FormFileHistory, shown in place of the graph and panel
   // (v0.16.0); the main history's state stays here while it is open.
   const fileHistory = useFileHistory()
+  // Settings is a page over the same area (v0.18.0); the gear toggles it.
+  const settings = useSettingsPage()
   // useGitActions rebuilds its closures every render; hand memoised children
   // stable identities so a row click re-renders only the grid and, deferred,
   // the bottom panel (owner report: "clicking commits feels laggy").
@@ -141,7 +146,7 @@ export default function App({ base }: { base: EngineClient }) {
     openStash: () => open({ kind: "stash" }),
     openRepo: () => void openFolder(),
     openRecents: () => open({ kind: "recents" }),
-    openSettings: () => open({ kind: "settings" }),
+    openSettings: settings.toggle,
     openSnapshot: () => void takeDiagnosticSnapshot(),
     selectTarget: (sha: string) => void history.jumpToRef(sha),
     collapseLeft: () => setLeftOpen(false),
@@ -165,7 +170,7 @@ export default function App({ base }: { base: EngineClient }) {
     {
       "browse.commit": actions.openCommit,
       "browse.openRepo": () => void openFolder(),
-      "browse.openSettings": () => open({ kind: "settings" }),
+      "browse.openSettings": settings.toggle,
       "browse.createBranch": actions.openCreateBranch,
       "browse.createTag": actions.openCreateTag,
       "browse.checkoutBranch": actions.openCheckoutBranch,
@@ -297,7 +302,9 @@ export default function App({ base }: { base: EngineClient }) {
 
           <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-              {leftOpen ? (
+              {settings.open ? (
+                <SettingsView onClose={settings.close} />
+              ) : leftOpen ? (
                 <RepoTree
                   tree={refs}
                   onSelectTarget={chrome.selectTarget}
@@ -314,76 +321,56 @@ export default function App({ base }: { base: EngineClient }) {
               ) : (
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
-              <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-                {fileHistory.target ? (
-                  <FileHistoryView
-                    target={fileHistory.target}
-                    session={session}
-                    repoState={repoState}
-                    layout={layout}
-                    menus={menus}
-                    remoteNames={remoteNames}
-                    tagNames={tagNames}
-                    headId={headId}
-                    onClose={chrome.closeFileHistory}
-                  />
-                ) : (
-                  <>
-                    <HistoryPane
-                      rows={rows}
+              {!settings.open && (
+                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+                  {fileHistory.target ? (
+                    <FileHistoryView
+                      target={fileHistory.target}
+                      session={session}
+                      repoState={repoState}
+                      layout={layout}
+                      menus={menus}
                       remoteNames={remoteNames}
                       tagNames={tagNames}
-                      selected={selected}
-                      loadingTail={loadingTail}
-                      loading={live && !demo && !loaded}
-                      engineError={engineError}
-                      view={view}
-                      onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
-                      onNearEnd={history.onNearEnd}
-                      menus={menus}
-                      selectedSha={selectedSha}
-                      onRetry={() => void refresh().catch(() => undefined)}
-                      onOpenRepo={() => void openFolder()}
-                      onRecover={() => setRecoveryOpen(true)}
-                    />
-                    <Box
-                      data-testid="panel-splitter"
-                      onPointerDown={splitter.onDividerDown}
-                      onPointerMove={splitter.onDividerMove}
-                      onPointerUp={splitter.onDividerUp}
-                      // A GTK focus steal mid-drag fires pointercancel, never
-                      // pointerup; without these the handle stays stuck to the cursor.
-                      onPointerCancel={splitter.onDividerUp}
-                      onLostPointerCapture={splitter.onDividerUp}
-                      role="separator"
-                      aria-orientation="horizontal"
-                      aria-label="Resize bottom panel"
-                      sx={{
-                        height: 5,
-                        flexShrink: 0,
-                        cursor: "row-resize",
-                        bgcolor: "background.default",
-                        borderTop: 1,
-                        borderColor: "divider",
-                        transition: "background-color 120ms",
-                        "&:hover": { bgcolor: "primary.main" },
-                      }}
-                    />
-                    <BottomPanel
-                      current={deferredCurrent}
-                      status={status}
                       headId={headId}
-                      onOpenCommit={actions.openCommit}
-                      height={bottomHeight}
-                      tab={bottomTab}
-                      onTab={setBottomTab}
-                      setStatus={repoState.setStatus}
-                      onFileHistory={fileHistory.open}
-                      onSelectedFile={fileHistory.setBrowseFile}
+                      onClose={chrome.closeFileHistory}
                     />
-                  </>
-                )}
-              </Box>
+                  ) : (
+                    <>
+                      <HistoryPane
+                        rows={rows}
+                        remoteNames={remoteNames}
+                        tagNames={tagNames}
+                        selected={selected}
+                        loadingTail={loadingTail}
+                        loading={live && !demo && !loaded}
+                        engineError={engineError}
+                        view={view}
+                        onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
+                        onNearEnd={history.onNearEnd}
+                        menus={menus}
+                        selectedSha={selectedSha}
+                        onRetry={() => void refresh().catch(() => undefined)}
+                        onOpenRepo={() => void openFolder()}
+                        onRecover={() => setRecoveryOpen(true)}
+                      />
+                      <PanelSplitter testid="panel-splitter" splitter={splitter} />
+                      <BottomPanel
+                        current={deferredCurrent}
+                        status={status}
+                        headId={headId}
+                        onOpenCommit={actions.openCommit}
+                        height={bottomHeight}
+                        tab={bottomTab}
+                        onTab={setBottomTab}
+                        setStatus={repoState.setStatus}
+                        onFileHistory={fileHistory.open}
+                        onSelectedFile={fileHistory.setBrowseFile}
+                      />
+                    </>
+                  )}
+                </Box>
+              )}
             </Box>
           </Box>
         </Box>

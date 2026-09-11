@@ -13,7 +13,7 @@ anything. When that's the case, I don't have a way to bring back the logs."
 The shell's log directory is Tauri's `app_log_dir()`:
 `%LOCALAPPDATA%\com.cynacons.powergit\logs` on Windows,
 `$XDG_DATA_HOME/com.cynacons.powergit/logs` (default `~/.local/share/...`)
-on Linux. Settings → Tools → "Open logs folder" opens it. Files:
+on Linux. Settings → Diagnostics → "Open logs folder" opens it. Files:
 
 - `engine.log` (+ `.1`): sidecar stderr, exits and restarts, what the shell
   logs itself (`log_line` in lib.rs), including watchdog transitions and
@@ -181,7 +181,7 @@ platform` elsewhere.
 `Ctrl+Shift+F1` … `Ctrl+Shift+F9` = steps 1–9, registered in
 `frontend/src/hotkeys/`, every phase, capture phase, Tauri only. Each press
 also `report()`s `recovery: step <n> requested` to the diagnostics ring.
-Settings → Tools → "Recovery experiments" has one button per step. Try 3,
+Settings → Diagnostics → "Recovery experiments" has one button per step. Try 3,
 6, 8 first.
 
 ### engine.log lines
@@ -236,7 +236,7 @@ JavaScript. Page focus/blur/visibility changes and numbered refresh start/end
 durations are sent immediately to frontend.log and printed in the console.
 Focus regain triggers a full repository refresh; focus loss itself does not.
 
-Release builds enable the platform inspector: Settings → Tools → Open developer
+Release builds enable the platform inspector: Settings → Diagnostics → Open developer
 tools, or launch `POWERGIT_DEVTOOLS=1 ./PowerGit_0.15.2_amd64.AppImage`
 (substitute the actual downloaded filename). Use the inspector's docking controls
 to select the right side if supported by the installed WebKitGTK, or detach it.

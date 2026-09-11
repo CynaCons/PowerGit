@@ -7,10 +7,12 @@ import { RECOVERY_STEPS, RECOVERY_TRY_FIRST, requestRecovery } from "../../diagn
 import { shortcutLabel, type CommandId } from "../../hotkeys"
 import { isTauriShell } from "../../shell"
 
-// Settings → Tools → Recovery experiments (v0.15.6). The nine steps of the
-// shell's recovery ladder, each with its hotkey, for the owner to try while
-// the picture is frozen. The hotkeys are the real trigger (a frozen window
-// cannot show this dialog); the list is where the owner reads what they do.
+// Settings → Diagnostics → Recovery experiments (v0.15.6). The nine steps
+// of the shell's recovery ladder, each with its hotkey, for the owner to
+// try while the picture is frozen. The hotkeys are the real trigger (a
+// frozen window cannot show this page); the list is where the owner reads
+// what they do. The row's title and description come from the catalog;
+// this is the control under them.
 
 export function RecoverySection() {
   const shell = isTauriShell()
@@ -26,10 +28,8 @@ export function RecoverySection() {
 
   return (
     <Box data-testid="recovery-experiments" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-      <Typography variant="body2">Recovery experiments</Typography>
       <Typography variant="caption" color="text.secondary" data-testid="recovery-experiments-help">
-        Use these while the picture is frozen but the app still reacts: press the hotkey, wait a few seconds, and note
-        whether the window repaints. Try {tryFirst} first. Every press is written to engine.log
+        Try {tryFirst} first. Every press is written to engine.log
         {shell ? "." : " (desktop app only; the buttons do nothing in a browser)."}
       </Typography>
       <Box component="ul" sx={{ m: 0, pl: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 0.25 }}>
@@ -47,12 +47,13 @@ export function RecoverySection() {
               disabled={!shell}
               onClick={() => run(s.step)}
               data-testid={`recovery-run-${s.step}`}
-              sx={{ minWidth: 0, whiteSpace: "nowrap" }}
+              sx={{ minWidth: 0, whiteSpace: "nowrap", fontSize: 11, py: 0.125, px: 0.75 }}
             >
               {shortcutLabel(`recovery.step${s.step}` as CommandId)}
             </Button>
             <Typography variant="body2" component="span">
               <code>{s.key}</code> — {s.meaning}
+              {RECOVERY_TRY_FIRST.includes(s.step) ? " · try first" : ""}
             </Typography>
           </Box>
         ))}
