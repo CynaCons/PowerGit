@@ -42,7 +42,7 @@ export function CheckoutBranchDialog({
   return (
     <OpDialog
       open={open}
-      title="Checkout Branch"
+      title="Checkout branch"
       onClose={onClose}
       actions={
         <>
