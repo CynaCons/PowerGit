@@ -150,14 +150,37 @@
   .notes ol { margin: 0; padding-left: 20px; }
   .notes li { margin-bottom: 4px; }
   @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+  /* Rejected lines: the third state of the cycle. */
+  .reviewing .row.change.rejected .mark::before { border-color: var(--removed); background: var(--removed); }
+  .reviewing .row.change.rejected .mark::after {
+    content: "×"; position: absolute; left: 10.5px; top: 1.5px; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; border: 0; transform: none; width: auto; height: auto;
+  }
+  .reviewing .row.change.rejected .code { box-shadow: inset 3px 0 0 var(--removed); }
+  .reviewing .row.cur.rejected .code { box-shadow: inset 3px 0 0 var(--removed), inset 0 0 0 100vw var(--sel-bg); }
+  .reviewing .row.cur.done .code { box-shadow: inset 3px 0 0 var(--sel-border), inset 0 0 0 100vw var(--sel-bg); }
+  .pill.rej { border-color: var(--removed); color: var(--removed); background: var(--removed-bg); }
+  .count b { color: var(--removed); font-weight: 600; }
+  /* Slash command line, inline under the cursor line. */
+  .cmd td { padding: 4px 10px 6px 70px !important; background: var(--surface-sunken); border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); white-space: normal; }
+  .cmd input { width: 100%; max-width: 720px; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--sel-border); border-radius: 4px; padding: 5px 8px; }
+  .cmd .hint { display: block; margin-top: 4px; font-size: 11px; color: var(--text-meta); }
+  .cmd .hint.err { color: var(--removed); }
+  /* The review file, shown beside the diff. */
+  .body.with-file { grid-template-columns: 300px 1fr 360px; }
+  .filepane { border-left: 1px solid var(--divider); background: var(--surface-sunken); display: flex; flex-direction: column; min-height: 0; }
+  .filepane[hidden] { display: none; }
+  .filepane .fh { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--divider); color: var(--text-2); }
+  .filepane .fh code { font-size: 11px; color: var(--text-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .filepane pre { margin: 0; padding: 10px; overflow: auto; flex: 1; font: 11.5px/1.5 Consolas, "Cascadia Mono", ui-monospace, monospace; color: var(--text); }
+  .filepane .saved { font-size: 11px; color: var(--text-meta); padding: 4px 10px; border-top: 1px solid var(--divider); }
 </style>
 </head>
 <body>
 
 <div class="intro">
   <h1>Review mode in the Diff panel</h1>
-  <p>Clickable draft. Turn review mode on with the round button at the bottom of the file list, next to the tree toggle. Every changed or added line then starts as <em>unreviewed</em>; click a line to mark it reviewed, click again to undo.</p>
-  <p><kbd>↑</kbd> <kbd>↓</kbd> or <kbd>k</kbd> <kbd>j</kbd> move the cursor a line at a time, <kbd>gg</kbd> and <kbd>G</kbd> jump to the top and bottom, <kbd>Space</kbd> toggles the current line, <kbd>n</kbd> jumps to the next unreviewed line, <kbd>Enter</kbd> goes to the next file that still has work. In the artifact viewer the first click only focuses the page; click again.</p>
+  <p>Clickable draft. Turn review mode on with the round button at the bottom of the file list, next to the tree toggle. Every changed or added line starts <em>unreviewed</em>; each press of <kbd>Space</kbd> (or a click) cycles it: unreviewed → ok → rejected → unreviewed. <kbd>x</kbd> toggles rejected directly.</p>
+  <p><kbd>↑</kbd> <kbd>↓</kbd> or <kbd>k</kbd> <kbd>j</kbd> move a line, <kbd>gg</kbd> / <kbd>G</kbd> top and bottom, <kbd>n</kbd> next unreviewed, <kbd>Enter</kbd> next file, <kbd>Shift</kbd>+<kbd>Enter</kbd> previous file. <kbd>/</kbd> opens a command line on the current line: <code>/comment why this is wrong</code>, <code>/ok</code>, <code>/reject</code>, <code>/clear</code>. In the artifact viewer the first click only focuses the page; click again.</p>
 </div>
 
 <div class="panel" id="panel">
@@ -170,11 +193,12 @@
       <span class="label" id="barLabel">Reviewing</span>
       <span class="meter"><i id="meter"></i></span>
       <span class="count" id="barCount">0 / 0 lines</span>
-      <button class="btn" id="btnReset" title="Mark every line unreviewed again">Start over</button>
-      <button class="btn primary" id="btnFinish" title="Later: sends your notes to the AI reviewer">Finish review</button>
+      <button class="btn" id="btnFile" title="The file this review is written to" aria-pressed="false">Review file</button>
+      <button class="btn" id="btnReset" title="Clear every mark and comment">Start over</button>
+      <button class="btn primary" id="btnFinish" title="Later: sends the review file to the AI reviewer">Finish review</button>
     </div>
   </div>
-  <div class="body">
+  <div class="body" id="body">
     <div class="files">
       <ul id="files"></ul>
       <div class="fabs">
@@ -187,27 +211,34 @@
       </div>
     </div>
     <div class="diff" id="diff"></div>
+    <div class="filepane" id="filepane" hidden>
+      <div class="fh"><code id="filePath">.powergit/reviews/</code><button class="btn" id="btnCopy">Copy</button></div>
+      <pre id="fileText"></pre>
+      <div class="saved" id="fileSaved"></div>
+    </div>
   </div>
 </div>
 
 <div class="legend">
   <span><i class="sw"></i> unreviewed change</span>
-  <span><i class="sw done"></i> reviewed</span>
+  <span><i class="sw done"></i> ok</span>
+  <span><i class="sw" style="background:var(--removed);border-color:var(--removed)"></i> rejected</span>
   <span><i class="sw stripe"></i> amber stripe: still to review (context lines never carry a marker)</span>
-  <span>file pill: reviewed / changed lines in that file</span>
+  <span>file pill: reviewed / changed lines, rejected count in red</span>
 </div>
 
 <div class="notes">
   <h2>What this drafts, and what comes after</h2>
   <ol>
-    <li>Review state is per commit (or per working-directory snapshot) and per line, keyed by file, side and line number, so it survives switching files and reopening the app until the diff itself changes.</li>
-    <li>Context lines are never part of the count. Only + and − lines are, because that is what a reviewer is accountable for.</li>
-    <li>The hover “+” on a changed line is the next step: a note attached to that line, kept as a draft, and sent together to the AI reviewer when you press Finish review, the way a Bitbucket review collects comments before submit.</li>
+    <li>The review lives in one file per reviewed commit, <code>.powergit/reviews/&lt;commit&gt;.json</code> (the Working directory review is keyed by the HEAD it sits on). Each changed line is keyed by file, side and line number with its state; comments sit beside them. The Review file button shows it live; here it is kept in the browser instead of on disk.</li>
+    <li>Context lines are never part of the count. Only + and − lines are, because that is what a reviewer is accountable for. Rejected counts as reviewed, and is listed separately.</li>
+    <li>Finish review hands that file to the AI reviewer, later over MCP: the rejected lines and the comments are the brief, the ok lines are the context it may skip.</li>
   </ol>
 </div>
 
 <script>
 (function () {
+  const COMMIT = "26218814f";
   // Real changes from today's v0.16.0 work, trimmed.
   const FILES = [
     { st: "M", path: "frontend/src/components/IgnoreDialog.tsx", hunks: [
@@ -264,33 +295,62 @@
   ];
 
   const $ = (s) => document.querySelector(s);
-  const state = { reviewing: false, file: 0, cur: -1, done: new Set(), notes: {} };
+  // marks: key -> "ok" | "rejected" (absent = unreviewed). comments: key -> text[].
+  const state = { reviewing: false, file: 0, cur: -1, marks: {}, comments: {}, cmd: null, showFile: false, saved: "" };
   const keyOf = (f, h, i) => `${f}:${h}:${i}`;
+  const lineOf = (f, h, i) => { const l = FILES[f].hunks[h].lines[i]; return l[0] === "-" ? `-${l[1]}` : `+${l[2]}`; };
+  const CYCLE = { undefined: "ok", ok: "rejected", rejected: undefined };
 
   function changed(f) {
     const out = [];
     FILES[f].hunks.forEach((h, hi) => h.lines.forEach((l, li) => { if (l[0] !== " ") out.push(keyOf(f, hi, li)); }));
     return out;
   }
-  const progress = (f) => { const all = changed(f); return [all.filter((k) => state.done.has(k)).length, all.length]; };
+  const progress = (f) => { const all = changed(f); return [all.filter((k) => state.marks[k]).length, all.length, all.filter((k) => state.marks[k] === "rejected").length]; };
 
+  // ---- the review file --------------------------------------------------
+  function reviewFile() {
+    const files = {};
+    FILES.forEach((file, f) => {
+      const lines = {}, comments = [];
+      file.hunks.forEach((h, hi) => h.lines.forEach((l, li) => {
+        const k = keyOf(f, hi, li); const ln = lineOf(f, hi, li);
+        if (state.marks[k]) lines[ln] = state.marks[k];
+        (state.comments[k] || []).forEach((t) => { if (t.trim()) comments.push({ line: ln, text: t.trim() }); });
+      }));
+      if (Object.keys(lines).length || comments.length) files[file.path] = { lines, comments };
+    });
+    const [d, n] = totals();
+    return { commit: COMMIT, reviewed: d, changed: n, status: d === n ? "complete" : "in-progress", files };
+  }
+  function totals() { let d = 0, n = 0, r = 0; FILES.forEach((_, i) => { const [a, b, c] = progress(i); d += a; n += b; r += c; }); return [d, n, r]; }
+  const STORE = `pg.review.${COMMIT}`;
+  function persist() {
+    try { localStorage.setItem(STORE, JSON.stringify({ marks: state.marks, comments: state.comments })); state.saved = new Date().toLocaleTimeString(); } catch (e) { state.saved = "not saved (storage unavailable)"; }
+  }
+  function restore() {
+    try { const raw = localStorage.getItem(STORE); if (!raw) return false; const o = JSON.parse(raw); state.marks = o.marks || {}; state.comments = o.comments || {}; return true; } catch (e) { return false; }
+  }
+
+  // ---- rendering ----------------------------------------------------------
   function renderFiles() {
     const ul = $("#files"); ul.innerHTML = "";
     FILES.forEach((file, i) => {
-      const [d, n] = progress(i);
+      const [d, n, r] = progress(i);
       const li = document.createElement("li");
       li.className = "file" + (i === state.file ? " sel" : "") + (state.reviewing ? (d === n ? " complete" : " todo") : "");
       const dir = file.path.slice(0, file.path.lastIndexOf("/") + 1), name = file.path.slice(dir.length);
-      li.innerHTML = `<span class="st ${file.st}">${file.st}</span><span class="path" title="${file.path}"><span>${dir}</span><b>${name}</b></span><span class="pill${d === n ? " done" : ""}" ${state.reviewing ? "" : "hidden"}>${d === n ? "✓ " : ""}${d}/${n}</span>`;
+      const pill = r ? `<span class="pill rej">${d}/${n} · ${r} ✗</span>` : `<span class="pill${d === n ? " done" : ""}">${d === n ? "✓ " : ""}${d}/${n}</span>`;
+      li.innerHTML = `<span class="st ${file.st}">${file.st}</span><span class="path" title="${file.path}"><span>${dir}</span><b>${name}</b></span>${state.reviewing ? pill : ""}`;
       li.tabIndex = 0;
-      li.addEventListener("click", () => { state.file = i; state.cur = -1; render(); });
+      li.addEventListener("click", () => { state.file = i; state.cur = -1; state.cmd = null; render(); });
       ul.appendChild(li);
     });
   }
 
   function renderDiff() {
     const file = FILES[state.file]; const diff = $("#diff"); diff.innerHTML = "";
-    const todo = changed(state.file).filter((k) => !state.done.has(k)).length;
+    const todo = changed(state.file).filter((k) => !state.marks[k]).length;
     const head = document.createElement("div"); head.className = "dh";
     head.innerHTML = `<span class="name">${file.path}</span><span>${file.st === "A" ? "new file" : "modified"}</span>` +
       (state.reviewing ? `<button class="btn next" id="btnNext">${todo ? `Next unreviewed (${todo})` : "File reviewed — next file"}</button>` : "");
@@ -301,87 +361,146 @@
       h.lines.forEach((l, li) => {
         const [sign, a, b, text] = l; const key = keyOf(state.file, hi, li); const isChange = sign !== " ";
         const tr = document.createElement("tr"); const myIdx = idx++;
+        const mark = state.marks[key];
         tr.className = "row " + (sign === "+" ? "add change" : sign === "-" ? "del change" : "ctx") +
-          (isChange ? (state.done.has(key) ? " done" : " todo") : "") + (state.reviewing && myIdx === state.cur ? " cur" : "");
+          (isChange ? (mark === "ok" ? " done" : mark === "rejected" ? " rejected" : " todo") : "") + (state.reviewing && myIdx === state.cur ? " cur" : "");
         tr.dataset.key = key; tr.dataset.idx = myIdx;
-        tr.innerHTML = `<td class="num numl">${isChange && state.reviewing ? '<button class="addnote" title="Add a note for the AI reviewer (later)">+</button>' : ""}${a ?? ""}</td><td class="num">${b ?? ""}</td><td class="mark"></td><td class="sign">${sign.trim()}</td><td class="code">${escape(text)}</td>`;
-        if (!isChange && state.reviewing) tr.addEventListener("click", () => { state.cur = myIdx; render(); });
-        if (isChange && state.reviewing) {
-          tr.tabIndex = 0;
-          tr.addEventListener("click", (e) => { if (e.target.classList.contains("addnote")) return; toggle(key); state.cur = myIdx; render(); });
-          tr.querySelector(".addnote").addEventListener("click", () => { state.notes[key] = state.notes[key] ?? ""; render(); });
+        tr.innerHTML = `<td class="num numl">${isChange && state.reviewing ? '<button class="addnote" title="Comment on this line (or press / then /comment …)">+</button>' : ""}${a ?? ""}</td><td class="num">${b ?? ""}</td><td class="mark"></td><td class="sign">${sign.trim()}</td><td class="code">${escape(text)}</td>`;
+        if (state.reviewing) {
+          tr.addEventListener("click", (e) => {
+            if (e.target.classList.contains("addnote")) { addComment(key, ""); state.cur = myIdx; render(); return; }
+            state.cur = myIdx; if (isChange) cycle(key); render();
+          });
         }
         table.appendChild(tr);
-        if (state.reviewing && key in state.notes) {
-          const nr = document.createElement("tr"); nr.className = "note";
-          nr.innerHTML = `<td colspan="5"><div class="who">Draft note · sent to the AI reviewer when you finish</div><textarea placeholder="Why does this line need attention?"></textarea></td>`;
-          const ta = nr.querySelector("textarea"); ta.value = state.notes[key];
-          ta.addEventListener("input", () => { state.notes[key] = ta.value; });
-          table.appendChild(nr);
+        if (state.reviewing) {
+          (state.comments[key] || []).forEach((text, ci) => {
+            const nr = document.createElement("tr"); nr.className = "note";
+            nr.innerHTML = `<td colspan="5"><div class="who">Review comment · line ${lineOf(state.file, hi, li)} · sent with the review file</div><textarea placeholder="Why does this line need attention?"></textarea></td>`;
+            const ta = nr.querySelector("textarea"); ta.value = text;
+            ta.addEventListener("input", () => { state.comments[key][ci] = ta.value; persist(); renderFilePane(); });
+            table.appendChild(nr);
+          });
+          if (state.cmd && state.cmd.idx === myIdx) table.appendChild(commandRow(key));
         }
       });
     });
     diff.appendChild(table);
     const next = $("#btnNext"); if (next) next.addEventListener("click", jumpNext);
+    if (state.cmd) { const inp = $("#cmdInput"); if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } }
   }
+
+  // The slash command line under the cursor line.
+  function commandRow(key) {
+    const tr = document.createElement("tr"); tr.className = "cmd";
+    tr.innerHTML = `<td colspan="5"><input id="cmdInput" spellcheck="false" value="${escape(state.cmd.text)}"><span class="hint${state.cmd.error ? " err" : ""}">${state.cmd.error || "/comment &lt;text&gt; · /ok · /reject · /clear — Enter runs, Esc cancels"}</span></td>`;
+    const inp = tr.querySelector("input");
+    inp.addEventListener("input", () => { state.cmd.text = inp.value; state.cmd.error = ""; });
+    inp.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") { state.cmd = null; render(); }
+      else if (e.key === "Enter") { e.preventDefault(); runCommand(key, inp.value); }
+    });
+    return tr;
+  }
+  function runCommand(key, raw) {
+    const m = raw.trim().match(/^\/(\w+)\s*(.*)$/s);
+    if (!m) { state.cmd.error = "A command starts with /: try /comment, /ok, /reject, /clear"; render(); return; }
+    const [, cmd, arg] = m; const isChange = document.querySelector(`#diff .row[data-key="${key}"]`).classList.contains("change");
+    switch (cmd) {
+      case "comment": case "c": if (!arg.trim()) { state.cmd.error = "/comment needs a text"; render(); return; } addComment(key, arg.trim()); break;
+      case "ok": if (!isChange) { state.cmd.error = "Only a changed line can be marked"; render(); return; } state.marks[key] = "ok"; break;
+      case "reject": case "rej": case "x": if (!isChange) { state.cmd.error = "Only a changed line can be marked"; render(); return; } state.marks[key] = "rejected"; break;
+      case "clear": delete state.marks[key]; delete state.comments[key]; break;
+      default: state.cmd.error = `Unknown command /${cmd}`; render(); return;
+    }
+    state.cmd = null; persist(); render();
+  }
+  function addComment(key, text) { (state.comments[key] = state.comments[key] || []).push(text); persist(); }
 
   function renderBar() {
     const bar = $("#bar"); bar.hidden = !state.reviewing;
     $("#fabReview").classList.toggle("on", state.reviewing); $("#fabReview").setAttribute("aria-pressed", String(state.reviewing));
     $("#panel").classList.toggle("reviewing", state.reviewing);
+    $("#body").classList.toggle("with-file", state.reviewing && state.showFile);
+    $("#filepane").hidden = !(state.reviewing && state.showFile);
+    $("#btnFile").setAttribute("aria-pressed", String(state.showFile));
     if (!state.reviewing) return;
-    let d = 0, n = 0; FILES.forEach((_, i) => { const [a, b] = progress(i); d += a; n += b; });
+    const [d, n, r] = totals();
     $("#meter").style.width = n ? `${(100 * d) / n}%` : "0";
-    $("#barCount").textContent = `${d} / ${n} lines · ${FILES.filter((_, i) => { const [a, b] = progress(i); return a === b; }).length} of ${FILES.length} files`;
+    const files = FILES.filter((_, i) => { const [a, b] = progress(i); return a === b; }).length;
+    const comments = Object.values(state.comments).flat().filter((t) => t.trim()).length;
+    $("#barCount").innerHTML = `${d} / ${n} lines${r ? ` · <b>${r} rejected</b>` : ""} · ${files} of ${FILES.length} files${comments ? ` · ${comments} comment${comments > 1 ? "s" : ""}` : ""}`;
     const lbl = $("#barLabel"); lbl.textContent = d === n ? "Review complete" : "Reviewing"; lbl.classList.toggle("complete", d === n);
+    renderFilePane();
   }
-
+  function renderFilePane() {
+    if (!(state.reviewing && state.showFile)) return;
+    $("#filePath").textContent = `.powergit/reviews/${COMMIT}.json`;
+    $("#fileText").textContent = JSON.stringify(reviewFile(), null, 2);
+    $("#fileSaved").textContent = state.saved ? `saved ${state.saved} (in this browser; the app writes the file)` : "not saved yet";
+  }
   function render() { renderFiles(); renderDiff(); renderBar(); }
-  function toggle(key) { if (state.done.has(key)) state.done.delete(key); else state.done.add(key); }
-  function jumpNext() {
-    const rows = [...document.querySelectorAll("#diff .row.change")];
-    const start = rows.findIndex((r) => Number(r.dataset.idx) > state.cur);
-    const order = start < 0 ? rows : rows.slice(start).concat(rows.slice(0, start));
-    const hit = order.find((r) => r.classList.contains("todo"));
-    if (hit) { state.cur = Number(hit.dataset.idx); render(); document.querySelector(`#diff .row[data-idx="${state.cur}"]`)?.scrollIntoView({ block: "nearest" }); return; }
-    const nf = FILES.findIndex((_, i) => { const [a, b] = progress(i); return a < b; });
-    if (nf >= 0) { state.file = nf; state.cur = -1; render(); jumpNext(); }
-  }
-  function escape(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-  $("#fabReview").addEventListener("click", () => { state.reviewing = !state.reviewing; state.cur = -1; render(); });
-  $("#btnReset").addEventListener("click", () => { state.done.clear(); state.cur = -1; render(); });
-  $("#btnFinish").addEventListener("click", () => {
-    const notes = Object.values(state.notes).filter((t) => t.trim()).length;
-    alert(`Draft only. Later this sends ${notes} note(s) and the reviewed/unreviewed map to the AI reviewer.`);
-  });
-  // Keyboard: arrows / vim j k move one line, gg / G top and bottom, Space
-  // toggles the current line (only a changed line has anything to toggle),
-  // n = next unreviewed, Enter = next file with work left.
-  let lastG = 0;
+  // ---- actions -------------------------------------------------------------
+  function cycle(key) { const next = CYCLE[state.marks[key]]; if (next) state.marks[key] = next; else delete state.marks[key]; persist(); }
+  function toggleReject(key) { if (state.marks[key] === "rejected") delete state.marks[key]; else state.marks[key] = "rejected"; persist(); }
   function rowCount() { return document.querySelectorAll("#diff .row[data-idx]").length; }
   function moveTo(idx) {
     const max = rowCount() - 1; if (max < 0) return;
     state.cur = Math.max(0, Math.min(max, idx)); render();
     document.querySelector(`#diff .row[data-idx="${state.cur}"]`)?.scrollIntoView({ block: "nearest" });
   }
+  function curRow() { return document.querySelector(`#diff .row[data-idx="${state.cur}"]`); }
+  function jumpNext() {
+    const rows = [...document.querySelectorAll("#diff .row.change")];
+    const start = rows.findIndex((r) => Number(r.dataset.idx) > state.cur);
+    const order = start < 0 ? rows : rows.slice(start).concat(rows.slice(0, start));
+    const hit = order.find((r) => r.classList.contains("todo"));
+    if (hit) { moveTo(Number(hit.dataset.idx)); return; }
+    const nf = FILES.findIndex((_, i) => { const [a, b] = progress(i); return a < b; });
+    if (nf >= 0) { state.file = nf; state.cur = -1; render(); jumpNext(); }
+  }
+  function gotoFile(delta) { state.file = (state.file + delta + FILES.length) % FILES.length; state.cur = -1; state.cmd = null; render(); moveTo(0); }
+  function escape(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  $("#fabReview").addEventListener("click", () => { state.reviewing = !state.reviewing; state.cur = -1; state.cmd = null; render(); });
+  $("#btnReset").addEventListener("click", () => { state.marks = {}; state.comments = {}; state.cur = -1; state.cmd = null; persist(); render(); });
+  $("#btnFile").addEventListener("click", () => { state.showFile = !state.showFile; render(); });
+  $("#btnCopy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(JSON.stringify(reviewFile(), null, 2)); $("#btnCopy").textContent = "Copied"; setTimeout(() => ($("#btnCopy").textContent = "Copy"), 1200); } catch (e) { $("#btnCopy").textContent = "Select the text"; } });
+  $("#btnFinish").addEventListener("click", () => {
+    const f = reviewFile(); const c = Object.values(f.files).reduce((n, x) => n + x.comments.length, 0);
+    alert(`Draft only. Later this hands .powergit/reviews/${COMMIT}.json to the AI reviewer over MCP: ${f.reviewed}/${f.changed} lines marked, ${totals()[2]} rejected, ${c} comment(s).`);
+  });
+
+  // Keyboard: arrows / vim j k move one line, gg / G top and bottom, Space
+  // cycles the current line, x toggles rejected, n next unreviewed, Enter
+  // next file, Shift+Enter previous file, / opens the command line.
+  let lastG = 0;
   document.addEventListener("keydown", (e) => {
-    if (!state.reviewing || e.target.tagName === "TEXTAREA" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!state.reviewing || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key;
     if (k === "ArrowDown" || k === "j") { e.preventDefault(); moveTo(state.cur + 1); }
     else if (k === "ArrowUp" || k === "k") { e.preventDefault(); moveTo(state.cur - 1); }
     else if (k === "G" || k === "End") { e.preventDefault(); moveTo(rowCount() - 1); }
     else if (k === "Home") { e.preventDefault(); moveTo(0); }
     else if (k === "g") { const now = Date.now(); if (now - lastG < 500) { e.preventDefault(); moveTo(0); lastG = 0; } else lastG = now; }
-    else if (k === " ") { e.preventDefault(); const r = document.querySelector(`#diff .row[data-idx="${state.cur}"]`); if (r && r.classList.contains("change")) { toggle(r.dataset.key); render(); } }
+    else if (k === " ") { e.preventDefault(); const r = curRow(); if (r && r.classList.contains("change")) { cycle(r.dataset.key); render(); } }
+    else if (k === "x") { e.preventDefault(); const r = curRow(); if (r && r.classList.contains("change")) { toggleReject(r.dataset.key); render(); } }
     else if (k === "n") { e.preventDefault(); jumpNext(); }
-    else if (k === "Enter") { e.preventDefault(); const nf = FILES.findIndex((_, i) => i !== state.file && progress(i)[0] < progress(i)[1]); if (nf >= 0) { state.file = nf; state.cur = -1; render(); moveTo(0); } }
+    else if (k === "Enter") { e.preventDefault(); gotoFile(e.shiftKey ? -1 : 1); }
+    else if (k === "/") { e.preventDefault(); if (state.cur < 0) moveTo(0); state.cmd = { idx: state.cur, text: "/", error: "" }; render(); }
   });
 
-  // Open in a realistic mid-review state so the markers are visible at once.
+  // Open in a realistic mid-review state so the markers are visible at once;
+  // a review saved in this browser wins over the sample.
   state.reviewing = true;
-  ["0:0:2", "0:0:3", "0:0:4", "0:0:5", "0:0:6"].forEach((k) => state.done.add(k));
-  state.cur = 10; state.notes["0:1:7"] = "Awaiting the preview is right, but should Cancel abort it too?";
+  if (!restore()) {
+    ["0:0:2", "0:0:3", "0:0:4", "0:0:5"].forEach((k) => (state.marks[k] = "ok"));
+    state.marks["0:0:6"] = "rejected";
+    state.comments["0:0:6"] = ["Two refs for one concern: fold the debounce handle into the inflight promise."];
+  }
+  state.cur = 10;
   render();
 })();
 </script>
