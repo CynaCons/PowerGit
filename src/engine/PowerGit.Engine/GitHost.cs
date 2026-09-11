@@ -186,6 +186,8 @@ public sealed partial class GitHost
     ///  <see cref="RunTimedWithEnv"/> — comes through here, so the Git
     ///  console misses nothing, reads included. A timeout or a cancellation
     ///  is recorded too (exit code -1) and then rethrown unchanged.
+    ///  <paramref name="okWhen"/> is the caller's verdict for the log entry
+    ///  (v0.16.0, see <see cref="RecordCommand"/>); null means exit 0.
     /// </summary>
     private GitProcess.Result RunLogged(
         IReadOnlyList<string> args,
@@ -193,18 +195,19 @@ public sealed partial class GitHost
         int timeoutMs,
         CancellationToken ct,
         int maxStdOutChars,
-        IReadOnlyDictionary<string, string> environment)
+        IReadOnlyDictionary<string, string> environment,
+        Func<int, bool>? okWhen = null)
     {
         long started = System.Diagnostics.Stopwatch.GetTimestamp();
         try
         {
             GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment);
-            RecordCommand(args, r.ExitCode, ElapsedMs(started), r.StdOut, r.StdErr);
+            RecordCommand(args, r.ExitCode, ElapsedMs(started), r.StdOut, r.StdErr, okWhen);
             return r;
         }
         catch (Exception ex)
         {
-            RecordCommand(args, -1, ElapsedMs(started), null, ex.Message);
+            RecordCommand(args, -1, ElapsedMs(started), null, ex.Message, okWhen);
             throw;
         }
     }

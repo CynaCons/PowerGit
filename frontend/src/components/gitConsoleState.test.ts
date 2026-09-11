@@ -13,11 +13,23 @@ describe("parseGitConsoleState", () => {
   })
 
   it("reads a v0.15.1 value, which has no tab, as the git tab", () => {
-    expect(parseGitConsoleState('{"open":true,"height":200}')).toEqual({ open: true, height: 200, tab: "git" })
+    expect(parseGitConsoleState('{"open":true,"height":200}')).toEqual({
+      open: true,
+      height: 200,
+      tab: "git",
+      showAll: false,
+    })
   })
 
   it("keeps a stored tab", () => {
     expect(parseGitConsoleState('{"open":true,"height":200,"tab":"app"}').tab).toBe("app")
+  })
+
+  it("folds the engine's reads away unless the user chose to see everything (v0.16.0)", () => {
+    // A v0.15 value has no showAll: the readable default, not the old flood.
+    expect(parseGitConsoleState('{"open":true,"height":200,"tab":"git"}').showAll).toBe(false)
+    expect(parseGitConsoleState('{"showAll":true}').showAll).toBe(true)
+    expect(parseGitConsoleState('{"showAll":"yes"}').showAll).toBe(false)
   })
 
   it("refuses a tab it does not know", () => {

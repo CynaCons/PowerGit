@@ -9,6 +9,13 @@ namespace PowerGit.Engine;
 /// <param name="At">UTC, round-trip ("O") format.</param>
 /// <param name="Command">Sanitized command line, e.g. <c>git fetch --prune origin</c>.</param>
 /// <param name="ExitCode">git's exit code; -1 when it timed out or was cancelled.</param>
+/// <param name="Ok">
+///  The caller's verdict (v0.16.0): did this invocation do what the engine
+///  asked? Normally <c>ExitCode == 0</c>, but some commands answer with a
+///  non-zero exit by design — <c>git diff --no-index</c> exits 1 whenever
+///  the two sides differ, which is every new file with content — and the
+///  console must not paint those red. A timeout or a cancellation is never ok.
+/// </param>
 /// <param name="DurationMs">Wall-clock milliseconds the child process took.</param>
 /// <param name="Output">stdout then stderr, sanitized and capped at 8 KB.</param>
 /// <param name="Truncated">True when <paramref name="Output"/> hit the cap.</param>
@@ -17,6 +24,7 @@ public sealed record GitLogEntryDto(
     string At,
     string Command,
     int ExitCode,
+    bool Ok,
     long DurationMs,
     string Output,
     bool Truncated);
@@ -40,12 +48,37 @@ public sealed partial class GitHost
     private long _commandLogSeq;
 
     /// <summary>
+    ///  Like <see cref="RunTimed(string?, int, string[])"/>, but the caller
+    ///  says which exit codes count as success for the console (v0.16.0).
+    ///  Use it where git's own convention is "non-zero means no, not
+    ///  failed": <c>diff --no-index</c> (1 = the sides differ). The
+    ///  <see cref="CommandResult"/> comes back unchanged — the verdict only
+    ///  colours the log entry; the caller still reads the exit code itself.
+    /// </summary>
+    internal CommandResult RunTimed(string? workingDirectory, int timeoutMs, Func<int, bool> okWhen, params string[] args)
+    {
+        GitProcess.Result r = RunLogged(args, workingDirectory, timeoutMs, CancellationToken.None, int.MaxValue, GitEnvironment, okWhen);
+        return new CommandResult(r.ExitCode, r.StdOut, r.StdErr);
+    }
+
+    /// <summary>
     ///  Records one git invocation. Called from <see cref="RunTimed(string?, int, CancellationToken, string[])"/>
     ///  and its siblings — every git child in the engine funnels through
     ///  those, so reads are logged as well as mutations.
+    ///  <paramref name="okWhen"/> is the caller's verdict on a real exit code
+    ///  (default: zero); a negative code is the engine's "never finished"
+    ///  and is never ok, whatever the caller would have accepted.
     /// </summary>
-    internal void RecordCommand(IReadOnlyList<string> args, int exitCode, long durationMs, string? stdOut, string? stdErr)
+    internal void RecordCommand(
+        IReadOnlyList<string> args,
+        int exitCode,
+        long durationMs,
+        string? stdOut,
+        string? stdErr,
+        Func<int, bool>? okWhen = null)
     {
+        bool ok = exitCode >= 0 && (okWhen?.Invoke(exitCode) ?? exitCode == 0);
+
         // Cut to what the console will keep BEFORE sanitizing. `git log` for
         // the graph and `git diff` on a large file produce hundreds of
         // kilobytes, and running the credential regexes over text that is
@@ -68,6 +101,7 @@ public sealed partial class GitHost
                 DateTime.UtcNow.ToString("O"),
                 GitCommandSanitizer.CommandLine(args),
                 exitCode,
+                ok,
                 durationMs,
                 output,
                 truncated));

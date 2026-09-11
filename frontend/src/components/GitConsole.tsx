@@ -4,7 +4,7 @@ import Tooltip from "@mui/material/Tooltip"
 import CloseIcon from "@mui/icons-material/Close"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import TerminalIcon from "@mui/icons-material/Terminal"
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
+import { useEffect, useMemo, useState, type ChangeEvent } from "react"
 import type { EngineClient, GitLogEntry } from "../engine"
 import { shortcutLabel } from "../hotkeys"
 import { useGitLog } from "../hooks/useGitLog"
@@ -13,15 +13,8 @@ import { GitFailureCard } from "./GitFailureCard"
 import { AppLogView } from "./AppLogView"
 import { copyAppLogText, filterDiagnostics, useDiagnostics } from "./appLogModel"
 import { setGitConsoleState, toggleGitConsole, useGitConsoleState, type ConsoleTab } from "./gitConsoleState"
-import {
-  copyAllText,
-  entryOutput,
-  failed,
-  filterEntries,
-  formatDuration,
-  formatExit,
-  notableFailure,
-} from "./gitLogModel"
+import { GitLogList, PinnedFailure } from "./GitConsoleRows"
+import { copyAllText, filterEntries, formatDuration, newestAction, notableFailure, pinnedFailure } from "./gitLogModel"
 
 /**
  * The Git console (v0.15.1, prototype "D"): a permanent dock line at the very
@@ -34,15 +27,33 @@ import {
  *
  * It also mounts the failure card (prototype "B"), because both surfaces
  * read the same rolling buffer and one poll must feed them.
+ *
+ * v0.16.0, owner: "there's always tons of stuff in that window, I can't even
+ * see my push when I push." The panel now reads newest first, keeps what the
+ * user did as rows and folds the engine's own reads into one thin row per
+ * gap; a failed action stays pinned at the top until dismissed; "Show all"
+ * brings the flat log back. The dock line names the last thing the user
+ * did, not the `git status` the refresh ran right after it.
  */
 export function GitConsole({ client, live }: { client: EngineClient; live: boolean }) {
-  const { open, height, tab } = useGitConsoleState()
+  const { open, height, tab, showAll } = useGitConsoleState()
   const feed = useGitLog({ client, live, open })
   const { entries, last, refresh } = feed
   // The badge counts real failures, not the engine's probes: `rev-parse
   // --verify refs/stash` answers "no stash" with exit 1 on every refresh, and
   // a permanently red badge would mean nothing.
   const failures = useMemo(() => entries.filter(notableFailure).length, [entries])
+  const lastAction = useMemo(() => newestAction(entries), [entries])
+  const dockEntry = lastAction ?? last
+
+  // The pin is dismissed per repository: ids restart with the engine's
+  // buffer, so a dismissal from another repository must not hide a fresh
+  // failure here. Derived, not an effect, so a repo switch needs no reset.
+  const [dismissedPin, setDismissedPin] = useState<{ repoId: string | null; id: number }>({ repoId: null, id: 0 })
+  const pinned = useMemo(
+    () => pinnedFailure(entries, dismissedPin.repoId === client.repoId ? dismissedPin.id : 0),
+    [entries, dismissedPin, client.repoId],
+  )
 
   // Opening should not wait for the next tick of the slow closed-poll.
   useEffect(() => {
@@ -55,12 +66,21 @@ export function GitConsole({ client, live }: { client: EngineClient; live: boole
       data-open={open ? "true" : "false"}
       sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}
     >
-      {open && <GitConsolePanel entries={entries} height={height} tab={tab} />}
+      {open && (
+        <GitConsolePanel
+          entries={entries}
+          height={height}
+          tab={tab}
+          showAll={showAll}
+          pinned={pinned}
+          onDismissPin={() => pinned && setDismissedPin({ repoId: client.repoId, id: pinned.id })}
+        />
+      )}
       <ButtonBase
         data-testid="git-console-dock"
         onClick={() => toggleGitConsole()}
         aria-expanded={open}
-        aria-label={`Git console${last ? `. Last command ${last.command}` : ""}`}
+        aria-label={`Git console${dockEntry ? `. Last command ${dockEntry.command}` : ""}`}
         title={`Git console (${shortcutLabel("browse.gitConsole")})`}
         sx={{
           height: 22,
@@ -91,14 +111,14 @@ export function GitConsole({ client, live }: { client: EngineClient; live: boole
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             textAlign: "left",
-            color: last && notableFailure(last) ? "var(--pg-console-fail)" : "var(--pg-console-text)",
+            color: dockEntry && notableFailure(dockEntry) ? "var(--pg-console-fail)" : "var(--pg-console-text)",
           }}
         >
-          {last ? last.command : "Git console"}
+          {dockEntry ? dockEntry.command : "Git console"}
         </Box>
-        {last && (
+        {dockEntry && (
           <Box component="span" sx={{ flexShrink: 0, color: "var(--pg-console-meta)" }}>
-            {formatDuration(last.durationMs)}
+            {formatDuration(dockEntry.durationMs)}
           </Box>
         )}
         <Box
@@ -128,7 +148,21 @@ export function GitConsole({ client, live }: { client: EngineClient; live: boole
   )
 }
 
-function GitConsolePanel({ entries, height, tab }: { entries: GitLogEntry[]; height: number; tab: ConsoleTab }) {
+function GitConsolePanel({
+  entries,
+  height,
+  tab,
+  showAll,
+  pinned,
+  onDismissPin,
+}: {
+  entries: GitLogEntry[]
+  height: number
+  tab: ConsoleTab
+  showAll: boolean
+  pinned: GitLogEntry | null
+  onDismissPin: () => void
+}) {
   // One filter box per tab: switching tabs should not carry "fatal" over to
   // a log where it means nothing.
   const [queries, setQueries] = useState<Record<ConsoleTab, string>>({ git: "", app: "" })
@@ -137,21 +171,9 @@ function GitConsolePanel({ entries, height, tab }: { entries: GitLogEntry[]; hei
   const diagnostics = useDiagnostics()
   const shown = useMemo(() => filterEntries(entries, query), [entries, query])
   const shownApp = useMemo(() => filterDiagnostics(diagnostics, query), [diagnostics, query])
-  const listRef = useRef<HTMLDivElement | null>(null)
-  const newestId = entries.length > 0 ? entries[entries.length - 1].id : 0
   const app = tab === "app"
   const total = app ? diagnostics.length : entries.length
   const count = app ? shownApp.length : shown.length
-
-  // Newest last, so the console follows the tail the way a terminal does —
-  // but only when the user is already at the bottom, otherwise reading an
-  // older entry would be yanked away by the next `git status`.
-  useEffect(() => {
-    const el = listRef.current
-    if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
-    if (atBottom) el.scrollTop = el.scrollHeight
-  }, [newestId, shown.length])
 
   return (
     <Box
@@ -211,6 +233,31 @@ function GitConsolePanel({ entries, height, tab }: { entries: GitLogEntry[]; hei
         <Box component="span" data-testid="git-console-shown" sx={{ fontSize: 11, color: "var(--pg-console-meta)" }}>
           {`${count}/${total}`}
         </Box>
+        {!app && (
+          <Tooltip title={showAll ? "Fold the engine's own reads away again" : "Every git command, reads included"}>
+            <ButtonBase
+              data-testid="git-console-show-all"
+              aria-pressed={showAll}
+              onClick={() => setGitConsoleState({ showAll: !showAll })}
+              sx={{
+                flexShrink: 0,
+                px: 0.75,
+                height: 18,
+                borderRadius: 0.5,
+                fontSize: 11,
+                letterSpacing: 0.2,
+                color: showAll ? "var(--pg-console-text)" : "var(--pg-console-meta)",
+                bgcolor: showAll ? "var(--pg-console-line-bg)" : "transparent",
+                border: "1px solid",
+                borderColor: showAll ? "var(--pg-console-meta)" : "var(--pg-console-border)",
+                "&:hover": { color: "var(--pg-console-text)" },
+                "&:focus-visible": { outline: "var(--pg-focus-ring-w) solid var(--pg-focus-ring)" },
+              }}
+            >
+              Show all
+            </ButtonBase>
+          </Tooltip>
+        )}
         <Tooltip title={app ? "Copy the whole app log" : "Copy the whole console"}>
           <ButtonBase
             data-testid="git-console-copy"
@@ -233,20 +280,10 @@ function GitConsolePanel({ entries, height, tab }: { entries: GitLogEntry[]; hei
       {app ? (
         <AppLogView entries={diagnostics} query={query} />
       ) : (
-        <Box
-          ref={listRef}
-          role="log"
-          sx={{ flex: 1, minHeight: 0, overflow: "auto", fontFamily: "var(--pg-font-mono)", fontSize: 11 }}
-        >
-          {shown.length === 0 && (
-            <Box data-testid="git-console-empty" sx={{ p: 1, color: "var(--pg-console-meta)" }}>
-              {entries.length === 0 ? "No git commands yet this session." : "Nothing matches that filter."}
-            </Box>
-          )}
-          {shown.map((entry) => (
-            <ConsoleRow key={entry.id} entry={entry} />
-          ))}
-        </Box>
+        <>
+          {pinned && <PinnedFailure entry={pinned} onDismiss={onDismissPin} />}
+          <GitLogList entries={entries} shown={shown} flat={showAll || query.trim().length > 0} />
+        </>
       )}
     </Box>
   )
@@ -287,52 +324,3 @@ const consoleIconSx = {
   "&:hover": { color: "var(--pg-console-text)" },
   "&:focus-visible": { outline: "var(--pg-focus-ring-w) solid var(--pg-focus-ring)" },
 } as const
-
-function ConsoleRow({ entry }: { entry: GitLogEntry }) {
-  const bad = failed(entry)
-  const output = entryOutput(entry)
-  return (
-    <Box
-      data-testid="git-console-entry"
-      data-exit={entry.exitCode}
-      data-failed={bad ? "true" : "false"}
-      sx={{ px: 1, py: 0.25, borderBottom: "1px solid var(--pg-console-border)" }}
-    >
-      <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
-        <Box component="span" sx={{ color: "var(--pg-console-meta)", flexShrink: 0 }}>
-          $
-        </Box>
-        <Box
-          component="span"
-          data-testid="git-console-command"
-          sx={{ flex: 1, minWidth: 0, wordBreak: "break-all", color: "var(--pg-console-text)" }}
-        >
-          {entry.command}
-        </Box>
-        <Box component="span" sx={{ flexShrink: 0, color: bad ? "var(--pg-console-fail)" : "var(--pg-console-ok)" }}>
-          {formatExit(entry)}
-        </Box>
-        <Box component="span" sx={{ flexShrink: 0, color: "var(--pg-console-meta)" }}>
-          {formatDuration(entry.durationMs)}
-        </Box>
-      </Box>
-      {output.trim().length > 0 && (
-        <Box
-          component="pre"
-          data-testid="git-console-output"
-          sx={{
-            m: 0,
-            mt: 0.25,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            color: bad ? "var(--pg-console-fail)" : "var(--pg-console-meta)",
-            maxHeight: 160,
-            overflow: "auto",
-          }}
-        >
-          {output}
-        </Box>
-      )}
-    </Box>
-  )
-}

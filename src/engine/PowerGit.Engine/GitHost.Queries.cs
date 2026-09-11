@@ -1032,10 +1032,13 @@ public sealed partial class GitHost
         }
 
         args.AddRange(["--", emptyFile, path]);
-        CommandResult result = RunTimed(root, 30_000, [.. args]);
 
         // --no-index exits 1 when the two sides differ, which is true for
-        // any new file with content; only >1 signals a real error.
+        // any new file with content; only >1 signals a real error. The log
+        // entry gets the same verdict (v0.16.0), or the console would show
+        // "git failed — exit 1" with the new file's diff every time one is
+        // opened.
+        CommandResult result = RunTimed(root, 30_000, exit => exit <= 1, [.. args]);
         if (result.ExitCode > 1)
         {
             throw new InvalidOperationException(result.StdErr.Trim());
