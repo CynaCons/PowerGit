@@ -340,6 +340,7 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
       <CommitFileContextMenu
         target={menu}
         onClose={() => setMenu(null)}
+        onStatus={onStatus}
         actions={{
           onStage: () => void stageSelection(menu?.staged ?? false),
           onReset: () => askConfirm("reset", menu?.staged ?? false),

@@ -48,13 +48,19 @@ test("blob view does not wrap long lines", async ({ page }) => {
 test("double-click a file in the Files tab requests the external diff tool", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
-  await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
+  const row = page.locator('[data-testid="grid-row"]:not([data-artificial])').first()
+  await row.click()
+  // The file list follows the selection asynchronously; on a dirty tree the
+  // artificial row's files are showing until the click lands, and reading the
+  // first path before that races the double-click below.
+  await expect(row).toHaveClass(/selected/)
   await page.getByRole("tab", { name: /Diff/ }).click()
 
   const rows = page.getByTestId("file-list-row")
   if ((await rows.count()) === 0) return
   const first = rows.first()
   const path = await first.locator("[title]").getAttribute("title")
+  await expect(first.locator("[title]")).toHaveAttribute("title", path ?? "")
 
   let captured: { commit?: string; path?: string } | null = null
   await page.route(
