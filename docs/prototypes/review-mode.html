@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PowerGit Review Mode</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --surface-sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --text-meta: #5b6778; --divider: #d9dee6;
+    --primary: #1553c9; --primary-soft: rgba(21, 83, 201, 0.10); --primary-soft-2: rgba(21, 83, 201, 0.22);
+    --sel-bg: #dbeafe; --sel-border: #2563eb;
+    --added: #189100; --removed: #d3000B; --hunk: #00a89a; --gutter: #8a8a8a; --gutter-border: #e0e0e0;
+    --added-bg: rgba(24, 145, 0, 0.08); --removed-bg: rgba(211, 0, 11, 0.07);
+    --todo: #b7791f; --todo-bg: rgba(183, 121, 31, 0.10); --todo-stripe: #d99a2b;
+    --done: var(--primary); --done-bg: rgba(21, 83, 201, 0.07);
+    --note-bg: #fff8e6; --note-border: #e6c56a;
+    --page: #e3e7ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --surface-sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --text-meta: #98a4b3; --divider: #2a3441;
+      --primary: #3b7bff; --primary-soft: rgba(59, 123, 255, 0.14); --primary-soft-2: rgba(59, 123, 255, 0.28);
+      --sel-bg: #1f3a5f; --sel-border: #3b7bff;
+      --added: #4fc23a; --removed: #ff5c66; --hunk: #2dcfc0; --gutter: #6f7b8a; --gutter-border: #2a3441;
+      --added-bg: rgba(79, 194, 58, 0.10); --removed-bg: rgba(255, 92, 102, 0.10);
+      --todo: #e0a83a; --todo-bg: rgba(224, 168, 58, 0.12); --todo-stripe: #e0a83a;
+      --done-bg: rgba(59, 123, 255, 0.10);
+      --note-bg: #2a2716; --note-border: #7a6420;
+      --page: #0c1117;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --surface-sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --text-meta: #98a4b3; --divider: #2a3441;
+    --primary: #3b7bff; --primary-soft: rgba(59, 123, 255, 0.14); --primary-soft-2: rgba(59, 123, 255, 0.28);
+    --sel-bg: #1f3a5f; --sel-border: #3b7bff;
+    --added: #4fc23a; --removed: #ff5c66; --hunk: #2dcfc0; --gutter: #6f7b8a; --gutter-border: #2a3441;
+    --added-bg: rgba(79, 194, 58, 0.10); --removed-bg: rgba(255, 92, 102, 0.10);
+    --todo: #e0a83a; --todo-bg: rgba(224, 168, 58, 0.12); --todo-stripe: #e0a83a;
+    --done-bg: rgba(59, 123, 255, 0.10);
+    --note-bg: #2a2716; --note-border: #7a6420;
+    --page: #0c1117;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text);
+    font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    font-variant-numeric: tabular-nums; padding: 28px 20px 40px;
+  }
+  .intro { max-width: 68ch; margin: 0 auto 18px; color: var(--text-2); }
+  .intro h1 { font-size: 18px; margin: 0 0 6px; color: var(--text); letter-spacing: -0.01em; }
+  .intro p { margin: 0 0 6px; }
+  .intro kbd { font: inherit; padding: 0 5px; border: 1px solid var(--divider); border-radius: 4px; background: var(--surface); }
+
+  .panel {
+    max-width: 1180px; margin: 0 auto; background: var(--surface); border: 1px solid var(--divider);
+    border-radius: 6px; overflow: hidden; box-shadow: 0 8px 28px rgba(0,0,0,0.12);
+    display: grid; grid-template-rows: auto 1fr; height: 560px;
+  }
+  .tabs { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--divider); padding: 0 8px; background: var(--surface); }
+  .tab { padding: 9px 12px; color: var(--text-meta); border-bottom: 2px solid transparent; cursor: default; text-transform: uppercase; font-size: 12px; letter-spacing: 0.04em; }
+  .tab.on { color: var(--primary); border-bottom-color: var(--primary); }
+  .tabs .spacer { flex: 1; }
+  .review-bar { display: flex; align-items: center; gap: 12px; padding: 4px 6px 4px 10px; border-radius: 4px; background: var(--todo-bg); color: var(--text); }
+  .review-bar[hidden] { display: none; }
+  .review-bar .label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--todo); }
+  .review-bar .label.complete { color: var(--done); }
+  .meter { position: relative; width: 160px; height: 6px; border-radius: 3px; background: var(--divider); overflow: hidden; }
+  .meter i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--done); transition: width 160ms ease; }
+  .count { color: var(--text-2); }
+  .btn { font: inherit; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--divider); background: var(--surface); color: var(--text); cursor: pointer; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn:focus-visible, .fab:focus-visible, .row:focus-visible { outline: 2px solid var(--sel-border); outline-offset: 1px; }
+
+  .body { display: grid; grid-template-columns: 300px 1fr; min-height: 0; }
+  .files { position: relative; border-right: 1px solid var(--divider); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+  .files ul { list-style: none; margin: 0; padding: 4px 0; overflow: auto; flex: 1; }
+  .file { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer; border-left: 3px solid transparent; }
+  .file:hover { background: var(--surface-sunken); }
+  .file.sel { background: var(--sel-bg); }
+  .file .st { font-weight: 700; font-size: 12px; text-align: center; }
+  .file .st.M { color: var(--primary); } .file .st.A { color: var(--added); } .file .st.D { color: var(--removed); }
+  .file .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file .path b { font-weight: 600; }
+  .file .path span { color: var(--text-meta); }
+  .pill { font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--todo); color: var(--todo); background: var(--todo-bg); white-space: nowrap; }
+  .pill.done { border-color: var(--done); color: var(--done); background: var(--done-bg); }
+  .pill[hidden] { display: none; }
+  .file.todo { border-left-color: var(--todo-stripe); }
+  .file.complete { border-left-color: var(--done); }
+
+  .fabs { position: absolute; right: 10px; bottom: 8px; display: flex; gap: 6px; }
+  .fab {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--divider); background: var(--primary-soft);
+    color: var(--primary); display: grid; place-items: center; cursor: pointer; padding: 0;
+  }
+  .fab:hover { background: var(--primary-soft-2); }
+  .fab.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .fab svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .diff { overflow: auto; background: var(--surface); min-height: 0; }
+  .dh { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--surface-alt); border-bottom: 1px solid var(--divider); color: var(--text-2); }
+  .dh .name { font-weight: 600; color: var(--text); }
+  .dh .next { margin-left: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  .row { height: 22px; }
+  .row td { padding: 0; vertical-align: top; white-space: pre; }
+  .num { width: 46px; text-align: right; padding-right: 8px !important; color: var(--gutter); user-select: none; border-right: 1px solid var(--gutter-border); background: var(--surface); }
+  .mark { width: 26px; user-select: none; position: relative; }
+  .sign { width: 16px; text-align: center; color: var(--text-meta); user-select: none; }
+  .code { padding: 0 10px 0 4px !important; }
+  .row.add .code, .row.add .sign { color: var(--added); background: var(--added-bg); }
+  .row.del .code, .row.del .sign { color: var(--removed); background: var(--removed-bg); }
+  .row.hunk td { color: var(--hunk); background: var(--surface-sunken); font-size: 12px; padding: 2px 10px !important; }
+  .row.ctx .code { color: var(--text); }
+  /* Review markers: only on changed lines, only in review mode. */
+  .reviewing .row.change { cursor: pointer; }
+  .reviewing .row.change .mark::before {
+    content: ""; position: absolute; left: 8px; top: 5px; width: 11px; height: 11px; border-radius: 50%;
+    border: 1.6px solid var(--todo); background: transparent;
+  }
+  .reviewing .row.change.todo .code { box-shadow: inset 3px 0 0 var(--todo-stripe); }
+  .reviewing .row.change:hover .code { filter: brightness(0.97); }
+  .reviewing .row.change.done .mark::before { border-color: var(--done); background: var(--done); }
+  .reviewing .row.change.done .mark::after {
+    content: ""; position: absolute; left: 11.5px; top: 7px; width: 3px; height: 6px;
+    border: solid #fff; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg);
+  }
+  .reviewing .row.change.done .code { opacity: 0.78; }
+  .reviewing .row.cur .code { box-shadow: inset 3px 0 0 var(--sel-border); }
+  .reviewing .row.cur.todo .code { box-shadow: inset 3px 0 0 var(--todo-stripe), inset 0 0 0 100vw var(--sel-bg); }
+  /* Note affordance (future AI review). */
+  .numl { position: relative; }
+  .addnote { position: absolute; left: 4px; top: 2px; width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--divider); background: var(--surface); color: var(--text-meta); font-size: 13px; line-height: 15px; text-align: center; opacity: 0; cursor: pointer; }
+  .reviewing .row.change:hover .addnote { opacity: 1; }
+  .note td { padding: 6px 10px 8px 70px !important; background: var(--note-bg); border-top: 1px dashed var(--note-border); border-bottom: 1px dashed var(--note-border); white-space: normal; }
+  .note .who { font-size: 11px; color: var(--text-meta); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+  .note textarea { width: 100%; max-width: 640px; min-height: 40px; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--note-border); border-radius: 4px; padding: 6px 8px; resize: vertical; }
+
+  .legend { max-width: 1180px; margin: 12px auto 0; display: flex; flex-wrap: wrap; gap: 18px; color: var(--text-2); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 11px; height: 11px; border-radius: 50%; border: 1.6px solid var(--todo); }
+  .sw.done { background: var(--done); border-color: var(--done); }
+  .sw.stripe { width: 3px; height: 14px; border-radius: 1px; background: var(--todo-stripe); border: 0; }
+  .notes { max-width: 68ch; margin: 22px auto 0; color: var(--text-2); }
+  .notes h2 { font-size: 14px; margin: 0 0 6px; color: var(--text); }
+  .notes ol { margin: 0; padding-left: 20px; }
+  .notes li { margin-bottom: 4px; }
+  @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Review mode in the Diff panel</h1>
+  <p>Clickable draft. Turn review mode on with the round button at the bottom of the file list, next to the tree toggle. Every changed or added line then starts as <em>unreviewed</em>; click a line to mark it reviewed, click again to undo. <kbd>Space</kbd> toggles the current line, <kbd>N</kbd> jumps to the next unreviewed line, <kbd>Enter</kbd> jumps to the next file that still has work. In the artifact viewer the first click only focuses the page; click the line again.</p>
+</div>
+
+<div class="panel" id="panel">
+  <div class="tabs">
+    <div class="tab">Commit</div>
+    <div class="tab on">Diff (3)</div>
+    <div class="tab">File Tree</div>
+    <div class="spacer"></div>
+    <div class="review-bar" id="bar" hidden>
+      <span class="label" id="barLabel">Reviewing</span>
+      <span class="meter"><i id="meter"></i></span>
+      <span class="count" id="barCount">0 / 0 lines</span>
+      <button class="btn" id="btnReset" title="Mark every line unreviewed again">Start over</button>
+      <button class="btn primary" id="btnFinish" title="Later: sends your notes to the AI reviewer">Finish review</button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="files">
+      <ul id="files"></ul>
+      <div class="fabs">
+        <button class="fab" id="fabReview" title="Review mode" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/><circle cx="12" cy="12" r="9.5" stroke-opacity="0.35"/></svg>
+        </button>
+        <button class="fab" title="Group by directory">
+          <svg viewBox="0 0 24 24"><path d="M4 5h6l2 2h8v12H4z"/><path d="M4 11h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="diff" id="diff"></div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><i class="sw"></i> unreviewed change</span>
+  <span><i class="sw done"></i> reviewed</span>
+  <span><i class="sw stripe"></i> amber stripe: still to review (context lines never carry a marker)</span>
+  <span>file pill: reviewed / changed lines in that file</span>
+</div>
+
+<div class="notes">
+  <h2>What this drafts, and what comes after</h2>
+  <ol>
+    <li>Review state is per commit (or per working-directory snapshot) and per line, keyed by file, side and line number, so it survives switching files and reopening the app until the diff itself changes.</li>
+    <li>Context lines are never part of the count. Only + and − lines are, because that is what a reviewer is accountable for.</li>
+    <li>The hover “+” on a changed line is the next step: a note attached to that line, kept as a draft, and sent together to the AI reviewer when you press Finish review, the way a Bitbucket review collects comments before submit.</li>
+  </ol>
+</div>
+
+<script>
+(function () {
+  // Real changes from today's v0.16.0 work, trimmed.
+  const FILES = [
+    { st: "M", path: "frontend/src/components/IgnoreDialog.tsx", hunks: [
+      { head: "@@ -24,6 +24,12 @@ export function IgnoreDialog({ open, initialPattern, target", lines: [
+        [" ", 27, 27, "  const [preview, setPreview] = useState<IgnorePreview | null>(null)"],
+        [" ", 28, 28, "  const [error, setError] = useState<string | null>(null)"],
+        ["+", null, 29, "  // The preview in flight, if any. The engine runs one operation per"],
+        ["+", null, 30, "  // repository at a time, so a confirm that lands while the preview is still"],
+        ["+", null, 31, "  // running is refused with \"Repository is busy\" and the dialog stays open."],
+        ["+", null, 32, "  const inflight = useRef<Promise<unknown> | null>(null)"],
+        ["+", null, 33, "  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)"],
+        [" ", 29, 34, ""],
+      ]},
+      { head: "@@ -59,6 +72,12 @@ export function IgnoreDialog({ open, initialPattern, target", lines: [
+        [" ", 59, 72, "  async function confirm() {"],
+        [" ", 60, 73, "    try {"],
+        ["+", null, 74, "      // A preview about to start would collide with the write the same way."],
+        ["+", null, 75, "      if (debounce.current) {"],
+        ["+", null, 76, "        clearTimeout(debounce.current)"],
+        ["+", null, 77, "        debounce.current = null"],
+        ["+", null, 78, "      }"],
+        ["+", null, 79, "      if (inflight.current) await inflight.current"],
+        [" ", 61, 80, "      await onConfirm(pattern.trim())"],
+        [" ", 62, 81, "      onClose()"],
+      ]},
+    ]},
+    { st: "M", path: "frontend/src/components/gitLogModel.ts", hunks: [
+      { head: "@@ -11,8 +11,12 @@ export type GitLogEntry = {", lines: [
+        [" ", 11, 11, "export const isProbe = (e: GitLogEntry): boolean => PROBE.test(e.command)"],
+        [" ", 12, 12, ""],
+        ["-", 13, null, "export const failed = (e: GitLogEntry): boolean => e.exitCode !== 0"],
+        ["+", null, 13, "/** The engine's verdict; an older engine has no `ok`, so fall back to the exit code. */"],
+        ["+", null, 14, "export const isOk = (e: GitLogEntry): boolean => e.ok ?? e.exitCode === 0"],
+        ["+", null, 15, ""],
+        ["+", null, 16, "export const failed = (e: GitLogEntry): boolean => !isOk(e)"],
+        [" ", 14, 17, ""],
+        ["-", 15, null, "export const notableFailure = (e: GitLogEntry): boolean => e.exitCode > 0 && !isProbe(e)"],
+        ["+", null, 18, "export const notableFailure = (e: GitLogEntry): boolean => !isOk(e) && e.exitCode >= 0 && !isProbe(e)"],
+      ]},
+    ]},
+    { st: "A", path: "frontend/src/components/commit-window/dialogSize.ts", hunks: [
+      { head: "@@ -0,0 +1,9 @@", lines: [
+        ["+", null, 1, "export const MIN_WIDTH = 560"],
+        ["+", null, 2, "export const MIN_HEIGHT = 400"],
+        ["+", null, 3, "export const MARGIN = 16"],
+        ["+", null, 4, ""],
+        ["+", null, 5, "export function clampSize(size: Size, viewport: Size): Size {"],
+        ["+", null, 6, "  const w = Math.max(MIN_WIDTH, Math.min(size.width, viewport.width - 2 * MARGIN))"],
+        ["+", null, 7, "  const h = Math.max(MIN_HEIGHT, Math.min(size.height, viewport.height - 2 * MARGIN))"],
+        ["+", null, 8, "  return { width: w, height: h }"],
+        ["+", null, 9, "}"],
+      ]},
+    ]},
+  ];
+
+  const $ = (s) => document.querySelector(s);
+  const state = { reviewing: false, file: 0, cur: -1, done: new Set(), notes: {} };
+  const keyOf = (f, h, i) => `${f}:${h}:${i}`;
+
+  function changed(f) {
+    const out = [];
+    FILES[f].hunks.forEach((h, hi) => h.lines.forEach((l, li) => { if (l[0] !== " ") out.push(keyOf(f, hi, li)); }));
+    return out;
+  }
+  const progress = (f) => { const all = changed(f); return [all.filter((k) => state.done.has(k)).length, all.length]; };
+
+  function renderFiles() {
+    const ul = $("#files"); ul.innerHTML = "";
+    FILES.forEach((file, i) => {
+      const [d, n] = progress(i);
+      const li = document.createElement("li");
+      li.className = "file" + (i === state.file ? " sel" : "") + (state.reviewing ? (d === n ? " complete" : " todo") : "");
+      const dir = file.path.slice(0, file.path.lastIndexOf("/") + 1), name = file.path.slice(dir.length);
+      li.innerHTML = `<span class="st ${file.st}">${file.st}</span><span class="path" title="${file.path}"><span>${dir}</span><b>${name}</b></span><span class="pill${d === n ? " done" : ""}" ${state.reviewing ? "" : "hidden"}>${d === n ? "✓ " : ""}${d}/${n}</span>`;
+      li.tabIndex = 0;
+      li.addEventListener("click", () => { state.file = i; state.cur = -1; render(); });
+      ul.appendChild(li);
+    });
+  }
+
+  function renderDiff() {
+    const file = FILES[state.file]; const diff = $("#diff"); diff.innerHTML = "";
+    const todo = changed(state.file).filter((k) => !state.done.has(k)).length;
+    const head = document.createElement("div"); head.className = "dh";
+    head.innerHTML = `<span class="name">${file.path}</span><span>${file.st === "A" ? "new file" : "modified"}</span>` +
+      (state.reviewing ? `<button class="btn next" id="btnNext">${todo ? `Next unreviewed (${todo})` : "File reviewed — next file"}</button>` : "");
+    diff.appendChild(head);
+    const table = document.createElement("table"); let idx = 0;
+    file.hunks.forEach((h, hi) => {
+      const hr = document.createElement("tr"); hr.className = "row hunk"; hr.innerHTML = `<td colspan="5">${h.head}</td>`; table.appendChild(hr);
+      h.lines.forEach((l, li) => {
+        const [sign, a, b, text] = l; const key = keyOf(state.file, hi, li); const isChange = sign !== " ";
+        const tr = document.createElement("tr"); const myIdx = idx++;
+        tr.className = "row " + (sign === "+" ? "add change" : sign === "-" ? "del change" : "ctx") +
+          (isChange ? (state.done.has(key) ? " done" : " todo") : "") + (state.reviewing && myIdx === state.cur ? " cur" : "");
+        tr.dataset.key = key; tr.dataset.idx = myIdx;
+        tr.innerHTML = `<td class="num numl">${isChange && state.reviewing ? '<button class="addnote" title="Add a note for the AI reviewer (later)">+</button>' : ""}${a ?? ""}</td><td class="num">${b ?? ""}</td><td class="mark"></td><td class="sign">${sign.trim()}</td><td class="code">${escape(text)}</td>`;
+        if (isChange && state.reviewing) {
+          tr.tabIndex = 0;
+          tr.addEventListener("click", (e) => { if (e.target.classList.contains("addnote")) return; toggle(key); state.cur = myIdx; render(); });
+          tr.querySelector(".addnote").addEventListener("click", () => { state.notes[key] = state.notes[key] ?? ""; render(); });
+        }
+        table.appendChild(tr);
+        if (state.reviewing && key in state.notes) {
+          const nr = document.createElement("tr"); nr.className = "note";
+          nr.innerHTML = `<td colspan="5"><div class="who">Draft note · sent to the AI reviewer when you finish</div><textarea placeholder="Why does this line need attention?"></textarea></td>`;
+          const ta = nr.querySelector("textarea"); ta.value = state.notes[key];
+          ta.addEventListener("input", () => { state.notes[key] = ta.value; });
+          table.appendChild(nr);
+        }
+      });
+    });
+    diff.appendChild(table);
+    const next = $("#btnNext"); if (next) next.addEventListener("click", jumpNext);
+  }
+
+  function renderBar() {
+    const bar = $("#bar"); bar.hidden = !state.reviewing;
+    $("#fabReview").classList.toggle("on", state.reviewing); $("#fabReview").setAttribute("aria-pressed", String(state.reviewing));
+    $("#panel").classList.toggle("reviewing", state.reviewing);
+    if (!state.reviewing) return;
+    let d = 0, n = 0; FILES.forEach((_, i) => { const [a, b] = progress(i); d += a; n += b; });
+    $("#meter").style.width = n ? `${(100 * d) / n}%` : "0";
+    $("#barCount").textContent = `${d} / ${n} lines · ${FILES.filter((_, i) => { const [a, b] = progress(i); return a === b; }).length} of ${FILES.length} files`;
+    const lbl = $("#barLabel"); lbl.textContent = d === n ? "Review complete" : "Reviewing"; lbl.classList.toggle("complete", d === n);
+  }
+
+  function render() { renderFiles(); renderDiff(); renderBar(); }
+  function toggle(key) { if (state.done.has(key)) state.done.delete(key); else state.done.add(key); }
+  function jumpNext() {
+    const rows = [...document.querySelectorAll("#diff .row.change")];
+    const start = rows.findIndex((r) => Number(r.dataset.idx) > state.cur);
+    const order = start < 0 ? rows : rows.slice(start).concat(rows.slice(0, start));
+    const hit = order.find((r) => r.classList.contains("todo"));
+    if (hit) { state.cur = Number(hit.dataset.idx); render(); document.querySelector(`#diff .row[data-idx="${state.cur}"]`)?.scrollIntoView({ block: "nearest" }); return; }
+    const nf = FILES.findIndex((_, i) => { const [a, b] = progress(i); return a < b; });
+    if (nf >= 0) { state.file = nf; state.cur = -1; render(); jumpNext(); }
+  }
+  function escape(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  $("#fabReview").addEventListener("click", () => { state.reviewing = !state.reviewing; state.cur = -1; render(); });
+  $("#btnReset").addEventListener("click", () => { state.done.clear(); state.cur = -1; render(); });
+  $("#btnFinish").addEventListener("click", () => {
+    const notes = Object.values(state.notes).filter((t) => t.trim()).length;
+    alert(`Draft only. Later this sends ${notes} note(s) and the reviewed/unreviewed map to the AI reviewer.`);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!state.reviewing || e.target.tagName === "TEXTAREA") return;
+    if (e.key === " ") { e.preventDefault(); const r = document.querySelector(`#diff .row[data-idx="${state.cur}"]`); if (r) { toggle(r.dataset.key); render(); } }
+    else if (e.key.toLowerCase() === "n") { e.preventDefault(); jumpNext(); }
+    else if (e.key === "Enter") { e.preventDefault(); const nf = FILES.findIndex((_, i) => i !== state.file && progress(i)[0] < progress(i)[1]); if (nf >= 0) { state.file = nf; state.cur = -1; render(); } }
+  });
+
+  // Open in a realistic mid-review state so the markers are visible at once.
+  state.reviewing = true;
+  ["0:0:2", "0:0:3", "0:0:4", "0:0:5", "0:0:6"].forEach((k) => state.done.add(k));
+  state.cur = 10; state.notes["0:1:7"] = "Awaiting the preview is right, but should Cancel abort it too?";
+  render();
+})();
+</script>
+
+</body>
+</html>
