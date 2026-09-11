@@ -59,6 +59,12 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
         description: "Scale of the whole window. Ctrl + and Ctrl − change it too.",
         keywords: ["scale", "size", "percent", "font"],
       },
+      {
+        id: "appearance.authorDiscs",
+        title: "Author discs",
+        description: "An initials disc before each author in the graph, and a ring on the selected commit's author.",
+        keywords: ["author", "initials", "avatar", "graph", "ring", "highlight", "mark"],
+      },
     ],
   },
   {

@@ -1,11 +1,12 @@
-import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
-import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { markAncestry } from "../graph/ancestry"
+import { authorIdentity } from "../graph/authorIdentity"
 import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
+import { useAuthorDiscs } from "../theme/authorDiscs"
 import { GraphOptionsBar } from "./GraphOptionsBar"
+import { RefChips } from "./RefChips"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
 
@@ -37,11 +38,6 @@ export function RevisionGrid({
   tagNames,
 }: Props) {
   const tagSet = useMemo(() => new Set(tagNames ?? []), [tagNames])
-  const isRemote = (ref: string) => {
-    const slash = ref.indexOf("/")
-    if (slash < 0) return false
-    return !remoteNames || remoteNames.length === 0 || remoteNames.includes(ref.slice(0, slash))
-  }
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollbarRef = useRef<HTMLDivElement>(null)
@@ -51,6 +47,13 @@ export function RevisionGrid({
   // historyMerge.ts), never per click.
   const ancestry = useMemo(() => markAncestry(rows), [rows])
   const graphOptions = useGraphOptions()
+  // Author identity (v0.18.1, prototype A): a disc per row, and the selected
+  // row's author marked on every loaded row by that author (class
+  // author-same, set here in the render, never by a DOM pass). A pending row
+  // has no author, so it never selects one and never carries the class.
+  const discs = useAuthorDiscs()
+  const selectedAuthor = rows[selected]?.rev.author || null
+  const markedAuthor = graphOptions.authorMark ? selectedAuthor : null
   // Last SHA the auto-scroll effect actually settled on. A --date-order
   // refresh can reorder rows so the same commit lands at a different index
   // with no user action; comparing SHAs (not the index) keeps that from
@@ -277,11 +280,12 @@ export function RevisionGrid({
           />
           {virtualItems.map((item) => {
             const row = rows[item.index]
-            const refs = visibleRefs(row.rev.refs)
+            const identity = discs && row.rev.author ? authorIdentity(row.rev.author) : null
+            const same = markedAuthor !== null && row.rev.author === markedAuthor
             return (
               <div
                 key={row.rev.id}
-                className={`grid-row${item.index === selected ? " selected" : ""}`}
+                className={`grid-row${item.index === selected ? " selected" : ""}${same ? " author-same" : ""}`}
                 data-testid="grid-row"
                 data-index={item.index}
                 data-artificial={row.artificial}
@@ -308,50 +312,24 @@ export function RevisionGrid({
               >
                 <div className="graph-cell" />
                 <div className="msg">
-                  <span className="msg-refs">
-                    {refs.shown.map((ref) => {
-                      const tag = ref !== "HEAD" && tagSet.has(ref)
-                      const remote = ref !== "HEAD" && !tag && !ref.includes("stash") && isRemote(ref)
-                      const kind =
-                        ref === "HEAD"
-                          ? "head"
-                          : ref.includes("stash")
-                            ? "stash"
-                            : tag
-                              ? "tag"
-                              : remote
-                                ? "remote"
-                                : "local"
-                      const menuKind = kind === "local" || kind === "remote" || kind === "tag" ? kind : null
-                      return (
-                        <span
-                          key={ref}
-                          className={`ref${kind === "local" ? "" : ` ${kind}`}`}
-                          data-ref-kind={kind}
-                          data-ref={ref}
-                          onContextMenu={
-                            onRefContextMenu && menuKind
-                              ? (e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  onRefContextMenu(e, ref, menuKind, item.index)
-                                }
-                              : undefined
-                          }
-                        >
-                          {/* v0.13.19, owner: "a little cloud icon on the left of the remote branches";
-                              v0.14.0: "tags should be having a different little icon" */}
-                          {remote && <CloudOutlinedIcon className="ref-cloud" />}
-                          {tag && <SellOutlinedIcon className="ref-cloud" />}
-                          {ref}
-                        </span>
-                      )
-                    })}
-                    {refs.extra > 0 ? <span className="ref extra">+{refs.extra}</span> : null}
-                  </span>
+                  <RefChips
+                    refs={row.rev.refs}
+                    tagSet={tagSet}
+                    remoteNames={remoteNames}
+                    onRefContextMenu={
+                      onRefContextMenu ? (e, ref, kind) => onRefContextMenu(e, ref, kind, item.index) : undefined
+                    }
+                  />
                   <span className="msg-text">{row.rev.message}</span>
                 </div>
-                <div className="author">{row.rev.author}</div>
+                <div className="author">
+                  {identity && (
+                    <span className="author-disc" data-palette={identity.palette}>
+                      {identity.initials}
+                    </span>
+                  )}
+                  {row.rev.author}
+                </div>
                 <div className="date">{row.rev.date}</div>
                 <div className="sha" data-testid="sha-cell" title={row.artificial ? undefined : row.rev.id}>
                   {row.artificial ? "" : row.rev.id.slice(0, 7)}
@@ -372,7 +350,7 @@ export function RevisionGrid({
           <div style={{ width: naturalWidth }} />
         </div>
       )}
-      <GraphOptionsBar />
+      <GraphOptionsBar rows={rows} selectedAuthor={selectedAuthor} />
       {loadingTail && (
         <div className="grid-tail" data-testid="history-tail-loading">
           Loading more history…
@@ -380,14 +358,4 @@ export function RevisionGrid({
       )}
     </div>
   )
-}
-
-function visibleRefs(refs: string[]) {
-  const head = refs.filter((r) => r === "HEAD")
-  const local = refs.filter((r) => r !== "HEAD" && !r.includes("/"))
-  const remote = refs.filter((r) => r.includes("/"))
-  const ordered = [...head, ...local, ...remote]
-  const max = 3
-  if (ordered.length <= max) return { shown: ordered, extra: 0 }
-  return { shown: ordered.slice(0, max), extra: ordered.length - max }
 }

@@ -28,7 +28,7 @@ html {
 .grid-row {
   display: grid;
   /* v0.14.3: the three metadata widths come from RevisionGrid (gridColumns.ts). */
-  --col-a: var(--col-author, 128px);
+  --col-a: var(--col-author, 154px);
   --col-d: var(--col-date, 142px);
   --col-s: var(--col-sha, 86px);
   grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-a) var(--col-d) var(--col-s);
@@ -44,7 +44,7 @@ html {
 @media (max-width: 1200px) {
   .grid-header,
   .grid-row {
-    --col-a: var(--col-author, 104px);
+    --col-a: var(--col-author, 128px); /* v0.18.1: room for the author disc */
     --col-d: var(--col-date, 106px);
     --col-s: var(--col-sha, 68px);
     grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-a) var(--col-d) var(--col-s);
@@ -108,6 +108,27 @@ html {
 .grid-row:hover:not(.selected) .date,
 .grid-row:hover:not(.selected) .sha {
   background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
+}
+
+/* The selected commit's author on every loaded row by that author (v0.18.1,
+   class author-same computed in RevisionGrid's row render): a primary ring
+   on the disc and the name in text colour at weight 600. Colour-only marks
+   on the author cell — the row background belongs to the selection
+   (v0.12.3, three owner reports), and a class toggled at runtime sets
+   `color` explicitly, the repaint signal WebKitGTK needed last time
+   (docs/agents/memories/webkitgtk-css.md). `.grid-row` in the selector
+   outranks the theme's `.grid-row .author` weight (theme/index.ts); the
+   selected row carries the class too and keeps its own colours because the
+   `.grid-row.selected` rules below come after. */
+.grid-row.author-same .author-disc {
+  box-shadow:
+    0 0 0 2px var(--pg-surface, #fff),
+    0 0 0 3.5px var(--pg-primary, #1553c9);
+}
+.grid-row.author-same .author {
+  color: var(--pg-text, #101827);
+  font-weight: 600;
+  opacity: 1;
 }
 
 .grid-row.selected {
@@ -389,6 +410,46 @@ html {
   font-size: 11px;
   justify-content: flex-end;
   padding-right: 8px;
+}
+
+/* Author identity (v0.18.1, prototype A): an initials disc before the name,
+   coloured from the ref-badge pairs by a stable hash of the author
+   (graph/authorIdentity.ts sets data-palette). The fallbacks are the light
+   values of theme/tokens.ts, as on the ref chips above. */
+.author-disc {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-right: 7px;
+  flex: none;
+  user-select: none;
+  background: var(--pg-ref-local-bg, #eff6ff);
+  color: var(--pg-ref-local-fg, #2563eb);
+}
+.author-disc[data-palette="remote"] {
+  background: var(--pg-ref-remote-bg, #ecfdf5);
+  color: var(--pg-ref-remote-fg, #059669);
+}
+.author-disc[data-palette="tag"] {
+  background: var(--pg-ref-tag-bg, #f5f3ff);
+  color: var(--pg-ref-tag-fg, #6d28d9);
+}
+.author-disc[data-palette="stash"] {
+  background: var(--pg-ref-stash-bg, #fef9c3);
+  color: var(--pg-ref-stash-fg, #a16207);
+}
+.author-disc[data-palette="head"] {
+  background: var(--pg-ref-head-bg, #fef2f2);
+  color: var(--pg-ref-head-fg, #dc2626);
+}
+.author-disc[data-palette="extra"] {
+  background: var(--pg-ref-extra-bg, #f3f4f6);
+  color: var(--pg-ref-extra-fg, #6b7280);
 }
 
 .mono,

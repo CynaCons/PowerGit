@@ -80,9 +80,10 @@ release's AppImage smoke path (see `appimage-glib-bundling.md`); worth a
 follow-up to add a headless `xvfb` grid-selection check alongside the
 existing undefined-symbol scan if this regresses again.
 
-## The same-author row highlight is gone (do not reintroduce it)
+## The same-author mark: gone in v0.12.3, back as author discs in v0.18.1
 
-Removed 2026-09-03 in v0.12.3 after three separate owner reports:
+The row highlight was removed 2026-09-03 in v0.12.3 after three separate
+owner reports:
 
 1. v0.12.0 — "when selecting a commit it is highlighted, but the same
    highlight is used for all other commits of that author, so we can't see
@@ -96,9 +97,39 @@ An intermediate fix moved the marker off the row background onto the author
 name's colour. That removed the repaint failure and the collision with the
 selection, but on a repo with one dominant author it accented nearly every
 row in the column — the same "everything is highlighted" defect wearing a
-different hat. The feature cannot distinguish anything in the common case, so
-it was deleted from `RevisionGrid.tsx`, `graph/draw.ts`, `app.css` and
-`tokens.css`. Selection now owns the row background exclusively.
+different hat. The feature could not distinguish anything in the common
+case, so it was deleted from `RevisionGrid.tsx`, `graph/draw.ts`, `app.css`
+and `tokens.css`. Selection owns the row background exclusively — still true.
 
-If it ever comes back it must be an opt-in setting, default off, and it must
-not use the row background.
+What came back on 2026-09-11 (v0.18.1, prototype A of
+`docs/prototypes/author-highlight.html`, owner: "A is perfect") is a
+different feature, and each of the three reports has a rule against it:
+
+- **Identity, not highlight.** Every row carries an 18 px initials disc
+  before the author name (`span.author-disc`, `graph/authorIdentity.ts`),
+  coloured from the ref-badge pairs by a stable hash of the author. With
+  one dominant author the discs are all one colour and say so; the *other*
+  authors' colours are what you read. Selecting a commit adds a primary ring
+  (`box-shadow`) on that author's discs and bolds the name on those rows.
+  The signal is the palette plus a ring on a small element, never "nearly
+  every row accented" (report 3).
+- **The row background belongs to the selection.** The marks are colour-only
+  changes on the author cell: the disc's `box-shadow`, and `color` /
+  `font-weight` on `.author`. No row gets a background, no other row's text
+  colour moves; the selected row keeps its own colours because
+  `.grid-row.selected` comes after `.grid-row.author-same` in `app.css`
+  (report 1). `tests/e2e/author-identity.spec.ts` asserts the selected
+  `.msg` is tinted and a same-author row's is transparent.
+- **Explicit `color` on the toggled class.** `.grid-row.author-same .author`
+  sets `color`, `font-weight` and `opacity: 1` with literal fallbacks — the
+  repaint signal WebKitGTK lacked in v0.12.1 (report 2). The class is set in
+  the row render from the selected author, never by a DOM mutation pass.
+- **Opt-out.** Appearance → "Author discs" (`theme/authorDiscs.ts`,
+  `pg.authorDiscs`, default on) removes the discs and the ring; the pill's
+  Mark (`authorMark` in `pg.graph`) removes the ring and the bold and keeps
+  the discs. The default is on because the discs are identity at rest, not
+  a highlight; the v0.12.3 "opt-in, default off" rule applied to a row
+  highlight that no longer exists.
+
+Not verified on WebKitGTK from the Windows box (see Verification limits);
+the owner's Ubuntu tick is the last task of v0.18.1.

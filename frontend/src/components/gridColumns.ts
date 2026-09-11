@@ -9,7 +9,8 @@ export type ColumnKey = "graph" | "author" | "date" | "sha"
 export type ColumnWidths = { graph: number | null; author: number; date: number; sha: number }
 
 export const STORAGE_KEY = "pg.gridColumns"
-export const DEFAULT_WIDTHS: ColumnWidths = { graph: null, author: 128, date: 142, sha: 86 }
+// v0.18.1: Author grew 128 → 154 for the 18 px initials disc and its gap.
+export const DEFAULT_WIDTHS: ColumnWidths = { graph: null, author: 154, date: 142, sha: 86 }
 export const MIN_WIDTH: Record<ColumnKey, number> = { graph: 24, author: 40, date: 40, sha: 40 }
 export const MAX_WIDTH = 1200
 
