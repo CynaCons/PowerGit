@@ -298,6 +298,91 @@ public sealed class QueryTests
         Assert.Equal(2500 + 2, reopened.GetRefs().Branches.Length); // main + feature + generated
     }
 
+    /// <summary>
+    ///  A file changed in three commits and renamed once, with unrelated
+    ///  commits in between and an unrelated branch. Returns the subjects of
+    ///  the commits that touched it, newest first.
+    /// </summary>
+    private static string[] FileHistoryFixture(TempRepo repo)
+    {
+        repo.Write("doc.txt", "one\n");
+        repo.StageAndCommit("doc-1");
+        repo.Write("other.txt", "x\n");
+        repo.StageAndCommit("other-1");
+        repo.Write("doc.txt", "one\ntwo\n");
+        repo.StageAndCommit("doc-2");
+        repo.Run("mv", "doc.txt", "renamed.txt");
+        repo.StageAndCommit("doc-rename");
+        repo.Write("other.txt", "y\n");
+        repo.StageAndCommit("other-2");
+        repo.Write("renamed.txt", "one\ntwo\nthree\n");
+        repo.StageAndCommit("doc-3");
+        return ["doc-3", "doc-rename", "doc-2", "doc-1"];
+    }
+
+    [Fact]
+    public void ListRevisions_with_path_follows_the_file_across_a_rename()
+    {
+        // Owner (v0.16.0): "right click a file and show the file history ...
+        // functionally equivalent to GE". GE's FormFileHistory lists the
+        // commits touching the path under every name it had (follow renames
+        // on by default) and nothing else.
+        using TempRepo repo = new();
+        string[] expected = FileHistoryFixture(repo);
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        IReadOnlyList<RevisionDto> history = host.ListRevisions(filter: new RevisionFilter("renamed.txt"));
+
+        Assert.Equal(expected, history.Select(r => r.Subject));
+        // Each row names the file as it was at that commit.
+        Assert.Equal(["renamed.txt", "renamed.txt", "doc.txt", "doc.txt"], history.Select(r => r.Path));
+        // --parents rewrites the parents to the previous row of the filtered
+        // list, so the lane layout draws one connected line (the unrelated
+        // commits between them are not in the list).
+        for (int i = 0; i + 1 < history.Count; i++)
+        {
+            Assert.Equal([history[i + 1].Id], history[i].Parents);
+        }
+
+        Assert.Empty(history[^1].Parents);
+        Assert.True(history[0].IsHead);
+        Assert.Contains("HEAD", history[0].Refs);
+        // An unfiltered list still has no Path.
+        Assert.All(host.ListRevisions(10), r => Assert.Null(r.Path));
+    }
+
+    [Fact]
+    public void ListRevisions_with_path_without_follow_stops_at_the_rename_and_pages()
+    {
+        using TempRepo repo = new();
+        FileHistoryFixture(repo);
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        // GE "Detect and follow renames" off: the new name only exists from
+        // the rename on; the old name's history ends with the rename.
+        IReadOnlyList<RevisionDto> plain = host.ListRevisions(filter: new RevisionFilter("renamed.txt", Follow: false));
+        Assert.Equal(["doc-3", "doc-rename"], plain.Select(r => r.Subject));
+        Assert.All(plain, r => Assert.Equal("renamed.txt", r.Path));
+        IReadOnlyList<RevisionDto> old = host.ListRevisions(filter: new RevisionFilter("doc.txt", Follow: false));
+        Assert.Equal(["doc-rename", "doc-2", "doc-1"], old.Select(r => r.Subject));
+
+        // Paging works on the filtered stream like on the full one.
+        RevisionFilter follow = new("renamed.txt");
+        IReadOnlyList<RevisionDto> first = host.ListRevisions(3, 0, filter: follow);
+        IReadOnlyList<RevisionDto> rest = host.ListRevisions(3, 3, filter: follow);
+        Assert.Equal(["doc-3", "doc-rename", "doc-2"], first.Select(r => r.Subject));
+        Assert.Equal(["doc-1"], rest.Select(r => r.Subject));
+
+        // A folder filters by prefix and never follows.
+        repo.Write("dir/inner.txt", "i\n");
+        repo.StageAndCommit("dir-1");
+        IReadOnlyList<RevisionDto> folder = host.ListRevisions(filter: new RevisionFilter("dir/"));
+        Assert.Equal(["dir-1"], folder.Select(r => r.Subject));
+        Assert.Equal("dir/", folder[0].Path);
+    }
+
     private static void CommitAt(string dir, string message, long unixSeconds)
     {
         string date = $"{unixSeconds} +0000";

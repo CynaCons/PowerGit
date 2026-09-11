@@ -127,6 +127,42 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, events.StatusCode);
     }
 
+    // v0.16.0: the file-history filter of /revisions is a query string, so
+    // the UI's paging client stays the one it has; Path travels only on a
+    // filtered answer.
+    [Fact]
+    public async Task Revisions_route_filters_by_path_and_omits_path_otherwise()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Write("doc.txt", "one\n");
+        repo.StageAndCommit("doc-1");
+        repo.Write("other.txt", "x\n");
+        repo.StageAndCommit("other-1");
+        repo.Run("mv", "doc.txt", "renamed.txt");
+        repo.StageAndCommit("doc-rename");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        HttpResponseMessage filtered = await client.GetAsync($"/repos/{sid}/revisions?path=renamed.txt");
+        filtered.EnsureSuccessStatusCode();
+        string json = await filtered.Content.ReadAsStringAsync();
+        RevisionDto[] rows = System.Text.Json.JsonSerializer.Deserialize<RevisionDto[]>(json, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? [];
+        Assert.Equal(["doc-rename", "doc-1"], rows.Select(r => r.Subject));
+        Assert.Equal(["renamed.txt", "doc.txt"], rows.Select(r => r.Path));
+        Assert.Contains("\"path\"", json, StringComparison.Ordinal);
+
+        HttpResponseMessage unfollowed = await client.GetAsync($"/repos/{sid}/revisions?path=renamed.txt&follow=false");
+        unfollowed.EnsureSuccessStatusCode();
+        RevisionDto[] plain = await unfollowed.Content.ReadFromJsonAsync<RevisionDto[]>() ?? [];
+        Assert.Equal(["doc-rename"], plain.Select(r => r.Subject));
+
+        HttpResponseMessage all = await client.GetAsync($"/repos/{sid}/revisions?max=10");
+        all.EnsureSuccessStatusCode();
+        string allJson = await all.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("\"path\"", allJson, StringComparison.Ordinal);
+        Assert.Equal(5, (await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?max=10"))!.Length);
+    }
+
     // v0.15.0 sequencer routes. Every one of these runs against a throwaway
     // TempRepo, never the real work tree.
     [Fact]

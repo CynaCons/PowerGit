@@ -4,6 +4,7 @@ import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
 import type { GraphRow } from "../graph/types"
+import type { GridMenus } from "../hooks/useGridMenus"
 import type { SessionView } from "../session/state"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import { RevisionGrid } from "./RevisionGrid"
@@ -18,10 +19,14 @@ export type HistoryPaneProps = {
   loading: boolean
   engineError: string | null
   view: SessionView
+  /** What an empty live list means here (v0.16.0: a path nothing touched). */
+  emptyText?: string
   onSelect: (index: number) => void
   onNearEnd: () => void
-  onRowContextMenu: (e: React.MouseEvent, index: number) => void
-  onRefContextMenu?: (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => void
+  /** The row and ref-chip menus (v0.16.0, shared with the file history). */
+  menus: GridMenus
+  /** The selection before a right-click moves it: what "Compare selected commits" compares with. */
+  selectedSha: string | null
   onRetry: () => void
   onOpenRepo: () => void
   onRecover: () => void
@@ -39,10 +44,11 @@ export function HistoryPane({
   loading,
   engineError,
   view,
+  emptyText,
   onSelect,
   onNearEnd,
-  onRowContextMenu,
-  onRefContextMenu,
+  menus,
+  selectedSha,
   onRetry,
   onOpenRepo,
   onRecover,
@@ -76,7 +82,7 @@ export function HistoryPane({
                 testid="grid-offline"
               />
             ) : view.live ? (
-              <EmptyState text="This repository has no commits yet." testid="grid-no-commits" />
+              <EmptyState text={emptyText ?? "This repository has no commits yet."} testid="grid-no-commits" />
             ) : (
               <EmptyState
                 text="Open a repository to see its history."
@@ -98,8 +104,17 @@ export function HistoryPane({
           remoteNames={remoteNames}
           tagNames={tagNames}
           onNearEnd={onNearEnd}
-          onRowContextMenu={onRowContextMenu}
-          onRefContextMenu={onRefContextMenu}
+          // The right-click has already moved the selection; the previous
+          // one (still in `selectedSha` during this event) is the other side
+          // of "Compare selected commits".
+          onRowContextMenu={(e, index) =>
+            menus.rowContextMenu(
+              e,
+              rows[index],
+              selectedSha && selectedSha !== rows[index]?.rev.id ? selectedSha : null,
+            )
+          }
+          onRefContextMenu={(e, name, kind, index) => menus.refContextMenu(e, name, kind, rows[index]?.rev.id ?? null)}
         />
       </Box>
     </Box>

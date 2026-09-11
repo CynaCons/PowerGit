@@ -32,6 +32,7 @@ export type FileMenuIcon =
   | "assume"
   | "untrack"
   | "show"
+  | "history"
 
 export type FileMenuNode = {
   id: string
@@ -196,6 +197,19 @@ export function buildFileMenu(input: FileMenuInput): FileMenuNode[] {
       hidden: !shell,
       disabled: allDeleted,
       hint: allDeleted ? "Already deleted from the working tree." : undefined,
+    },
+    // --- browse (GE sepBrowse group) ---------------------------------------
+    {
+      // GE ShouldShowMenuFileHistory: one item, tracked (v0.16.0: the file
+      // history view exists now, so the item is no longer hidden).
+      id: "ctx-file-history",
+      label: "View file history",
+      icon: "history",
+      shortcut: shortcutLabel("browse.fileHistory"),
+      divider: true,
+      hidden: !anyTracked,
+      disabled: !single,
+      hint: single ? undefined : oneAtATime,
     },
     // --- ignore (GE sepIgnore group; work-tree rows only, as in GE) --------
     {

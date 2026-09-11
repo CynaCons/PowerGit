@@ -37,6 +37,10 @@ type Props = {
   /** Lets the Diff tab mutate (v0.15.5); omitted, the panel stays read-only.
    *  A useState setter, so its identity is stable and memoisation holds. */
   setStatus?: (status: RepoStatus) => void
+  /** v0.16.0: "View file history" from the Diff tab's list and the File Tree. */
+  onFileHistory?: (path: string, sha?: string | null) => void
+  /** v0.16.0: the file the visible tab has selected (Diff list or File Tree), for Ctrl+Shift+H. */
+  onSelectedFile?: (path: string | null) => void
 }
 
 import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
@@ -81,7 +85,18 @@ function useDelayed(pending: boolean, delayMs: number): boolean {
   return shown && pending
 }
 
-export function BottomPanel({ current, status, headId, onOpenCommit, height, tab: tabProp, onTab, setStatus }: Props) {
+export function BottomPanel({
+  current,
+  status,
+  headId,
+  onOpenCommit,
+  height,
+  tab: tabProp,
+  onTab,
+  setStatus,
+  onFileHistory,
+  onSelectedFile,
+}: Props) {
   const engine = useEngine()
   const pendingRow = useMemo(() => pendingOf(current, status), [current, status])
   const actions: DiffTabActions | undefined = useMemo(() => (setStatus ? { setStatus } : undefined), [setStatus])
@@ -268,6 +283,14 @@ export function BottomPanel({ current, status, headId, onOpenCommit, height, tab
     return () => ctrl.abort()
   }, [engine, commitId, treeFile, reloadTick])
 
+  // The file Ctrl+Shift+H opens the history of: the Diff tab's selection or
+  // the File Tree's; nothing on the Commit tab.
+  useEffect(() => {
+    onSelectedFile?.(tab === 1 ? file : tab === 2 ? treeFile : null)
+  }, [onSelectedFile, tab, file, treeFile])
+  useEffect(() => () => onSelectedFile?.(null), [onSelectedFile])
+  const fileHistory = onFileHistory ? (path: string) => onFileHistory(path, commitId) : undefined
+
   const reload = useCallback(() => setReloadTick((t) => t + 1), [])
   // One thin bar for the whole panel once a load has run for 200 ms; short
   // loads (the common case after v0.13.14) show nothing at all.
@@ -359,6 +382,7 @@ export function BottomPanel({ current, status, headId, onOpenCommit, height, tab
             row={browseRow}
             commitId={commitId}
             actions={actions}
+            onFileHistory={fileHistory}
           />
         )}
         {tab === 2 && (
@@ -367,6 +391,7 @@ export function BottomPanel({ current, status, headId, onOpenCommit, height, tab
               <CommitFileTree
                 commitId={commitId ?? (pendingRow ? headId : null)}
                 onSelectFile={(path) => setTreeFile(path)}
+                onFileHistory={fileHistory}
               />
             </Box>
             <SplitHandle {...splitHandleProps} />

@@ -46,6 +46,7 @@ describe("buildFileMenu", () => {
       "ctx-delete-file",
       "ctx-copy-path",
       "ctx-show-in-folder",
+      "ctx-file-history",
       "ctx-ignore-file",
       "ctx-exclude-file",
       "ctx-skip-worktree",
@@ -54,10 +55,11 @@ describe("buildFileMenu", () => {
       "ctx-show-skip-worktree",
       "ctx-show-assume-unchanged",
     ])
-    // GE's separators: sepGit, sepFile, sepIgnore, plus the view group.
+    // GE's separators: sepGit, sepFile, sepBrowse, sepIgnore, plus the view group.
     expect(nodes.filter((n) => n.divider).map((n) => n.id)).toEqual([
       "ctx-difftool",
       "ctx-copy-path",
+      "ctx-file-history",
       "ctx-ignore-file",
       "ctx-show-skip-worktree",
     ])
@@ -65,6 +67,9 @@ describe("buildFileMenu", () => {
     expect(nodes.every((n) => !n.disabled)).toBe(true)
     expect(find(nodes, "ctx-stage-selected")?.label).toBe("Stage file")
     expect(find(nodes, "ctx-stage-selected")?.shortcut).toBe("S")
+    // GE FileStatusList "File history" (v0.16.0): one tracked file, with the browse-scope chord.
+    expect(find(nodes, "ctx-file-history")?.label).toBe("View file history")
+    expect(find(nodes, "ctx-file-history")?.shortcut).toBe("Ctrl+Shift+H")
   })
 
   it("offers Index and HEAD as reset targets on the unstaged list, HEAD only on the staged list", () => {
@@ -93,6 +98,8 @@ describe("buildFileMenu", () => {
     expect(ids(nodes)).not.toContain("ctx-assume-unchanged")
     expect(ids(nodes)).not.toContain("ctx-move-file")
     expect(ids(nodes)).not.toContain("ctx-stop-tracking")
+    // GE ShouldShowMenuFileHistory needs a tracked item.
+    expect(ids(nodes)).not.toContain("ctx-file-history")
     // Ignoring and excluding are exactly for untracked files; reset deletes them (SRS-ENG-041).
     expect(find(nodes, "ctx-ignore-file")?.disabled).toBeFalsy()
     expect(find(nodes, "ctx-exclude-file")?.disabled).toBeFalsy()
@@ -113,6 +120,7 @@ describe("buildFileMenu", () => {
       "ctx-edit-file",
       "ctx-move-file",
       "ctx-ignore-file",
+      "ctx-file-history",
     ]) {
       expect(find(nodes, id)?.disabled, id).toBe(true)
       expect(find(nodes, id)?.hint, id).toBe("One file at a time.")

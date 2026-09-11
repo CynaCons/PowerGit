@@ -86,9 +86,9 @@ GE order, item by item (separators are GE's `sep*` names):
 | `sepFile` | | divider above "Copy path" |
 | Copy path(s) ▸ (relative POSIX / relative native / full native (bold) / full WSL / full Cygwin) | any row | `ctx-copy-path` ▸ `ctx-copy-full` (native separators, from `RepoInfo.root`), `ctx-copy-relative` (git's forward slashes). WSL/Cygwin flavours: not ported. |
 | Show in folder | any row whose file or parent exists | `ctx-show-in-folder` → Tauri `opener.revealItemInDir` (`diagnostics/snapshot.ts revealInFolder`), one call per selected file like GE. **Hidden in the browser** (`isTauriShell()` false): there is no file manager to reach from a web page. The contract's optional engine route `/files/reveal` was not added. |
-| `sepBrowse` | | (no visible item follows in the commit dialog, so no divider) |
+| `sepBrowse` | | divider above "View file history" (since v0.16.0) |
 | Show in File tree, Filter in grid, Find in commit files using git-grep…, Show 'Find in commit files…' | Browse-tab binding only (`BindContextMenu` 9-arg overload) | n/a in the commit dialog (GE hides them there as well) |
-| File history | one tracked row | **Hidden.** GE opens `FormFileHistory` (a path-filtered log). PowerGit's history has no path filter yet (`GET /revisions` takes `max`/`skip` only; no `?path=` anywhere in the UI). Add it with the search/filter work in the backlog and wire `ctx-file-history` then. |
+| File history | one tracked row (`ShouldShowMenuFileHistory`) | `ctx-file-history` "View file history", Ctrl+Shift+H, since v0.16.0: closes the dialog and opens the file history view (next section). Disabled on a multi-selection, hidden for untracked rows, as in GE. |
 | Blame | one tracked row | **Hidden.** No blame view in PowerGit yet. |
 | Find file… | any | **Hidden.** In-list search dialog; the commit lists are short and the Ctrl+F filter is backlog. |
 | `sepIgnore` | any work-tree row, or a tracked single file | divider above "Add to .gitignore…" |
@@ -107,6 +107,37 @@ the version by hand), i.e. ~0.5–1 s later, unless `CommitDialog.tsx` passes
 the optional `onStatus` prop to `CommitFileContextMenu`, which then hands the
 answered status over at once (the pre-v0.16.0 items go through the dialog's
 callbacks and always refresh at once).
+
+## FormFileHistory → the file history view (v0.16.0)
+
+Owner: "In main view, in the file tree, right click a file and show the
+file history. Here again, we have to be functionally equivalent to GE." GE
+is `src/app/GitUI/CommandsDialogs/FormFileHistory.cs` (+ `.Designer.cs`): a
+separate window holding a `RevisionGridControl` with a path filter, a tab
+control (Commit, Diff, View, Blame), a toolbar (load, "Show full history"
+drop-down, blame options, git command log) and the grid's own
+`FileHistoryContextMenu`. It is opened by `UICommands.StartFileHistoryDialog`
+from `FileStatusList.ContextMenu.cs` (`tsmiFileHistory`, hotkey
+`RevisionDiffControl.Command.ShowHistory` = a bare `H` on the focused list;
+`tsmiBlame` does the same with `showBlame: true`). PowerGit shows it in
+place of the main graph and bottom panel (no second window: the shell has
+one webview, see [commit-window.md](commit-window.md)), and the main
+history's state stays mounted in `App.tsx`, so Escape brings it back with
+no refetch.
+
+| Git Extensions | PowerGit |
+|---|---|
+| `RevisionGrid.SetAndApplyPathFilter(path)` → `BuildPathFilter`: a `git log --name-only --follow --find-renames --find-copies -- path` walk collects every name the file had, then the real log runs with `--parents [--full-history [--simplify-merges]] -- <names>` (`FilterInfo.GetRevisionFilter`), because `--follow` alone skips commits with graph options | `GET /revisions?path=&follow=&exact=&full=&simplify=` → `GitHost.Queries.cs ListRevisions(filter)` + `FollowFileNames`: the same two steps, same `--date-order --branches --remotes --tags HEAD [refs/stash]` and paging as the graph. `--parents` rewrites `%P` (verified on git 2.38) so the layouter's rule "a row resolves against its listed parents" still draws one connected line. Each row carries `RevisionDto.Path`, the file's name at that commit (the walk's answer, else the nearest newer row's, else the requested path); an unfiltered list omits the field. The walk is HEAD-only, like GE's, so a rename that only happened on another branch is not followed. |
+| `GetRevisionFileName` (name at a revision, for the viewers) | `RevisionDto.Path` above; `fileHistoryModel.ts pathAtRow` |
+| `FormFileHistory` window; `Text = "File History - path (name at revision)"` (`SetTitle`) | `components/FileHistoryView.tsx` in the content column (`data-testid="file-history"`), header "File history" + `fileHistoryTitle(path, at)` |
+| `followFileHistoryToolStripMenuItem` "Detect and follow renames" (`AppSettings.FollowRenamesInFileHistory`), `followFileHistoryRenamesToolStripMenuItem` "exact renames and copies only" (enabled when following), `showFullHistoryToolStripMenuItem` "Show full history", `simplifyMergesToolStripMenuItem` "Simplify merges" (enabled with full history) | the four header check boxes `file-history-follow` / `-exact` / `-full` / `-simplify`, same enable rules, remembered in `localStorage` `powergit.fileHistory.options` (`fileHistoryModel.ts`); a change reloads the list (`useHistory` with a new `filter`) |
+| `toolStripSplitLoad` "Load file history" (+ "Load history on show", "Load blame on show") | `file-history-reload`; the list always loads on show |
+| `tabControl1`: `CommitInfoTabPage`, `DiffTab`, `ViewTab`, `BlameTab`; `UpdateSelectedFileViewers` removes Commit/View/Blame for an artificial row, Diff/View/Blame when the file is not in the revision, and loads only the selected tab | `fileHistoryTabs(row, path)`: Commit + Diff + View for a commit, Diff alone for a pending row, no View for a folder; only the visible tab requests (`/commits/{id}` for Commit, `/commits/{id}/diff?path=<name at commit>` or `/diff/worktree` for Diff, `/commits/{id}/blob` for View). **Blame: not ported** (no blame view in PowerGit yet; `toolStripBlameOptions` and its nine settings go with it). |
+| Artificial commits in the grid (the file is modified in the work tree / index) | `withArtificialRows(rows, counts, anchor)`: the pending rows sit on HEAD when it is in the list, else on the newest commit that touched the path (the `anchor` parameter, added for this) |
+| `FileHistoryContextMenu` on the grid: Copy to clipboard ▸, Open with difftool (F3), Difftool selected ↔ local, Save as, Manipulate commit ▸ (Revert, Cherry pick), the two follow toggles | the main grid's `RevisionContextMenu` (a superset: checkout, reset, create branch/tag, cherry-pick, revert, compare, archive…) and `RefContextMenu`, through `hooks/useGridMenus.ts`; the follow toggles are in the header. Save as, Difftool selected ↔ local: not ported. |
+| Escape in any viewer closes the form (`EscapePressed += Close`) | Escape anywhere in the view (`onKeyDown` on its root; MUI menus and dialogs stop their own Escape first) and the header's X (`file-history-close`) → `useFileHistory.close` + `focusGrid()` |
+| Opened from `FileStatusList` (Browse Diff tab, File tree tab, FormCommit lists) with the selected revision, or with `showBlame` | `CommitFileTree.tsx` menu (`ctx-tree-file-history`, folders as `path/`), `DiffContextMenus.tsx` (`ctx-diff-file-history`), `commitFileMenuModel.ts` (`ctx-file-history`, the commit dialog closes first), and `browse.fileHistory` = Ctrl+Shift+H on the file the bottom panel has selected (`useFileHistory.openSelected`; GE's bare `H` is not bound). The commit the panel showed is preselected when it is in the list (`FileHistoryTarget.sha`). |
+| Hotkey `RevisionGridControl.Command.ResetRevisionPathFilter` = Ctrl+Shift+H (clears the grid's path filter) | not bound as such; PowerGit's Ctrl+Shift+H opens the file history (owner's ask) and Escape clears it |
 
 ## Leave on Windows
 - `src/native/GitExtensionsShellEx/` Explorer extension.

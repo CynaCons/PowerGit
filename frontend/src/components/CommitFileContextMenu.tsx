@@ -11,6 +11,7 @@ import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutli
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined"
 import FileOpenOutlinedIcon from "@mui/icons-material/FileOpenOutlined"
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined"
+import HistoryIcon from "@mui/icons-material/History"
 import LaunchIcon from "@mui/icons-material/Launch"
 import LinkOffIcon from "@mui/icons-material/LinkOff"
 import RemoveIcon from "@mui/icons-material/Remove"
@@ -58,6 +59,8 @@ export type CommitFileMenuActions = {
   onDifftool: () => void
   onCopyPath: () => void
   onIgnore: () => void
+  /** v0.16.0: GE "File history". Absent, the item stays hidden. */
+  onFileHistory?: (path: string) => void
 }
 
 const ICONS: Record<FileMenuIcon, ReactNode> = {
@@ -79,6 +82,7 @@ const ICONS: Record<FileMenuIcon, ReactNode> = {
   assume: <DoNotDisturbIcon fontSize="small" />,
   untrack: <LinkOffIcon fontSize="small" />,
   show: <VisibilityOutlinedIcon fontSize="small" />,
+  history: <HistoryIcon fontSize="small" />,
 }
 
 function Item({
@@ -179,7 +183,11 @@ export function CommitFileContextMenu({
     }
     return [rows.find((f) => f.path === target.path) ?? { path: target.path, status: "?", staged }]
   })()
-  const nodes = target ? buildFileMenu({ staged, files, listCount: list?.files.length ?? 0, shell, view }) : []
+  const nodes = target
+    ? buildFileMenu({ staged, files, listCount: list?.files.length ?? 0, shell, view }).filter(
+        (n) => n.id !== "ctx-file-history" || actions.onFileHistory !== undefined,
+      )
+    : []
 
   const fail = (what: string) => (e: unknown) => setError(`${what}: ${describeThrown(e)}`)
   const done = (status: RepoStatus) => onStatus?.(status)

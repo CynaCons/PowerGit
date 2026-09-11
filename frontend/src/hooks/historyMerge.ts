@@ -11,7 +11,7 @@ import type { Revision } from "../graph/types"
 // that changes nothing is reported as such so the caller skips setState.
 
 export function toRevision(dto: RevisionDto): Revision {
-  return {
+  const rev: Revision = {
     id: dto.id,
     parents: dto.parents,
     message: dto.subject,
@@ -19,6 +19,8 @@ export function toRevision(dto: RevisionDto): Revision {
     date: formatDate(dto.date),
     refs: dto.refs,
   }
+  if (dto.path !== undefined) rev.path = dto.path
+  return rev
 }
 
 export function formatDate(iso: string): string {
@@ -43,7 +45,8 @@ export function reuseRevision(dto: RevisionDto, old: Revision | undefined): Revi
     old.author === dto.author &&
     old.date === formatDate(dto.date) &&
     sameList(old.parents, dto.parents) &&
-    sameList(old.refs, dto.refs)
+    sameList(old.refs, dto.refs) &&
+    old.path === dto.path
   ) {
     return old
   }

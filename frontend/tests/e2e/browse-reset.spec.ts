@@ -90,6 +90,7 @@ test.describe("reset from the Browse diff view", () => {
         "Reset unstaged changes…",
         "Open with difftool",
         "Copy path",
+        "View file history",
       ])
       await page.getByTestId("ctx-diff-reset-file").click()
 

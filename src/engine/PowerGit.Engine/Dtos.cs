@@ -1,5 +1,13 @@
+using System.Text.Json.Serialization;
+
 namespace PowerGit.Engine;
 
+/// <summary>
+/// One row of the revision grid. v0.16.0: when the list was filtered by a
+/// path (<c>GET /revisions?path=</c>, Git Extensions' FormFileHistory)
+/// <paramref name="Path"/> is the name that file had at this commit, following
+/// renames; it is omitted from the JSON of an unfiltered list.
+/// </summary>
 public sealed record RevisionDto(
     string Id,
     string[] Parents,
@@ -11,7 +19,23 @@ public sealed record RevisionDto(
     string Subject,
     string Body,
     string[] Refs,
-    bool IsHead);
+    bool IsHead,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Path = null);
+
+/// <summary>
+/// The path filter of a revision list (v0.16.0, GE FormFileHistory). Every
+/// flag mirrors a Git Extensions setting: <paramref name="Follow"/> is
+/// "Detect and follow renames" (FollowRenamesInFileHistory), <paramref name="ExactRenames"/>
+/// its "exact renames and copies only" variant, <paramref name="FullHistory"/>
+/// "Show full history" (<c>--full-history</c>) and <paramref name="SimplifyMerges"/>
+/// "Simplify merges" (<c>--simplify-merges</c>, only with the former).
+/// </summary>
+public sealed record RevisionFilter(
+    string Path,
+    bool Follow = true,
+    bool ExactRenames = false,
+    bool FullHistory = false,
+    bool SimplifyMerges = false);
 
 public sealed record CommitDetailDto(
     string Id,

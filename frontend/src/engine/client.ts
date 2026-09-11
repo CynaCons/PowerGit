@@ -26,6 +26,7 @@ import type {
   RepoStatus,
   ResetScope,
   RevisionDto,
+  RevisionFilter,
   ToolInfo,
   SessionInfo,
   StashInfo,
@@ -58,6 +59,18 @@ export type RequestOptions = {
 
 /** Default budget for read requests. Jobs poll instead of waiting, so no request should legitimately take longer. */
 export const READ_TIMEOUT_MS = 30_000
+
+/** Query string of a path filter; empty without one. Only what differs from
+ *  the engine's defaults travels, so an unfiltered request is unchanged. */
+export function filterParams(filter: RevisionFilter | undefined): string {
+  if (!filter || !filter.path) return ""
+  let qs = `&path=${encodeURIComponent(filter.path)}`
+  if (filter.follow === false) qs += "&follow=false"
+  if (filter.exact) qs += "&exact=true"
+  if (filter.full) qs += "&full=true"
+  if (filter.simplify) qs += "&simplify=true"
+  return qs
+}
 
 export class EngineError extends Error {
   constructor(
@@ -275,12 +288,16 @@ export class EngineClient {
 
   // ---- reads (abortable: latest request wins) ---------------------------
 
-  async revisions(max = 800, skip = 0, signal?: AbortSignal): Promise<RevisionDto[]> {
+  /** The revision stream, or with `filter` (v0.16.0) the commits that touched one path. */
+  async revisions(max = 800, skip = 0, signal?: AbortSignal, filter?: RevisionFilter): Promise<RevisionDto[]> {
     return json<RevisionDto[]>(
-      await this.get(`${this.repoPath()}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}`, {
-        signal,
-        timeoutMs: 120_000,
-      }),
+      await this.get(
+        `${this.repoPath()}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}${filterParams(filter)}`,
+        {
+          signal,
+          timeoutMs: 120_000,
+        },
+      ),
     )
   }
 

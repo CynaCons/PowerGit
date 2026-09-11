@@ -77,5 +77,7 @@ export function runFileMenuAction(node: FileMenuNode, deps: FileMenuDeps): void 
     }
     case "ctx-stop-tracking":
       return setPending({ kind: "untrack", path: one })
+    case "ctx-file-history":
+      return actions.onFileHistory?.(one)
   }
 }

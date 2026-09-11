@@ -4,6 +4,7 @@ import { BottomPanel } from "./components/BottomPanel"
 import { CommandBar } from "./components/CommandBar"
 import { AppDialogs } from "./components/dialogs/AppDialogs"
 import { ErrorBanner } from "./components/ErrorBanner"
+import { FileHistoryView } from "./components/FileHistoryView"
 import { GitConsole } from "./components/GitConsole"
 import { openConsoleTab, toggleGitConsole } from "./components/gitConsoleState"
 import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
@@ -17,6 +18,8 @@ import { EngineProvider, type EngineClient } from "./engine"
 import { focusGrid } from "./hooks/focusGrid"
 import { useChromeLayout } from "./hooks/useChromeLayout"
 import { useDialogs } from "./hooks/useDialogs"
+import { useFileHistory } from "./hooks/useFileHistory"
+import { useGridMenus } from "./hooks/useGridMenus"
 import { useEngineSession } from "./hooks/useEngineSession"
 import { useGitActions } from "./hooks/useGitActions"
 import { useHistory } from "./hooks/useHistory"
@@ -86,6 +89,9 @@ export default function App({ base }: { base: EngineClient }) {
   useAutoFetch({ client, live, busy, status, defaultRemote, refresh })
   const dialogs = useDialogs()
   const { open, hotkeysEnabled } = dialogs
+  // Git Extensions' FormFileHistory, shown in place of the graph and panel
+  // (v0.16.0); the main history's state stays here while it is open.
+  const fileHistory = useFileHistory()
   // useGitActions rebuilds its closures every render; hand memoised children
   // stable identities so a row click re-renders only the grid and, deferred,
   // the bottom panel (owner report: "clicking commits feels laggy").
@@ -144,7 +150,13 @@ export default function App({ base }: { base: EngineClient }) {
     configureRemote: (name: string) => open({ kind: "remoteConfig", remote: name }),
     mergeRef: (name: string) => actions.openMerge(name),
     rebaseOnto: (name: string) => open({ kind: "rebase", onto: name }),
+    closeFileHistory: () => {
+      fileHistory.close()
+      focusGrid()
+    },
   })
+  // Row and ref-chip menus, shared by the main grid and the file history's.
+  const menus = useGridMenus(open, repo?.branch)
 
   const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
 
@@ -204,6 +216,7 @@ export default function App({ base }: { base: EngineClient }) {
       },
       "browse.gitConsole": () => toggleGitConsole(),
       "browse.appLog": () => openConsoleTab("app"),
+      "browse.fileHistory": () => fileHistory.openSelected(current?.rev.id),
     } satisfies Partial<Record<CommandId, () => void>>,
     hotkeysEnabled,
   )
@@ -302,74 +315,74 @@ export default function App({ base }: { base: EngineClient }) {
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
               <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-                <HistoryPane
-                  rows={rows}
-                  remoteNames={remoteNames}
-                  tagNames={tagNames}
-                  selected={selected}
-                  loadingTail={loadingTail}
-                  loading={live && !demo && !loaded}
-                  engineError={engineError}
-                  view={view}
-                  onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
-                  onNearEnd={history.onNearEnd}
-                  onRowContextMenu={(e, index) => {
-                    e.preventDefault()
-                    // The right-click has already moved the selection; the
-                    // previous one is what "Compare selected commits" means.
-                    const previousSha = selectedSha && selectedSha !== rows[index]?.rev.id ? selectedSha : null
-                    open({ kind: "context", target: { x: e.clientX, y: e.clientY, row: rows[index], previousSha } })
-                  }}
-                  onRefContextMenu={(e, name, kind, index) => {
-                    open({
-                      kind: "refContext",
-                      target: {
-                        x: e.clientX,
-                        y: e.clientY,
-                        name,
-                        kind,
-                        current: kind === "local" && name === repo?.branch,
-                        sha: rows[index]?.rev.id ?? null,
-                      },
-                    })
-                  }}
-                  onRetry={() => void refresh().catch(() => undefined)}
-                  onOpenRepo={() => void openFolder()}
-                  onRecover={() => setRecoveryOpen(true)}
-                />
-                <Box
-                  data-testid="panel-splitter"
-                  onPointerDown={splitter.onDividerDown}
-                  onPointerMove={splitter.onDividerMove}
-                  onPointerUp={splitter.onDividerUp}
-                  // A GTK focus steal mid-drag fires pointercancel, never
-                  // pointerup; without these the handle stays stuck to the cursor.
-                  onPointerCancel={splitter.onDividerUp}
-                  onLostPointerCapture={splitter.onDividerUp}
-                  role="separator"
-                  aria-orientation="horizontal"
-                  aria-label="Resize bottom panel"
-                  sx={{
-                    height: 5,
-                    flexShrink: 0,
-                    cursor: "row-resize",
-                    bgcolor: "background.default",
-                    borderTop: 1,
-                    borderColor: "divider",
-                    transition: "background-color 120ms",
-                    "&:hover": { bgcolor: "primary.main" },
-                  }}
-                />
-                <BottomPanel
-                  current={deferredCurrent}
-                  status={status}
-                  headId={headId}
-                  onOpenCommit={actions.openCommit}
-                  height={bottomHeight}
-                  tab={bottomTab}
-                  onTab={setBottomTab}
-                  setStatus={repoState.setStatus}
-                />
+                {fileHistory.target ? (
+                  <FileHistoryView
+                    target={fileHistory.target}
+                    session={session}
+                    repoState={repoState}
+                    layout={layout}
+                    menus={menus}
+                    remoteNames={remoteNames}
+                    tagNames={tagNames}
+                    headId={headId}
+                    onClose={chrome.closeFileHistory}
+                  />
+                ) : (
+                  <>
+                    <HistoryPane
+                      rows={rows}
+                      remoteNames={remoteNames}
+                      tagNames={tagNames}
+                      selected={selected}
+                      loadingTail={loadingTail}
+                      loading={live && !demo && !loaded}
+                      engineError={engineError}
+                      view={view}
+                      onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
+                      onNearEnd={history.onNearEnd}
+                      menus={menus}
+                      selectedSha={selectedSha}
+                      onRetry={() => void refresh().catch(() => undefined)}
+                      onOpenRepo={() => void openFolder()}
+                      onRecover={() => setRecoveryOpen(true)}
+                    />
+                    <Box
+                      data-testid="panel-splitter"
+                      onPointerDown={splitter.onDividerDown}
+                      onPointerMove={splitter.onDividerMove}
+                      onPointerUp={splitter.onDividerUp}
+                      // A GTK focus steal mid-drag fires pointercancel, never
+                      // pointerup; without these the handle stays stuck to the cursor.
+                      onPointerCancel={splitter.onDividerUp}
+                      onLostPointerCapture={splitter.onDividerUp}
+                      role="separator"
+                      aria-orientation="horizontal"
+                      aria-label="Resize bottom panel"
+                      sx={{
+                        height: 5,
+                        flexShrink: 0,
+                        cursor: "row-resize",
+                        bgcolor: "background.default",
+                        borderTop: 1,
+                        borderColor: "divider",
+                        transition: "background-color 120ms",
+                        "&:hover": { bgcolor: "primary.main" },
+                      }}
+                    />
+                    <BottomPanel
+                      current={deferredCurrent}
+                      status={status}
+                      headId={headId}
+                      onOpenCommit={actions.openCommit}
+                      height={bottomHeight}
+                      tab={bottomTab}
+                      onTab={setBottomTab}
+                      setStatus={repoState.setStatus}
+                      onFileHistory={fileHistory.open}
+                      onSelectedFile={fileHistory.setBrowseFile}
+                    />
+                  </>
+                )}
               </Box>
             </Box>
           </Box>
@@ -396,6 +409,7 @@ export default function App({ base }: { base: EngineClient }) {
           onForgetRecent={forgetRecent}
           repoState={repoState}
           jobs={jobs}
+          onFileHistory={fileHistory.open}
         />
         <JobPanel jobs={jobs} onClose={() => jobs.setPanelOpen(false)} />
         <SnapshotDialog state={snapshot} onClose={() => setSnapshot({ phase: "idle" })} />

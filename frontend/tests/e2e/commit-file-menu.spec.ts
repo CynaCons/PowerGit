@@ -85,6 +85,7 @@ test("file context menu: GE item set and every item works against the engine", a
       "Delete file…",
       "Copy path",
       // "Show in folder" needs the Tauri opener plugin: not offered in the browser.
+      "View file history",
       "Add to .gitignore…",
       "Add to .git/info/exclude…",
       "Skip worktree",
@@ -95,9 +96,9 @@ test("file context menu: GE item set and every item works against the engine", a
     ])
     // Every action row has an icon so the labels line up; the four check
     // items keep the slot for their check mark (all unchecked here).
-    expect(await items.locator(".MuiListItemIcon-root svg").count()).toBe(13)
+    expect(await items.locator(".MuiListItemIcon-root svg").count()).toBe(14)
     await expect(items.first()).toContainText("S")
-    expect(await menu.locator("hr").count()).toBe(4)
+    expect(await menu.locator("hr").count()).toBe(5)
     await expect(page.getByTestId("ctx-skip-worktree")).toHaveAttribute("aria-checked", "false")
     await expect(page.getByTestId("ctx-show-skip-worktree")).toHaveAttribute("aria-checked", "false")
     for (const id of ["ctx-stage-selected", "ctx-reset-file", "ctx-open-file", "ctx-move-file", "ctx-exclude-file"]) {

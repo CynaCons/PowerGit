@@ -5,11 +5,56 @@ public sealed partial class GitHost
     private const char Field = '\u001f';
     private const char Record = '\u001e';
 
-    public IReadOnlyList<RevisionDto> ListRevisions(int max = 800, int skip = 0, CancellationToken ct = default)
+    /// <summary>
+    /// The revision stream of the graph, or (v0.16.0, <paramref name="filter"/>)
+    /// the commits that touched one path — Git Extensions' FormFileHistory.
+    /// Same paging, ordering and refs either way, so the lane layout runs on
+    /// the filtered list unchanged; each filtered row carries the file's name
+    /// at that commit in <see cref="RevisionDto.Path"/>.
+    /// </summary>
+    public IReadOnlyList<RevisionDto> ListRevisions(int max = 800, int skip = 0, CancellationToken ct = default, RevisionFilter? filter = null)
     {
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
         bool hasStash = Run(root, "rev-parse", "--verify", "-q", "refs/stash").ExitCode == 0;
+
+        // Path filter (GE RevisionGridControl.BuildPathFilter + FilterInfo.
+        // GetRevisionFilter): `git log --follow` is only reliable for a
+        // single path and skips commits when combined with graph options
+        // (https://stackoverflow.com/questions/46487476), so GE takes two
+        // steps: a `--follow --name-only` walk collects every name the file
+        // ever had, then the real log is limited to that set of names.
+        // --parents makes git rewrite each commit's parents to the nearest
+        // ancestor in the filtered set, which is what keeps the lane layout
+        // (a row only ever resolves against its listed parents) connected.
+        // --full-history / --simplify-merges are GE's "Show full history" and
+        // "Simplify merges" toggles. Folders never follow (GE: the command
+        // line "can be very long for folders").
+        string? filterPath = filter is null ? null : filter.Path.Trim().Replace('\\', '/');
+        List<string> pathspec = [];
+        Dictionary<string, string>? nameByCommit = null;
+        if (filterPath is not null)
+        {
+            pathspec.Add(filterPath);
+            if (filter!.Follow && !filterPath.EndsWith('/'))
+            {
+                nameByCommit = FollowFileNames(root, filterPath, filter.ExactRenames, ct);
+                foreach (string name in nameByCommit.Values.Distinct(StringComparer.Ordinal))
+                {
+                    if (!pathspec.Contains(name, StringComparer.Ordinal))
+                    {
+                        pathspec.Add(name);
+                    }
+                }
+
+                // Windows argv tops out near 32K; GE ignores a pathspec past
+                // 31000 characters rather than fail the whole log.
+                if (pathspec.Sum(p => p.Length + 3) > 31_000)
+                {
+                    pathspec = [filterPath];
+                }
+            }
+        }
 
         // Ref GLOBS, never explicit tips: a repo can hold thousands of refs,
         // and expanding them into argv blows the 32K Windows command-line
@@ -46,11 +91,30 @@ public sealed partial class GitHost
             logArgs.Add($"--skip={Math.Clamp(skip, 0, 1_000_000)}");
         }
 
+        if (filterPath is not null)
+        {
+            logArgs.Add("--parents");
+            if (filter!.FullHistory)
+            {
+                logArgs.Add("--full-history");
+                if (filter.SimplifyMerges)
+                {
+                    logArgs.Add("--simplify-merges");
+                }
+            }
+        }
+
         logArgs.Add($"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
         logArgs.Add("HEAD");
         if (hasStash)
         {
             logArgs.Add("refs/stash");
+        }
+
+        if (pathspec.Count > 0)
+        {
+            logArgs.Add("--");
+            logArgs.AddRange(pathspec);
         }
 
         CommandResult log = RunTimed(root, 120_000, ct, [.. logArgs]);
@@ -61,6 +125,11 @@ public sealed partial class GitHost
         }
 
         List<RevisionDto> rows = [];
+        // The name the file has at each row: the follow walk's answer where
+        // it has one, else the name of the nearest newer row (a merge, or a
+        // commit the HEAD-only walk did not visit, sits between commits that
+        // agree on the name), else the requested path.
+        string? nameHere = filterPath;
         foreach (string rec in log.StdOut.Split(Record, StringSplitOptions.RemoveEmptyEntries))
         {
             string[] f = rec.TrimStart('\n', '\r').Split(Field);
@@ -77,6 +146,11 @@ public sealed partial class GitHost
                 refs = ["HEAD", .. refs];
             }
 
+            if (nameByCommit is not null && nameByCommit.TryGetValue(id, out string? known))
+            {
+                nameHere = known;
+            }
+
             rows.Add(new RevisionDto(
                 id,
                 parents,
@@ -88,10 +162,57 @@ public sealed partial class GitHost
                 f[7],
                 f.Length > 9 ? f[9].Trim() : "",
                 refs,
-                id == head));
+                id == head,
+                nameHere));
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Every name <paramref name="path"/> had along HEAD's history, keyed by
+    /// the commit that touched it under that name (GE's first step:
+    /// <c>git log --name-only --follow --find-renames --find-copies -- path</c>,
+    /// walked from HEAD only, as GE does; a rename that only happened on
+    /// another branch is not followed).
+    /// </summary>
+    private Dictionary<string, string> FollowFileNames(string root, string path, bool exactOnly, CancellationToken ct)
+    {
+        List<string> args = [
+            "-c", "core.quotepath=false",
+            "log", "--format=%H", "--name-only", "--follow",
+            exactOnly ? "--find-renames=100%" : "--find-renames",
+            exactOnly ? "--find-copies=100%" : "--find-copies",
+            "--", path,
+        ];
+        CommandResult walk = RunTimed(root, 120_000, ct, [.. args]);
+        Dictionary<string, string> names = new(StringComparer.Ordinal);
+        if (walk.ExitCode != 0)
+        {
+            // GE ignores a failed walk and filters by the given path alone.
+            return names;
+        }
+
+        string? commit = null;
+        foreach (string raw in walk.StdOut.Split('\n'))
+        {
+            string line = raw.TrimEnd('\r');
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (line.Length == 40 && line.All(Uri.IsHexDigit))
+            {
+                commit = line;
+            }
+            else if (commit is not null && !names.ContainsKey(commit))
+            {
+                names[commit] = line;
+            }
+        }
+
+        return names;
     }
 
     public CommitDetailDto GetCommit(string id, CancellationToken ct = default)

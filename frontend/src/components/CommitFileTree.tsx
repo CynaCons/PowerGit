@@ -1,24 +1,39 @@
 import ChevronRightIcon from "@mui/icons-material/ChevronRight"
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined"
+import HistoryIcon from "@mui/icons-material/History"
 import Box from "@mui/material/Box"
 import CircularProgress from "@mui/material/CircularProgress"
+import ListItemIcon from "@mui/material/ListItemIcon"
+import ListItemText from "@mui/material/ListItemText"
+import Menu from "@mui/material/Menu"
+import MenuItem from "@mui/material/MenuItem"
 import Typography from "@mui/material/Typography"
 import { useEffect, useState, type ReactNode } from "react"
 import { describeThrown, isAbort, useEngine, type TreeEntry } from "../engine"
 import { isDemoMode } from "../hooks/useEngineSession"
+import { shortcutLabel } from "../hotkeys/catalog"
+import { copyToClipboard } from "./clipboard"
 
 type Props = {
   commitId: string | null
   onSelectFile?: (path: string) => void
+  /** v0.16.0: the tree's right-click menu (GE FileStatusList in file-tree
+   *  mode: "File history", the double-click default). A folder's path ends
+   *  with "/", which is how the engine tells a prefix from a file. */
+  onFileHistory?: (path: string) => void
 }
+
+type TreeMenu = { x: number; y: number; path: string }
 
 type Loaded = { entries: TreeEntry[]; error: string | null }
 
-export function CommitFileTree({ commitId, onSelectFile }: Props) {
+export function CommitFileTree({ commitId, onSelectFile, onFileHistory }: Props) {
   const engine = useEngine()
   const [root, setRoot] = useState<Loaded | null>(null)
   const [dirs, setDirs] = useState<Map<string, Loaded>>(new Map())
+  const [menu, setMenu] = useState<TreeMenu | null>(null)
 
   useEffect(() => {
     setRoot(null)
@@ -89,6 +104,10 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
     )
   }
 
+  const menuClick = (action: () => void) => () => {
+    setMenu(null)
+    action()
+  }
   return (
     <Box data-testid="commit-file-tree" sx={{ overflow: "auto", py: 0.5 }}>
       <Level
@@ -99,7 +118,41 @@ export function CommitFileTree({ commitId, onSelectFile }: Props) {
         dirs={dirs}
         onToggle={toggleDir}
         onSelectFile={onSelectFile}
+        onContext={onFileHistory ? (path, x, y) => setMenu({ x, y, path }) : undefined}
       />
+      <Menu
+        transitionDuration={0}
+        open={menu !== null}
+        onClose={() => setMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={menu ? { top: menu.y, left: menu.x } : undefined}
+        slotProps={{ paper: { sx: { minWidth: 240 } } }}
+        data-testid="file-tree-menu"
+      >
+        <MenuItem
+          data-testid="ctx-tree-file-history"
+          dense
+          onClick={menuClick(() => menu && onFileHistory?.(menu.path))}
+        >
+          <ListItemIcon>
+            <HistoryIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText slotProps={{ primary: { sx: { fontWeight: 600 } } }}>View file history</ListItemText>
+          <Typography variant="caption" color="text.secondary" sx={{ pl: 3 }}>
+            {shortcutLabel("browse.fileHistory")}
+          </Typography>
+        </MenuItem>
+        <MenuItem
+          data-testid="ctx-tree-copy-path"
+          dense
+          onClick={menuClick(() => void copyToClipboard(menu?.path ?? ""))}
+        >
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy path</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   )
 }
@@ -112,6 +165,7 @@ function Level({
   dirs,
   onToggle,
   onSelectFile,
+  onContext,
 }: {
   commitId: string
   entries: TreeEntry[]
@@ -120,6 +174,7 @@ function Level({
   dirs: Map<string, Loaded>
   onToggle: (path: string) => void
   onSelectFile?: (path: string) => void
+  onContext?: (path: string, x: number, y: number) => void
 }) {
   return (
     <>
@@ -137,6 +192,7 @@ function Level({
                 path={path}
                 folder
                 onClick={() => onToggle(path)}
+                onContext={onContext ? (x, y) => onContext(`${path}/`, x, y) : undefined}
               />
               {open && child && child.error && (
                 <Typography
@@ -157,6 +213,7 @@ function Level({
                   dirs={dirs}
                   onToggle={onToggle}
                   onSelectFile={onSelectFile}
+                  onContext={onContext}
                 />
               )}
             </Box>
@@ -170,6 +227,14 @@ function Level({
             label={e.name}
             path={path}
             onClick={() => onSelectFile?.(path)}
+            onContext={
+              onContext
+                ? (x, y) => {
+                    onSelectFile?.(path)
+                    onContext(path, x, y)
+                  }
+                : undefined
+            }
           />
         )
       })}
@@ -184,6 +249,7 @@ function TreeRow({
   path,
   folder,
   onClick,
+  onContext,
 }: {
   depth: number
   icon: ReactNode
@@ -191,6 +257,7 @@ function TreeRow({
   path: string
   folder?: boolean
   onClick: () => void
+  onContext?: (x: number, y: number) => void
 }) {
   return (
     <Box
@@ -198,6 +265,14 @@ function TreeRow({
       data-path={path}
       data-type={folder ? "tree" : "blob"}
       onClick={onClick}
+      onContextMenu={
+        onContext
+          ? (e) => {
+              e.preventDefault()
+              onContext(e.clientX, e.clientY)
+            }
+          : undefined
+      }
       sx={{
         display: "flex",
         alignItems: "center",

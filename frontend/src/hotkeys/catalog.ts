@@ -44,6 +44,7 @@ export type CommandId =
   | "browse.gitBash"
   | "browse.gitConsole"
   | "browse.appLog"
+  | "browse.fileHistory"
   | "diff.stageSelected"
   | "diff.unstageSelected"
   | "commit.refresh"
@@ -201,6 +202,17 @@ export const CATALOG: CommandDef[] = [
     ge: null,
     scope: "browse",
     chord: chord("`", { ctrl: true, shift: true }),
+    available: true,
+  },
+  // v0.16.0: file history of the file selected in the Diff or File Tree
+  // tab (GE RevisionDiffControl.ShowHistory is a bare H on the focused
+  // file list; PowerGit binds the chord the owner asked for so it works
+  // from the grid as well).
+  {
+    id: "browse.fileHistory",
+    ge: "ShowHistory",
+    scope: "browse",
+    chord: chord("H", { ctrl: true, shift: true }),
     available: true,
   },
 

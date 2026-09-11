@@ -196,11 +196,19 @@ repo.AddEndpointFilter(async (ctx, next) =>
 // Read routes hand HttpContext.RequestAborted down to the git process:
 // when the UI abandons a request (latest selection wins) the git child is
 // killed instead of finishing for nobody (v0.13.11).
-repo.MapGet("/revisions", (GitHost git, int? max, int? skip, HttpContext ctx) =>
+// v0.16.0: `path=` filters the stream to the commits that touched one path
+// (Git Extensions' file history), `follow` (default true) walks renames,
+// `exact` restricts that to exact renames and copies, `full` and `simplify`
+// are GE's "Show full history" / "Simplify merges". Same DTO, paging and
+// refs as the unfiltered stream, plus each row's name for the file.
+repo.MapGet("/revisions", (GitHost git, int? max, int? skip, string? path, bool? follow, bool? exact, bool? full, bool? simplify, HttpContext ctx) =>
 {
     try
     {
-        return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0, ctx.RequestAborted));
+        RevisionFilter? filter = string.IsNullOrWhiteSpace(path)
+            ? null
+            : new RevisionFilter(path, follow ?? true, exact ?? false, full ?? false, simplify ?? false);
+        return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0, ctx.RequestAborted, filter));
     }
     catch (OperationCanceledException)
     {

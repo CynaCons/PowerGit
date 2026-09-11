@@ -18,6 +18,18 @@ describe("withArtificialRows", () => {
     expect(withArtificialRows(noHead, { unstagedCount: 2, stagedCount: 0 })).toBe(noHead)
   })
 
+  it("chains to the anchor row when HEAD is not loaded (file history, v0.16.0)", () => {
+    const noHead = layoutGraph([rev("x", ["y"]), rev("y", [])])
+    const rows = withArtificialRows(noHead, { unstagedCount: 1, stagedCount: 0 }, 0)
+    expect(rows).toHaveLength(3)
+    expect(rows[0].rev.id).toBe(WORKTREE_ID)
+    expect(rows[0].rev.parents).toEqual([id("x")])
+    expect(rows[1].rev.id).toBe(id("x"))
+    // The anchor is ignored when HEAD is there, and when it is out of range.
+    expect(withArtificialRows(linear, { unstagedCount: 1, stagedCount: 0 }, 2)[1].rev.id).toBe(id("head"))
+    expect(withArtificialRows(noHead, { unstagedCount: 1, stagedCount: 0 }, 5)).toBe(noHead)
+  })
+
   it("adds a Working directory row above HEAD in HEAD's lane, chained by a segment", () => {
     const rows = withArtificialRows(linear, { unstagedCount: 3, stagedCount: 0 })
     expect(rows).toHaveLength(4)

@@ -48,6 +48,7 @@ export function DiffTab({
   row,
   commitId,
   actions,
+  onFileHistory,
 }: {
   files: FileChange[]
   selectedPath: string | null
@@ -68,6 +69,8 @@ export function DiffTab({
   commitId: string | null
   /** Absent in demo mode and wherever the panel must stay read-only. */
   actions?: DiffTabActions
+  /** v0.16.0: GE FileStatusList "File history" on the list's menu. */
+  onFileHistory?: (path: string) => void
 }) {
   const engine = useEngine()
   const [note, setNote] = useState<BrowseResetNote | null>(null)
@@ -186,6 +189,7 @@ export function DiffTab({
             onReset={reset.askFileReset}
             onDifftool={() => reset.fileMenu && onOpenDifftool(reset.fileMenu.path)}
             onCopyPath={() => void copyToClipboard(reset.fileMenu?.path ?? "")}
+            onFileHistory={onFileHistory ? () => reset.fileMenu && onFileHistory(reset.fileMenu.path) : undefined}
           />
           <DiffLineContextMenu
             target={reset.lines.menu}

@@ -38,9 +38,14 @@ function maxLane(rows: (GraphRow | undefined)[]): number {
   return max
 }
 
-export function withArtificialRows(rows: GraphRow[], counts: PendingCounts | null): GraphRow[] {
+/** `anchor` (v0.16.0, file history): the row the pending rows chain to
+ *  when HEAD is not in the list — a path-filtered history only holds the
+ *  commits that touched the path, so the pending change sits on the last
+ *  one that did. Without it the rows go above HEAD, or nowhere. */
+export function withArtificialRows(rows: GraphRow[], counts: PendingCounts | null, anchor?: number): GraphRow[] {
   if (!counts || (counts.unstagedCount <= 0 && counts.stagedCount <= 0)) return rows
-  const headIndex = rows.findIndex((r) => r.isHead)
+  let headIndex = rows.findIndex((r) => r.isHead)
+  if (headIndex < 0 && anchor !== undefined && anchor >= 0 && anchor < rows.length) headIndex = anchor
   if (headIndex < 0) return rows
   const head = rows[headIndex]
   const above = rows[headIndex - 1]

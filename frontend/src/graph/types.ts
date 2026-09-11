@@ -5,6 +5,8 @@ export type Revision = {
   author: string
   date: string
   refs: string[]
+  /** File history only (v0.16.0): the name the filtered path had at this commit. */
+  path?: string
 }
 
 export type LaneSharing = "exclusive" | "differentStart" | "differentEnd" | "entire"

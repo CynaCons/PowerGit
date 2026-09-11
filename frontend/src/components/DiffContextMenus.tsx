@@ -1,6 +1,7 @@
 import CompareIcon from "@mui/icons-material/Compare"
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined"
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"
+import HistoryIcon from "@mui/icons-material/History"
 import SettingsBackupRestoreIcon from "@mui/icons-material/SettingsBackupRestore"
 import UndoIcon from "@mui/icons-material/Undo"
 import Divider from "@mui/material/Divider"
@@ -11,6 +12,7 @@ import MenuItem from "@mui/material/MenuItem"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
 import type { ReactNode } from "react"
+import { shortcutLabel } from "../hotkeys/catalog"
 import type { BrowseRow, FilePlan, LinePlan } from "./browseReset"
 
 // Right-click menus of the Browse panel's Diff tab (v0.15.5). Owner: "when
@@ -32,6 +34,7 @@ function Item({
   testid,
   icon,
   label,
+  shortcut,
   disabled,
   hint,
   onClick,
@@ -39,6 +42,7 @@ function Item({
   testid: string
   icon: ReactNode
   label: string
+  shortcut?: string
   disabled?: boolean
   /** Shown on hover; the reason when `disabled`. */
   hint?: string
@@ -50,7 +54,9 @@ function Item({
         <MenuItem data-testid={testid} disabled={disabled} onClick={onClick} dense>
           <ListItemIcon>{icon}</ListItemIcon>
           <ListItemText>{label}</ListItemText>
-          <Typography variant="caption" color="text.secondary" sx={{ pl: 3, minWidth: 24 }} />
+          <Typography variant="caption" color="text.secondary" sx={{ pl: 3, minWidth: 24 }}>
+            {shortcut ?? ""}
+          </Typography>
         </MenuItem>
       </span>
     </Tooltip>
@@ -92,6 +98,7 @@ export function DiffFileContextMenu({
   onReset,
   onDifftool,
   onCopyPath,
+  onFileHistory,
 }: {
   target: DiffFileMenuTarget | null
   row: BrowseRow
@@ -102,6 +109,8 @@ export function DiffFileContextMenu({
   onReset: () => void
   onDifftool: () => void
   onCopyPath: () => void
+  /** v0.16.0: GE "File history"; absent where no history view can open. */
+  onFileHistory?: () => void
 }) {
   const run = (action: () => void) => () => {
     onClose()
@@ -130,6 +139,16 @@ export function DiffFileContextMenu({
         label="Copy path"
         onClick={run(onCopyPath)}
       />
+      {onFileHistory && <Divider />}
+      {onFileHistory && (
+        <Item
+          testid="ctx-diff-file-history"
+          icon={<HistoryIcon fontSize="small" />}
+          label="View file history"
+          shortcut={shortcutLabel("browse.fileHistory")}
+          onClick={run(onFileHistory)}
+        />
+      )}
     </Frame>
   )
 }

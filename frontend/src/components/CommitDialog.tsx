@@ -38,13 +38,25 @@ type Props = {
   onClose: () => void
   onStatus: (status: RepoStatus) => void
   onCommit: (message: string) => Promise<void>
+  /** v0.16.0: "View file history" on a file; the dialog closes so the view is visible. */
+  onFileHistory?: (path: string) => void
 }
 
 // Layout mirrors Git Extensions FormCommit: unstaged/staged lists stacked on
 // the left, selected-file diff on the right, commit message bottom-right.
 // Selection follows GE: click selects, ctrl+click toggles, shift+click ranges,
 // double-click stages/unstages. Right-click opens the file context menu.
-export function CommitDialog({ open, status, amend, initialMessage, repository, onClose, onStatus, onCommit }: Props) {
+export function CommitDialog({
+  open,
+  status,
+  amend,
+  initialMessage,
+  repository,
+  onClose,
+  onStatus,
+  onCommit,
+  onFileHistory,
+}: Props) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const { filesWidth, setFilesWidth, commitWidth, treeMode, toggleTree } = useCommitFilesLayout()
   const engine = useEngine()
@@ -355,6 +367,12 @@ export function CommitDialog({ open, status, amend, initialMessage, repository, 
           onIgnore: () => {
             if (menu) setIgnoreFor(menu.path)
           },
+          onFileHistory: onFileHistory
+            ? (path) => {
+                onClose()
+                onFileHistory(path)
+              }
+            : undefined,
         }}
       />
       <CommitDiffContextMenu

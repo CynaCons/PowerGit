@@ -30,6 +30,22 @@ export type RevisionDto = {
   body: string
   refs: string[]
   isHead: boolean
+  /** v0.16.0: on a path-filtered list, the name the file had at this commit (renames followed). */
+  path?: string
+}
+
+/** v0.16.0: `GET /revisions?path=` — Git Extensions' file history. Every flag
+ *  is one of GE's FormFileHistory settings; `follow` defaults to on there too. */
+export type RevisionFilter = {
+  path: string
+  /** "Detect and follow renames" (default true). */
+  follow?: boolean
+  /** "Detect and follow - exact renames and copies only". */
+  exact?: boolean
+  /** "Show full history" (`--full-history`). */
+  full?: boolean
+  /** "Simplify merges" (`--simplify-merges`, only with `full`). */
+  simplify?: boolean
 }
 
 export type CommitDetail = {

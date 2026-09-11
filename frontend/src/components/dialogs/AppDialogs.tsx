@@ -31,12 +31,23 @@ export type AppDialogsProps = {
   onForgetRecent?: (root: string) => void
   repoState: Pick<RepoState, "status" | "setStatus" | "refs" | "branchNames" | "dirty" | "refresh" | "openFolder">
   jobs: Jobs
+  /** v0.16.0: the commit dialog's "View file history". */
+  onFileHistory?: (path: string) => void
 }
 
 // Every modal surface of the shell, driven by the single DialogState. The
 // always-mounted MUI dialogs (commit, settings, recents, stash) get an
 // `open` flag so their exit transitions play; the rest mount on demand.
-export function AppDialogs({ dialogs, actions, repo, recents, onForgetRecent, repoState, jobs }: AppDialogsProps) {
+export function AppDialogs({
+  dialogs,
+  actions,
+  repo,
+  recents,
+  onForgetRecent,
+  repoState,
+  jobs,
+  onFileHistory,
+}: AppDialogsProps) {
   const { dialog, open, close } = dialogs
   const { status, setStatus, refs, branchNames, dirty, refresh, openFolder } = repoState
   const ctxTarget = dialog.kind === "context" ? dialog.target : null
@@ -59,6 +70,7 @@ export function AppDialogs({ dialogs, actions, repo, recents, onForgetRecent, re
         onCommit={async (msg) => {
           await actions.commit(msg)
         }}
+        onFileHistory={onFileHistory}
       />
 
       <SettingsDialog

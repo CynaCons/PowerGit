@@ -58,6 +58,15 @@ Git Extensions' `FileStatusList` context menu, as the engine serves it under `/f
 | SRS-ENG-047 | The engine shall open a working-tree file with the OS default handler or with a named program, and shall open it for editing with git's `core.editor` when one is set (falling back to the OS handler for terminal editors), refusing paths that do not exist or escape the working tree and reporting a program that fails to start. | GE "Open working directory file" / "with..." / "Edit working directory file". | Test | `POST /files/open`, `/files/edit`, `FilesTests` |
 | SRS-ENG-048 | The engine shall stop tracking given paths (`git rm --cached`, files kept on disk) and shall rename or move one path through `git mv`, refusing an existing target. | GE "Stop tracking this file" and "Rename / move". | Test | `POST /files/untrack`, `/files/move`, `FilesTests` |
 
+## File history (v0.16.0)
+
+Git Extensions' `FormFileHistory`: the revision stream limited to one path.
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-ENG-049 | The revision stream shall accept a path filter and then list only the commits that touched that path, with the same paging, ordering and ref labels as the unfiltered stream, and with each commit's parents rewritten to the nearest listed ancestor so the filtered commits form one connected graph. | GE `FilterInfo.GetRevisionFilter` adds `--parents` with a path filter; the lane layout only ever resolves a row against its listed parents. | Test | `GET /revisions?path=`, `RevisionFilter`, `QueryTests`, `ApiTests` |
+| SRS-ENG-050 | With renames followed (the default) the filter shall include every name the file had along HEAD's history, found by a `--follow` walk, and each listed commit shall carry the file's name at that commit; a folder path (trailing `/`) shall never follow. Renames off, exact renames and copies only, full history and simplified merges shall be selectable, as in GE's file history menus. | GE `RevisionGridControl.BuildPathFilter` takes the two-step route because `git log --follow` skips commits when combined with graph options. | Test | `RevisionDto.Path`, `follow`/`exact`/`full`/`simplify`, `QueryTests` |
+
 ## Windows isolation
 
 | ID | Requirement | Rationale | Verification | Trace |
