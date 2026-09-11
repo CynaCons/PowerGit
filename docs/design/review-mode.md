@@ -165,14 +165,12 @@ Each iteration ends with a symptom e2e in the owner's words and an owner
 tick. The MCP hand-off (`Finish review` sending the file to an agent) is
 the next major, once the file format has been used for real.
 
-## 7. Open calls for the owner
+## 7. Owner calls (decided 2026-09-11)
 
-1. **Click on the text of a line**: cursor only (line selection for reset
-   keeps working) — recommended — or cycle like the prototype (then line
-   selection needs another gesture in review mode).
-2. **Where j/k work**: only while the diff has focus (strict; Enter and n
-   move focus into it) — recommended — or anywhere in the Diff tab
-   including the file list.
-3. **`.powergit/` in the repo**, hidden through `.git/info/exclude` —
-   recommended, it is what makes the MCP hand-off possible — or the app
-   data directory, leaving the repository untouched.
+1. **Click on the text of a line** moves the cursor only; the mark cell
+   cycles. Line selection for reset and text selection keep working in
+   review mode.
+2. **j/k work only while the diff has focus.** Toggling review mode, Enter
+   and n move the focus into the diff.
+3. **The file lives in the repo** under `.powergit/`, hidden through
+   `.git/info/exclude`. The app-data fallback stays a one-line switch.
