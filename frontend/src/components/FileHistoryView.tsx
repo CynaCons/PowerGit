@@ -41,6 +41,7 @@ import {
 } from "./fileHistoryModel"
 import { HistoryPane } from "./HistoryPane"
 import type { Loadable } from "./loadable"
+import { PanelSplitter } from "./PanelSplitter"
 
 // Git Extensions' FormFileHistory (v0.16.0). Owner: "In main view, in the
 // file tree, right click a file and show the file history. Here again, we
@@ -330,26 +331,7 @@ export function FileHistoryView({
         onDifftool={openDifftoolFor}
         onClose={rowMenu.close}
       />
-      <Box
-        data-testid="file-history-splitter"
-        onPointerDown={layout.splitter.onDividerDown}
-        onPointerMove={layout.splitter.onDividerMove}
-        onPointerUp={layout.splitter.onDividerUp}
-        onPointerCancel={layout.splitter.onDividerUp}
-        onLostPointerCapture={layout.splitter.onDividerUp}
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize bottom panel"
-        sx={{
-          height: 5,
-          flexShrink: 0,
-          cursor: "row-resize",
-          bgcolor: "background.default",
-          borderTop: 1,
-          borderColor: "divider",
-          "&:hover": { bgcolor: "primary.main" },
-        }}
-      />
+      <PanelSplitter testid="file-history-splitter" splitter={layout.splitter} />
       <Paper
         data-testid="file-history-panel"
         sx={{
