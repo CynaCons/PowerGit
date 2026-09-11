@@ -7,11 +7,13 @@ mod snapshot;
 mod tinyhttp;
 mod logwriter;
 mod watchdog;
+mod probe;
+mod recovery;
 
 use std::fs::{self, File, OpenOptions};
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
@@ -63,6 +65,9 @@ struct EngineState {
     /// mean the user cannot see the page's answer.
     presses: Mutex<Vec<Instant>>,
     started: Instant,
+    /// v0.15.6: the paint / main-loop liveness probe (probe.rs), shared
+    /// with the GTK signal handlers and the liveness thread.
+    probe: Arc<probe::Probe>,
 }
 
 /// Presses of the snapshot button closer together than this count as one
@@ -74,7 +79,8 @@ const PRESS_WINDOW: Duration = Duration::from_secs(15);
 struct Incident {
     at: String,
     snapshot: String,
-    /// "script", "paint" or "crash" (watchdog::Stall); absent in v0.14.1 files.
+    /// "script", "paint", "crash", "forced", "presentation" or "loop"
+    /// (watchdog::Stall); absent in v0.14.1 files.
     #[serde(default)]
     kind: String,
 }
@@ -210,6 +216,32 @@ fn paint_age(state: &EngineState) -> Option<Duration> {
         .map(|p| p.elapsed())
 }
 
+/// engine.log from anywhere that only has the handle (probe.rs, recovery.rs).
+pub(crate) fn log(app: &AppHandle, line: &str) {
+    log_line(&app.state::<EngineState>(), line);
+}
+
+pub(crate) fn is_exiting(app: &AppHandle) -> bool {
+    *app.state::<EngineState>().exiting.lock().expect("exiting flag poisoned")
+}
+
+/// (age of the last heartbeat, age of the last page frame).
+pub(crate) fn heartbeat_ages(app: &AppHandle) -> (Option<Duration>, Option<Duration>) {
+    let state = app.state::<EngineState>();
+    let beat = state
+        .last_beat
+        .lock()
+        .expect("beat mutex poisoned")
+        .map(|b| b.elapsed());
+    (beat, paint_age(&state))
+}
+
+/// The probe's one-line readout, for the log after a recovery step.
+pub(crate) fn probe_readout(app: &AppHandle) -> String {
+    let (beat, frame) = heartbeat_ages(app);
+    app.state::<EngineState>().probe.readout(beat, frame)
+}
+
 /// The native "restart?" dialog: it is drawn by the OS, not the webview,
 /// so it shows even when the page is a black rectangle.
 fn ask_restart(app: &AppHandle, why: &str) {
@@ -260,7 +292,7 @@ fn log_frontend(state: tauri::State<EngineState>, lines: Vec<String>) {
 /// Tauri command: writes snapshot-<time>.zip in the log dir and returns its
 /// path. `frontend` is the page's own dump (empty when the watchdog calls
 /// without a responsive page).
-#[tauri::command]
+#[tauri::command(async)]
 fn diagnostic_snapshot(app: AppHandle, frontend: String) -> Result<String, String> {
     let path = write_snapshot(&app, frontend, "button")?;
     let state = app.state::<EngineState>();
@@ -290,6 +322,13 @@ fn diagnostic_snapshot(app: AppHandle, frontend: String) -> Result<String, Strin
         tell_snapshot_path(&app, &path);
     }
     Ok(path)
+}
+
+/// Tauri command (v0.15.6): one step of the recovery ladder (recovery.rs),
+/// from Ctrl+Shift+F1..F9 or Settings -> Tools. Returns the step's key.
+#[tauri::command]
+fn recover(app: AppHandle, step: u8) -> Result<String, String> {
+    recovery::run(&app, step, recovery::Source::Command)
 }
 
 /// The side effects of a watchdog decision (shared by the timer loop and
@@ -404,7 +443,19 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
         .map(|c| c.pid().to_string())
         .unwrap_or_else(|| "none".into());
     let restarts = state.restarts.lock().expect("restart mutex poisoned").0;
-    let facts = snapshot::shell_facts(&[
+    // v0.15.6: the paint / liveness probe, the fields probe.txt carries.
+    let (beat, frame) = heartbeat_ages(app);
+    let probe_fields: Vec<(String, String)> = std::iter::once(("probe".to_string(), state.probe.readout(beat, frame)))
+        .chain(
+            state
+                .probe
+                .fields(beat, frame)
+                .into_iter()
+                .map(|(k, v)| (format!("probe {k}"), v)),
+        )
+        .collect();
+    let probe_refs: Vec<(&str, String)> = probe_fields.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+    let mut all_facts: Vec<(&str, String)> = vec![
         ("powergit", env!("POWERGIT_VERSION").into()),
         ("taken", timestamp()),
         ("trigger", trigger.into()),
@@ -440,11 +491,16 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
         ),
         ("LIBGL_ALWAYS_SOFTWARE", env_fact("LIBGL_ALWAYS_SOFTWARE")),
         ("POWERGIT_WAYLAND", env_fact("POWERGIT_WAYLAND")),
+        ("POWERGIT_X11", env_fact("POWERGIT_X11")),
+        ("POWERGIT_NO_FRAME_SYNC", env_fact("POWERGIT_NO_FRAME_SYNC")),
+        ("POWERGIT_PROBE_PAINT", env_fact("POWERGIT_PROBE_PAINT")),
         ("POWERGIT_KEEP_DMABUF", env_fact("POWERGIT_KEEP_DMABUF")),
         ("POWERGIT_KEEP_COMPOSITING", env_fact("POWERGIT_KEEP_COMPOSITING")),
         ("webkit", webkit_version()),
         ("nvidia driver", nvidia),
-    ]);
+    ];
+    all_facts.extend(probe_refs);
+    let facts = snapshot::shell_facts(&all_facts);
     let mut parts = vec![
         snapshot::Part::text("shell.txt", facts),
         snapshot::Part::text("frontend.json", frontend),
@@ -510,23 +566,40 @@ fn spawn_watchdog(handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(watchdog::INTERVAL).await;
-            let state = handle.state::<EngineState>();
-            if *state.exiting.lock().expect("exiting flag poisoned") {
+            if is_exiting(&handle) {
                 return;
             }
+            watchdog_tick(&handle);
+        }
+    });
+}
+
+/// One watchdog step: observe, decide, apply. Also called by the liveness
+/// thread (probe.rs) when the main loop stops answering, since a parked loop
+/// is the one stall this timer might report late. Never touches the main
+/// thread itself: the snapshot is files + tinyhttp, and a Loop stall is never
+/// reloaded or asked about.
+pub(crate) fn watchdog_tick(handle: &AppHandle) {
+    let handle = handle.clone();
+    {
+        {
+            let state = handle.state::<EngineState>();
+            let paint = paint_age(&state);
             let obs = watchdog::Observation {
                 beat_age: state
                     .last_beat
                     .lock()
                     .expect("beat mutex poisoned")
                     .map(|b| b.elapsed()),
-                paint_age: paint_age(&state),
+                paint_age: paint,
                 crashed: state
                     .crashed
                     .lock()
                     .expect("crash mutex poisoned")
                     .take()
                     .is_some(),
+                gdk_paint_age: state.probe.gdk_paint_age(paint.is_some()),
+                loop_age: state.probe.loop_age(),
             };
             let action = watchdog::step(
                 obs,
@@ -550,6 +623,14 @@ fn spawn_watchdog(handle: AppHandle) {
                             ),
                             watchdog::Stall::Crash => "webview process crashed".into(),
                             watchdog::Stall::Forced => "display declared dead by the user".into(),
+                            watchdog::Stall::Presentation => format!(
+                                "window not painting: page frames fresh but no GTK paint for {:.0}s",
+                                secs(obs.gdk_paint_age)
+                            ),
+                            watchdog::Stall::Loop => format!(
+                                "main loop unresponsive: no round-trip for {:.0}s",
+                                secs(obs.loop_age)
+                            ),
                         },
                     );
                     match write_snapshot(&handle, String::new(), "watchdog") {
@@ -583,7 +664,7 @@ fn spawn_watchdog(handle: AppHandle) {
                 }
             }
         }
-    });
+    }
 }
 
 /// Picks the port to spawn the sidecar on. The default port is tried first
@@ -857,7 +938,8 @@ pub fn run() {
             app_location,
             diagnostic_snapshot,
             last_incident,
-            log_dir
+            log_dir,
+            recover
         ])
         .setup(|app| {
             let port = resolve_engine_port();
@@ -879,6 +961,9 @@ pub fn run() {
                 crashed: Mutex::new(None),
                 presses: Mutex::new(Vec::new()),
                 started: Instant::now(),
+                probe: Arc::new(probe::Probe::new(
+                    std::env::var("POWERGIT_PROBE_PAINT").as_deref() != Ok("0"),
+                )),
             });
 
             let state = app.state::<EngineState>();
@@ -901,6 +986,13 @@ pub fn run() {
             spawn_engine(app.handle().clone());
             spawn_watchdog(app.handle().clone());
             crash_hooks::install(app.handle(), note_crash);
+            if state.probe.enabled {
+                #[cfg(target_os = "linux")]
+                probe::install(app.handle(), state.probe.clone());
+                probe::spawn_liveness(app.handle().clone(), state.probe.clone());
+            } else {
+                log_line(&state, "paint probe disabled (POWERGIT_PROBE_PAINT=0)");
+            }
             if std::env::var("POWERGIT_DEVTOOLS").as_deref() == Ok("1") {
                 if let Some(window) = app.get_webview_window("main") {
                     window.open_devtools();
@@ -1006,6 +1098,7 @@ mod tests {
             crashed: Mutex::new(None),
             presses: Mutex::new(Vec::new()),
             started: Instant::now(),
+            probe: Arc::new(probe::Probe::new(false)),
         }
     }
 

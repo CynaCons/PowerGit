@@ -1,8 +1,9 @@
 {
   "identifier": "default",
-  "description": "Main window: engine config, the window controls of the custom title bar (v0.13.14), and in-app updates (v0.14.0)",
+  "description": "Main window: engine config, the window controls of the custom title bar (v0.13.14), and in-app updates (v0.14.0); recovery-* are the second windows of recovery step 8 (v0.15.6)",
   "windows": [
-    "main"
+    "main",
+    "recovery-*"
   ],
   "permissions": [
     "core:default",
