@@ -76,6 +76,23 @@ export type Tokens = {
     warn: string
     fail: string
   }
+  /** Review mode's marks (v0.17.0, docs/design/review-mode.md §4). An
+   *  unreviewed line is amber — green would read as "added" in a diff —
+   *  ok is the primary blue, rejected is the diff's removed red, and the
+   *  cursor is the grid selection so the two surfaces agree. */
+  review: {
+    todo: string
+    todoBg: string
+    todoStripe: string
+    /** = primary */
+    ok: string
+    okBg: string
+    /** = diff.removed */
+    rejected: string
+    rejectedBg: string
+    /** = selectionBg */
+    cursorBg: string
+  }
   graph: {
     /** Git Extensions AppColor.GraphBranch1–7 (light) — parity, do not tune. */
     lanes: readonly [string, string, string, string, string, string, string]
@@ -147,6 +164,17 @@ export const light: Tokens = {
     warn: "#f5b942",
     fail: "#ff8a80",
   },
+  // The prototype's light ambers (docs/prototypes/review-mode.html).
+  review: {
+    todo: "#b7791f",
+    todoBg: "rgba(183, 121, 31, 0.10)",
+    todoStripe: "#d99a2b",
+    ok: "#1553c9",
+    okBg: "rgba(21, 83, 201, 0.10)",
+    rejected: "#d3000B",
+    rejectedBg: "rgba(211, 0, 11, 0.10)",
+    cursorBg: "#dbeafe",
+  },
   graph: {
     lanes: ["#f064a0", "#78b4e6", "#24c221", "#a078f0", "#dd3228", "#1ac6a6", "#e7b00f"],
     nonRelative: "#a0a0a0",
@@ -215,6 +243,18 @@ export const dark: Tokens = {
     ok: "#5ee38a",
     warn: "#f5b942",
     fail: "#ff8a80",
+  },
+  // The prototype's dark amber; the stripe is the ring colour itself since
+  // a lighter amber would wash out on the dark surface.
+  review: {
+    todo: "#e0a83a",
+    todoBg: "rgba(224, 168, 58, 0.12)",
+    todoStripe: "#e0a83a",
+    ok: "#3b7bff",
+    okBg: "rgba(59, 123, 255, 0.14)",
+    rejected: "#ff8a80",
+    rejectedBg: "rgba(255, 138, 128, 0.14)",
+    cursorBg: "#1f3a5f",
   },
   graph: {
     // Same hues as the GE set, lifted where a lane fell under 3:1 against
@@ -299,6 +339,14 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-console-ok": t.console.ok,
     "--pg-console-warn": t.console.warn,
     "--pg-console-fail": t.console.fail,
+    "--pg-review-todo": t.review.todo,
+    "--pg-review-todo-bg": t.review.todoBg,
+    "--pg-review-todo-stripe": t.review.todoStripe,
+    "--pg-review-ok": t.review.ok,
+    "--pg-review-ok-bg": t.review.okBg,
+    "--pg-review-rejected": t.review.rejected,
+    "--pg-review-rejected-bg": t.review.rejectedBg,
+    "--pg-review-cursor-bg": t.review.cursorBg,
     "--pg-lane-non-relative": t.graph.nonRelative,
     "--pg-lane-head": t.graph.headOutline,
     "--pg-row-height": `${metrics.rowHeight}px`,

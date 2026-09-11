@@ -42,6 +42,42 @@ describe("semantic visual tokens", () => {
     expect(contrast(t.console.fail, t.console.bg)).toBeGreaterThanOrEqual(4.5)
     expect(contrast(t.console.fail, t.console.lineBg)).toBeGreaterThanOrEqual(4.5)
     expect(contrast(t.console.ok, t.console.bg)).toBeGreaterThanOrEqual(4.5)
+    // Review marks (v0.17.0) are graphics on the diff surface: the three
+    // rings at 3:1, and the row text must stay readable over the cursor.
+    expect(contrast(t.review.todo, t.surface)).toBeGreaterThanOrEqual(3)
+    expect(contrast(t.review.todoStripe, t.surface)).toBeGreaterThanOrEqual(2)
+    expect(contrast(t.review.ok, t.surface)).toBeGreaterThanOrEqual(3)
+    expect(contrast(t.review.rejected, t.surface)).toBeGreaterThanOrEqual(3)
+    expect(contrast(t.text, t.review.cursorBg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.diff.added, t.review.cursorBg)).toBeGreaterThanOrEqual(3)
+    expect(contrast(t.diff.removed, t.review.cursorBg)).toBeGreaterThanOrEqual(3)
+  })
+
+  test.each([
+    ["light", light],
+    ["dark", dark],
+  ])("%s review family: ok is the primary, rejected the removed red, the cursor the grid selection", (_name, t) => {
+    expect(t.review.ok).toBe(t.primary)
+    expect(t.review.rejected).toBe(t.diff.removed)
+    expect(t.review.cursorBg).toBe(t.selectionBg)
+    // Amber, not the added green: the unreviewed ring must not read as "+".
+    expect(t.review.todo).not.toBe(t.diff.added)
+    expect(t.review.todoStripe).not.toBe(t.diff.added)
+    for (const value of Object.values(t.review)) expect(value).toMatch(/^(#[\da-f]{6}|rgba\(\d+, \d+, \d+, 0\.\d+\))$/i)
+  })
+
+  test("the review family is exported as --pg-review-* in both themes", () => {
+    for (const t of [light, dark]) {
+      const vars = cssVariables(t)
+      expect(vars["--pg-review-todo"]).toBe(t.review.todo)
+      expect(vars["--pg-review-todo-bg"]).toBe(t.review.todoBg)
+      expect(vars["--pg-review-todo-stripe"]).toBe(t.review.todoStripe)
+      expect(vars["--pg-review-ok"]).toBe(t.review.ok)
+      expect(vars["--pg-review-ok-bg"]).toBe(t.review.okBg)
+      expect(vars["--pg-review-rejected"]).toBe(t.review.rejected)
+      expect(vars["--pg-review-rejected-bg"]).toBe(t.review.rejectedBg)
+      expect(vars["--pg-review-cursor-bg"]).toBe(t.review.cursorBg)
+    }
   })
 
   test("CSS variables cover every runtime semantic family", () => {
@@ -63,6 +99,8 @@ describe("semantic visual tokens", () => {
           "--pg-lane-7",
           "--pg-ref-local-bg",
           "--pg-ref-remote-fg",
+          "--pg-review-todo",
+          "--pg-review-cursor-bg",
         ]),
       )
       expect(Object.values(vars).every(Boolean)).toBe(true)
