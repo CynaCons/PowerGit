@@ -174,8 +174,9 @@ export function DiffLineContextMenu({
         }}
       />
       <Divider />
-      {/* Selecting lines turns off text selection in the diff, so copying
-          needs a home here or it stops being possible at all. */}
+      {/* Copies the selected rows with their "+"/"-" markers (v0.15.5). Since
+          v0.16.0 the diff is also plain selectable text, and Ctrl+C over a
+          text selection copies clean code (DiffView). */}
       <Item
         testid="ctx-diff-copy-lines"
         icon={<ContentCopyOutlinedIcon fontSize="small" />}

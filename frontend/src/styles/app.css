@@ -164,6 +164,7 @@ html {
   background: var(--pg-surface, #ffffff);
   color: var(--pg-diff-gutter, #8a8a8a);
   user-select: none;
+  cursor: default;
   border-right: 1px solid var(--pg-diff-gutter-border, #e0e0e0);
 }
 .diff-row-num {
@@ -181,11 +182,10 @@ html {
 .diff-row-text {
   padding-left: 8px;
 }
-/* Commit dialog line selection (v0.13.14): stage / reset selected lines. */
-.diff-row-selectable {
-  cursor: default;
-  user-select: none;
-}
+/* Commit dialog line selection (v0.13.14): stage / reset selected lines.
+   v0.16.0: the rows are plain selectable text again (owner: "missing the
+   ability to select text for copy-paste"); a click that ends a text drag is
+   filtered in useDiffLineSelection, and only the gutter above opts out. */
 .diff-row-selectable:hover {
   background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
 }
