@@ -1,11 +1,11 @@
 import Box from "@mui/material/Box"
 import { useTheme } from "@mui/material/styles"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import type { DiffDto } from "../engine"
 import { languageForPath, tokenizeLines, type Token } from "../highlight"
 import { codeSx } from "../theme"
 import { ContentNotice } from "./ContentNotice"
-import { VirtualLines } from "./VirtualLines"
+import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines"
 
 // Git Extensions palette (git-coloring mode).
 // Source: src/app/GitExtUtils/GitUI/Theming/AppColorDefaults.cs,
@@ -217,32 +217,99 @@ const DRAG_SLOP = 3
 const movedSince = (press: Point | null, e: React.MouseEvent): boolean =>
   press !== null && (Math.abs(e.clientX - press.x) > DRAG_SLOP || Math.abs(e.clientY - press.y) > DRAG_SLOP)
 
+/**
+ * Review mode (v0.17.0), supplied by the host that owns the review document
+ * (DiffTab / the commit dialog). Absent, the rendered DOM and CSS are
+ * exactly the pre-review ones.
+ */
+export type DiffReviewProps = {
+  /** The review line key of parsed row `i` ("+<new>" / "-<old>"); null for context and header rows. */
+  keyOf: (i: number) => string | null
+  stateOf: (key: string) => "ok" | "rejected" | undefined
+  /** Row index under the cursor. */
+  cursor: number | null
+  /** A click on the text of any row (context included): cursor only; the existing onLineClick still runs. */
+  onCursor: (i: number) => void
+  /** A click on the mark cell in the gutter: the host cycles the line and sets the cursor. */
+  onMarkClick: (i: number) => void
+}
+
+/** Imperative surface for the review layer's keys: scroll the cursor row into view, take the focus. */
+export type DiffViewHandle = {
+  scrollToRow: (i: number) => void
+  focus: () => void
+}
+
+/**
+ * Brings `row` inside the nearest ancestor that scrolls vertically, with
+ * the smallest move (align "auto"). Vertical only and by hand:
+ * scrollIntoView would also pull the horizontal scroll back to the row's
+ * left edge. The ancestor is the diff list in the Diff tab; in the commit
+ * dialog the list grows with its content and the dialog's diff box scrolls.
+ */
+function scrollRowIntoView(row: Element) {
+  for (let el = row.parentElement; el; el = el.parentElement) {
+    if (el.scrollHeight <= el.clientHeight) continue
+    const { overflowY } = getComputedStyle(el)
+    if (overflowY !== "auto" && overflowY !== "scroll") continue
+    const r = row.getBoundingClientRect()
+    const c = el.getBoundingClientRect()
+    if (r.top < c.top) el.scrollTop += r.top - c.top
+    else if (r.bottom > c.bottom) el.scrollTop += r.bottom - c.bottom
+    return
+  }
+}
+
+const PLAIN_LINES_SX = { flex: 1, minHeight: 0, overflow: "auto" } as const
+// The plain list becomes a focus target only in review mode; the ring
+// matches VirtualLines so the two paths look the same with the focus.
+const REVIEW_LINES_SX = {
+  ...PLAIN_LINES_SX,
+  outline: "none",
+  "&:focus-visible": { boxShadow: "inset 0 0 0 1px var(--pg-focus-ring, #2563eb)" },
+} as const
+
 /** Unified diff with a sticky two-column line-number gutter. v0.13.11:
  *  rows are virtualized (only the visible window is in the DOM), and a
  *  truncated or binary diff carries an explicit notice on top. */
-export function DiffView({
-  diff,
-  onOpenDifftool,
-  onRetry,
-  selection,
-  onLineClick,
-  onLineContextMenu,
-}: {
-  diff: DiffDto
-  onOpenDifftool?: () => void
-  onRetry?: () => void
-  /** Line selection (v0.13.14, commit dialog): indices into diff.text.split("\n"). */
-  selection?: Set<number>
-  /** `moved` (v0.16.0): the pointer travelled since the press, i.e. this click ends a text drag. */
-  onLineClick?: (index: number, e: React.MouseEvent, moved: boolean) => void
-  onLineContextMenu?: (index: number, e: React.MouseEvent) => void
-}) {
+export const DiffView = forwardRef<
+  DiffViewHandle,
+  {
+    diff: DiffDto
+    onOpenDifftool?: () => void
+    onRetry?: () => void
+    /** Line selection (v0.13.14, commit dialog): indices into diff.text.split("\n"). */
+    selection?: Set<number>
+    /** `moved` (v0.16.0): the pointer travelled since the press, i.e. this click ends a text drag. */
+    onLineClick?: (index: number, e: React.MouseEvent, moved: boolean) => void
+    onLineContextMenu?: (index: number, e: React.MouseEvent) => void
+    /** Review mode (v0.17.0): marks in the gutter, a cursor row, a focusable surface. */
+    review?: DiffReviewProps
+  }
+>(function DiffView({ diff, onOpenDifftool, onRetry, selection, onLineClick, onLineContextMenu, review }, ref) {
   const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
   const mode = useTheme().palette.mode
   const tokens = useDiffTokens(diff.text, lines, diff.path, mode)
   const selectable = onLineClick !== undefined
   // Where the last press on a row landed, to tell a click from a text drag.
   const press = useRef<Point | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const plainRef = useRef<HTMLDivElement>(null)
+  const virtualRef = useRef<VirtualLinesHandle>(null)
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToRow: (i) => {
+        virtualRef.current?.scrollToIndex(i, { align: "auto" })
+        // Mounted (always in the plain list; in the virtual one when it
+        // already sat in the window): settle whichever ancestor scrolls.
+        const row = rootRef.current?.querySelector(`[data-index="${i}"]`)
+        if (row) scrollRowIntoView(row)
+      },
+      focus: () => (virtualRef.current ?? plainRef.current)?.focus(),
+    }),
+    [],
+  )
   // Plain elements with classes (app.css .diff-row*), not MUI Box: a row is
   // rendered hundreds of times per diff and per-element emotion styling was
   // most of the render cost (v0.13.14, diff-latency.spec).
@@ -255,10 +322,16 @@ export function DiffView({
     // handler can leave it out; header rows are copied whole.
     const first = line.segments[0]
     const sign = line.kind === "other" || !first ? null : first.text.charAt(0) || " "
+    // Review (v0.17.0): changed rows carry their state as a class and a
+    // data attribute, the cursor row its own class; context rows get neither.
+    const key = review ? review.keyOf(i) : null
+    const state = review && key !== null ? (review.stateOf(key) ?? "todo") : undefined
+    const reviewClass = `${state ? ` diff-row-review-${state}` : ""}${review && review.cursor === i ? " diff-row-cursor" : ""}`
     return (
       <div
-        className={`diff-row${kindClass}${selectable ? " diff-row-selectable" : ""}${selected ? " diff-row-selected" : ""}`}
+        className={`diff-row${kindClass}${selectable ? " diff-row-selectable" : ""}${selected ? " diff-row-selected" : ""}${reviewClass}`}
         data-selected={selected ? "true" : undefined}
+        data-review={state}
         onMouseDown={
           selectable
             ? (e) => {
@@ -267,12 +340,30 @@ export function DiffView({
               }
             : undefined
         }
-        onClick={selectable ? (e) => onLineClick(i, e, movedSince(press.current, e)) : undefined}
+        onClick={
+          selectable || review
+            ? (e) => {
+                if (onLineClick) onLineClick(i, e, movedSince(press.current, e))
+                review?.onCursor(i)
+              }
+            : undefined
+        }
         onContextMenu={onLineContextMenu ? (e) => onLineContextMenu(i, e) : undefined}
       >
         <div data-testid="diff-gutter" aria-hidden="true" className="diff-row-gutter">
           <span className="diff-row-num diff-row-num-old">{line.oldNum ?? ""}</span>
           <span className="diff-row-num diff-row-num-new">{line.newNum ?? ""}</span>
+          {review && (
+            // Inside the sticky gutter: user-select none, and plainTextOf
+            // never reads it. Its click is the mark's, not the row's.
+            <span
+              className="diff-row-mark"
+              onClick={(e) => {
+                e.stopPropagation()
+                review.onMarkClick(i)
+              }}
+            />
+          )}
         </div>
         <span className="diff-row-text">
           {sign !== null && (
@@ -297,6 +388,7 @@ export function DiffView({
   }
   return (
     <Box
+      ref={rootRef}
       data-testid="diff-view"
       onCopy={copyPlainText}
       sx={{
@@ -320,7 +412,13 @@ export function DiffView({
     >
       <ContentNotice dto={diff} onOpenDifftool={onOpenDifftool} onRetry={onRetry} />
       {lines.length <= VIRTUALIZE_MIN_LINES ? (
-        <Box data-testid="diff-lines" sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        <Box
+          ref={plainRef}
+          data-testid="diff-lines"
+          data-hotkey-surface={review ? "review" : undefined}
+          tabIndex={review ? 0 : undefined}
+          sx={review ? REVIEW_LINES_SX : PLAIN_LINES_SX}
+        >
           {lines.map((_, i) => (
             <div key={i} data-index={i}>
               {renderLine(i)}
@@ -329,12 +427,15 @@ export function DiffView({
         </Box>
       ) : (
         <VirtualLines
+          ref={virtualRef}
           count={lines.length}
           ariaLabel={`Diff of ${diff.path}`}
           testid="diff-lines"
           renderLine={renderLine}
+          hotkeySurface={review ? "review" : undefined}
+          passKeys={review !== undefined}
         />
       )}
     </Box>
   )
-}
+})

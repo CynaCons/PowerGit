@@ -1,8 +1,14 @@
 import Box from "@mui/material/Box"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useRef, type CSSProperties, type ReactNode } from "react"
+import { forwardRef, useImperativeHandle, useRef, type CSSProperties, type ReactNode } from "react"
 
 export const CODE_LINE_HEIGHT = 18
+
+/** Imperative surface (v0.17.0, review mode): scroll a row into view, focus the list. */
+export type VirtualLinesHandle = {
+  scrollToIndex: (index: number, options?: { align?: "auto" | "start" | "center" | "end" }) => void
+  focus: () => void
+}
 
 /**
  * v0.13.11: a line-oriented virtual list for code (diffs, blobs). Only the
@@ -11,22 +17,24 @@ export const CODE_LINE_HEIGHT = 18
  * container is focusable and scrolls with the keyboard (arrows, PageUp/
  * PageDown, Home/End); text selection works across the rendered window.
  */
-export function VirtualLines({
-  count,
-  renderLine,
-  testid,
-  sx,
-  ariaLabel,
-  header,
-}: {
-  count: number
-  renderLine: (index: number) => ReactNode
-  testid?: string
-  sx?: CSSProperties
-  ariaLabel?: string
-  /** Rendered above the lines inside the scroll container (notices). */
-  header?: ReactNode
-}) {
+export const VirtualLines = forwardRef<
+  VirtualLinesHandle,
+  {
+    count: number
+    renderLine: (index: number) => ReactNode
+    testid?: string
+    sx?: CSSProperties
+    ariaLabel?: string
+    /** Rendered above the lines inside the scroll container (notices). */
+    header?: ReactNode
+    /** `data-hotkey-surface` on the scroll container (v0.17.0: "review" while review mode is on). */
+    hotkeySurface?: string
+    /** Leave every key to the host (v0.17.0): the review layer owns
+     *  Arrow/Home/End while it is on, and this list must not scroll a
+     *  second time underneath it. Unhandled keys fall to the browser. */
+    passKeys?: boolean
+  }
+>(function VirtualLines({ count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys }, ref) {
   const parentRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
     count,
@@ -35,9 +43,18 @@ export function VirtualLines({
     overscan: 20,
   })
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToIndex: (index, options) => virtualizer.scrollToIndex(index, { align: options?.align ?? "auto" }),
+      focus: () => parentRef.current?.focus(),
+    }),
+    [virtualizer],
+  )
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const el = parentRef.current
-    if (!el) return
+    if (!el || passKeys) return
     const page = Math.max(CODE_LINE_HEIGHT, el.clientHeight - CODE_LINE_HEIGHT)
     const map: Record<string, number | "home" | "end"> = {
       ArrowDown: CODE_LINE_HEIGHT,
@@ -59,6 +76,7 @@ export function VirtualLines({
     <Box
       ref={parentRef}
       data-testid={testid}
+      data-hotkey-surface={hotkeySurface}
       tabIndex={0}
       role="region"
       aria-label={ariaLabel}
@@ -95,4 +113,4 @@ export function VirtualLines({
       </div>
     </Box>
   )
-}
+})
