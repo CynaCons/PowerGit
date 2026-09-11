@@ -231,6 +231,12 @@ export type GitLogEntry = {
   command: string
   /** git's exit code; -1 when it timed out or was cancelled. */
   exitCode: number
+  /**
+   * The caller's verdict (v0.16.0): `git diff --no-index` exits 1 for any
+   * new file with content and is still ok. Absent from a pre-v0.16 engine;
+   * `gitLogModel.isOk` falls back to exit 0 then.
+   */
+  ok?: boolean
   durationMs: number
   /** stdout then stderr, capped at 8 KB engine-side. */
   output: string

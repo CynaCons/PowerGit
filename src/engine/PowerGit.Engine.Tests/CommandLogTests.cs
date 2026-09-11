@@ -49,6 +49,7 @@ public sealed class CommandLogTests
         GitLogEntryDto entry = host.CommandLog()[^1];
         Assert.Equal("git rev-parse --abbrev-ref HEAD", entry.Command);
         Assert.Equal(0, entry.ExitCode);
+        Assert.True(entry.Ok);
         Assert.True(entry.DurationMs >= 0 && entry.DurationMs < 30_000, $"implausible duration {entry.DurationMs}");
         Assert.False(entry.Truncated);
         Assert.True(DateTime.TryParse(entry.At, out _), $"not a timestamp: {entry.At}");
@@ -66,7 +67,50 @@ public sealed class CommandLogTests
         GitLogEntryDto entry = host.CommandLog()[^1];
         Assert.Equal("git checkout no-such-branch-here", entry.Command);
         Assert.NotEqual(0, entry.ExitCode);
+        Assert.False(entry.Ok);
         Assert.Contains("no-such-branch-here", entry.Output, StringComparison.Ordinal);
+    }
+
+    // ---- the caller's verdict (v0.16.0) -----------------------------------
+
+    [Fact]
+    public void Untracked_file_diff_exits_1_and_is_still_ok()
+    {
+        // Owner (2026-09-11): "one of the files is new, I see 'git failed -
+        // exit 1' with a diff of the new file." `git diff --no-index` exits 1
+        // whenever the two sides differ, which every new file with content
+        // does; the engine tolerated it, the log entry did not.
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+        repo.Write("brand-new.txt", "line1\nline2\n");
+
+        DiffDto diff = host.GetWorkTreeDiff("brand-new.txt", staged: false);
+
+        Assert.Contains("+line1", diff.Text, StringComparison.Ordinal);
+        GitLogEntryDto entry = host.CommandLog()[^1];
+        Assert.Contains(" diff ", entry.Command, StringComparison.Ordinal);
+        Assert.Contains("--no-index", entry.Command, StringComparison.Ordinal);
+        Assert.Equal(1, entry.ExitCode);
+        Assert.True(entry.Ok, "the caller's verdict must colour the entry, not git's exit code");
+    }
+
+    [Fact]
+    public void A_verdict_never_forgives_a_timeout_or_a_cancellation()
+    {
+        // -1 is the engine's "never finished": whatever exit codes the caller
+        // would accept, there was no exit to judge.
+        GitHost host = new();
+        host.RecordCommand(["diff", "--no-index"], -1, 5, null, "timed out", exit => exit <= 1);
+        GitLogEntryDto timedOut = host.CommandLog()[^1];
+        Assert.Equal(-1, timedOut.ExitCode);
+        Assert.False(timedOut.Ok);
+
+        // And a verdict that is not asked for is exit 0, nothing wider.
+        host.RecordCommand(["diff", "--no-index"], 1, 5, "differs", null);
+        Assert.False(host.CommandLog()[^1].Ok);
+        host.RecordCommand(["diff", "--no-index"], 2, 5, null, "fatal", exit => exit <= 1);
+        Assert.False(host.CommandLog()[^1].Ok);
     }
 
     [Fact]

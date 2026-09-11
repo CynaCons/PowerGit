@@ -17,10 +17,15 @@ import { useSyncExternalStore } from "react"
  */
 export type ConsoleTab = "git" | "app"
 
-export type GitConsoleState = { open: boolean; height: number; tab: ConsoleTab }
+/**
+ * `showAll` (v0.16.0): the git tab folds the engine's own reads away by
+ * default so what the user did stands out; "Show all" flattens the log to
+ * every command, and the choice sticks like the tab does.
+ */
+export type GitConsoleState = { open: boolean; height: number; tab: ConsoleTab; showAll: boolean }
 
 export const GIT_CONSOLE_KEY = "pg.console"
-export const DEFAULT_GIT_CONSOLE: GitConsoleState = { open: false, height: 180, tab: "git" }
+export const DEFAULT_GIT_CONSOLE: GitConsoleState = { open: false, height: 180, tab: "git", showAll: false }
 
 const MIN_HEIGHT = 96
 const MAX_HEIGHT = 480
@@ -34,6 +39,7 @@ export function parseGitConsoleState(raw: string | null): GitConsoleState {
       open: typeof o.open === "boolean" ? o.open : DEFAULT_GIT_CONSOLE.open,
       height: Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(height))),
       tab: o.tab === "app" || o.tab === "git" ? o.tab : DEFAULT_GIT_CONSOLE.tab,
+      showAll: typeof o.showAll === "boolean" ? o.showAll : DEFAULT_GIT_CONSOLE.showAll,
     }
   } catch {
     return DEFAULT_GIT_CONSOLE
@@ -57,7 +63,14 @@ export function getGitConsoleState(): GitConsoleState {
 
 export function setGitConsoleState(patch: Partial<GitConsoleState>) {
   const next = { ...state, ...patch }
-  if (next.open === state.open && next.height === state.height && next.tab === state.tab) return
+  if (
+    next.open === state.open &&
+    next.height === state.height &&
+    next.tab === state.tab &&
+    next.showAll === state.showAll
+  ) {
+    return
+  }
   state = next
   try {
     window.localStorage.setItem(GIT_CONSOLE_KEY, JSON.stringify(next))

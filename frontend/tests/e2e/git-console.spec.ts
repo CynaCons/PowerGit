@@ -10,6 +10,10 @@ import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, w
 // The fixture is main and topic diverged from a shared base, so `git merge
 // --ff-only topic` is a command git genuinely refuses. That is the failure
 // the card has to catch, with the command and git's own words in it.
+//
+// v0.16.0: the panel reads newest first (the owner looks for the last thing
+// he did), so "the entry" is `.first()` here; git-console-readability.spec.ts
+// covers the folding of the engine's own reads.
 
 test.describe("git console", () => {
   let repoDir: string
@@ -71,9 +75,10 @@ test.describe("git console", () => {
     await page.getByTestId("refresh-button").click()
 
     await page.getByTestId("git-console-filter").fill("log --date-order")
-    const entry = page.getByTestId("git-console-entry").last()
+    const entry = page.getByTestId("git-console-entry").first()
     await expect(entry.getByTestId("git-console-command")).toContainText("log --date-order")
     await expect(entry).toHaveAttribute("data-exit", "0")
+    await expect(entry).toHaveAttribute("data-failed", "false")
     // Its output is git's own: the commits this fixture made.
     await expect(entry.getByTestId("git-console-output")).toContainText("topic change")
 
@@ -123,12 +128,26 @@ test.describe("git console", () => {
     await card.getByTestId("git-failure-open").click()
     await expect(page.getByTestId("git-console-panel")).toBeVisible()
     await expect(card).toHaveCount(0)
+    // v0.16.0: a failed action is pinned at the top of the panel with its
+    // whole output until the user closes it; the card leaves, the pin stays.
+    const pinned = page.getByTestId("git-console-pinned")
+    await expect(pinned).toBeVisible()
+    await expect(pinned.getByTestId("git-console-pinned-command")).toContainText("git merge --ff-only")
+    await expect(pinned.getByTestId("git-console-pinned-output")).toContainText(/fast[- ]forward/i)
     await page.getByTestId("git-console-filter").fill("merge --ff-only")
-    const entry = page.getByTestId("git-console-entry").last()
+    const entry = page.getByTestId("git-console-entry").first()
     await expect(entry).toHaveAttribute("data-failed", "true")
+    await expect(entry).toHaveAttribute("data-kind", "action")
     await expect(entry.getByTestId("git-console-output")).toContainText(/fast[- ]forward/i)
     // The dock line's badge counts the failure in its own colour.
     await expect(page.getByTestId("git-console-count")).not.toHaveAttribute("data-failures", "0")
+    // Dismissed, the pin is gone and stays gone across a close and reopen.
+    await pinned.getByTestId("git-console-pin-dismiss").click()
+    await expect(pinned).toHaveCount(0)
+    await page.getByTestId("git-console-close").click()
+    await page.getByTestId("git-console-dock").click()
+    await expect(page.getByTestId("git-console-panel")).toBeVisible()
+    await expect(page.getByTestId("git-console-pinned")).toHaveCount(0)
   })
 
   test("an unpinned failure card takes itself away after about five seconds", async ({ page }) => {
@@ -152,6 +171,6 @@ test.describe("git console", () => {
     await expect(page.getByTestId("merge-dialog")).toHaveCount(0)
     await page.keyboard.press("Control+`")
     await page.getByTestId("git-console-filter").fill("merge --ff-only")
-    await expect(page.getByTestId("git-console-entry").last()).toHaveAttribute("data-failed", "true")
+    await expect(page.getByTestId("git-console-entry").first()).toHaveAttribute("data-failed", "true")
   })
 })

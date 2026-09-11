@@ -53,7 +53,43 @@ on them on every refresh: `rev-parse --verify refs/stash`, `@{upstream}`,
 would be a permanent nag, so `notableFailure` in `gitLogModel.ts` excludes
 them, and excludes `-1` (a read the UI itself abandoned). They still appear
 in the console; they just raise nothing. **That list is a heuristic: adding a
-new probe to the engine means adding a line there.**
+new probe to the engine means adding a line there.** Spellings matter: pull
+and push ask with `@{u}`, the status reads with `@{upstream}`; the regex
+covers both since v0.16.0 (a first push popped a card for the question).
+
+## The caller's verdict: `Ok` on the entry (v0.16.0)
+
+Owner: "one of the files is new, I see 'git failed - exit 1' with a diff of
+the new file." `git diff --no-index` exits 1 whenever the sides differ,
+which every new file with content does; `GetUntrackedDiff` tolerated it, the
+log entry did not. `GitLogEntryDto.Ok` is the caller's verdict, default
+`ExitCode == 0`; the overload `RunTimed(root, timeout, okWhen, args)` in
+`GitHost.CommandLog.cs` passes a predicate through `RunLogged` to
+`RecordCommand`. A negative exit (timeout, cancel) is never ok, whatever the
+predicate. Frontend: `isOk(e) = e.ok ?? e.exitCode === 0`, so a pre-v0.16
+engine still reads as before; `failed` and `notableFailure` build on it.
+A probe (above) is still recorded `Ok = false` with its exit 1 — it *is* a
+"no"; the verdict is for commands whose non-zero exit is the wanted answer.
+
+## The panel folds the engine's reads (v0.16.0)
+
+Owner: "there's always tons of stuff in that window, I can't even see my
+push when I push. Hard to understand where my stuff is." `entryKind` in
+`gitLogModel.ts` says `action` (push, pull, fetch, commit, merge, rebase,
+stash push/pop, checkout, branch/tag create/delete, remote add/set-url,
+config set, add/rm/restore/apply …) or `background` (status, log,
+rev-parse, ls-files, diff, show, for-each-ref, cat-file, config --get,
+remote -v, stash list, branch --list, …). **The reads are the closed list;
+anything unknown is shown**, because hiding what the user did is the whole
+complaint. `groupEntries` folds each run of reads between two actions into
+one "N background commands" row that opens on click; the list is **newest
+first** (the pin and the last action sit at the top, no scroll-follow), and
+the dock line names the newest action rather than the `git status` the
+refresh ran after it. "Show all" (`showAll` in `pg.console`) flattens; a
+typed filter also flattens, so a hit is never hidden inside a fold. A failed
+action is pinned at the top (`git-console-pinned`) until its X is clicked;
+the dismissal is per repository and in memory only (ids restart with the
+engine's buffer). Rows live in `GitConsoleRows.tsx` (the 400-line lint cap).
 
 ## Surfaces
 
