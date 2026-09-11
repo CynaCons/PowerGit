@@ -2,9 +2,10 @@ import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
 import { setThemePreference, useThemePreference, type ThemePreference } from "../../theme/appearance"
+import { setAuthorDiscs, useAuthorDiscs } from "../../theme/authorDiscs"
 import { setBarLayout, useBarLayout, type BarLayout } from "../../theme/barLayout"
 import { ZOOM_DEFAULT, setZoom, stepZoom, useZoom, zoomPercent } from "../../theme/zoom"
-import { SettingSelect } from "./controls"
+import { SettingCheck, SettingSelect } from "./controls"
 import { SettingRow } from "./SettingRow"
 import { SettingsSection } from "./SettingsSection"
 import { isShown, type SettingId } from "./settingsCatalog"
@@ -18,6 +19,7 @@ export function AppearanceSection({ visible }: { visible: Set<SettingId> | null 
   const theme = useThemePreference()
   const bar = useBarLayout()
   const zoom = useZoom()
+  const discs = useAuthorDiscs()
   return (
     <SettingsSection id="appearance" visible={visible}>
       <SettingRow
@@ -73,6 +75,20 @@ export function AppearanceSection({ visible }: { visible: Set<SettingId> | null 
             Reset
           </Button>
         </Box>
+      </SettingRow>
+      {/* v0.18.1: off is the pre-disc look; the pill's Mark then only bolds the name. */}
+      <SettingRow
+        id="appearance.authorDiscs"
+        hidden={!isShown(visible, "appearance.authorDiscs")}
+        changed={!discs}
+        onReset={() => setAuthorDiscs(true)}
+      >
+        <SettingCheck
+          label="Show author discs"
+          checked={discs}
+          testid="settings-author-discs"
+          onChange={setAuthorDiscs}
+        />
       </SettingRow>
     </SettingsSection>
   )
