@@ -7,9 +7,11 @@ import { metaOf, type SettingId } from "./settingsCatalog"
 
 // One setting on the page (v0.18.0, prototype A): the title, the one-line
 // description and the control under them. A row whose value differs from
-// its default carries a primary bar at the left, a "changed" tag after the
-// title and a Reset (Unset for a Git key) that shows on hover or focus — it
-// is always in the DOM so a test can click it without hovering first.
+// its default carries a primary bar at the left, a tag after the title and
+// a button that shows on hover or focus — it is always in the DOM so a test
+// can click it without hovering first. App rows say "changed" / Reset; a
+// Git key is not changed but set at this scope, so it says "set here" /
+// Unset (unsetting the global user.name is a real act, the words say so).
 
 type Props = {
   id: SettingId
@@ -68,7 +70,7 @@ export function SettingRow({ id, title, changed = false, onReset, resetLabel = "
         {title ?? meta.title}
         {changed && (
           <Typography component="span" sx={{ fontWeight: 400, color: "text.secondary", ml: 0.75 }}>
-            changed
+            {resetLabel === "Unset" ? "set here" : "changed"}
           </Typography>
         )}
       </Typography>

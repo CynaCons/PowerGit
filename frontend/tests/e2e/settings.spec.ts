@@ -57,8 +57,9 @@ test.describe("settings", () => {
     await expect(page.getByTestId("settings-status-git")).toHaveText("Saved")
     await expect.poll(async () => (await localConfig()).userName).toBe("Renamed Locally")
 
-    // A key set at this scope is "changed"; Unset removes it from the file.
+    // A key set at this scope says so; Unset removes it from the file.
     await expect(page.getByTestId("settings-row-git.userName")).toHaveAttribute("data-changed", "true")
+    await expect(page.getByTestId("settings-row-git.userName")).toContainText("set here")
     await page.getByTestId("settings-reset-git.userName").click()
     await expect.poll(async () => (await localConfig()).userName).toBeFalsy()
     await expect(page.getByTestId("settings-row-git.userName")).toHaveAttribute("data-changed", "false")
