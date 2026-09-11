@@ -1,0 +1,604 @@
+<title>PowerGit Settings Layouts</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb; --code-bg: #f8fafc;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --primary-dark: #0f3f9c; --on-primary: #ffffff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --warn: #b7791f; --ok: #059669; --err: #dc2626;
+    --page: #e3e7ee; --shadow: 0 14px 40px rgba(16, 24, 39, 0.22); --scrim: rgba(16, 24, 39, 0.38);
+    --lane1: #1553c9; --lane2: #059669; --lane3: #a16207;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23; --code-bg: #10161e;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --primary-dark: #2f66d6; --on-primary: #ffffff; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #60a5fa;
+      --warn: #e0a83a; --ok: #34d399; --err: #f87171;
+      --page: #0c1117; --shadow: 0 14px 40px rgba(0, 0, 0, 0.5); --scrim: rgba(0, 0, 0, 0.5);
+      --lane1: #60a5fa; --lane2: #34d399; --lane3: #e0a83a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23; --code-bg: #10161e;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --primary-dark: #2f66d6; --on-primary: #ffffff; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #60a5fa;
+    --warn: #e0a83a; --ok: #34d399; --err: #f87171;
+    --page: #0c1117; --shadow: 0 14px 40px rgba(0, 0, 0, 0.5); --scrim: rgba(0, 0, 0, 0.5);
+    --lane1: #60a5fa; --lane2: #34d399; --lane3: #e0a83a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text);
+    font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  code, .mono { font-family: "Cascadia Mono", Consolas, "DejaVu Sans Mono", ui-monospace, monospace; font-size: 12px; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* ---------- page chrome ---------- */
+  .top {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .switch { display: flex; gap: 4px; margin-left: auto; }
+  .switch button, .theme button {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 5px 11px; cursor: pointer;
+  }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .theme { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 5px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+
+  main { padding: 22px 20px 48px; }
+  .lead { max-width: 74ch; margin: 0 auto 16px; color: var(--text-2); }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+
+  /* ---------- the faux PowerGit window ---------- */
+  .win {
+    width: 1140px; max-width: 100%; height: 660px; margin: 0 auto; background: var(--surface-alt);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow);
+    display: grid; grid-template-rows: 30px 1fr;
+  }
+  .titlebar {
+    display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--meta);
+  }
+  .titlebar .dots { display: flex; gap: 6px; margin-left: auto; }
+  .titlebar .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--border); display: block; }
+  .winbody { display: grid; grid-template-columns: 44px 1fr; min-height: 0; }
+  .rail { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 6px; }
+  .rail .ico { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: var(--meta); }
+  .rail .ico.on { background: var(--primary-soft); color: var(--primary); }
+  .rail .spacer { flex: 1; }
+  .content { position: relative; min-height: 0; overflow: hidden; }
+
+  /* faux Browse view behind the dialogs */
+  .browse { position: absolute; inset: 0; display: grid; grid-template-rows: 34px 1fr; }
+  .browse .strip { display: flex; align-items: center; gap: 14px; padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--border); color: var(--meta); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .browse .strip b { color: var(--primary); border-bottom: 2px solid var(--primary); padding: 8px 0; font-weight: 600; }
+  .browse .rows { background: var(--surface); }
+  .browse .row { display: grid; grid-template-columns: 60px 1fr 170px 110px; align-items: center; height: 26px; border-bottom: 1px solid var(--border-soft); padding: 0 8px; color: var(--text-2); }
+  .browse .row .lane { position: relative; height: 100%; }
+  .browse .row .lane::before { content: ""; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: var(--lane1); }
+  .browse .row .lane i { position: absolute; left: 8px; top: 8px; width: 10px; height: 10px; border-radius: 50%; background: var(--lane1); border: 2px solid var(--surface); }
+  .browse .row.b2 .lane::before, .browse .row.b2 .lane i { background: var(--lane2); left: 26px; }
+  .browse .row.b2 .lane i { left: 22px; }
+  .browse .row .meta { color: var(--meta); font-size: 12px; }
+  .browse .badge { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--sel-bg); color: var(--primary); margin-right: 6px; }
+  .scrim { position: absolute; inset: 0; background: var(--scrim); display: grid; place-items: center; }
+
+  /* ---------- shared controls (the app's MUI look, flattened) ---------- */
+  .sel, .txt {
+    height: 30px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text);
+    padding: 0 8px; font: inherit; min-width: 220px;
+  }
+  .sel { appearance: none; -webkit-appearance: none; padding-right: 26px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--meta) 50%), linear-gradient(135deg, var(--meta) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 12px, calc(100% - 9px) 12px; background-size: 5px 5px; background-repeat: no-repeat; }
+  .sel:hover, .txt:hover { border-color: var(--meta); }
+  .txt.mono { font-family: "Cascadia Mono", Consolas, "DejaVu Sans Mono", ui-monospace, monospace; font-size: 12px; }
+  .txt::placeholder { color: var(--disabled); }
+  .chk { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; }
+  .chk input { margin: 2px 0 0; accent-color: var(--primary); width: 15px; height: 15px; flex: none; }
+  .chk .t { font-weight: 500; }
+  .chk .d { color: var(--meta); font-size: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); padding: 4px 10px; color: var(--text-2); cursor: pointer; border-left: 1px solid var(--border); font-size: 12.5px; font-weight: 400; }
+  .seg button:first-child { border-left: 0; }
+  .seg button.on { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .btn { border: 1px solid var(--border); background: var(--surface); border-radius: 4px; padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+  .btn.text { border-color: transparent; color: var(--primary); }
+  .btn.sm { padding: 2px 8px; font-size: 12px; }
+  .zoom { display: inline-flex; align-items: center; gap: 4px; }
+  .zoom b { min-width: 44px; text-align: center; font-weight: 500; }
+  .zoom .btn { min-width: 28px; padding: 3px 0; text-align: center; }
+  .hint { color: var(--meta); font-size: 12px; }
+  .kv { display: flex; align-items: center; gap: 8px; }
+  .kv code { background: var(--code-bg); border: 1px solid var(--border-soft); padding: 1px 6px; border-radius: 3px; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--surface-alt); color: var(--meta); border: 1px solid var(--border-soft); vertical-align: 2px; }
+  .pill.ok { color: var(--ok); }
+  .ladder { display: grid; grid-template-columns: auto auto 1fr; gap: 4px 10px; align-items: center; }
+  .ladder .btn { font-size: 11px; padding: 2px 6px; }
+  .ladder code { color: var(--text-2); }
+  .ladder .m { color: var(--meta); font-size: 12px; }
+  .ladder .m.first { color: var(--text-2); }
+
+  /* ---------- A: VS Code page ---------- */
+  .vs { position: absolute; inset: 0; display: grid; grid-template-rows: 48px 1fr; background: var(--surface); }
+  .vs .head { display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--border); }
+  .vs .head .back { width: 28px; height: 28px; border-radius: 6px; border: 0; background: transparent; display: grid; place-items: center; color: var(--meta); cursor: pointer; }
+  .vs .head .back:hover { background: var(--hover); color: var(--text); }
+  .vs .head h2 { font-size: 15px; margin: 0; font-weight: 600; }
+  .vs .search { position: relative; margin-left: 12px; flex: 1; max-width: 460px; }
+  .vs .search input { width: 100%; height: 30px; border: 1px solid var(--border); border-radius: 5px; background: var(--sunken); color: var(--text); padding: 0 30px 0 30px; font: inherit; }
+  .vs .search input:focus { background: var(--surface); border-color: var(--focus); outline: none; }
+  .vs .search svg { position: absolute; left: 9px; top: 8px; color: var(--meta); }
+  .vs .search .count { position: absolute; right: 9px; top: 7px; font-size: 11px; color: var(--meta); }
+  .vs .head .apply { margin-left: auto; color: var(--meta); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .vs .head .apply i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: block; }
+  .vs .cols { display: grid; grid-template-columns: 190px 1fr; min-height: 0; }
+  .vs .toc { border-right: 1px solid var(--border-soft); padding: 14px 0; overflow: auto; }
+  .vs .toc a { display: block; padding: 5px 20px 5px 18px; color: var(--text-2); text-decoration: none; border-left: 2px solid transparent; cursor: pointer; }
+  .vs .toc a.sub { padding-left: 32px; color: var(--meta); font-size: 12px; }
+  .vs .toc a:hover { background: var(--hover); }
+  .vs .toc a.on { color: var(--primary); border-left-color: var(--primary); font-weight: 600; }
+  .vs .list { overflow: auto; padding: 8px 32px 60px 26px; scroll-behavior: smooth; }
+  .vs .sec { padding-top: 22px; }
+  .vs .sec > .st { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .vs .sec > .sh { color: var(--meta); font-size: 12px; margin: 0 0 8px; }
+  .vs .item { position: relative; padding: 10px 12px 12px 14px; margin: 2px 0; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; }
+  .vs .item:hover { background: var(--sunken); }
+  .vs .item .t { font-weight: 600; }
+  .vs .item .t small { font-weight: 400; color: var(--meta); margin-left: 6px; }
+  .vs .item .d { color: var(--meta); font-size: 12px; max-width: 70ch; }
+  .vs .item .c { margin-top: 2px; }
+  .vs .item.mod::before { content: ""; position: absolute; left: 2px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--primary); }
+  .vs .item .reset { position: absolute; right: 10px; top: 10px; display: none; }
+  .vs .item.mod:hover .reset { display: inline-block; }
+  .vs .item.hide, .vs .sec.hide { display: none; }
+  .vs .empty { color: var(--meta); padding: 40px 0; text-align: center; display: none; }
+  .vs .chk { padding: 2px 0; }
+  .vs .checks { display: flex; flex-direction: column; gap: 6px; }
+
+  /* ---------- B: sidebar dialog ---------- */
+  .dlg { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); display: grid; overflow: hidden; }
+  .dlg .dt { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; }
+  .dlg .dt .x { margin-left: auto; width: 26px; height: 26px; border-radius: 5px; border: 0; background: transparent; color: var(--meta); display: grid; place-items: center; cursor: pointer; }
+  .dlg .dt .x:hover { background: var(--hover); color: var(--text); }
+  .dlg .foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--sunken); }
+  .dlg .foot .hint { margin-right: auto; }
+  .sb { width: 900px; height: 600px; grid-template-rows: 40px 1fr auto; }
+  .sb .mid { display: grid; grid-template-columns: 200px 1fr; min-height: 0; }
+  .sb .side { background: var(--sunken); border-right: 1px solid var(--border-soft); padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .sb .side a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 5px; color: var(--text-2); cursor: pointer; }
+  .sb .side a svg { color: var(--meta); flex: none; }
+  .sb .side a:hover { background: var(--hover); }
+  .sb .side a.on { background: var(--sel-bg); color: var(--primary); font-weight: 600; }
+  .sb .side a.on svg { color: var(--primary); }
+  .sb .side .ver { margin-top: auto; color: var(--meta); font-size: 11px; padding: 8px 10px; }
+  .sb .pane { overflow: auto; padding: 18px 26px 24px; }
+  .ph { display: flex; align-items: center; gap: 12px; margin: 0 0 4px; }
+  .ph h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  .ph .seg { margin-left: auto; }
+  .psub { color: var(--meta); font-size: 12px; margin: 0 0 16px; max-width: 70ch; }
+  .form { display: grid; grid-template-columns: 170px 1fr; gap: 12px 16px; align-items: start; }
+  .form label.l { color: var(--text-2); padding-top: 6px; }
+  .form .f { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+  .form .f .hint { max-width: 60ch; }
+  .form .sel, .form .txt { min-width: 300px; }
+  .form .grp { border-top: 1px solid var(--border-soft); grid-column: 1 / -1; height: 0; margin: 6px 0; }
+  .form .checks { display: flex; flex-direction: column; gap: 7px; }
+
+  /* ---------- C: toolbar tabs ---------- */
+  .tb { width: 780px; height: 560px; grid-template-rows: 40px auto 1fr auto; }
+  .tb .tabs { display: flex; gap: 2px; padding: 8px 10px 0; background: var(--sunken); border-bottom: 1px solid var(--border); }
+  .tb .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px; padding: 8px 4px 7px; border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; color: var(--text-2); cursor: pointer; font-size: 12px; margin-bottom: -1px; }
+  .tb .tab svg { width: 20px; height: 20px; color: var(--meta); }
+  .tb .tab:hover { background: var(--hover); }
+  .tb .tab.on { background: var(--surface); border-color: var(--border); color: var(--primary); font-weight: 600; }
+  .tb .tab.on svg { color: var(--primary); }
+  .tb .pane { overflow: auto; padding: 18px 24px 22px; }
+  .tb .form { grid-template-columns: 150px 1fr; }
+  .tb .form .sel, .tb .form .txt { min-width: 260px; }
+
+  /* ---------- notes ---------- */
+  .notes { width: 1140px; max-width: 100%; margin: 26px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .note { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .note.pick { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+  .note h3 { margin: 0 0 2px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .note h3 .pill { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .note .who { color: var(--meta); font-size: 12px; margin: 0 0 10px; }
+  .note dl { margin: 0; display: grid; grid-template-columns: 82px 1fr; gap: 6px 10px; font-size: 12.5px; }
+  .note dt { color: var(--meta); }
+  .note dd { margin: 0; color: var(--text-2); }
+  .note dd b { color: var(--text); font-weight: 600; }
+  .verdict { width: 1140px; max-width: 100%; margin: 14px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; color: var(--text-2); }
+  .verdict h3 { margin: 0 0 6px; font-size: 14px; }
+  .verdict p { margin: 0 0 6px; max-width: 90ch; }
+  .verdict b { color: var(--text); font-weight: 600; }
+</style>
+
+<header class="top">
+  <div>
+    <h1>Settings — three layouts</h1>
+    <div class="sub">Same settings, three surfaces. Click around: navigation, search and the scope switch work.</div>
+  </div>
+  <nav class="switch" role="tablist" aria-label="Prototype">
+    <button data-proto="a" class="on">A · VS Code page</button>
+    <button data-proto="b">B · Sidebar dialog</button>
+    <button data-proto="c">C · Toolbar tabs</button>
+  </nav>
+  <div class="theme" role="group" aria-label="Theme">
+    <button data-theme-pick="system" class="on">System</button>
+    <button data-theme-pick="light">Light</button>
+    <button data-theme-pick="dark">Dark</button>
+  </div>
+</header>
+
+<main>
+  <div class="lead" id="lead"></div>
+  <section class="win" aria-label="PowerGit window">
+    <div class="titlebar">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--primary)" stroke-width="1.8"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="8" cy="12" r="2"/><path d="M4 6v2a2 2 0 0 0 2 2h2M12 6v2a2 2 0 0 1-2 2H8"/></svg>
+      PowerGit — powergit
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>
+    <div class="winbody">
+      <div class="rail" id="rail"></div>
+      <div class="content" id="content"></div>
+    </div>
+  </section>
+  <section class="notes" id="notes"></section>
+  <section class="verdict" id="verdict"></section>
+</main>
+
+<script>
+(function () {
+  // ---------- icons ----------
+  const I = {
+    appearance: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 2v12A6 6 0 0 0 8 2z" fill="currentColor" stroke="none"/></svg>',
+    git: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="3"/><path d="M2.5 14a5.5 5.5 0 0 1 11 0"/></svg>',
+    tools: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10.6 2.4a3.4 3.4 0 0 0-3.9 4.7L2 11.8 4.2 14l4.7-4.7a3.4 3.4 0 0 0 4.7-3.9L11.4 7.6 8.4 4.6z"/></svg>',
+    behaviour: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5.5" cy="4" r="1.7" fill="var(--surface)"/><circle cx="10.5" cy="8" r="1.7" fill="var(--surface)"/><circle cx="7" cy="12" r="1.7" fill="var(--surface)"/></svg>',
+    diagnostics: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.5 8.5h3l2-4.5 3 8 2-3.5h3"/></svg>',
+    updates: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 11.2V5M5.5 7.5 8 5l2.5 2.5"/></svg>',
+    search: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>',
+    back: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3 5 8l5 5"/></svg>',
+    x: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+    folder: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v6a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12z"/></svg>',
+    clock: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>',
+    bug: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4.5" y="5" width="7" height="8" rx="3.5"/><path d="M6 5V3.5M10 5V3.5M2 9h2.5M11.5 9H14M3 13l2-1.5M13 13l-2-1.5M3 5l2 1.5M13 5l-2 1.5"/></svg>',
+    gear: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M3.6 12.4l1.2-1.2M11.2 4.8l1.2-1.2"/></svg>',
+    undo: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 7h7a3 3 0 0 1 0 6H7"/><path d="m5.5 4.5-3 2.5 3 2.5"/></svg>',
+  }
+
+  // ---------- controls ----------
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
+  const sel = (options, value, extra = "") =>
+    `<select class="sel" ${extra}>${options.map((o) => {
+      const [label, disabled] = Array.isArray(o) ? o : [o, false]
+      return `<option ${label === value ? "selected" : ""} ${disabled ? "disabled" : ""}>${esc(label)}</option>`
+    }).join("")}</select>`
+  const txt = (value, placeholder = "", mono = false) =>
+    `<input class="txt ${mono ? "mono" : ""}" value="${esc(value)}" placeholder="${esc(placeholder)}">`
+  const chk = (label, checked, desc = "") =>
+    `<label class="chk"><input type="checkbox" ${checked ? "checked" : ""}><span><span class="t">${esc(label)}</span>${desc ? `<div class="d">${esc(desc)}</div>` : ""}</span></label>`
+  const seg = (options, value, cls = "") =>
+    `<span class="seg ${cls}" role="group">${options.map((o) => `<button type="button" class="${o === value ? "on" : ""}">${esc(o)}</button>`).join("")}</span>`
+  const btn = (label, kind = "") => `<button type="button" class="btn ${kind}">${esc(label)}</button>`
+  const zoom = () => `<span class="zoom">${btn("−")}<b>100 %</b>${btn("+")}${btn("Reset", "text sm")}</span>`
+
+  // ---------- the settings, as they are in the app today (v0.17.0) ----------
+  // scope: "app" — this app, every repository (localStorage);
+  //        "git" — Git config, this repository or all repositories.
+  const SECTIONS = [
+    {
+      id: "appearance", title: "Appearance", icon: I.appearance, scope: "app",
+      items: [
+        { id: "theme", type: "select", title: "Theme", desc: "Follow the system, or force light or dark.", options: ["System", "Light", "Dark"], value: "Dark", mod: true },
+        { id: "bar", type: "select", title: "Command bar", desc: "Where Commit, Pull, Push and the other commands live.", options: ["In the left rail", "In the title bar"], value: "In the left rail" },
+        { id: "zoom", type: "zoom", title: "Zoom", desc: "Scale of the whole window. Ctrl + and Ctrl − change it too." },
+      ],
+    },
+    {
+      id: "git", title: "Git identity", icon: I.git, scope: "git",
+      hint: { local: "Saved to this repository only. The name in use comes from your global config until you set one here.", global: "Saved to your global Git config, for every repository." },
+      items: [
+        { id: "name", type: "text", title: "User name", desc: "user.name — who the commits are by.", value: "Constantin Chabirand" },
+        { id: "email", type: "text", title: "Email", desc: "user.email", value: "cynako@gmail.com" },
+        { id: "crlf", type: "select", title: "Line endings", desc: "core.autocrlf — what happens to CRLF on the way in and out.", options: ["Git default (core.autocrlf unset)", "CRLF in the working tree, LF in commits (true)", "Convert to LF on commit only (input)", "Never convert (false)"], value: "Git default (core.autocrlf unset)" },
+      ],
+    },
+    {
+      id: "tools", title: "Tools", icon: I.tools, scope: "git",
+      hint: { local: "Saved to this repository only.", global: "Saved to your global Git config, for every repository." },
+      items: [
+        { id: "difftool", type: "select", title: "Diff tool", desc: "diff.tool — what “Open in diff tool” launches.", options: ["Not set", "VS Code", ["Beyond Compare — not found", true], ["KDiff3 — not found", true], "Custom command…"], value: "VS Code" },
+        { id: "mergetool", type: "select", title: "Merge tool", desc: "merge.tool — what “Resolve conflicts” opens for a file.", options: ["Not set", "VS Code", ["Beyond Compare — not found", true], ["KDiff3 — not found", true], "Custom command…"], value: "VS Code" },
+        { id: "editor", type: "text", title: "Editor", desc: "core.editor — for commit messages and interactive rebases.", value: "code --wait", placeholder: "e.g. code --wait", mono: true },
+        { id: "vscode", type: "kv", title: "VS Code", desc: "Found on this machine. One click sets it as editor, diff and merge tool.", value: "/usr/share/code/bin/code", button: "Use VS Code for all three" },
+      ],
+    },
+    {
+      id: "behaviour", title: "Behaviour", icon: I.behaviour, scope: "app",
+      items: [
+        { id: "confirm", type: "checks", title: "Ask before", desc: "A confirmation dialog before these; turn one off knowingly.", checks: [
+          ["Force-pushing a branch", true], ["Deleting a branch or tag", true], ["Resetting hard (discards changes)", true],
+          ["Checking out with uncommitted changes", true], ["Aborting a merge or rebase", false],
+        ] },
+        { id: "autofetch", type: "select", title: "Fetch in the background", desc: "Keeps the remote branches fresh without asking.", options: ["Never", "Every minute", "Every 5 minutes", "Every 15 minutes", "Every 30 minutes"], value: "Every 5 minutes", mod: true },
+        { id: "mergeff", type: "select", title: "Merges by default", desc: "What the Merge dialog starts with.", options: ["Fast-forward when possible", "Always create a merge commit", "Fast-forward only, else refuse"], value: "Fast-forward when possible" },
+        { id: "rebase", type: "checks", title: "Rebase defaults", desc: "What the Rebase dialog starts with.", checks: [
+          ["Stash and restore local changes around a rebase", false], ["Fold fixup! and squash! commits during an interactive rebase", false],
+        ] },
+      ],
+    },
+    {
+      id: "diagnostics", title: "Diagnostics", icon: I.diagnostics, scope: "app",
+      items: [
+        { id: "logs", type: "actions", title: "Logs", desc: "The app log needs no inspector; the developer tools may be unavailable on Ubuntu.", buttons: ["Open app log", "Open developer tools", "Open logs folder"] },
+        { id: "recovery", type: "recovery", title: "Recovery experiments", desc: "For a frozen picture while the app still reacts: press the hotkey, wait a few seconds, note whether the window repaints. Every press is written to engine.log." },
+      ],
+    },
+    {
+      id: "updates", title: "Updates", icon: I.updates, scope: "app",
+      items: [
+        { id: "check", type: "updates", title: "PowerGit v0.17.0", desc: "Nothing is fetched until you check, nothing installed until you say so." },
+        { id: "loc", type: "actions", title: "Install", desc: "", buttons: ["Open app location"] },
+      ],
+    },
+  ]
+  const RECOVERY = [
+    [1, "queue_draw", "ask GTK to redraw the window"], [2, "thaw", "thaw the window's frozen update clock"],
+    [3, "hide_show", "hide the window, then show it again"], [4, "resize", "grow the window by one pixel, then shrink it back"],
+    [5, "present", "present the window to the window manager again"], [6, "frame_sync_off_hide_show", "switch off X11 frame sync, then hide and show"],
+    [7, "reload", "reload the page in the same window"], [8, "new_window", "open a second window on the same page"],
+    [9, "webview_snapshot", "ask WebKit for a picture of the page (5 s timeout)"],
+  ]
+  const TRY_FIRST = new Set([3, 6, 8])
+
+  // The control for an item, shared by the three layouts.
+  function control(it, compact) {
+    switch (it.type) {
+      case "select": return sel(it.options, it.value)
+      case "text": return txt(it.value, it.placeholder || "", it.mono)
+      case "zoom": return zoom()
+      case "checks": return `<div class="checks">${it.checks.map(([l, c]) => chk(l, c)).join("")}</div>`
+      case "kv": return `<div class="kv"><code>${esc(it.value)}</code><span class="pill ok">found</span></div><div style="margin-top:6px">${btn(it.button)}</div>`
+      case "actions": return `<div style="display:flex;gap:8px;flex-wrap:wrap">${it.buttons.map((b) => btn(b)).join("")}</div>`
+      case "recovery": return `<div class="ladder">${RECOVERY.map(([n, k, m]) =>
+        `${btn(`Ctrl+Shift+F${n}`, "sm")}<code>${k}</code><span class="m ${TRY_FIRST.has(n) ? "first" : ""}">${esc(m)}${TRY_FIRST.has(n) ? " · try first" : ""}</span>`).join("")}</div>`
+      case "updates": return `<div style="display:flex;align-items:center;gap:10px">${btn("Check for updates")}<span class="hint">You are up to date.</span></div>`
+    }
+    return ""
+  }
+
+  // ---------- A: VS Code-style page ----------
+  function renderA(host) {
+    host.innerHTML = `
+      <div class="vs">
+        <div class="head">
+          <button class="back" title="Back to Browse">${I.back}</button>
+          <h2>Settings</h2>
+          <div class="search">${I.search}<input placeholder="Search settings  (fetch, editor, force…)" aria-label="Search settings"><span class="count"></span></div>
+          <div class="apply"><i></i>Changes apply as you make them</div>
+        </div>
+        <div class="cols">
+          <nav class="toc"></nav>
+          <div class="list"><div class="empty">No setting matches.</div></div>
+        </div>
+      </div>`
+    const toc = host.querySelector(".toc"), list = host.querySelector(".list")
+    for (const s of SECTIONS) {
+      toc.insertAdjacentHTML("beforeend", `<a data-sec="${s.id}">${s.title}</a>`)
+      if (s.id === "behaviour") toc.insertAdjacentHTML("beforeend", `<a class="sub" data-sec="behaviour" data-item="confirm">Confirmations</a><a class="sub" data-sec="behaviour" data-item="autofetch">Background fetch</a>`)
+      if (s.id === "diagnostics") toc.insertAdjacentHTML("beforeend", `<a class="sub" data-sec="diagnostics" data-item="recovery">Recovery ladder</a>`)
+      const scopeCtl = s.scope === "git"
+        ? seg(["This repository", "All repositories"], "This repository", "scope")
+        : `<span class="pill">This app, every repository</span>`
+      const hint = s.scope === "git" ? `<div class="sh">${esc(s.hint.local)}</div>` : ""
+      list.insertAdjacentHTML("beforeend", `
+        <section class="sec" id="a-${s.id}" data-sec="${s.id}">
+          <h3 class="st">${s.title} ${scopeCtl}</h3>${hint}
+          ${s.items.map((it) => `
+            <div class="item ${it.mod ? "mod" : ""}" id="a-${s.id}-${it.id}" data-q="${esc((it.title + " " + it.desc + " " + (it.checks || []).map((c) => c[0]).join(" ")).toLowerCase())}">
+              <div class="t">${esc(it.title)}${it.mod ? "<small>changed</small>" : ""}</div>
+              ${it.desc ? `<div class="d">${esc(it.desc)}</div>` : ""}
+              <div class="c">${control(it)}</div>
+              <button class="btn sm reset" title="Reset to default">${I.undo} Reset</button>
+            </div>`).join("")}
+        </section>`)
+    }
+    // scope switch swaps the hint, like the app's identity re-read
+    for (const s of SECTIONS) if (s.scope === "git") {
+      const sec = host.querySelector(`#a-${s.id}`)
+      sec.querySelectorAll(".scope button").forEach((b, i) => b.addEventListener("click", () => {
+        sec.querySelectorAll(".scope button").forEach((x) => x.classList.toggle("on", x === b))
+        sec.querySelector(".sh").textContent = i === 0 ? s.hint.local : s.hint.global
+      }))
+    }
+    // a change marks the row, and the reset clears it
+    list.addEventListener("change", (e) => { const it = e.target.closest(".item"); if (it) { it.classList.add("mod"); if (!it.querySelector(".t small")) it.querySelector(".t").insertAdjacentHTML("beforeend", "<small>changed</small>") } })
+    list.querySelectorAll(".reset").forEach((b) => b.addEventListener("click", () => { const it = b.closest(".item"); it.classList.remove("mod"); const sm = it.querySelector(".t small"); if (sm) sm.remove() }))
+    // TOC: click scrolls, scroll highlights
+    const links = [...toc.querySelectorAll("a")]
+    toc.addEventListener("click", (e) => {
+      const a = e.target.closest("a"); if (!a) return
+      const target = host.querySelector(a.dataset.item ? `#a-${a.dataset.sec}-${a.dataset.item}` : `#a-${a.dataset.sec}`)
+      if (target) list.scrollTo({ top: target.offsetTop - 8, behavior: "smooth" })
+    })
+    const secs = [...list.querySelectorAll(".sec")]
+    const mark = () => {
+      let cur = secs[0]
+      for (const s of secs) if (!s.classList.contains("hide") && s.offsetTop - 40 <= list.scrollTop) cur = s
+      links.forEach((a) => a.classList.toggle("on", a.dataset.sec === cur.dataset.sec && !a.dataset.item))
+    }
+    list.addEventListener("scroll", mark); mark()
+    // search
+    const input = host.querySelector(".search input"), count = host.querySelector(".search .count"), empty = host.querySelector(".empty")
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase(); let n = 0
+      for (const s of secs) {
+        let any = false
+        for (const it of s.querySelectorAll(".item")) { const hit = !q || it.dataset.q.includes(q); it.classList.toggle("hide", !hit); if (hit) { any = true; n++ } }
+        s.classList.toggle("hide", !any)
+      }
+      count.textContent = q ? `${n} setting${n === 1 ? "" : "s"}` : ""
+      empty.style.display = n ? "none" : "block"
+      links.forEach((a) => a.classList.toggle("hide", q && !secs.find((s) => s.dataset.sec === a.dataset.sec && !s.classList.contains("hide"))))
+      mark()
+    })
+  }
+
+  // ---------- shared: one section as a label/control form (B and C) ----------
+  function formFor(s, scopeIdx) {
+    const rows = s.items.map((it, i) => {
+      const sepBefore = it.type === "checks" && i > 0 ? `<div class="grp"></div>` : ""
+      const sepAfter = it.type === "checks" && i < s.items.length - 1 ? `<div class="grp"></div>` : ""
+      const hint = it.type === "checks" || it.type === "kv" || it.type === "recovery" || !it.desc ? "" : `<span class="hint">${esc(it.desc)}</span>`
+      return `${sepBefore}<label class="l">${esc(it.title)}</label><div class="f">${control(it, true)}${hint}</div>${sepAfter}`
+    }).join("")
+    const scopeCtl = s.scope === "git" ? seg(["This repository", "All repositories"], scopeIdx ? "All repositories" : "This repository", "scope") : ""
+    const sub = s.scope === "git" ? s.hint[scopeIdx ? "global" : "local"] : "This app, every repository."
+    return `<div class="ph"><h3>${s.title}</h3>${scopeCtl}</div><p class="psub">${esc(sub)}</p><div class="form">${rows}</div>`
+  }
+  function wireScope(pane, s, rerender) {
+    pane.querySelectorAll(".scope button").forEach((b, i) => b.addEventListener("click", () => rerender(i)))
+  }
+
+  // faux Browse view under a modal
+  function browseBehind() {
+    const rows = [
+      ["docs: write up the Ubuntu freeze investigation", "powergit", "Constantin", "2 hours ago"],
+      ["chore(plan): record the two CI failures that predate v0.15.5", "", "Constantin", "5 hours ago"],
+      ["chore(plan): record the v0.15.5 gates", "", "Constantin", "yesterday"],
+      ["feat(diff): reset a file or selected lines from the Browse diff view", "v0.15.5", "Constantin", "yesterday"],
+      ["fix(shell): keep the main loop off the disk, and capture a freeze from outside", "", "Constantin", "2 days ago"],
+      ["feat(console): pin the row for the running command", "", "Constantin", "2 days ago"],
+      ["fix(engine): untracked diff exits 1 by design", "", "Constantin", "3 days ago"],
+      ["feat(commit): resizable window, close button", "", "Constantin", "3 days ago"],
+      ["feat(review): mark lines in the Diff tab", "v0.17.0", "Constantin", "4 days ago"],
+      ["chore(release): v0.16.0", "v0.16.0", "Constantin", "5 days ago"],
+      ["feat(tree): show file history from the file tree", "", "Constantin", "6 days ago"],
+      ["fix(tree): the working directory row loads HEAD's blob", "", "Constantin", "6 days ago"],
+      ["docs: review-mode design", "", "Constantin", "last week"],
+      ["chore: bump deps", "", "Constantin", "last week"],
+      ["feat(diff): select text for copy in the diff view", "", "Constantin", "last week"],
+      ["feat(console): usable bottom git console", "", "Constantin", "last week"],
+      ["chore(release): v0.15.7", "v0.15.7", "Constantin", "2 weeks ago"],
+      ["fix(shell): presentation stall needs focus", "", "Constantin", "2 weeks ago"],
+      ["feat(shell): Wayland by default", "", "Constantin", "2 weeks ago"],
+      ["feat(shell): recovery ladder", "", "Constantin", "2 weeks ago"],
+    ]
+    return `<div class="browse"><div class="strip"><b>Browse</b><span>Diff</span><span>Tree</span><span>File history</span><span>Console</span></div>
+      <div class="rows">${rows.map((r, i) => `<div class="row ${i % 4 === 2 ? "b2" : ""}"><div class="lane"><i></i></div><div>${r[1] ? `<span class="badge">${esc(r[1])}</span>` : ""}${esc(r[0])}</div><div class="meta">${esc(r[2])}</div><div class="meta">${esc(r[3])}</div></div>`).join("")}</div></div>`
+  }
+
+  // ---------- B: sidebar dialog ----------
+  function renderB(host) {
+    host.innerHTML = `${browseBehind()}<div class="scrim"><div class="dlg sb" role="dialog" aria-label="Settings">
+      <div class="dt">Settings<button class="x" title="Close">${I.x}</button></div>
+      <div class="mid"><nav class="side">${SECTIONS.map((s) => `<a data-sec="${s.id}">${s.icon}${s.title}</a>`).join("")}<div class="ver">PowerGit v0.17.0</div></nav><div class="pane"></div></div>
+      <div class="foot"><span class="hint">Nothing applies until Save. Escape cancels.</span>${btn("Cancel")}${btn("Save", "primary")}</div>
+    </div></div>`
+    const side = host.querySelector(".side"), pane = host.querySelector(".pane")
+    const show = (id, scopeIdx = 0) => {
+      const s = SECTIONS.find((x) => x.id === id)
+      side.querySelectorAll("a").forEach((a) => a.classList.toggle("on", a.dataset.sec === id))
+      pane.innerHTML = formFor(s, scopeIdx); pane.scrollTop = 0
+      wireScope(pane, s, (i) => show(id, i))
+    }
+    side.addEventListener("click", (e) => { const a = e.target.closest("a"); if (a) show(a.dataset.sec) })
+    show("git")
+  }
+
+  // ---------- C: toolbar tabs ----------
+  function renderC(host) {
+    host.innerHTML = `${browseBehind()}<div class="scrim"><div class="dlg tb" role="dialog" aria-label="Settings">
+      <div class="dt">Settings<button class="x" title="Close">${I.x}</button></div>
+      <div class="tabs">${SECTIONS.map((s) => `<a class="tab" data-sec="${s.id}">${s.icon}${s.title}</a>`).join("")}</div>
+      <div class="pane"></div>
+      <div class="foot"><span class="hint">Nothing applies until Save.</span>${btn("Cancel")}${btn("Save", "primary")}</div>
+    </div></div>`
+    const tabs = host.querySelector(".tabs"), pane = host.querySelector(".pane")
+    const show = (id, scopeIdx = 0) => {
+      const s = SECTIONS.find((x) => x.id === id)
+      tabs.querySelectorAll(".tab").forEach((a) => a.classList.toggle("on", a.dataset.sec === id))
+      pane.innerHTML = formFor(s, scopeIdx); pane.scrollTop = 0
+      wireScope(pane, s, (i) => show(id, i))
+    }
+    tabs.addEventListener("click", (e) => { const a = e.target.closest(".tab"); if (a) show(a.dataset.sec) })
+    show("behaviour")
+  }
+
+  // ---------- rail, lead, notes ----------
+  document.getElementById("rail").innerHTML = `
+    <span class="ico" title="Open repository">${I.folder}</span><span class="ico" title="Recents">${I.clock}</span>
+    <span class="spacer"></span><span class="ico" title="Bug snapshot">${I.bug}</span><span class="ico on" title="Settings">${I.gear}</span>`
+
+  const LEAD = {
+    a: `<p><b>A — a settings page, like VS Code.</b> Settings replaces the Browse view (the back arrow returns); a table of contents on the left, one long list on the right, a search box that filters every setting by name and description. Changes apply as you make them: a changed setting gets a blue bar and a Reset, there is no Save. Try the search with “fetch” or “force”.</p>`,
+    b: `<p><b>B — a preferences dialog with a sidebar.</b> A modal, larger than today, one category at a time, labels in a column so the eye lines up. Keeps today's draft-until-Save model and the Cancel/Escape behaviour. The scope switch for Git identity and Tools sits in the pane header.</p>`,
+    c: `<p><b>C — toolbar tabs, like macOS Preferences, Fork or Sourcetree.</b> A compact fixed dialog, icon tabs across the top, one category at a time. Smallest footprint; suits the current six categories, gets crowded past eight or so.</p>`,
+  }
+  const NOTES = `
+    <div class="note pick"><h3><span class="pill">A</span>VS Code page</h3><p class="who">Full-window page, no modal</p>
+      <dl><dt>Find things</dt><dd><b>Search</b> across every setting, plus a table of contents. The only one of the three where “where is the auto-fetch setting?” is a keystroke.</dd>
+      <dt>Saving</dt><dd><b>Immediate</b>, per row, with a blue “changed” bar and a Reset. Identity fields commit on blur / Enter (they write Git config).</dd>
+      <dt>Room</dt><dd>Unlimited; review mode, MCP and the rest just add rows. Long descriptions fit.</dd>
+      <dt>On Ubuntu</dt><dd>No dialog sizing at all: it is the main view, so it inherits the window and the zoom.</dd>
+      <dt>Build</dt><dd>A new view in App.tsx (like File history), a rows model, the search filter. Drops the v0.13.18 draft logic. ~1 iteration.</dd></dl></div>
+    <div class="note"><h3><span class="pill">B</span>Sidebar dialog</h3><p class="who">Modal, 900 × 600, six categories</p>
+      <dl><dt>Find things</dt><dd>Sidebar; one glance shows the six areas. No search (could be added above the sidebar).</dd>
+      <dt>Saving</dt><dd><b>Draft until Save</b>, exactly today's behaviour, so nothing changes in the audit-tested paths.</dd>
+      <dt>Room</dt><dd>Good; each pane scrolls on its own. Adding a category is a sidebar row.</dd>
+      <dt>On Ubuntu</dt><dd>A fixed-size modal, same as today, so it must fit the window at 150 % zoom (today's dialog already scrolls).</dd>
+      <dt>Build</dt><dd>Re-lay the existing SettingsDialog: a category state, the pane switch, the label/control grid. Smallest change. ~half an iteration.</dd></dl></div>
+    <div class="note"><h3><span class="pill">C</span>Toolbar tabs</h3><p class="who">Modal, 780 × 560, icon tabs</p>
+      <dl><dt>Find things</dt><dd>Six icons in a row; recognisable after one visit, but labels compete for width.</dd>
+      <dt>Saving</dt><dd><b>Draft until Save</b>, as today.</dd>
+      <dt>Room</dt><dd>Limited: the tab row caps the number of categories, and Diagnostics' recovery ladder already needs the pane to scroll.</dd>
+      <dt>On Ubuntu</dt><dd>The most compact of the three, fits small windows best.</dd>
+      <dt>Build</dt><dd>Same as B with a tab strip instead of a sidebar. ~half an iteration.</dd></dl></div>`
+  const VERDICT = `<h3>My call</h3>
+    <p><b>A.</b> Settings have doubled since v0.15.0 and review mode is about to add more; a page with search scales, a dialog does not. It also removes the one thing that keeps going wrong in this dialog — sizing a modal on Ubuntu at zoom — because there is no modal. The cost is the save model: VS Code applies immediately, and that replaces the v0.13.18 draft-until-Save behaviour (Cancel discards). The per-row Reset and the “changed” bar cover the same need without a footer.</p>
+    <p>If you want to keep Save/Cancel, <b>B</b> is the same content with the smallest code change and could take A's search box above its sidebar later. C only if you value the compact footprint over room to grow.</p>`
+
+  // ---------- wiring ----------
+  const content = document.getElementById("content"), lead = document.getElementById("lead")
+  const renderers = { a: renderA, b: renderB, c: renderC }
+  function pick(p) {
+    document.querySelectorAll(".switch button").forEach((b) => b.classList.toggle("on", b.dataset.proto === p))
+    lead.innerHTML = LEAD[p]
+    renderers[p](content)
+    try { localStorage.setItem("pg.settings-proto", p) } catch (_) {}
+  }
+  document.querySelectorAll(".switch button").forEach((b) => b.addEventListener("click", () => pick(b.dataset.proto)))
+  document.querySelectorAll(".theme button").forEach((b) => b.addEventListener("click", () => {
+    const t = b.dataset.themePick
+    document.querySelectorAll(".theme button").forEach((x) => x.classList.toggle("on", x === b))
+    if (t === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t)
+  }))
+  document.getElementById("notes").innerHTML = NOTES
+  document.getElementById("verdict").innerHTML = VERDICT
+  let initial = "a"
+  try { initial = localStorage.getItem("pg.settings-proto") || "a" } catch (_) {}
+  if (!renderers[initial]) initial = "a"
+  pick(initial)
+})()
+</script>
