@@ -2,8 +2,6 @@ import CloseIcon from "@mui/icons-material/Close"
 import HistoryIcon from "@mui/icons-material/History"
 import RefreshIcon from "@mui/icons-material/Refresh"
 import Box from "@mui/material/Box"
-import Checkbox from "@mui/material/Checkbox"
-import FormControlLabel from "@mui/material/FormControlLabel"
 import IconButton from "@mui/material/IconButton"
 import Paper from "@mui/material/Paper"
 import Tab from "@mui/material/Tab"
@@ -14,9 +12,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { describeThrown, isAbort, useEngine, type CommitDetail, type DiffDto, type DiffOptions } from "../engine"
 import { DEFAULT_DIFF_OPTIONS } from "../engine/commitCache"
 import { withArtificialRows } from "../graph/artificial"
+import type { GraphRow } from "../graph/types"
 import { focusGrid } from "../hooks/focusGrid"
 import type { ChromeLayout } from "../hooks/useChromeLayout"
 import type { EngineSession } from "../hooks/useEngineSession"
+import { useFileHistoryMenus } from "../hooks/useFileHistoryMenus"
 import type { GridMenus } from "../hooks/useGridMenus"
 import { useHistory } from "../hooks/useHistory"
 import type { RepoState } from "../hooks/useRepoState"
@@ -24,7 +24,9 @@ import { MONO_FONT } from "../theme"
 import { ErrorState, LoadingState } from "./AsyncState"
 import { BlobPane } from "./BlobPane"
 import { CommitDetailView } from "./CommitDetailView"
+import { FileHistoryContextMenu } from "./dialogs/FileHistoryContextMenu"
 import { DiffPane } from "./DiffPane"
+import { FileHistoryToggle as Toggle } from "./FileHistoryToggle"
 import {
   fileHistoryFilter,
   fileHistoryTabs,
@@ -51,7 +53,9 @@ import type { Loadable } from "./loadable"
 // the grid is the same RevisionGrid on a second useHistory whose pages ask
 // the engine for `?path=`, and the tabs reuse the panel's own panes. Blame
 // is absent because PowerGit has no blame view yet. The rules of what shows
-// when are in fileHistoryModel.ts.
+// when are in fileHistoryModel.ts. The grid's row menu is GE's
+// FormFileHistory menu (dialogs/FileHistoryContextMenu.tsx), not the Browse
+// one: no checkout, reset, branch or tag on a filtered list.
 
 export type FileHistoryTarget = { path: string; sha: string | null }
 
@@ -60,43 +64,13 @@ type Props = {
   session: Pick<EngineSession, "client" | "view" | "setEngineError" | "handleFailure">
   repoState: Pick<RepoState, "status" | "openFolder">
   layout: Pick<ChromeLayout, "bottomHeight" | "splitter">
+  /** The app's grid menus; only the ref-chip menu is used, the rows get the file history's own. */
   menus: GridMenus
   remoteNames: string[]
   tagNames: string[]
   /** HEAD of the main history: when it moves (commit, checkout, reset) the filtered list reloads. */
   headId: string | null
   onClose: () => void
-}
-
-function Toggle({
-  id,
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  id: string
-  label: string
-  checked: boolean
-  disabled?: boolean
-  onChange: (checked: boolean) => void
-}) {
-  return (
-    <FormControlLabel
-      sx={{ mr: 1, ml: 0, "& .MuiFormControlLabel-label": { fontSize: 12 } }}
-      control={
-        <Checkbox
-          size="small"
-          checked={checked}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.checked)}
-          sx={{ py: 0, px: 0.5 }}
-          data-testid={`file-history-${id}`}
-        />
-      }
-      label={label}
-    />
-  )
 }
 
 export function FileHistoryView({
@@ -123,6 +97,7 @@ export function FileHistoryView({
       return next
     })
   const filter = useMemo(() => fileHistoryFilter(path, options), [path, options])
+  const rowMenu = useFileHistoryMenus(menus.refContextMenu)
   const history = useHistory({ client, demo: false, live: view.live, setEngineError, onFailure: handleFailure, filter })
   const { rows: engineRows, selectedSha, setSelectedSha, loadingTail, loaded, resetHistory, reloadHistory } = history
 
@@ -238,12 +213,17 @@ export function FileHistoryView({
   }, [engine, tab, commitId, pending, pendingStaged, at, reloadTick])
 
   const reload = () => setReloadTick((t) => t + 1)
-  const openDifftool = () => {
-    if (!current) return
-    const request = current.artificial
-      ? engine.openWorkTreeDifftool(path, pendingStaged)
-      : engine.openDifftool(current.rev.id, at)
+  // The row against its parent (GE DiffAB), or with `local` against the
+  // working tree (GE DiffBLocal, "Difftool selected <-> local"); a pending
+  // row is the working tree already.
+  const openDifftoolFor = (row: GraphRow, local: boolean) => {
+    const request = row.artificial
+      ? engine.openWorkTreeDifftool(path, row.artificial === "index")
+      : engine.openDifftool(row.rev.id, pathAtRow(row, path), local)
     void request.catch((e: unknown) => setEngineError(`open in diff tool failed: ${describeThrown(e)}`))
+  }
+  const openDifftool = () => {
+    if (current) openDifftoolFor(current, false)
   }
   const busy = diff.kind === "loading" || (diff.kind === "ready" && diff.stale === true)
 
@@ -337,11 +317,18 @@ export function FileHistoryView({
         emptyText={`No commit touches ${path}.`}
         onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
         onNearEnd={history.onNearEnd}
-        menus={menus}
+        menus={rowMenu.menus}
         selectedSha={selectedSha}
         onRetry={() => void reloadHistory()}
         onOpenRepo={() => void repoState.openFolder()}
         onRecover={onClose}
+      />
+      <FileHistoryContextMenu
+        target={rowMenu.target}
+        options={options}
+        onOptions={setOptions}
+        onDifftool={openDifftoolFor}
+        onClose={rowMenu.close}
       />
       <Box
         data-testid="file-history-splitter"

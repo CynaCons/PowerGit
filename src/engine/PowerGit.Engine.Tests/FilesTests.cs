@@ -258,6 +258,113 @@ public sealed class FilesTests : IClassFixture<WebApplicationFactory<Program>>
         }
     }
 
+    /// <summary>
+    ///  Review of v0.16.0 (finding 1): a symlink (junction on Windows) inside
+    ///  the tree that points outside it passed the lexical prefix check, so
+    ///  <c>link/secret.txt</c> opened a file the repository does not hold.
+    ///  Every route that takes a path from the UI goes through
+    ///  <see cref="GitHost.ResolveInRoot"/>, and so does the working-tree
+    ///  blob; both are asserted at the call site as well.
+    /// </summary>
+    [Fact]
+    public void Resolve_in_root_rejects_a_link_that_leaves_the_working_tree_and_keeps_one_that_stays()
+    {
+        using TempRepo repo = new();
+        string outside = Directory.CreateTempSubdirectory("powergit-files-outside-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(outside, "secret.txt"), "not yours\n");
+            LinkDirectory(Path.Combine(repo.Dir, "escape"), outside);
+            Assert.True(File.Exists(Path.Combine(repo.Dir, "escape", "secret.txt")), "the link was not created");
+
+            InvalidOperationException resolve = Assert.Throws<InvalidOperationException>(() => GitHost.ResolveInRoot(repo.Dir, "escape/secret.txt"));
+            Assert.Contains("outside the repository", resolve.Message);
+            Assert.Throws<InvalidOperationException>(() => GitHost.ResolveInRoot(repo.Dir, "escape"));
+
+            GitHost host = new();
+            host.Open(repo.Dir);
+            Assert.Contains("outside the repository", Assert.Throws<InvalidOperationException>(() => host.GetWorkTreeBlob("escape/secret.txt", staged: false)).Message);
+            Assert.Contains("outside the repository", Assert.Throws<InvalidOperationException>(() => host.OpenFile("escape/secret.txt")).Message);
+            Assert.Contains("outside the repository", Assert.Throws<InvalidOperationException>(() => host.MoveFile("a.txt", "escape/a.txt")).Message);
+            Assert.True(File.Exists(Path.Combine(repo.Dir, "a.txt")));
+
+            // A link that stays inside the tree is an ordinary path, and so
+            // is a plain nested one and the file the link resolves to.
+            repo.Write("sub/inner.txt", "inner\n");
+            LinkDirectory(Path.Combine(repo.Dir, "alias"), Path.Combine(repo.Dir, "sub"));
+            Assert.Equal(Path.Combine(repo.Dir, "alias", "inner.txt"), GitHost.ResolveInRoot(repo.Dir, "alias/inner.txt"));
+            Assert.Equal(Path.Combine(repo.Dir, "sub", "inner.txt"), GitHost.ResolveInRoot(repo.Dir, "sub/inner.txt"));
+            Assert.Equal(Path.Combine(repo.Dir, "sub", "new", "file.txt"), GitHost.ResolveInRoot(repo.Dir, "sub/new/file.txt"));
+            Assert.Equal("inner\n", host.GetWorkTreeBlob("alias/inner.txt", staged: false).Text);
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///  Review of v0.16.0 (finding 1): the containment check folded case on
+    ///  every OS, so on Linux <c>../Repo/secret.txt</c> next to <c>/tmp/repo</c>
+    ///  passed as inside <c>/tmp/repo/</c>. Windows and macOS fold case in
+    ///  the file system itself, so there the sibling is the same directory.
+    /// </summary>
+    [LinuxFact]
+    public void Resolve_in_root_rejects_a_case_distinct_sibling_on_a_case_sensitive_file_system()
+    {
+        string parent = Directory.CreateTempSubdirectory("powergit-files-case-").FullName;
+        try
+        {
+            string root = Path.Combine(parent, "repo");
+            string sibling = Path.Combine(parent, "Repo");
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(sibling);
+            File.WriteAllText(Path.Combine(sibling, "secret.txt"), "not yours\n");
+
+            Assert.Contains("outside the repository", Assert.Throws<InvalidOperationException>(() => GitHost.ResolveInRoot(root, "../Repo/secret.txt")).Message);
+            Assert.Equal(Path.Combine(root, "sub", "file.txt"), GitHost.ResolveInRoot(root, "sub/file.txt"));
+        }
+        finally
+        {
+            Directory.Delete(parent, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///  A directory symlink; on Windows, where creating one needs a
+    ///  privilege the test runner may not hold, a junction (the reparse
+    ///  point <c>mklink /J</c> makes, which needs none) stands in for it.
+    ///  The engine follows both through <see cref="FileSystemInfo.LinkTarget"/>.
+    /// </summary>
+    private static void LinkDirectory(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return;
+        }
+        catch (Exception ex) when (OperatingSystem.IsWindows() && ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        System.Diagnostics.ProcessStartInfo psi = new("cmd.exe")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        psi.ArgumentList.Add("/d");
+        psi.ArgumentList.Add("/c");
+        psi.ArgumentList.Add("mklink");
+        psi.ArgumentList.Add("/J");
+        psi.ArgumentList.Add(link);
+        psi.ArgumentList.Add(target);
+        using System.Diagnostics.Process? p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(30_000);
+        Assert.True(p?.ExitCode == 0, $"mklink /J failed: {p?.StandardError.ReadToEnd()}{p?.StandardOutput.ReadToEnd()}");
+    }
+
     [Fact]
     public async Task Routes_answer_with_status_and_400_with_the_reason()
     {
@@ -308,6 +415,18 @@ public sealed class FilesTests : IClassFixture<WebApplicationFactory<Program>>
         finally
         {
             await client.DeleteAsync($"/repos/{id}");
+        }
+    }
+}
+
+/// <summary>A fact that runs on Linux only; skipped, not silently passed, elsewhere.</summary>
+public sealed class LinuxFactAttribute : FactAttribute
+{
+    public LinuxFactAttribute()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Skip = "Linux only: the default file systems of Windows and macOS fold case";
         }
     }
 }

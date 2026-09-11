@@ -726,14 +726,15 @@ repo.MapPost("/tools/vscode", (GitHost git) =>
     }
 });
 
-// Opens a file's diff (commit^ vs commit) in the configured external diff
-// tool (git difftool). The engine starts the tool detached and responds as
-// soon as the process is launched, not when the tool window closes.
+// Opens a file's diff (commit^ vs commit, or commit vs the working tree
+// with `local`) in the configured external diff tool (git difftool). The
+// engine starts the tool detached and responds as soon as the process is
+// launched, not when the tool window closes.
 repo.MapPost("/difftool", (DifftoolRequest body, GitHost git) =>
 {
     try
     {
-        git.OpenDifftool(body.Commit, body.Path);
+        git.OpenDifftool(body.Commit, body.Path, body.Local);
         return Results.Ok(new { ok = true });
     }
     catch (Exception ex)

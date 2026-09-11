@@ -10,7 +10,7 @@ import ListItemText from "@mui/material/ListItemText"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import Typography from "@mui/material/Typography"
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { describeThrown, isAbort, useEngine, type TreeEntry } from "../engine"
 import { isDemoMode } from "../hooks/useEngineSession"
 import { shortcutLabel } from "../hotkeys/catalog"
@@ -34,16 +34,24 @@ export function CommitFileTree({ commitId, onSelectFile, onFileHistory }: Props)
   const [root, setRoot] = useState<Loaded | null>(null)
   const [dirs, setDirs] = useState<Map<string, Loaded>>(new Map())
   const [menu, setMenu] = useState<TreeMenu | null>(null)
+  // The commit the tree shows and the controller of every request made for
+  // it, the directory expansions included (v0.16.0 review, finding 4: an
+  // expansion answered after a commit switch used to land its entries in
+  // the next commit's tree). A switch or unmount aborts them all, and an
+  // answer is applied only while its commit is still the one shown.
+  const shown = useRef<{ commitId: string; ctrl: AbortController } | null>(null)
 
   useEffect(() => {
     setRoot(null)
     setDirs(new Map())
+    shown.current = null
     if (!commitId) return
     if (isDemoMode()) {
       setRoot({ entries: [], error: null })
       return
     }
     const ctrl = new AbortController()
+    shown.current = { commitId, ctrl }
     engine
       .tree(commitId, undefined, ctrl.signal)
       .then((entries) => {
@@ -52,11 +60,15 @@ export function CommitFileTree({ commitId, onSelectFile, onFileHistory }: Props)
       .catch((e: unknown) => {
         if (!ctrl.signal.aborted && !isAbort(e)) setRoot({ entries: [], error: describeThrown(e) })
       })
-    return () => ctrl.abort()
+    return () => {
+      ctrl.abort()
+      if (shown.current?.ctrl === ctrl) shown.current = null
+    }
   }, [engine, commitId])
 
   function toggleDir(path: string) {
-    if (!commitId) return
+    const request = shown.current
+    if (!commitId || request?.commitId !== commitId) return
     if (dirs.has(path)) {
       setDirs((prev) => {
         const next = new Map(prev)
@@ -66,10 +78,17 @@ export function CommitFileTree({ commitId, onSelectFile, onFileHistory }: Props)
       return
     }
     setDirs((prev) => new Map(prev).set(path, { entries: [], error: null }))
+    const { ctrl } = request
+    const stillShown = () => !ctrl.signal.aborted && shown.current?.commitId === request.commitId
     engine
-      .tree(commitId, path)
-      .then((entries) => setDirs((prev) => new Map(prev).set(path, { entries, error: null })))
-      .catch((e: unknown) => setDirs((prev) => new Map(prev).set(path, { entries: [], error: describeThrown(e) })))
+      .tree(commitId, path, ctrl.signal)
+      .then((entries) => {
+        if (stillShown()) setDirs((prev) => new Map(prev).set(path, { entries, error: null }))
+      })
+      .catch((e: unknown) => {
+        if (stillShown() && !isAbort(e))
+          setDirs((prev) => new Map(prev).set(path, { entries: [], error: describeThrown(e) }))
+      })
   }
 
   if (!commitId) {
