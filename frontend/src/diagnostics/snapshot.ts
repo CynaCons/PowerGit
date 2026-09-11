@@ -105,7 +105,12 @@ export async function openLogsFolder(): Promise<void> {
   await openPath(dir)
 }
 
-/** `kind`: "script" (no heartbeat), "paint" (beats but no frames), "crash" (web process died); "" from v0.14.1 files. */
+/**
+ * `kind`: "script" (no heartbeat), "paint" (beats but no frames), "crash"
+ * (web process died), "presentation" (v0.15.6: beats and page frames fresh
+ * but GTK stopped painting the window), "loop" (v0.15.6: the shell's main
+ * loop stopped answering round-trips); "" from v0.14.1 files.
+ */
 export type Incident = { at: string; snapshot: string; kind?: string }
 
 export function describeIncident(kind: string | undefined): string {
@@ -114,6 +119,10 @@ export function describeIncident(kind: string | undefined): string {
       return "PowerGit's window stopped updating"
     case "crash":
       return "PowerGit's page process crashed"
+    case "presentation":
+      return "PowerGit: the window stopped painting while the page kept running"
+    case "loop":
+      return "PowerGit: the shell's main loop stopped responding"
     default:
       return "PowerGit stopped responding"
   }

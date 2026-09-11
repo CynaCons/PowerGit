@@ -122,4 +122,40 @@ test.describe("settings", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0)
     await expect.poll(async () => (await localConfig()).editor).toBe("code --wait")
   })
+
+  // v0.15.6 (Ubuntu freeze taskforce): the recovery ladder the owner drives
+  // with Ctrl+Shift+F1..F9 while the picture is frozen is listed under
+  // Tools, so its keys and hotkeys can be read before the freeze happens.
+  test("the Tools section lists the nine recovery steps with their keys and hotkeys", async ({ page }) => {
+    await page.goto("/")
+    await expect(page.getByTestId("grid-row").first()).toBeVisible()
+    await page.getByTestId("settings-button").click()
+
+    const block = page.getByTestId("recovery-experiments")
+    await expect(block).toContainText("Recovery experiments")
+    await expect(page.getByTestId("recovery-experiments-help")).toContainText("Try 3, 6, 8 first")
+    await expect(page.getByTestId("recovery-experiments-help")).toContainText("engine.log")
+
+    const keys = [
+      "queue_draw",
+      "thaw",
+      "hide_show",
+      "resize",
+      "present",
+      "frame_sync_off_hide_show",
+      "reload",
+      "new_window",
+      "webview_snapshot",
+    ]
+    for (let n = 1; n <= 9; n++) {
+      const row = page.getByTestId(`recovery-step-${n}`)
+      await expect(row).toHaveAttribute("data-key", keys[n - 1])
+      await expect(row).toContainText(keys[n - 1])
+      await expect(page.getByTestId(`recovery-run-${n}`)).toHaveText(`Ctrl+Shift+F${n}`)
+    }
+    // In the browser there is no shell to ask, so the buttons say so by being disabled.
+    await expect(page.getByTestId("recovery-run-3")).toBeDisabled()
+    await page.getByRole("button", { name: "Cancel" }).click()
+    await expect(page.getByRole("dialog")).toHaveCount(0)
+  })
 })
