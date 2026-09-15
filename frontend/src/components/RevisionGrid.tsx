@@ -6,9 +6,10 @@ import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
 import { useAuthorDiscs } from "../theme/authorDiscs"
 import { GraphOptionsBar } from "./GraphOptionsBar"
-import { RefChips } from "./RefChips"
+import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
+import { chipBudget, gridGeometry, type RowBand } from "./gridGeometry"
 
 type Props = {
   rows: GraphRow[]
@@ -24,6 +25,8 @@ type Props = {
   remoteNames?: string[]
   /** Tag names from the ref tree; matching chips get the tag glyph. */
   tagNames?: string[]
+  /** The checked-out branch: its chip comes first after HEAD (v0.18.3). */
+  currentBranch?: string | null
 }
 
 export function RevisionGrid({
@@ -36,12 +39,17 @@ export function RevisionGrid({
   onNearEnd,
   remoteNames,
   tagNames,
+  currentBranch,
 }: Props) {
   const tagSet = useMemo(() => new Set(tagNames ?? []), [tagNames])
   const parentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollbarRef = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(-1)
+  // The one row grown to show every ref (v0.18.3, variant B), by SHA so a
+  // --date-order refresh that moves it keeps it open. +n opens, − / +n on
+  // another row / Escape close.
+  const [expandedSha, setExpandedSha] = useState<string | null>(null)
   // Branch history highlight (v0.14.0): recomputed only when the rows
   // change (a refresh that changes nothing keeps the array, see
   // historyMerge.ts), never per click.
@@ -85,6 +93,8 @@ export function RevisionGrid({
   // (owner: "a discreet scroll bar at the bottom of that column ... shift
   // scroll to scroll left or right"). The canvas is translated by it.
   const overflow = Math.max(0, naturalWidth - width)
+  // Ref chips fold by width (v0.18.3): 60 % of the message column.
+  const budget = chipBudget(bodyWidth, width, widths.author, widths.date, widths.sha)
   const [graphScroll, setGraphScroll] = useState(0)
   useEffect(() => {
     if (graphScroll > overflow) setGraphScroll(overflow)
@@ -105,16 +115,31 @@ export function RevisionGrid({
     return () => el.removeEventListener("wheel", onWheel)
   }, [])
 
+  // Rows are ROW_HEIGHT tall except the expanded one, which measureElement
+  // measures (offsetHeight and the ResizeObserver's border box, both local
+  // px under the #root zoom). Sizes are cached by SHA, not index, so a
+  // refresh that shifts the rows keeps the tall one tall and no other.
+  const getItemKey = useCallback((index: number) => rows[index]?.rev.id ?? index, [rows])
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
+    getItemKey,
     overscan: 12,
   })
 
   const virtualItems = virtualizer.getVirtualItems()
-  const start = virtualItems[0]?.index ?? 0
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
+  // The canvas geometry: the visible bands plus a neighbour on each side
+  // (graph/draw.ts). getVirtualItems() is memoised inside the virtualizer,
+  // so this only recomputes when a row moved or changed height.
+  const geometry = useMemo(() => {
+    const bandOf = (index: number): RowBand | undefined => {
+      const m = virtualizer.measurementsCache[index]
+      return m ? { index: m.index, start: m.start, size: m.size } : undefined
+    }
+    return gridGeometry(virtualItems, bandOf)
+  }, [virtualItems, virtualizer])
 
   // Jumping to a ref can select a row far outside the viewport; keep the
   // selection visible. Only do this when the *commit* changed - not merely
@@ -128,8 +153,9 @@ export function RevisionGrid({
     lastScrolledSha.current = sha
     const parent = parentRef.current
     if (parent) {
-      const top = selected * ROW_HEIGHT
-      const bottom = top + ROW_HEIGHT
+      const item = virtualizer.measurementsCache[selected]
+      const top = item?.start ?? selected * ROW_HEIGHT
+      const bottom = top + (item?.size ?? ROW_HEIGHT)
       if (top >= parent.scrollTop && bottom <= parent.scrollTop + parent.clientHeight) return
     }
     virtualizer.scrollToIndex(selected, { align: "auto" })
@@ -146,19 +172,18 @@ export function RevisionGrid({
     const canvas = canvasRef.current
     const parent = parentRef.current
     if (!canvas || !parent) return
-    const visible = Math.max(end - start, 1)
     const dpr = window.devicePixelRatio || 1
     canvas.width = Math.ceil(width * dpr)
-    canvas.height = Math.ceil(visible * ROW_HEIGHT * dpr)
+    canvas.height = Math.ceil(geometry.height * dpr)
     canvas.style.width = `${width}px`
-    canvas.style.height = `${visible * ROW_HEIGHT}px`
+    canvas.style.height = `${geometry.height}px`
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     // Shifted left by the graph scroll; the drawn width grows by the same
     // amount so the selection band still spans the visible column.
     ctx.setTransform(dpr, 0, 0, dpr, -graphScroll * dpr, 0)
-    drawRows(ctx, rows, start, end, ROW_HEIGHT, width + graphScroll, selected, hovered, ancestry, graphOptions)
-  }, [rows, start, end, selected, hovered, width, graphScroll, ancestry, graphOptions])
+    drawRows(ctx, rows, geometry, width + graphScroll, selected, hovered, ancestry, graphOptions)
+  }, [rows, geometry, selected, hovered, width, graphScroll, ancestry, graphOptions])
 
   // Header drag handles: pointer capture on the handle, width follows the
   // pointer; double-click restores the default.
@@ -187,6 +212,38 @@ export function RevisionGrid({
     [width, widths],
   )
   const resetColumn = (key: ColumnKey) => () => setWidths((w) => ({ ...w, [key]: DEFAULT_WIDTHS[key] }))
+  // Expanding or folding also resets the previously expanded row's cached
+  // size: folded off-screen (Escape, +n elsewhere) it has no element for
+  // the ResizeObserver to re-measure, and its stale height would leave a
+  // phantom gap in the list until it scrolled back into the overscan.
+  const setExpanded = useCallback(
+    (next: string | null) => {
+      if (expandedSha !== null && expandedSha !== next) {
+        const i = rows.findIndex((r) => r.rev.id === expandedSha)
+        if (i >= 0) virtualizer.resizeItem(i, ROW_HEIGHT)
+      }
+      setExpandedSha(next)
+    },
+    [expandedSha, rows, virtualizer],
+  )
+  const foldRow = useCallback(() => setExpanded(null), [setExpanded])
+  const clickRow = useCallback(
+    (index: number) => {
+      onSelect(index)
+      parentRef.current?.focus()
+    },
+    [onSelect],
+  )
+  const contextRow = useMemo(
+    () =>
+      onRowContextMenu
+        ? (e: React.MouseEvent, index: number) => {
+            onSelect(index)
+            onRowContextMenu(e, index)
+          }
+        : undefined,
+    [onSelect, onRowContextMenu],
+  )
   const handle = (key: ColumnKey) => (
     <div
       className="col-resize"
@@ -233,6 +290,15 @@ export function RevisionGrid({
         tabIndex={0}
         onMouseLeave={() => setHovered(-1)}
         onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            // Folds the expanded row; with none, the key goes on (the file
+            // history closes on it).
+            if (expandedSha === null) return
+            e.preventDefault()
+            e.stopPropagation()
+            foldRow()
+            return
+          }
           if (e.altKey || e.ctrlKey || e.metaKey) return
           if (rows.length === 0) return
           const last = rows.length - 1
@@ -275,66 +341,33 @@ export function RevisionGrid({
           <canvas
             ref={canvasRef}
             className="graph-canvas"
-            style={{ top: virtualItems[0]?.start ?? 0, height: (end - start) * ROW_HEIGHT, width }}
+            style={{ top: geometry.top, height: geometry.height, width }}
             data-testid="graph-canvas"
           />
           {virtualItems.map((item) => {
             const row = rows[item.index]
-            const identity = discs && row.rev.author ? authorIdentity(row.rev.author) : null
-            const same = markedAuthor !== null && row.rev.author === markedAuthor
             return (
-              <div
+              <RevisionRow
                 key={row.rev.id}
-                className={`grid-row${item.index === selected ? " selected" : ""}${same ? " author-same" : ""}`}
-                data-testid="grid-row"
-                data-index={item.index}
-                data-artificial={row.artificial}
-                onClick={() => {
-                  onSelect(item.index)
-                  parentRef.current?.focus()
-                }}
-                onContextMenu={
-                  onRowContextMenu
-                    ? (e) => {
-                        onSelect(item.index)
-                        onRowContextMenu(e, item.index)
-                      }
-                    : undefined
-                }
-                onMouseEnter={() => setHovered(item.index)}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${item.start}px)`,
-                }}
-              >
-                <div className="graph-cell" />
-                <div className="msg">
-                  <RefChips
-                    refs={row.rev.refs}
-                    tagSet={tagSet}
-                    remoteNames={remoteNames}
-                    onRefContextMenu={
-                      onRefContextMenu ? (e, ref, kind) => onRefContextMenu(e, ref, kind, item.index) : undefined
-                    }
-                  />
-                  <span className="msg-text">{row.rev.message}</span>
-                </div>
-                <div className="author">
-                  {identity && (
-                    <span className="author-disc" data-palette={identity.palette}>
-                      {identity.initials}
-                    </span>
-                  )}
-                  {row.rev.author}
-                </div>
-                <div className="date">{row.rev.date}</div>
-                <div className="sha" data-testid="sha-cell" title={row.artificial ? undefined : row.rev.id}>
-                  {row.artificial ? "" : row.rev.id.slice(0, 7)}
-                </div>
-              </div>
+                row={row}
+                index={item.index}
+                start={item.start}
+                selected={item.index === selected}
+                sameAuthor={markedAuthor !== null && row.rev.author === markedAuthor}
+                identity={discs && row.rev.author ? authorIdentity(row.rev.author) : null}
+                expanded={row.rev.id === expandedSha}
+                budget={budget}
+                tagSet={tagSet}
+                remoteNames={remoteNames}
+                currentBranch={currentBranch}
+                measureRef={virtualizer.measureElement}
+                onClick={clickRow}
+                onContextMenu={contextRow}
+                onMouseEnter={setHovered}
+                onRefContextMenu={onRefContextMenu}
+                onExpand={setExpanded}
+                onFold={foldRow}
+              />
             )
           })}
         </div>

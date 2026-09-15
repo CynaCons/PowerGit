@@ -42,6 +42,7 @@ import {
 import { HistoryPane } from "./HistoryPane"
 import type { Loadable } from "./loadable"
 import { PanelSplitter } from "./PanelSplitter"
+import { findRefTarget } from "./refChipsModel"
 
 // Git Extensions' FormFileHistory (v0.16.0). Owner: "In main view, in the
 // file tree, right click a file and show the file history. Here again, we
@@ -63,7 +64,7 @@ export type FileHistoryTarget = { path: string; sha: string | null }
 type Props = {
   target: FileHistoryTarget
   session: Pick<EngineSession, "client" | "view" | "setEngineError" | "handleFailure">
-  repoState: Pick<RepoState, "status" | "openFolder">
+  repoState: Pick<RepoState, "status" | "openFolder" | "refs">
   layout: Pick<ChromeLayout, "bottomHeight" | "splitter">
   /** The app's grid menus; only the ref-chip menu is used, the rows get the file history's own. */
   menus: GridMenus
@@ -310,6 +311,7 @@ export function FileHistoryView({
         rows={rows}
         remoteNames={remoteNames}
         tagNames={tagNames}
+        currentBranch={view.repo?.branch}
         selected={selected}
         loadingTail={loadingTail}
         loading={view.live && !loaded}
@@ -367,7 +369,19 @@ export function FileHistoryView({
                 <ErrorState message={detail.message} onRetry={reload} testid="commit-error" />
               )}
               {detail.kind === "loading" && <LoadingState label="Loading commit…" testid="commit-loading" />}
-              {detail.kind === "ready" && <CommitDetailView detail={detail.value} />}
+              {detail.kind === "ready" && (
+                <CommitDetailView
+                  detail={detail.value}
+                  tagNames={tagNames}
+                  remoteNames={remoteNames}
+                  currentBranch={view.repo?.branch}
+                  onSelectRef={(name) => {
+                    const sha = findRefTarget(repoState.refs, name)
+                    if (sha) void history.jumpToRef(sha)
+                  }}
+                  onRefContextMenu={menus.refContextMenu}
+                />
+              )}
             </Box>
           )}
           {tab === "diff" && (
