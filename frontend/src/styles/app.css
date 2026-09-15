@@ -343,8 +343,6 @@ html {
   flex-shrink: 0;
   align-items: center;
   gap: 4px;
-  max-width: 46%;
-  overflow: hidden;
 }
 
 .msg-text {
@@ -357,6 +355,7 @@ html {
 .ref {
   display: inline-flex;
   align-items: center;
+  gap: 3px; /* v0.18.3: every kind carries a glyph, the local branch's fork included */
   padding: 0 6px;
   border-radius: 999px;
   font-size: 10px;
@@ -366,26 +365,79 @@ html {
   white-space: nowrap;
 }
 
+/* "+n" folds the refs that do not fit the row's budget (refChipsModel.ts);
+   clicking it grows the row (variant B), "−" folds it back. */
 .ref.extra {
   background: var(--pg-ref-extra-bg, #f3f4f6);
   color: var(--pg-ref-extra-fg, #6b7280);
+  cursor: pointer;
+}
+.ref.extra:hover {
+  outline: 1px solid var(--pg-ref-extra-fg, #6b7280);
 }
 
 .ref.remote {
   background: var(--pg-ref-remote-bg, #ecfdf5);
   color: var(--pg-ref-remote-fg, #059669);
-  gap: 3px;
 }
 
 .ref.tag {
   background: var(--pg-ref-tag-bg, #f5f3ff);
   color: var(--pg-ref-tag-fg, #6d28d9);
-  gap: 3px;
 }
 
 .ref-cloud {
   font-size: 11px !important;
   flex-shrink: 0;
+}
+
+/* The Commit tab's chips (v0.18.3, variant A): one size up, clickable. */
+.ref.big {
+  height: 20px;
+  padding: 0 8px;
+  gap: 4px;
+  font-size: 11px;
+}
+.ref.big .ref-cloud {
+  font-size: 12px !important;
+}
+.ref.clickable {
+  cursor: pointer;
+}
+.ref.clickable:hover {
+  filter: brightness(0.92);
+}
+
+/* The expanded row (v0.18.3, variant B, owner: "expand vertically the
+   column"): every chip, wrapping, the message under them. The row's height
+   comes from the message cell; the virtualizer measures it
+   (measureElement) and graph/draw.ts gets the real geometry, so the lanes
+   stay continuous through the taller row. Integer heights on purpose: the
+   chips are 16 px, the text line 18 px, so the canvas and the DOM agree. */
+.grid-row.expanded {
+  height: auto;
+  min-height: var(--pg-row-height, 28px);
+}
+.grid-row.expanded .msg {
+  height: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.grid-row.expanded .msg-refs {
+  flex-wrap: wrap;
+  row-gap: 3px;
+  max-width: 100%;
+}
+.grid-row.expanded .ref {
+  height: 16px;
+}
+.grid-row.expanded .msg-text {
+  max-width: 100%;
+  line-height: 18px;
 }
 
 .ref.head {
