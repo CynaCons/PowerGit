@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test"
 import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
 // v0.15.0, owner: "the right-click menu will be upgraded". The commit menu
-// is Git Extensions' full one now: five groups separated by dividers, an
+// is Git Extensions' full one now: six groups separated by dividers (the
+// sixth, Highlight ancestry, since v0.18.4), an
 // icon on every row, the same shortcuts the toolbar shows, and submenus for
 // reset / delete / compare / copy. What is in it is unit-tested
 // (revisionMenuModel.test.ts); this spec proves the rendering, the submenu
@@ -24,6 +25,7 @@ const EXPECTED_ORDER = [
   "ctx-fixup",
   "ctx-squash",
   "ctx-compare",
+  "ctx-highlight-ancestry",
   "ctx-copy",
   "ctx-archive",
   "ctx-open-browser",
@@ -73,7 +75,7 @@ test.describe("revision context menu", () => {
     expect(ids).toEqual(EXPECTED_ORDER)
 
     // One separator per group boundary, and none above the first item.
-    await expect(page.locator("#revision-context-menu hr")).toHaveCount(4)
+    await expect(page.locator("#revision-context-menu hr")).toHaveCount(5)
     const firstChild = await page
       .locator("#revision-context-menu > ul > *")
       .first()
@@ -89,6 +91,7 @@ test.describe("revision context menu", () => {
     await expect(page.getByTestId("ctx-merge")).toContainText("Ctrl+M")
     await expect(page.getByTestId("ctx-merge")).toContainText("Merge 'topic' into current branch")
     await expect(page.getByTestId("ctx-rebase")).toContainText("Ctrl+Shift+E")
+    await expect(page.getByTestId("ctx-highlight-ancestry")).toContainText("Ctrl+Shift+B")
     // No remote in the fixture: the item is there, greyed, not missing.
     await expect(page.getByTestId("ctx-open-browser")).toHaveAttribute("aria-disabled", "true")
     // Nothing staged: the fixup/squash pair is disabled too.

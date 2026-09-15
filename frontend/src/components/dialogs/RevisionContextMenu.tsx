@@ -144,6 +144,8 @@ export function RevisionContextMenu({
         return actions.compare(target?.previousSha ?? sha, sha)
       case "ctx-compare-to-base":
         return actions.compare(baseSha ?? sha, sha, { fromLabel: `BASE ${(baseSha ?? sha).slice(0, 7)}` })
+      case "ctx-highlight-ancestry":
+        return actions.highlightAncestry(sha)
       case "ctx-archive":
         return void actions.archive(sha)
       case "ctx-open-browser":

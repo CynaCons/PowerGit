@@ -9,7 +9,7 @@ import type { RepoState } from "./useRepoState"
 
 export type GitActionsDeps = {
   session: Pick<EngineSession, "client" | "view" | "setEngineError">
-  history: Pick<History, "current" | "selectedSha">
+  history: Pick<History, "current" | "selectedSha" | "setHighlightRoot">
   repoState: Pick<RepoState, "status" | "setStatus" | "setRefs" | "refresh" | "branchNames" | "openFolder">
   jobs: Pick<Jobs, "withBusy" | "runJob">
   dialogs: Dialogs
@@ -154,6 +154,11 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
   function deleteBranchPrompt() {
     open({ kind: "deleteBranch" })
   }
+  /** The row menu's "Highlight ancestry (until refresh)" (v0.18.4): this
+   *  commit's history takes the checked-out branch's highlight. */
+  function highlightAncestry(sha: string) {
+    if (!isArtificialId(sha)) history.setHighlightRoot(sha)
+  }
   function openSubmodule(path: string) {
     if (!repo) return
     const sep = repo.root.endsWith("/") || repo.root.endsWith("\\") ? "" : "/"
@@ -198,6 +203,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs }: Gi
     openRebase,
     openMergeBranch,
     deleteBranchPrompt,
+    highlightAncestry,
     openSubmodule,
     applyLatestStash,
     dropLatestStash,
