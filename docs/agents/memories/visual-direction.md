@@ -108,3 +108,32 @@ at 150 px) in place of "Checked-out branch", an outlined amber Exit with
 an Esc key chip, pinned open until Exit / Esc / a refresh that drops the
 row / a repository switch, then it collapses again. Text cells are still
 never dimmed. Never persisted: it is a look, not a setting.
+
+## Recent repositories: a flat picker, the disc is the one bold element (v0.18.7)
+
+Owner (2026-09-15): "can we run /frontend-design on the Recent Repositories
+overlay? Show me visual prototypes to improve that UI" → "ok for C" of
+`docs/prototypes/recents.html` (A quick-open list, B by folder, C tiles, D
+today). The v0.4.6 dialog was the last place the rounded-card kit survived
+(a centred modal, two columns of outlined cards, the full path on every
+one). The picker (`components/RecentsDialog.tsx`, `RecentTile.tsx`,
+`recentsModel.ts`) opens where a command palette opens — 80 px from the
+top, 760 wide — with the focus in the search box, and is a hairline grid
+of tiles three across (two under 700 px): no cards, no shadows, the lines
+are the 1 px gap on `--pg-border-soft`. One bold element per tile: a
+30 px initials disc (the name's first two words, camel-case counted,
+PowerGit → PG) coloured by a stable hash of the *path* onto the six
+ref-badge pairs — the author-disc device of v0.18.1, so two repositories
+called `api` never share a disc. Then the name at 500 with a fork-glyph
+branch chip (the chip truncates before the name does), the path in the
+code face with the shared root in text.disabled, the tail in
+text.secondary and the ellipsis from the left, "open now" after the path
+of the open repository, and a mono 1–9 hint in the corner that gives way
+to the cross on hover and on the cursor tile. The cursor tile wears the
+grid's selection band (`--pg-grid-sel`, 2 px `--pg-grid-sel-border` on the
+left). The footer sits on the sunken surface: the count ("6
+repositories" / "1 of 6"), the key hints as `Kbd` chips, Open folder….
+Forgetting is a five-second Undo in the footer ("Removed <name> · Undo"),
+never a confirm. Empty states in the interface's voice: "No repositories
+yet — Open a folder and it will be listed here next time." and "Nothing
+matches "x" — Try part of the path or the branch name."

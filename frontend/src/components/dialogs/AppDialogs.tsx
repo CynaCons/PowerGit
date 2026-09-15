@@ -84,6 +84,8 @@ export function AppDialogs({
         onPick={(p) => {
           if (p) void openFolder(p)
         }}
+        currentRoot={repo?.root ?? null}
+        onOpenFolder={() => void openFolder()}
       />
 
       <RevisionContextMenu
