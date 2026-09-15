@@ -1,7 +1,7 @@
 const FEATURES = [
   {
     title: "The graph, always complete",
-    body: "All branches, tags and stashes as nodes, Git Extensions lane colours, virtualised to tens of thousands of commits. The selected row keeps its node and lanes.",
+    body: "All branches, tags and stashes as nodes, Git Extensions lane colours, virtualised to tens of thousands of commits. Every ref on its row, with +n to see them all; tick branches in the tree to show only their history; highlight any commit's ancestry with a right-click.",
   },
   {
     title: "Never stale",
@@ -17,7 +17,7 @@ const FEATURES = [
   },
   {
     title: "Everything in reach",
-    body: "Commit details, changed files as a flat list or a directory tree, unified diffs with context / full-file / whitespace options, the full repository tree at any revision.",
+    body: "Commit details with every ref, changed files as a flat list or a directory tree, unified diffs with context / full-file / whitespace / wrap options, the full repository tree at any revision.",
   },
   {
     title: "Keyboard muscle memory",
@@ -29,7 +29,7 @@ const FEATURES = [
   },
   {
     title: "Branch ops with GE guards",
-    body: "Checkout, reset (soft/mixed/hard), rebase, cherry-pick and revert from the graph's right-click menu, with the same prompts and guards as Git Extensions.",
+    body: "Checkout, reset (soft/mixed/hard), rebase, cherry-pick, revert and Save as patch from the graph's right-click menu, with the same prompts and guards as Git Extensions.",
   },
   {
     title: "Frameless and portable",
