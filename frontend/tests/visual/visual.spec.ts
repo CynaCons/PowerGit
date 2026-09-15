@@ -119,6 +119,10 @@ test.describe("@dialogs", () => {
     await page.getByTestId("recents-button").click()
     await expect(page.getByTestId("recents-filter")).toBeFocused()
     await expect(page.getByTestId("recent-card").first()).toBeVisible()
+    // MUI fades the backdrop in through an inline transition that
+    // animations: "disabled" does not fast-forward; without this wait the
+    // baseline sometimes has the dim and sometimes not.
+    await expect(page.locator(".MuiBackdrop-root").first()).toHaveCSS("opacity", "1")
     await page.mouse.move(5, 5)
     await expect(page).toHaveScreenshot("recents-picker.png")
   })
