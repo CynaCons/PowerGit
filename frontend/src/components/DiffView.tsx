@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import type { DiffDto } from "../engine"
 import { languageForPath, tokenizeLines, type Token } from "../highlight"
 import { codeSx } from "../theme"
+import { useCodeWrap } from "./codeWrap"
 import { ContentNotice } from "./ContentNotice"
 import { parseGutterLines, type GutterLine } from "./diffLines"
 import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines"
@@ -204,6 +205,9 @@ export const DiffView = forwardRef<
   const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
   const mode = useTheme().palette.mode
   const tokens = useDiffTokens(diff.text, lines, diff.path, mode)
+  // Wrap lines (v0.18.8): the scroll container carries data-wrap and
+  // app.css lets the text cell break while the gutter stays put.
+  const wrap = useCodeWrap()
   const selectable = onLineClick !== undefined
   // Where the last press on a row landed, to tell a click from a text drag.
   const press = useRef<Point | null>(null)
@@ -330,6 +334,7 @@ export const DiffView = forwardRef<
           ref={plainRef}
           data-testid="diff-lines"
           data-hotkey-surface={review ? "review" : undefined}
+          data-wrap={wrap ? "true" : undefined}
           tabIndex={review ? 0 : undefined}
           sx={review ? REVIEW_LINES_SX : PLAIN_LINES_SX}
         >
@@ -348,6 +353,7 @@ export const DiffView = forwardRef<
           renderLine={renderLine}
           hotkeySurface={review ? "review" : undefined}
           passKeys={review !== undefined}
+          wrap={wrap}
         />
       )}
     </Box>

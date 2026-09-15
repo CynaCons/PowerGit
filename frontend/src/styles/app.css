@@ -210,6 +210,30 @@ html {
 .diff-row-text {
   padding-left: 8px;
 }
+/* Wrap lines (v0.18.8, owner: "an option to activate line wrapping in the
+   floating action menu"). The scroll container (DiffView's diff-lines, the
+   blob pane, VirtualLines) carries data-wrap="true" while the remembered
+   switch (codeWrap.ts, pg.diffWrap) is on: the row is as wide as the pane
+   instead of its longest line, the text cell breaks (pre-wrap, anywhere:
+   a 400-character token still breaks) and the row grows; the gutter keeps
+   its width, its sticky left and its numbers. Off, nothing here applies
+   and the diff-view.spec no-wrap assertions hold. */
+[data-wrap="true"] .diff-row {
+  width: 100%;
+}
+[data-wrap="true"] .diff-row-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+/* The blob pane's own <pre> (an emotion class sets white-space: pre on it,
+   hence the two-attribute selector) and Shiki's nested pre/code. */
+[data-testid="blob-pane"][data-wrap="true"],
+[data-wrap="true"] pre,
+[data-wrap="true"] code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* Commit dialog line selection (v0.13.14): stage / reset selected lines.
    v0.16.0: the rows are plain selectable text again (owner: "missing the
    ability to select text for copy-paste"); a click that ends a text drag is

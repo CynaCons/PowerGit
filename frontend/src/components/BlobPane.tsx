@@ -6,6 +6,8 @@ import { highlightToHtml, languageForPath } from "../highlight"
 import { codeSx, MONO_FONT } from "../theme"
 import { ContentNotice } from "./ContentNotice"
 import { EmptyState, LoadingState } from "./AsyncState"
+import { useCodeWrap } from "./codeWrap"
+import { DiffOptionsBar } from "./DiffOptionsBar"
 import { VirtualLines } from "./VirtualLines"
 
 // Shared by both the plain-text and Shiki-highlighted render paths so
@@ -92,9 +94,13 @@ export function BlobPane({
   }, [text, path, highlightable])
 
   const lines = useMemo(() => (text === null ? [] : text.split("\n")), [text])
+  // Wrap lines (v0.18.8): the pane's pill is the diff pill reduced to that
+  // one switch; data-wrap on the scroll container drives app.css.
+  const wrap = useCodeWrap()
+  const dataWrap = wrap ? "true" : undefined
 
   return (
-    <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+    <Box sx={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box sx={{ px: 1.5, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
         <Typography variant="caption" sx={{ fontFamily: MONO_FONT }}>
           {path ?? " "}
@@ -104,6 +110,7 @@ export function BlobPane({
       {html ? (
         <Box
           data-testid="blob-pane"
+          data-wrap={dataWrap}
           sx={BLOB_PANE_HTML_SX}
           // Safe: this is Shiki's own HTML, produced by tokenizing
           // `blob.text` against a TextMate grammar — Shiki escapes the text
@@ -111,7 +118,7 @@ export function BlobPane({
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : blob && lines.length <= VIRTUALIZE_MIN_LINES ? (
-        <Box data-testid="blob-pane" component="pre" sx={BLOB_PANE_SX}>
+        <Box data-testid="blob-pane" data-wrap={dataWrap} component="pre" sx={BLOB_PANE_SX}>
           {blob.text}
         </Box>
       ) : blob ? (
@@ -122,6 +129,7 @@ export function BlobPane({
             testid="blob-lines"
             sx={{ padding: "16px" }}
             renderLine={(i) => <span>{lines[i] || " "}</span>}
+            wrap={wrap}
           />
         </Box>
       ) : path ? (
@@ -133,6 +141,7 @@ export function BlobPane({
           <EmptyState text="Select a file in the tree." testid="blob-empty" />
         </Box>
       )}
+      <DiffOptionsBar wrapOnly />
     </Box>
   )
 }
