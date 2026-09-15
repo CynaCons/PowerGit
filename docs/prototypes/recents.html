@@ -1,0 +1,404 @@
+<title>PowerGit Recent Repositories</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee; --scrim: rgba(16, 24, 39, 0.28); --shadow: 0 18px 48px rgba(16, 24, 39, 0.26);
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb;
+    /* the six badge pairs, reused as the repository disc palette (v0.18.1 device) */
+    --d1-bg: #eff6ff; --d1-fg: #2563eb; --d2-bg: #ecfdf5; --d2-fg: #059669; --d3-bg: #f5f3ff; --d3-fg: #6d28d9;
+    --d4-bg: #fef9c3; --d4-fg: #a16207; --d5-bg: #fef2f2; --d5-fg: #dc2626; --d6-bg: #f3f4f6; --d6-fg: #6b7280;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+      --page: #0c1117; --scrim: rgba(0, 0, 0, 0.5); --shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+      --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe;
+      --d1-bg: #1f3a5f; --d1-fg: #bfdbfe; --d2-bg: #0b3d2e; --d2-fg: #86efac; --d3-bg: #2e1f5e; --d3-fg: #ddd6fe;
+      --d4-bg: #3f2a06; --d4-fg: #fde68a; --d5-bg: #4a1d1d; --d5-fg: #fecaca; --d6-bg: #2c3239; --d6-fg: #c5cbd3;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+    --page: #0c1117; --scrim: rgba(0, 0, 0, 0.5); --shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe;
+    --d1-bg: #1f3a5f; --d1-fg: #bfdbfe; --d2-bg: #0b3d2e; --d2-fg: #86efac; --d3-bg: #2e1f5e; --d3-fg: #ddd6fe;
+    --d4-bg: #3f2a06; --d4-fg: #fde68a; --d5-bg: #4a1d1d; --d5-fg: #fecaca; --d6-bg: #2c3239; --d6-fg: #c5cbd3;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Ubuntu", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  svg { display: block; }
+  kbd { font: inherit; font-size: 10.5px; font-family: var(--mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--meta); line-height: 15px; }
+
+  /* ---------- page chrome ---------- */
+  .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 9px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .right { display: flex; gap: 10px; margin-left: auto; align-items: center; }
+  .switch { display: flex; gap: 4px; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch button b { font-weight: 700; margin-right: 6px; }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 4px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 20px 20px 56px; }
+  .lead { max-width: 78ch; margin: 0 auto 14px; color: var(--text-2); }
+  .lead h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .lead .quote { border-left: 2px solid var(--border); padding-left: 10px; color: var(--meta); font-style: italic; margin: 8px 0; }
+  .notes { max-width: 1180px; margin: 16px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .notes h3 { font-size: 12px; font-weight: 600; color: var(--meta); margin: 0 0 6px; }
+  .notes ol, .notes ul { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+  .notes li { display: flex; gap: 9px; margin: 0 0 7px; }
+  .notes li .mark { flex: none; margin-top: 1px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+  .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; line-height: 1; font-style: normal; }
+  .win .mark { position: relative; z-index: 3; margin-left: 6px; box-shadow: 0 0 0 2px var(--surface); flex: none; }
+  @media (max-width: 800px) { .notes { grid-template-columns: 1fr; } }
+
+  /* ---------- the window behind the picker ---------- */
+  .win-wrap { overflow-x: auto; }
+  .win { width: 1180px; max-width: 100%; height: 700px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 14px 40px rgba(16, 24, 39, 0.22); display: grid; grid-template-rows: 30px 1fr; position: relative; user-select: none; }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--meta); }
+  .titlebar .word { font-weight: 600; color: var(--text); }
+  .titlebar .hair { width: 1px; height: 14px; background: var(--border); }
+  .shell { display: grid; grid-template-columns: 48px 240px 1fr; min-height: 0; }
+  .rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 10px; }
+  .rail i { width: 22px; height: 22px; border-radius: 5px; background: var(--surface-alt); display: block; }
+  .rail i.on { background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+  .tree { border-right: 1px solid var(--border); padding: 10px 12px; }
+  .bar { height: 10px; border-radius: 3px; background: var(--surface-alt); margin: 8px 0; }
+  .grid { padding: 8px 12px; }
+  .grid .bar { margin: 12px 0; }
+  .scrim { position: absolute; left: 0; top: 30px; right: 0; bottom: 0; background: var(--scrim); }
+
+  /* ---------- the picker frame shared by A / B / C ---------- */
+  .pick { position: absolute; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; z-index: 4; }
+  .pick.palette { top: 64px; width: 640px; max-height: 560px; }
+  .pick.tiles { top: 80px; width: 760px; max-height: 560px; }
+  .search { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border-bottom: 1px solid var(--border); flex: none; }
+  .search svg { width: 16px; height: 16px; fill: var(--meta); flex: none; }
+  .search input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13.5px; min-width: 0; }
+  .search input::placeholder { color: var(--disabled); }
+  .search .esc { color: var(--meta); font-size: 11px; display: inline-flex; gap: 5px; align-items: center; }
+  .list { overflow: auto; flex: 1; min-height: 0; }
+  .foot { display: flex; align-items: center; gap: 14px; height: 34px; padding: 0 14px; border-top: 1px solid var(--border); background: var(--sunken); font-size: 12px; color: var(--meta); flex: none; }
+  .foot .sp { flex: 1; }
+  .foot .hint { display: inline-flex; gap: 5px; align-items: center; }
+  .foot a { color: var(--primary); cursor: pointer; text-decoration: none; font-weight: 500; }
+  .foot a:hover { text-decoration: underline; }
+  .undo { color: var(--text-2); }
+  .empty { padding: 28px 16px; text-align: left; color: var(--meta); }
+  .empty b { display: block; color: var(--text); font-weight: 600; margin-bottom: 4px; }
+
+  /* rows (A and B) */
+  .row { display: grid; grid-template-columns: 26px 1fr auto 26px; align-items: center; column-gap: 10px; padding: 0 10px 0 12px; cursor: default; border-left: 2px solid transparent; position: relative; }
+  .row.two { height: 46px; }
+  .row.one { height: 32px; }
+  .row:hover { background: var(--hover); }
+  .row.cur { background: var(--sel-bg); border-left-color: var(--sel-border); }
+  .row .key { font-family: var(--mono); font-size: 11px; color: var(--disabled); text-align: center; }
+  .row.cur .key { color: var(--primary); }
+  .row .main { min-width: 0; }
+  .row .name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text); line-height: 18px; }
+  .row .name .open-now { font-size: 11px; color: var(--meta); font-weight: 400; }
+  .row .path { font-family: var(--mono); font-size: 11.5px; color: var(--meta); line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+  .row .path bdi { unicode-bidi: plaintext; }
+  .row .path .shared { color: var(--disabled); }
+  .row .path .tail { color: var(--text-2); }
+  .row .x { width: 22px; height: 22px; border: 0; background: transparent; border-radius: 4px; color: var(--meta); display: inline-grid; place-items: center; cursor: pointer; visibility: hidden; }
+  .row:hover .x, .row.cur .x { visibility: visible; }
+  .row .x:hover { background: var(--hover); color: var(--text); }
+  .row .x svg { width: 14px; height: 14px; fill: currentColor; }
+  .ref { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; height: 16px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--ref-local-bg); color: var(--ref-local-fg); white-space: nowrap; }
+  .ref svg { width: 11px; height: 11px; fill: currentColor; }
+  .hl { background: rgba(21, 83, 201, 0.16); border-radius: 2px; }
+  :root[data-theme="dark"] .hl { background: rgba(59, 123, 255, 0.28); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hl { background: rgba(59, 123, 255, 0.28); } }
+
+  /* groups (B) */
+  .group { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 12px; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--meta); background: var(--sunken); border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 1; }
+  .group:first-child { margin-top: 0; border-top: 0; }
+  .group .n { margin-left: auto; font-family: inherit; color: var(--disabled); }
+  .group svg { width: 13px; height: 13px; fill: var(--meta); }
+
+  /* tiles (C) */
+  .tilegrid { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--border-soft); gap: 1px; }
+  .tile { background: var(--surface); padding: 10px 12px 10px 12px; display: grid; grid-template-columns: 30px 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; min-height: 76px; cursor: default; position: relative; border-left: 2px solid transparent; }
+  .tile:hover { background: var(--hover); }
+  .tile.cur { background: var(--sel-bg); border-left-color: var(--sel-border); }
+  .tile .disc { grid-row: 1 / span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; margin-top: 2px; }
+  .tile .name { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .tile .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile .key { font-family: var(--mono); font-size: 11px; color: var(--disabled); grid-column: 3; }
+  .tile.cur .key { color: var(--primary); }
+  .tile .path { grid-column: 2 / span 2; font-family: var(--mono); font-size: 11px; color: var(--meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+  .tile .path bdi { unicode-bidi: plaintext; }
+  .tile .path .shared { color: var(--disabled); }
+  .tile .path .tail { color: var(--text-2); }
+  .tile .x { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border: 0; background: transparent; border-radius: 4px; color: var(--meta); display: grid; place-items: center; cursor: pointer; visibility: hidden; }
+  .tile:hover .x, .tile.cur .x { visibility: visible; }
+  .tile:hover .key, .tile.cur .key { visibility: hidden; } /* the key gives way to the cross */
+  .tile .x svg { width: 13px; height: 13px; fill: currentColor; }
+  .tile .open-now { font-size: 11px; color: var(--meta); font-weight: 400; }
+  .p1 { background: var(--d1-bg); color: var(--d1-fg); } .p2 { background: var(--d2-bg); color: var(--d2-fg); } .p3 { background: var(--d3-bg); color: var(--d3-fg); }
+  .p4 { background: var(--d4-bg); color: var(--d4-fg); } .p5 { background: var(--d5-bg); color: var(--d5-fg); } .p6 { background: var(--d6-bg); color: var(--d6-fg); }
+
+  /* the toast that answers Enter */
+  .toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--text); color: var(--surface); padding: 6px 12px; border-radius: 5px; font-size: 12px; z-index: 6; opacity: 0; transition: opacity 120ms ease; pointer-events: none; }
+  .toast.on { opacity: 1; }
+
+  /* the current (D) dialog, for comparison */
+  .old { position: absolute; left: 50%; top: 90px; transform: translateX(-50%); width: 900px; background: var(--surface); border-radius: 4px; box-shadow: var(--shadow); z-index: 4; padding: 16px 24px 18px; }
+  .old h3 { margin: 0 0 14px; font-size: 20px; font-weight: 500; }
+  .old .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .old .card { border: 1px solid var(--border); border-radius: 4px; padding: 14px 40px 14px 16px; position: relative; }
+  .old .card b { display: block; font-size: 15px; font-weight: 600; }
+  .old .card i { display: block; font-style: normal; color: var(--meta); font-size: 13px; }
+  .old .card small { display: block; color: var(--meta); font-size: 11.5px; margin-top: 4px; word-break: break-all; }
+  .old .card em { position: absolute; top: 6px; right: 8px; font-style: normal; color: var(--meta); }
+</style>
+
+<div class="top">
+  <h1>Recent repositories</h1>
+  <span class="sub">three pickers for the same twelve repositories — type, use ↑ ↓ Enter, or press 1–9</span>
+  <div class="right">
+    <div class="switch" id="variants"></div>
+    <div class="theme" id="theme">
+      <button data-t="light">Light</button><button data-t="system" class="on">System</button><button data-t="dark">Dark</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="lead" id="lead"></div>
+  <div class="win-wrap">
+  <div class="win" id="win" tabindex="-1">
+    <div class="titlebar"><span class="word">PowerGit</span><span class="hair"></span><span>powergit</span></div>
+    <div class="shell">
+      <div class="rail"><i></i><i></i><i></i><i class="on"></i><i style="margin-top:14px"></i><i></i><i></i><i></i><i></i></div>
+      <div class="tree"><div class="bar" style="width:70%"></div><div class="bar" style="width:40%;margin-left:16px"></div><div class="bar" style="width:52%;margin-left:16px"></div><div class="bar" style="width:36%"></div><div class="bar" style="width:60%;margin-left:16px"></div><div class="bar" style="width:44%;margin-left:32px"></div><div class="bar" style="width:30%"></div></div>
+      <div class="grid"><div class="bar" style="width:92%"></div><div class="bar" style="width:85%"></div><div class="bar" style="width:88%"></div><div class="bar" style="width:80%"></div><div class="bar" style="width:90%"></div><div class="bar" style="width:76%"></div><div class="bar" style="width:84%"></div><div class="bar" style="width:70%"></div><div class="bar" style="width:86%"></div><div class="bar" style="width:78%"></div></div>
+    </div>
+    <div class="scrim"></div>
+    <div id="picker"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+  </div>
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+const I = {
+  search: '<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>',
+  branch: '<svg viewBox="0 0 24 24"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>',
+};
+
+/* recents.json as the engine keeps it: name, root, branch — newest first, 20 at most */
+const SEED = [
+  { name: 'PowerGit', root: 'C:\\dev\\public-repo\\powergit', branch: 'powergit', open: true },
+  { name: 'gitextensions-ref', root: 'C:\\dev\\public-repo\\gitextensions-ref', branch: 'master' },
+  { name: 'powerspawn', root: 'C:\\dev\\public-repo\\powerspawn', branch: 'main' },
+  { name: 'website', root: 'C:\\dev\\work\\acme\\website', branch: 'release/2026-09' },
+  { name: 'api', root: 'C:\\dev\\work\\acme\\api', branch: 'feature/rate-limits' },
+  { name: 'powerplan', root: 'C:\\dev\\public-repo\\powerplan', branch: 'main' },
+  { name: 'shiki', root: 'C:\\dev\\oss\\shiki', branch: 'main' },
+  { name: 'tauri', root: 'C:\\dev\\oss\\tauri', branch: 'dev' },
+  { name: 'api', root: 'C:\\dev\\work\\northwind\\api', branch: 'main' },
+  { name: 'infra', root: 'C:\\dev\\work\\acme\\infra', branch: 'main' },
+  { name: 'notes', root: 'C:\\Users\\cynak\\notes', branch: 'main' },
+  { name: 'dotfiles', root: 'C:\\Users\\cynak\\dotfiles', branch: 'main' },
+];
+
+const state = { variant: 'A', items: SEED.map((r) => ({ ...r })), q: '', cur: 0, undo: null };
+const VARIANTS = { A: 'The list', B: 'By folder', C: 'Tiles', D: 'Today' };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const parent = (root) => root.slice(0, root.lastIndexOf('\\'));
+/* Initials from the name's words, camel-case counted as words (PowerGit → PG,
+   gitextensions-ref → GR, powerspawn → PO); the colour from the PATH, so two
+   repositories called api never share a disc. */
+const initials = (n) => { const w = n.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s\-_.]+/).filter(Boolean); return (w.length > 1 ? w[0][0] + w[1][0] : n.slice(0, 2)).toUpperCase(); };
+const palette = (n) => { let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) >>> 0; return 'p' + ((h % 6) + 1); };
+
+/* The part of the path every listed repository shares is dimmed; the last
+   segment carries the ink. Recognition by path, not decoration. */
+function sharedPrefix(items) {
+  if (items.length < 2) return '';
+  const parts = items.map((r) => r.root.split('\\'));
+  let n = 0;
+  while (parts.every((p) => p.length > n + 1 && p[n] === parts[0][n])) n++;
+  return parts[0].slice(0, n).join('\\') + (n ? '\\' : '');
+}
+function pathHtml(root, shared, q) {
+  const tailAt = root.lastIndexOf('\\') + 1;
+  const sh = root.startsWith(shared) ? shared : '';
+  const mid = root.slice(sh.length, tailAt);
+  const tail = root.slice(tailAt);
+  return `<bdi><span class="shared">${esc(sh)}</span>${mark(esc(mid), q)}<span class="tail">${mark(esc(tail), q)}</span></bdi>`;
+}
+function mark(html, q) {
+  if (!q) return html;
+  const i = html.toLowerCase().indexOf(q.toLowerCase());
+  return i < 0 ? html : html.slice(0, i) + '<span class="hl">' + html.slice(i, i + q.length) + '</span>' + html.slice(i + q.length);
+}
+function matches(r, q) {
+  if (!q) return true;
+  const s = q.toLowerCase();
+  return r.name.toLowerCase().includes(s) || r.root.toLowerCase().includes(s) || r.branch.toLowerCase().includes(s);
+}
+function visible() { return state.items.filter((r) => matches(r, state.q.trim())); }
+
+/* ---------- render ---------- */
+function render() {
+  $('variants').innerHTML = Object.entries(VARIANTS).map(([k, t]) => `<button data-variant="${k}" class="${k === state.variant ? 'on' : ''}"><b>${k}</b>${t}</button>`).join('');
+  renderLead(); renderPicker(); renderNotes();
+}
+function renderLead() {
+  const v = state.variant;
+  const h = {
+    A: `<h2>A · The list — a quick-open palette</h2>
+      <p class="quote">"Can we improve the Recent repositories overlay?"</p>
+      <p>The picker's one job is to get you back into the right repository in a second, with the keyboard, and to make <b>which one</b> unmistakable when three of them are called <code>api</code>. So the row is built from what identifies a repository: the name, then its <b>path</b> in the code face — the part every entry shares is dimmed, the folder you would say out loud is in ink — and the branch it was on. The panel opens where a command palette opens (top, not centre), the cursor is in the search box, and typing narrows by name, path or branch. <b>1–9</b> open the first nine outright; ↑ ↓ and Enter do the rest. The repository that is open now is a fact on its row, not a card you can re-open. <b>Recommended.</b></p>`,
+    B: `<h2>B · By folder — the same list, grouped where you keep things</h2>
+      <p>Twenty repositories usually live in three or four places. Grouping by parent folder turns the path into a heading (<code>C:\\dev\\work\\acme</code>) and lets every row be one line: name and branch. The group headers stay put while you scroll; typing filters inside them and hides the empty ones. Better when your roots are few and your names clash (two <code>api</code>s sit under different headings); weaker when every repository is in its own place — then every group has one row.</p>`,
+    C: `<h2>C · Tiles — recognition by shape</h2>
+      <p>Closest to today's layout, made flat: a hairline grid instead of cards with shadows, three across, and one bold element per tile — an initials disc coloured from the repository's name, the device the author discs use in the graph (v0.18.1). You find PowerGit by its blue <b>PG</b> before you read a word. Name and branch on the first line, the path's tail on the second, the key hint in the corner. The same search box and keys as A.</p>`,
+    D: `<h2>D · Today — for comparison</h2>
+      <p>The v0.4.6 dialog: a centred modal, two columns of outlined cards, name at 15 px, the branch and the full path underneath, a cross to forget. It is the one place the pre-v0.13.13 rounded-card kit survived. No search, no keyboard, no sign of which repository is open now, and the full path repeats <code>C:\\dev\\public-repo\\</code> on every card.</p>`,
+  }[v];
+  $('lead').innerHTML = h;
+}
+function renderPicker() {
+  const v = state.variant;
+  const list = visible();
+  if (state.cur >= list.length) state.cur = Math.max(0, list.length - 1);
+  const q = state.q.trim();
+  const shared = sharedPrefix(state.items);
+  const x = (r) => `<button class="x" data-forget="${esc(r.root)}" title="Remove from recent repositories" aria-label="Remove ${esc(r.name)} from recent repositories">${I.close}</button>`;
+  const chip = (r) => `<span class="ref">${I.branch}${mark(esc(r.branch), q)}</span>`;
+  const key = (i) => (i < 9 ? String(i + 1) : '');
+  const search = `<div class="search">${I.search}<input id="q" type="text" value="${esc(state.q)}" placeholder="Type to filter by name, path or branch" aria-label="Filter recent repositories" autocomplete="off" spellcheck="false"><span class="esc"><kbd>Esc</kbd></span></div>`;
+  const foot = `<div class="foot">${state.undo ? `<span class="undo">Removed ${esc(state.undo.name)} <a data-act="undo">Undo</a></span>` : `<span>${list.length === state.items.length ? `${state.items.length} repositories` : `${list.length} of ${state.items.length}`}</span>`}<span class="sp"></span><span class="hint"><kbd>↑</kbd><kbd>↓</kbd> move</span><span class="hint"><kbd>Enter</kbd> open</span><span class="hint"><kbd>1</kbd>–<kbd>9</kbd> jump</span><a data-act="open-folder">Open folder…</a></div>`;
+  const empty = state.items.length === 0
+    ? `<div class="empty"><b>No repositories yet</b>Open a folder and it will be listed here next time.</div>`
+    : `<div class="empty"><b>Nothing matches "${esc(q)}"</b>Try part of the path or the branch name.</div>`;
+
+  if (v === 'D') {
+    $('picker').innerHTML = `<div class="old" role="dialog"><h3>Recent repositories</h3><div class="cards">${state.items.slice(0, 6).map((r) => `<div class="card"><b>${esc(r.name)}</b><i>${esc(r.branch)}</i><small>${esc(r.root)}</small><em>✕</em></div>`).join('')}</div></div>`;
+    return;
+  }
+  let body = '';
+  if (list.length === 0) body = empty;
+  else if (v === 'A') {
+    body = list.map((r, i) => `<div class="row two ${i === state.cur ? 'cur' : ''}" data-i="${i}" data-root="${esc(r.root)}"><span class="key">${key(i)}</span><div class="main"><div class="name"><span>${mark(esc(r.name), q)}</span>${chip(r)}${r.open ? '<span class="open-now">open now</span>' : ''}${i === 0 ? '<span class="mark">1</span>' : ''}${i === 1 ? '<span class="mark">2</span>' : ''}</div><div class="path">${pathHtml(r.root, shared, q)}</div></div><span></span>${x(r)}</div>`).join('');
+  } else if (v === 'B') {
+    const groups = new Map();
+    list.forEach((r, i) => { const p = parent(r.root); if (!groups.has(p)) groups.set(p, []); groups.get(p).push({ r, i }); });
+    for (const [p, rows] of groups) {
+      body += `<div class="group">${I.folder}<span>${mark(esc(p), q)}</span><span class="n">${rows.length}</span>${p === parent(list[0].root) ? '<span class="mark">1</span>' : ''}</div>`;
+      body += rows.map(({ r, i }) => `<div class="row one ${i === state.cur ? 'cur' : ''}" data-i="${i}" data-root="${esc(r.root)}"><span class="key">${key(i)}</span><div class="main"><div class="name"><span>${mark(esc(r.name), q)}</span>${chip(r)}${r.open ? '<span class="open-now">open now</span>' : ''}${i === 4 ? '<span class="mark">2</span>' : ''}</div></div><span></span>${x(r)}</div>`).join('');
+    }
+  } else {
+    body = `<div class="tilegrid">${list.map((r, i) => `<div class="tile ${i === state.cur ? 'cur' : ''}" data-i="${i}" data-root="${esc(r.root)}"><span class="disc ${palette(r.root)}">${initials(r.name)}</span><div class="name"><span>${mark(esc(r.name), q)}</span>${chip(r)}${i === 0 ? '<span class="mark">1</span>' : ''}</div><span class="key">${key(i)}</span><div class="path">${pathHtml(r.root, shared, q)}${r.open ? ' <span class="open-now">open now</span>' : ''}</div>${x(r)}</div>`).join('')}</div>`;
+  }
+  $('picker').innerHTML = `<div class="pick ${v === 'C' ? 'tiles' : 'palette'}" role="dialog" aria-label="Recent repositories">${search}<div class="list" id="list">${body}</div>${foot}</div>`;
+  const input = $('q');
+  if (input && document.activeElement !== input && !state.blurred) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  const curEl = document.querySelector('[data-i].cur');
+  if (curEl) curEl.scrollIntoView({ block: 'nearest' });
+}
+function renderNotes() {
+  const v = state.variant;
+  const li = (n, t) => `<li><span class="mark">${n}</span><span>${t}</span></li>`;
+  const bl = (t) => `<li><span>${t}</span></li>`;
+  let a = '', b = '';
+  if (v === 'A') {
+    a = li(1, `<b>The row is an identity, not a card.</b> Name at 500, the branch chip from the graph (fork glyph, v0.18.3), "open now" on the repository you are in; the path in the code face with the shared root (<code>C:\</code> here; all of <code>C:\dev\</code> when everything sits under it) dimmed and <code>powergit</code> in ink because that is the word you are looking for. Two <code>api</code>s stop looking alike.`)
+      + li(2, `<b>Keys on the left, forget on the right.</b> 1–9 are real bindings (the first nine rows), so the numbers carry information; the cross appears on hover and on the cursor row, and the footer offers Undo for five seconds instead of asking "are you sure?".`);
+    b = bl(`<b>Component:</b> <code>RecentsDialog.tsx</code> keeps its props (<code>recents</code>, <code>onPick</code>, <code>onForget</code>) and its test ids (<code>recent-card</code> becomes the row, <code>recent-forget</code> the cross); a MUI <code>Dialog</code> with <code>PaperProps</code> anchored at the top (<code>sx: { position: "absolute", top: 64 }</code>) and a plain list, no <code>Card</code>. The filter and the cursor are local state; <code>sharedPrefix</code> and the match are two pure functions with a unit test.`)
+      + bl(`<b>Keys:</b> the dialog owns them while open (the browse layer is already silent under a dialog): ↑ ↓ move, Enter opens the cursor row, 1–9 open that row, Esc clears the filter then closes, Delete forgets the cursor row. Focus starts in the search box.`)
+      + bl(`<b>Undo:</b> <code>forgetRecent</code> already removes for good; Undo re-adds through <code>POST /repos/recents</code> (a small engine route, <code>RecentsStore.Remember</code> exists) — or the dialog delays the DELETE by five seconds and Undo cancels it, no engine change. The second is the plan's default.`)
+      + bl(`<b>Cost:</b> a day: the component, the two pure functions and their tests, <code>recents.spec.ts</code> extended with type-to-filter, Enter and 1–9; visual baseline for the dialog.`);
+  }
+  if (v === 'B') {
+    a = li(1, `<b>The folder is the heading</b> — in the code face, with the count; sticky while the list scrolls; the filter hides groups with no match.`)
+      + li(2, `<b>One-line rows</b>: name, branch, "open now". The path is not repeated because the heading says it; the cross and the key hint are as in A.`);
+    b = bl(`<b>Same component as A</b> plus a <code>groupByParent</code> pure function (sorted by most recent member, so the group you used last is on top); 1–9 still number the rows in list order, not per group.`)
+      + bl(`<b>When it is worse:</b> twelve repositories in twelve folders is twelve headings for twelve rows. A rule can fall back to A's flat rows when no group has two members.`)
+      + bl(`<b>Cost:</b> A plus half a day.`);
+  }
+  if (v === 'C') {
+    a = li(1, `<b>The disc</b> is the one bold element: initials from the name, colour from a stable hash of the path onto the six badge pairs (so two <code>api</code>s differ) — the same device and palette as the author discs, so it already belongs to the app. The grid is hairlines, not shadows; three across at 760 px, two at a narrower window.`);
+    b = bl(`<b>Same keys and search as A</b>; the cursor moves with ← → as well; <code>repoIdentity</code> reuses <code>graph/authorIdentity.ts</code>'s hash and initials.`)
+      + bl(`<b>Trade-off:</b> the path tail gets one line and is the first thing to be cut; two <code>api</code>s are told apart by the disc colour and the tail (<code>acme\\api</code> vs <code>northwind\\api</code>), not by reading.`)
+      + bl(`<b>Cost:</b> A plus a few hours for the grid and the disc.`);
+  }
+  if (v === 'D') {
+    a = li(1, `Cards with a radius and a border on a modal, a title at 20 px, no search, no keys, no "open now", the full path on every card.`);
+    b = bl(`Kept here so the three proposals are judged against what ships today.`);
+  }
+  $('notes').innerHTML = `<div><h3>What you are looking at</h3><ol>${a}</ol></div><div><h3>How it would be built</h3><ul>${b}</ul></div>`;
+}
+
+/* ---------- interactions ---------- */
+let toastTimer = null, undoTimer = null;
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1600); }
+function openIndex(i) { const list = visible(); const r = list[i]; if (!r) return; toast(r.open ? `${r.name} is already open` : `Opening ${r.name} on ${r.branch}…`); }
+function forget(root) {
+  const idx = state.items.findIndex((r) => r.root === root); if (idx < 0) return;
+  const [r] = state.items.splice(idx, 1);
+  state.undo = { ...r, idx };
+  clearTimeout(undoTimer); undoTimer = setTimeout(() => { state.undo = null; renderPicker(); }, 5000);
+  renderPicker();
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-variant],[data-t],[data-forget],[data-act],[data-i]');
+  if (!t) return;
+  if (t.dataset.variant) { state.variant = t.dataset.variant; state.q = ''; state.cur = 0; state.blurred = false; return render(); }
+  if (t.dataset.t) { const v = t.dataset.t; document.documentElement.removeAttribute('data-theme'); if (v !== 'system') document.documentElement.setAttribute('data-theme', v); document.querySelectorAll('#theme button').forEach((b) => b.classList.toggle('on', b.dataset.t === v)); return; }
+  if (t.dataset.forget !== undefined) { e.stopPropagation(); return forget(t.dataset.forget); }
+  if (t.dataset.act === 'undo') { const u = state.undo; if (u) { state.items.splice(Math.min(u.idx, state.items.length), 0, { name: u.name, root: u.root, branch: u.branch, open: u.open }); state.undo = null; clearTimeout(undoTimer); renderPicker(); } return; }
+  if (t.dataset.act === 'open-folder') return toast('The folder picker opens here');
+  if (t.dataset.i !== undefined) { state.cur = +t.dataset.i; renderPicker(); return openIndex(state.cur); }
+});
+document.addEventListener('input', (e) => { if (e.target.id === 'q') { state.q = e.target.value; state.cur = 0; renderPicker(); } });
+document.addEventListener('focusin', (e) => { if (e.target.id === 'q') state.blurred = false; });
+document.addEventListener('keydown', (e) => {
+  if (state.variant === 'D') return;
+  const inWin = e.target.closest && (e.target.closest('#win') || e.target === document.body);
+  if (!inWin) return;
+  const list = visible();
+  const cols = state.variant === 'C' ? 3 : 1;
+  if (e.key === 'ArrowDown') { e.preventDefault(); state.cur = Math.min(list.length - 1, state.cur + cols); renderPicker(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); state.cur = Math.max(0, state.cur - cols); renderPicker(); }
+  else if (e.key === 'ArrowRight' && cols > 1 && e.target.id === 'q' && e.target.selectionStart === e.target.value.length) { e.preventDefault(); state.cur = Math.min(list.length - 1, state.cur + 1); renderPicker(); }
+  else if (e.key === 'ArrowLeft' && cols > 1 && e.target.id === 'q' && e.target.selectionStart === 0) { e.preventDefault(); state.cur = Math.max(0, state.cur - 1); renderPicker(); }
+  else if (e.key === 'Enter') { e.preventDefault(); openIndex(state.cur); }
+  else if (e.key === 'Escape') { e.preventDefault(); if (state.q) { state.q = ''; state.cur = 0; renderPicker(); } else toast('Closes the picker'); }
+  else if (e.key === 'Delete' && e.target.id === 'q' && !state.q) { const r = list[state.cur]; if (r) forget(r.root); }
+  else if (/^[1-9]$/.test(e.key) && !(e.target.id === 'q' && state.q)) { e.preventDefault(); openIndex(+e.key - 1); }
+});
+render();
+</script>
