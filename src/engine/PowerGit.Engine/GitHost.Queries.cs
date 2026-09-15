@@ -9,16 +9,19 @@ public sealed partial class GitHost
 
     /// <summary>
     /// The revision stream of the graph, or (v0.16.0, <paramref name="filter"/>)
-    /// the commits that touched one path — Git Extensions' FormFileHistory.
-    /// Same paging, ordering and refs either way, so the lane layout runs on
-    /// the filtered list unchanged; each filtered row carries the file's name
-    /// at that commit in <see cref="RevisionDto.Path"/>.
+    /// the commits that touched one path — Git Extensions' FormFileHistory —
+    /// or (v0.18.5, <see cref="RevisionFilter.Refs"/>) the history of chosen
+    /// refs only — GE's "Show filtered branches". Same paging, ordering and
+    /// refs either way, so the lane layout runs on the filtered list
+    /// unchanged; each path-filtered row carries the file's name at that
+    /// commit in <see cref="RevisionDto.Path"/>.
     /// </summary>
     public IReadOnlyList<RevisionDto> ListRevisions(int max = 800, int skip = 0, CancellationToken ct = default, RevisionFilter? filter = null)
     {
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
         bool hasStash = Run(root, "rev-parse", "--verify", "-q", "refs/stash").ExitCode == 0;
+        string? stdinRefs = filter?.Refs is { Count: > 0 } wanted ? ValidatedRefLines(root, wanted) : null;
 
         // Path filter (GE RevisionGridControl.BuildPathFilter + FilterInfo.
         // GetRevisionFilter): `git log --follow` is only reliable for a
@@ -32,7 +35,7 @@ public sealed partial class GitHost
         // --full-history / --simplify-merges are GE's "Show full history" and
         // "Simplify merges" toggles. Folders never follow (GE: the command
         // line "can be very long for folders").
-        string? filterPath = filter is null ? null : filter.Path.Trim().Replace('\\', '/');
+        string? filterPath = string.IsNullOrWhiteSpace(filter?.Path) ? null : filter.Path.Trim().Replace('\\', '/');
         List<string> pathspec = [];
         Dictionary<string, string>? nameByCommit = null;
         if (filterPath is not null)
@@ -67,6 +70,15 @@ public sealed partial class GitHost
         // single argv entries. skip/max page the ordered stream so the UI
         // can load history incrementally.
         //
+        // Ref filter (v0.18.5, GE FilterInfo "Show filtered branches", which
+        // hands git log explicit revs): the chosen full names replace the
+        // three globs and travel on STDIN (--stdin, one per line) for the
+        // same argv reason — a "Show all" over a heavy repo is every ref.
+        // They are validated against the repository's real refs first
+        // (ValidatedRefLines), so nothing that is not a ref name — least of
+        // all an option — ever reaches git. HEAD and refs/stash stay on the
+        // command line as before; the unfiltered command line is unchanged.
+        //
         // --date-order, not --topo-order: GE's default (RevisionSortOrder.
         // GitDefault in RevisionReader.BuildArguments) passes neither sort
         // flag, which falls back to git log's own default of reverse-
@@ -85,9 +97,17 @@ public sealed partial class GitHost
         List<string> logArgs = [
             "-c", "core.quotepath=false",
             "log", "--date-order", "--decorate=short",
-            "--branches", "--remotes", "--tags",
-            $"-n{Math.Clamp(max, 1, 5000)}",
         ];
+        if (stdinRefs is null)
+        {
+            logArgs.AddRange(["--branches", "--remotes", "--tags"]);
+        }
+        else
+        {
+            logArgs.Add("--stdin");
+        }
+
+        logArgs.Add($"-n{Math.Clamp(max, 1, 5000)}");
         if (skip > 0)
         {
             logArgs.Add($"--skip={Math.Clamp(skip, 0, 1_000_000)}");
@@ -119,7 +139,9 @@ public sealed partial class GitHost
             logArgs.AddRange(pathspec);
         }
 
-        CommandResult log = RunTimed(root, 120_000, ct, [.. logArgs]);
+        CommandResult log = stdinRefs is null
+            ? RunTimed(root, 120_000, ct, [.. logArgs])
+            : RunTimedWithStdin(root, 120_000, ct, stdinRefs, [.. logArgs]);
 
         if (log.ExitCode != 0)
         {
@@ -169,6 +191,45 @@ public sealed partial class GitHost
         }
 
         return rows;
+    }
+
+    /// <summary>
+    ///  The ref filter's stdin payload: every requested name, validated
+    ///  against the repository's actual full ref names under refs/heads,
+    ///  refs/remotes and refs/tags, one per line, LF-terminated (git reads
+    ///  <c>--stdin</c> up to the first empty line and refuses anything that
+    ///  starts with a dash). An unknown name, a name outside those three
+    ///  namespaces or one starting with <c>-</c> is an <see cref="ArgumentException"/>
+    ///  naming it — the route answers 400 — so the payload can never carry
+    ///  an option or a revision expression git would resolve on its own.
+    /// </summary>
+    private string ValidatedRefLines(string root, IReadOnlyList<string> wanted)
+    {
+        CommandResult known = Run(root, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags");
+        if (known.ExitCode != 0)
+        {
+            throw new InvalidOperationException(known.StdErr.Trim());
+        }
+
+        HashSet<string> names = new(
+            known.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            StringComparer.Ordinal);
+        StringBuilder sb = new();
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        foreach (string name in wanted)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.StartsWith('-') || !names.Contains(name))
+            {
+                throw new ArgumentException($"unknown ref: {name}");
+            }
+
+            if (seen.Add(name))
+            {
+                sb.Append(name).Append('\n');
+            }
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

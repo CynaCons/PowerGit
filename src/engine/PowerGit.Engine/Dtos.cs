@@ -23,19 +23,25 @@ public sealed record RevisionDto(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Path = null);
 
 /// <summary>
-/// The path filter of a revision list (v0.16.0, GE FormFileHistory). Every
+/// The filter of a revision list. <paramref name="Path"/> (v0.16.0, GE
+/// FormFileHistory) limits it to the commits that touched one path; every
 /// flag mirrors a Git Extensions setting: <paramref name="Follow"/> is
 /// "Detect and follow renames" (FollowRenamesInFileHistory), <paramref name="ExactRenames"/>
 /// its "exact renames and copies only" variant, <paramref name="FullHistory"/>
 /// "Show full history" (<c>--full-history</c>) and <paramref name="SimplifyMerges"/>
 /// "Simplify merges" (<c>--simplify-merges</c>, only with the former).
+/// <paramref name="Refs"/> (v0.18.5, GE FilterInfo "Show filtered branches")
+/// limits it to the history of the given full ref names (<c>refs/heads/x</c>,
+/// <c>refs/remotes/origin/x</c>, <c>refs/tags/x</c>) plus HEAD; both filters
+/// are optional and may combine.
 /// </summary>
 public sealed record RevisionFilter(
-    string Path,
+    string? Path = null,
     bool Follow = true,
     bool ExactRenames = false,
     bool FullHistory = false,
-    bool SimplifyMerges = false);
+    bool SimplifyMerges = false,
+    IReadOnlyList<string>? Refs = null);
 
 public sealed record CommitDetailDto(
     string Id,
