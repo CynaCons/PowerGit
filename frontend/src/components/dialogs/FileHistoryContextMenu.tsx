@@ -13,8 +13,8 @@ import { RevertDialog } from "./RevertDialog"
 // draws it like the Browse menu; this file dispatches the clicks: the copy
 // fields and the cherry-pick / revert dialogs are the Browse menu's own,
 // the difftool goes through the view (which knows the path at the row and
-// the pending rows' staged side), the follow items toggle the view's
-// options.
+// the pending rows' staged side), Save as patch… is the app's own action
+// (v0.18.6), the follow items toggle the view's options.
 
 export type FileHistoryMenuTarget = { x: number; y: number; row: GraphRow }
 
@@ -23,6 +23,7 @@ export function FileHistoryContextMenu({
   options,
   onOptions,
   onDifftool,
+  onSavePatch,
   onClose,
 }: {
   target: FileHistoryMenuTarget | null
@@ -30,6 +31,8 @@ export function FileHistoryContextMenu({
   onOptions: (patch: Partial<FileHistoryOptions>) => void
   /** "Open with difftool" (the row against its parent) or, with `local`, the row against the working tree. */
   onDifftool: (row: GraphRow, local: boolean) => void
+  /** "Save as patch…": the whole commit, as in the Browse menu. */
+  onSavePatch: (row: GraphRow) => void
   onClose: () => void
 }) {
   const [cherryPickTarget, setCherryPickTarget] = useState<GraphRow | null>(null)
@@ -53,6 +56,8 @@ export function FileHistoryContextMenu({
         return onDifftool(row, false)
       case "fh-difftool-local":
         return onDifftool(row, true)
+      case "fh-save-patch":
+        return onSavePatch(row)
       case "fh-revert":
         return setRevertTarget(row)
       case "fh-cherry-pick":

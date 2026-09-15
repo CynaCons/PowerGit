@@ -3,6 +3,7 @@ import ButtonBase from "@mui/material/ButtonBase"
 import CircularProgress from "@mui/material/CircularProgress"
 import Typography from "@mui/material/Typography"
 import type { RepoStatus } from "../engine"
+import type { StatusNote } from "../hooks/useStatusNote"
 import type { SessionView } from "../session/state"
 import { operationCaption } from "./operationText"
 
@@ -13,6 +14,8 @@ export type StatusBarProps = {
   /** Background refresh in progress while the last valid data stays visible. */
   refreshing: boolean
   progressLabel: string | null
+  /** A transient outcome with an optional action ("Saved x.patch — Show in folder", v0.18.6). */
+  note?: StatusNote | null
   /** Opens the operation detail (v0.13.12). */
   onOpenJobs: () => void
   /** Opens the recovery panel when the session is not ready. */
@@ -35,6 +38,7 @@ export function StatusBar({
   dirty,
   refreshing,
   progressLabel,
+  note = null,
   onOpenJobs,
   onOpenRecovery,
 }: StatusBarProps) {
@@ -137,7 +141,25 @@ export function StatusBar({
       >
         {showRepo ? `Repository ${repo.name} on ${repo.branch}` : statusText}
         {progressLabel ? `. ${progressLabel}` : ""}
+        {note ? `. ${note.text}` : ""}
       </Box>
+      {/* What just landed on disk, and where (v0.18.6 "Save as patch…"). */}
+      {note && (
+        <Box data-testid="status-note" sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {note.text}
+          </Typography>
+          {note.action && (
+            <ButtonBase
+              data-testid="status-note-action"
+              onClick={note.action.run}
+              sx={{ font: "inherit", fontSize: 12, color: "primary.main", borderRadius: 0.5, px: 0.5 }}
+            >
+              {note.action.label}
+            </ButtonBase>
+          )}
+        </Box>
+      )}
       {/* Long-running work reports here, the way VS Code does, rather than
           floating over the toolbar buttons. Clicking opens the detail. */}
       {progressLabel !== null && (

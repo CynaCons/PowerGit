@@ -205,6 +205,10 @@ export type ConflictTake = "ours" | "theirs" | "base" | "mark" | "delete"
 export type ConflictStage = 1 | 2 | 3
 
 export type ArchiveFormat = "zip" | "tar.gz"
+/** The pending rows' patch (v0.18.6): the working tree's diff or the index's. */
+export type PatchScope = "worktree" | "index"
+/** A streamed patch as text, with the file name the engine put in Content-Disposition. */
+export type PatchText = { name: string; text: string }
 export type RefItem = { name: string; fullName: string; target: string; current: boolean }
 export type Submodule = { name: string; path: string; head: string | null }
 export type RefTree = {

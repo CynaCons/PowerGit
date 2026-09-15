@@ -27,6 +27,7 @@ export function RevisionContextMenu({
   tags,
   currentBranch,
   stagedCount,
+  unstagedCount,
   operation,
   actions,
   dialogs,
@@ -37,6 +38,7 @@ export function RevisionContextMenu({
   tags: string[]
   currentBranch: string
   stagedCount: number
+  unstagedCount: number
   operation: RepoOperationState
   actions: GitActions
   dialogs: Pick<Dialogs, "open">
@@ -78,12 +80,13 @@ export function RevisionContextMenu({
     ? buildRevisionMenu({
         sha,
         subject: row.rev.message,
-        artificial: Boolean(row.artificial),
+        artificial: row.artificial ?? false,
         refs: row.rev.refs,
         currentBranch,
         localBranches: branches,
         tags,
         stagedCount,
+        unstagedCount,
         otherSelectedSha: target?.previousSha && target.previousSha !== sha ? target.previousSha : null,
         baseSha,
         webUrl: remote ? commitWebUrl(remote.url, sha) : null,
@@ -148,6 +151,8 @@ export function RevisionContextMenu({
         return actions.highlightAncestry(sha)
       case "ctx-archive":
         return void actions.archive(sha)
+      case "ctx-save-patch":
+        return void actions.savePatch(row)
       case "ctx-open-browser":
         return void actions.openInBrowser(sha)
     }

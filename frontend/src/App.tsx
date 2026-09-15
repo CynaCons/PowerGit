@@ -31,6 +31,7 @@ import { useRepoState } from "./hooks/useRepoState"
 import { useSettingsPage } from "./hooks/useSettingsPage"
 import { useZoomHotkeys } from "./hooks/useZoomHotkeys"
 import { useStable } from "./hooks/useStable"
+import { useStatusNote } from "./hooks/useStatusNote"
 import { prefetchCommit } from "./engine/commitCache"
 import { useHotkeyLayer, type CommandId } from "./hotkeys"
 import { useBarLayout } from "./theme/barLayout"
@@ -108,7 +109,12 @@ export default function App({ base }: { base: EngineClient }) {
   // useGitActions rebuilds its closures every render; hand memoised children
   // stable identities so a row click re-renders only the grid and, deferred,
   // the bottom panel (owner report: "clicking commits feels laggy").
-  const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs }))
+  // The status bar's transient line ("Saved 0001-….patch", v0.18.6): the
+  // next row selection clears it, or it fades on its own.
+  const notes = useStatusNote()
+  const { clearNote } = notes
+  useEffect(() => clearNote(), [clearNote, selectedSha])
+  const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs, notes }))
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
@@ -337,6 +343,7 @@ export default function App({ base }: { base: EngineClient }) {
                       remoteNames={remoteNames}
                       tagNames={tagNames}
                       headId={headId}
+                      onSavePatch={(row) => void actions.savePatch(row)}
                       onClose={chrome.closeFileHistory}
                     />
                   ) : (
@@ -392,6 +399,7 @@ export default function App({ base }: { base: EngineClient }) {
           dirty={dirty}
           refreshing={refreshing && loaded}
           progressLabel={progressLabel}
+          note={notes.note}
           onOpenJobs={() => jobs.setPanelOpen(true)}
           onOpenRecovery={() => setRecoveryOpen(true)}
         />

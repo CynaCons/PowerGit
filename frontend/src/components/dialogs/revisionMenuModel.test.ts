@@ -10,6 +10,7 @@ const base: RevisionMenuInput = {
   localBranches: ["main", "topic"],
   tags: ["v1.0"],
   stagedCount: 0,
+  unstagedCount: 0,
   otherSelectedSha: null,
   baseSha: null,
   webUrl: null,
@@ -40,6 +41,7 @@ describe("buildRevisionMenu", () => {
       "ctx-highlight-ancestry",
       "ctx-copy",
       "ctx-archive",
+      "ctx-save-patch",
       "ctx-open-browser",
     ])
   })
@@ -73,7 +75,7 @@ describe("buildRevisionMenu", () => {
     expect(item).toMatchObject({ label: "Highlight ancestry (until refresh)", icon: "route", divider: true })
     expect(item?.disabled).toBeFalsy()
     expect(ids(nodes).indexOf("ctx-highlight-ancestry")).toBe(ids(nodes).indexOf("ctx-compare") + 1)
-    expect(find(build({ artificial: true }), "ctx-highlight-ancestry")).toBeUndefined()
+    expect(find(build({ artificial: "worktree" }), "ctx-highlight-ancestry")).toBeUndefined()
   })
 
   it("offers Merge only for a branch that is not the current one", () => {
@@ -146,7 +148,37 @@ describe("buildRevisionMenu", () => {
     expect(find(build({ webUrl: "https://github.com/o/r/commit/1a2b3c4" }), "ctx-open-browser")?.disabled).toBe(false)
   })
 
-  it("a pending-changes row offers only the commit dialog", () => {
-    expect(ids(build({ artificial: true, refs: [] }))).toEqual(["ctx-open-commit"])
+  it("a pending-changes row offers the commit dialog and its changes as a patch", () => {
+    const nodes = build({ artificial: "worktree", refs: [], unstagedCount: 2 })
+    expect(ids(nodes)).toEqual(["ctx-open-commit", "ctx-save-patch"])
+    expect(nodes[0].divider).toBeFalsy()
+    expect(find(nodes, "ctx-save-patch")).toMatchObject({
+      label: "Save changes as patch…",
+      icon: "patch",
+      divider: true,
+      disabled: false,
+    })
+  })
+
+  // v0.18.6, owner: "Being able to export a patch from a commit. Probably
+  // from the right click menu."
+  it("save as patch follows Create archive… in the same group, and a pending row's entry needs its files", () => {
+    const nodes = build()
+    const item = find(nodes, "ctx-save-patch")
+    expect(item).toMatchObject({ label: "Save as patch…", icon: "patch" })
+    expect(item?.divider).toBeFalsy()
+    expect(item?.disabled).toBeFalsy()
+    expect(ids(nodes).indexOf("ctx-save-patch")).toBe(ids(nodes).indexOf("ctx-archive") + 1)
+
+    // The Working directory row counts unstaged files, the Index row staged ones.
+    expect(find(build({ artificial: "worktree", unstagedCount: 0, stagedCount: 3 }), "ctx-save-patch")).toMatchObject({
+      disabled: true,
+    })
+    expect(find(build({ artificial: "worktree", unstagedCount: 1 }), "ctx-save-patch")?.disabled).toBe(false)
+    expect(find(build({ artificial: "index", stagedCount: 0, unstagedCount: 3 }), "ctx-save-patch")).toMatchObject({
+      disabled: true,
+    })
+    expect(find(build({ artificial: "index", stagedCount: 1 }), "ctx-save-patch")?.disabled).toBe(false)
+    expect(find(build({ artificial: "index" }), "ctx-save-patch")?.hint).toMatch(/Nothing to save/)
   })
 })

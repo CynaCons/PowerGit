@@ -28,6 +28,7 @@ const EXPECTED_ORDER = [
   "ctx-highlight-ancestry",
   "ctx-copy",
   "ctx-archive",
+  "ctx-save-patch",
   "ctx-open-browser",
 ]
 
@@ -159,7 +160,7 @@ test.describe("revision context menu", () => {
     await expect(page.locator("#revision-context-menu")).toHaveCount(0)
   })
 
-  test("a ref chip has its own menu, and pending rows keep the one-item menu", async ({ page }) => {
+  test("a ref chip has its own menu, and pending rows keep their short menu", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
 
@@ -172,12 +173,14 @@ test.describe("revision context menu", () => {
     await expect(page.locator("#revision-context-menu")).toHaveCount(0)
     await page.keyboard.press("Escape")
 
-    // Pending-change rows are not commits (v0.14.1): one entry only.
+    // Pending-change rows are not commits (v0.14.1): the commit dialog and,
+    // since v0.18.6, their changes as a patch — nothing that moves a branch.
     write(repoDir, "a.txt", "dirty\n")
     const pending = page.locator('[data-testid="grid-row"][data-artificial]')
     await expect(pending.first()).toBeVisible({ timeout: 20_000 })
     await pending.first().click({ button: "right" })
     await expect(page.getByTestId("ctx-open-commit")).toBeVisible()
+    await expect(page.getByTestId("ctx-save-patch")).toContainText("Save changes as patch…")
     await expect(page.getByTestId("ctx-rebase")).toHaveCount(0)
   })
 })

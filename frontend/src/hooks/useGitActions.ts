@@ -6,6 +6,7 @@ import type { History } from "./useHistory"
 import type { Jobs } from "./useJobs"
 import { useOperationActions } from "./useOperationActions"
 import type { RepoState } from "./useRepoState"
+import type { StatusNotes } from "./useStatusNote"
 
 export type GitActionsDeps = {
   session: Pick<EngineSession, "client" | "view" | "setEngineError">
@@ -13,6 +14,7 @@ export type GitActionsDeps = {
   repoState: Pick<RepoState, "status" | "setStatus" | "setRefs" | "refresh" | "branchNames" | "openFolder">
   jobs: Pick<Jobs, "withBusy" | "runJob">
   dialogs: Dialogs
+  notes: Pick<StatusNotes, "setNote">
 }
 
 export type GitActions = ReturnType<typeof useGitActions>
@@ -22,14 +24,14 @@ export type GitActions = ReturnType<typeof useGitActions>
 // entry points agree. The v0.15.0 operations (merge, rebase, sequencer,
 // conflicts, compare, archive) live in useOperationActions and are spread
 // into the same object.
-export function useGitActions({ session, history, repoState, jobs, dialogs }: GitActionsDeps) {
+export function useGitActions({ session, history, repoState, jobs, dialogs, notes }: GitActionsDeps) {
   const { client: engine, view, setEngineError } = session
   const repo = view.repo
   const { current } = history
   const { status, setStatus, setRefs, refresh, branchNames, openFolder } = repoState
   const { withBusy, runJob } = jobs
   const { dialog, open, close } = dialogs
-  const operations = useOperationActions({ session, repoState, jobs, dialogs })
+  const operations = useOperationActions({ session, repoState, jobs, dialogs, notes })
 
   function openCommit() {
     open({ kind: "commit", amend: false, initialMsg: undefined })
