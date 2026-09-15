@@ -1,14 +1,6 @@
 import { expect, test } from "vitest"
 import { paletteOf } from "../graph/authorIdentity"
-import {
-  findMatch,
-  matchRecent,
-  pathParts,
-  repoInitials,
-  repoPalette,
-  sharedRoot,
-  sliceRange,
-} from "./recentsModel"
+import { findMatch, matchRecent, pathParts, repoInitials, repoPalette, sharedRoot, sliceRange } from "./recentsModel"
 
 test("repoInitials: two words give a letter each, camel-case and separators count as words", () => {
   expect(repoInitials("PowerGit")).toBe("PG")
