@@ -21,6 +21,7 @@ import { focusGrid } from "./hooks/focusGrid"
 import { useChromeLayout } from "./hooks/useChromeLayout"
 import { useDialogs } from "./hooks/useDialogs"
 import { useFileHistory } from "./hooks/useFileHistory"
+import { useGraphFilterChip, useGraphRefFilter } from "./hooks/useGraphRefFilter"
 import { useGridMenus } from "./hooks/useGridMenus"
 import { useEngineSession } from "./hooks/useEngineSession"
 import { useGitActions } from "./hooks/useGitActions"
@@ -54,10 +55,20 @@ export default function App({ base }: { base: EngineClient }) {
   const session = useEngineSession(base)
   const { view, state, client, engineError, setEngineError, recents, forgetRecent, demo } = session
   const { live, offline, repo } = view
-  const history = useHistory({ client, demo, live, setEngineError, onFailure: session.handleFailure })
+  // Which refs the graph shows (v0.18.5): the tree's ticks, per repository.
+  const graphFilter = useGraphRefFilter(client.repoId)
+  const history = useHistory({
+    client,
+    demo,
+    live,
+    setEngineError,
+    onFailure: session.handleFailure,
+    filter: graphFilter.filter,
+  })
   const { rows: engineRows, selectedSha, setSelectedSha, loadingTail, loaded, historyNote } = history
   const repoState = useRepoState({ session, history })
   const { refs, status, stashes, refresh, refreshing, openFolder, remoteNames, defaultRemote, dirty } = repoState
+  const filterChip = useGraphFilterChip(graphFilter, { client, live, refs, history })
   // Pending changes as rows on top of HEAD (v0.14.1): injected after layout,
   // so the engine rows and the worker's append path stay untouched. Selection
   // is resolved here so a pending row can be the current one.
@@ -309,6 +320,7 @@ export default function App({ base }: { base: EngineClient }) {
               ) : leftOpen ? (
                 <RepoTree
                   tree={refs}
+                  repoId={client.repoId}
                   onSelectTarget={chrome.selectTarget}
                   onCollapse={chrome.collapseLeft}
                   onCheckoutRef={chrome.checkoutRef}
@@ -348,6 +360,7 @@ export default function App({ base }: { base: EngineClient }) {
                         loading={live && !demo && !loaded}
                         engineError={engineError}
                         view={view}
+                        headerExtra={filterChip}
                         onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
                         onNearEnd={history.onNearEnd}
                         menus={menus}

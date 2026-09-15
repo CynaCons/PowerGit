@@ -1,18 +1,18 @@
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft"
-import SearchIcon from "@mui/icons-material/Search"
 import Box from "@mui/material/Box"
-import IconButton from "@mui/material/IconButton"
-import InputBase from "@mui/material/InputBase"
 import Paper from "@mui/material/Paper"
-import Typography from "@mui/material/Typography"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import type { RefItem, RefTree } from "../engine"
+import { getGraphRefs, graphRefCounts, setGraphRefs, useGraphRefs } from "../graph/graphRefs"
 import { RefContextMenu, type RefMenuKind } from "./dialogs/RefContextMenu"
+import { checkState, toggleNames } from "./repoTreeChecks"
+import { RepoTreeHeader } from "./RepoTreeHeader"
 import { ROW_HEIGHT, SECTION_HEIGHT, SectionHeader, TreeRow, type Item } from "./RepoTreeRows"
 
 type Props = {
   tree: RefTree | null
+  /** v0.18.5: the graph filter mode's ticks are kept per repository. */
+  repoId?: string | null
   onSelectTarget?: (sha: string) => void
   onCollapse?: () => void
   onCheckoutRef?: (name: string) => void
@@ -33,6 +33,8 @@ type TreeNode = {
   current?: boolean
   /** Full ref name of the leaf (e.g. "feature/x", "origin/main"). */
   full?: string
+  /** Git's full name ("refs/heads/feature/x"): what the graph filter ticks. */
+  refName?: string
 }
 
 type CtxMenu = { kind: RefMenuKind; name: string; x: number; y: number }
@@ -55,6 +57,7 @@ function insert(root: TreeNode, segments: string[], item: RefItem) {
       child.target = item.target
       child.current = item.current
       child.full = item.name
+      child.refName = item.fullName
     }
     node = child
   }
@@ -70,6 +73,15 @@ function buildTree(items: RefItem[], splitOffset = 0): TreeNode[] {
   return root.children
 }
 
+/** Every leaf's git name below a node (a folder's or a remote's box covers them all). */
+function leafRefNames(node: TreeNode, out: string[] = []): string[] {
+  for (const c of node.children) {
+    if (c.children.length > 0) leafRefNames(c, out)
+    else if (c.refName) out.push(c.refName)
+  }
+  return out
+}
+
 function sortNodes(nodes: TreeNode[]) {
   nodes.sort((a, b) => {
     const aDir = a.children.length > 0
@@ -82,6 +94,7 @@ function sortNodes(nodes: TreeNode[]) {
 
 function RepoTreeImpl({
   tree,
+  repoId = null,
   onSelectTarget,
   onCollapse,
   onCheckoutRef,
@@ -99,6 +112,21 @@ function RepoTreeImpl({
   const [sectionOverride, setSectionOverride] = useState<ReadonlyMap<string, boolean>>(new Map())
   const [nodeOverride, setNodeOverride] = useState<ReadonlyMap<string, boolean>>(new Map())
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Graph filter mode (v0.18.5): every leaf gets a box, groups a tri-state
+  // one; the checked-out branch is ticked and locked. Only the ticks are
+  // stored — HEAD is always in the graph.
+  const graphRefs = useGraphRefs(repoId)
+  const mode = graphRefs.mode
+  const ticked = useMemo(() => new Set(graphRefs.refs), [graphRefs])
+  const currentRef = useMemo(() => tree?.branches.find((b) => b.current)?.fullName ?? null, [tree])
+  const counts = useMemo(() => graphRefCounts(tree, graphRefs), [tree, graphRefs])
+  const toggle = (names: string[]) =>
+    setGraphRefs(repoId, { refs: toggleNames(getGraphRefs(repoId).refs, names, currentRef) })
+  const toggleMode = () => setGraphRefs(repoId, { mode: !mode, refs: [] })
+  const showAll = () =>
+    setGraphRefs(repoId, {
+      refs: [...(tree?.branches ?? []), ...(tree?.remotes ?? []), ...(tree?.tags ?? [])].map((r) => r.fullName),
+    })
 
   const branchRoot = useMemo(() => buildTree(tree?.branches ?? []), [tree])
   const tagRoot = useMemo(() => buildTree(tree?.tags ?? []), [tree])
@@ -153,6 +181,14 @@ function RepoTreeImpl({
         onClick: () => toggleSection(title),
       })
 
+    // The row's box in the graph filter mode; nothing outside it.
+    const leafCheck = (refName: string | undefined, current: boolean | undefined): Partial<Item> =>
+      mode && refName
+        ? { checked: current || ticked.has(refName), locked: current, onCheck: () => toggle([refName]) }
+        : {}
+    const groupCheck = (names: string[]): Partial<Item> =>
+      mode && names.length > 0 ? { checked: checkState(names, ticked, currentRef), onCheck: () => toggle(names) } : {}
+
     const leafCtx = (icon: Item["icon"], full: string): ((x: number, y: number) => void) | undefined => {
       switch (icon) {
         case "branch":
@@ -191,6 +227,7 @@ function RepoTreeImpl({
             muted: true,
             onClick: () => toggleNode(path, dirDefaultOpen),
             onContext: dirCtx,
+            ...groupCheck(leafRefNames(node)),
           })
           if (open) walk(node.children, path, depth + 1, icon, false, dirCtx)
         } else {
@@ -205,6 +242,7 @@ function RepoTreeImpl({
               if (node.target) onSelectTarget?.(node.target)
             },
             onContext: node.current ? undefined : (leafCtx(icon, full) ?? dirCtx),
+            ...leafCheck(node.refName, node.current),
           })
         }
       }
@@ -226,6 +264,7 @@ function RepoTreeImpl({
             current: item.current,
             onClick: () => onSelectTarget?.(item.target),
             onContext: item.current ? undefined : leafCtx(icon, item.name),
+            ...leafCheck(item.fullName, item.current),
           })
         }
       }
@@ -259,6 +298,7 @@ function RepoTreeImpl({
           muted: true,
           onClick: () => toggleNode(path, def),
           onContext: remoteCtx,
+          ...groupCheck(leafRefNames(node)),
         })
         if (open) walk(node.children, path, 1, "remote", false, remoteCtx)
       }
@@ -282,7 +322,20 @@ function RepoTreeImpl({
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, filter, sectionOverride, nodeOverride, branchRoot, tagRoot, remoteRoots, remoteTotal, tagTotal])
+  }, [
+    tree,
+    filter,
+    sectionOverride,
+    nodeOverride,
+    branchRoot,
+    tagRoot,
+    remoteRoots,
+    remoteTotal,
+    tagTotal,
+    mode,
+    ticked,
+    currentRef,
+  ])
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -309,36 +362,16 @@ function RepoTreeImpl({
         borderColor: "divider",
       }}
     >
-      <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center" }}>
-        <Typography variant="subtitle2" sx={{ flex: 1, pl: 1 }}>
-          Repository
-        </Typography>
-        {onCollapse && (
-          <IconButton size="small" data-testid="left-panel-collapse" onClick={onCollapse} aria-label="Collapse panel">
-            <ChevronLeftIcon fontSize="small" />
-          </IconButton>
-        )}
-      </Box>
-      <Box
-        sx={{
-          px: 1,
-          py: 0.5,
-          borderBottom: 1,
-          borderColor: "divider",
-          display: "flex",
-          alignItems: "center",
-          gap: 0.5,
-        }}
-      >
-        <SearchIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-        <InputBase
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter refs…"
-          inputProps={{ "data-testid": "tree-filter", "aria-label": "Filter refs" }}
-          sx={{ flex: 1, fontSize: 12.5, "& input": { p: 0 } }}
-        />
-      </Box>
+      <RepoTreeHeader
+        filter={filter}
+        onFilter={setFilter}
+        onCollapse={onCollapse}
+        mode={mode}
+        shown={counts.shown}
+        total={counts.total}
+        onToggleMode={toggleMode}
+        onShowAll={showAll}
+      />
       <Box ref={scrollRef} sx={{ flex: 1, overflow: "auto", userSelect: "none" }}>
         <Box sx={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {virtualizer.getVirtualItems().map((vi) => {
@@ -378,5 +411,7 @@ function RepoTreeImpl({
 }
 
 // Memoised: the ref tree only changes on a refs refresh, never on a row
-// selection (App hands it stable callbacks via useStable).
+// selection (App hands it stable callbacks via useStable). The graph filter
+// store is read inside, so a tick re-renders the tree and, through App's
+// history filter, the grid — not the command rail.
 export const RepoTree = memo(RepoTreeImpl)

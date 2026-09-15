@@ -3,6 +3,7 @@ import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
+import type { ReactNode } from "react"
 import type { GraphRow } from "../graph/types"
 import type { GridMenus } from "../hooks/useGridMenus"
 import type { SessionView } from "../session/state"
@@ -21,6 +22,8 @@ export type HistoryPaneProps = {
   view: SessionView
   /** What an empty live list means here (v0.16.0: a path nothing touched). */
   emptyText?: string
+  /** v0.18.5: the graph's ref filter chip, at the end of the Message header. */
+  headerExtra?: ReactNode
   onSelect: (index: number) => void
   onNearEnd: () => void
   /** The row and ref-chip menus (v0.16.0, shared with the file history). */
@@ -45,6 +48,7 @@ export function HistoryPane({
   engineError,
   view,
   emptyText,
+  headerExtra,
   onSelect,
   onNearEnd,
   menus,
@@ -104,6 +108,7 @@ export function HistoryPane({
           remoteNames={remoteNames}
           tagNames={tagNames}
           onNearEnd={onNearEnd}
+          headerExtra={headerExtra}
           // The right-click has already moved the selection; the previous
           // one (still in `selectedSha` during this event) is the other side
           // of "Compare selected commits".

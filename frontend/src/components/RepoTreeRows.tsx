@@ -3,8 +3,10 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight"
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined"
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import Box from "@mui/material/Box"
+import Checkbox from "@mui/material/Checkbox"
 import Typography from "@mui/material/Typography"
 import type { ReactNode } from "react"
 
@@ -23,6 +25,13 @@ export type Item = {
   muted?: boolean
   onClick: () => void
   onContext?: (x: number, y: number) => void
+  /** v0.18.5 graph filter mode: the row's box — true, false, or "some" on
+   *  a folder / remote root with part of its leaves ticked. Absent outside
+   *  the mode (and on submodules). */
+  checked?: boolean | "some"
+  /** The checked-out branch: ticked, disabled, with a lock after the label. */
+  locked?: boolean
+  onCheck?: () => void
 }
 
 // Uniform row geometry for every node in the tree:
@@ -74,7 +83,11 @@ export function SectionHeader({ item, style }: { item: Item; style: React.CSSPro
   )
 }
 
+/** The checked-out branch's lock (v0.18.5): it is always in the graph. */
+export const LOCKED_TITLE = "The checked-out branch is always shown"
+
 export function TreeRow({ item, style }: { item: Item; style: React.CSSProperties }) {
+  const checked = item.checked
   return (
     <Box
       data-testid="tree-row"
@@ -110,6 +123,27 @@ export function TreeRow({ item, style }: { item: Item; style: React.CSSPropertie
           )
         ) : null}
       </Box>
+      {checked !== undefined && (
+        // The click must not also select the row (jump to its tip).
+        <Checkbox
+          size="small"
+          checked={checked === true}
+          indeterminate={checked === "some"}
+          disabled={item.locked}
+          onClick={(e) => {
+            e.stopPropagation()
+            item.onCheck?.()
+          }}
+          slotProps={{
+            input: {
+              "data-testid": "tree-check",
+              "data-checked": checked === true ? "true" : checked === "some" ? "some" : "false",
+              "aria-label": `Show ${item.label} in the graph`,
+            } as React.InputHTMLAttributes<HTMLInputElement>,
+          }}
+          sx={{ p: 0, mr: 0.5, "& .MuiSvgIcon-root": { fontSize: 14 } }}
+        />
+      )}
       <Box
         component="span"
         sx={{
@@ -135,6 +169,16 @@ export function TreeRow({ item, style }: { item: Item; style: React.CSSPropertie
         {item.label}
         {item.count !== undefined ? ` (${item.count})` : ""}
       </Typography>
+      {item.locked && (
+        <Box
+          component="span"
+          data-testid="tree-lock"
+          title={LOCKED_TITLE}
+          sx={{ display: "inline-flex", ml: 0.5, color: "text.secondary", flexShrink: 0 }}
+        >
+          <LockOutlinedIcon sx={{ fontSize: 12 }} />
+        </Box>
+      )}
     </Box>
   )
 }

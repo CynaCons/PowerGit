@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { markAncestry } from "../graph/ancestry"
 import { authorIdentity } from "../graph/authorIdentity"
 import { drawRows, graphWidth } from "../graph/draw"
@@ -24,6 +24,8 @@ type Props = {
   remoteNames?: string[]
   /** Tag names from the ref tree; matching chips get the tag glyph. */
   tagNames?: string[]
+  /** v0.18.5: rendered at the end of the Message header cell (the ref filter's chip). */
+  headerExtra?: ReactNode
 }
 
 export function RevisionGrid({
@@ -36,6 +38,7 @@ export function RevisionGrid({
   onNearEnd,
   remoteNames,
   tagNames,
+  headerExtra,
 }: Props) {
   const tagSet = useMemo(() => new Set(tagNames ?? []), [tagNames])
   const parentRef = useRef<HTMLDivElement>(null)
@@ -212,7 +215,10 @@ export function RevisionGrid({
           Graph
           {handle("graph")}
         </div>
-        <div>Message</div>
+        <div style={headerExtra ? { display: "flex", alignItems: "center" } : undefined}>
+          Message
+          {headerExtra}
+        </div>
         <div>
           Author
           {handle("author")}
