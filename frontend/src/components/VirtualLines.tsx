@@ -1,6 +1,6 @@
 import Box from "@mui/material/Box"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { forwardRef, useImperativeHandle, useRef, type CSSProperties, type ReactNode } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef, type CSSProperties, type ReactNode } from "react"
 
 export const CODE_LINE_HEIGHT = 18
 
@@ -33,15 +33,34 @@ export const VirtualLines = forwardRef<
      *  Arrow/Home/End while it is on, and this list must not scroll a
      *  second time underneath it. Unhandled keys fall to the browser. */
     passKeys?: boolean
+    /** Wrap lines (v0.18.8): rows break inside the container and are
+     *  measured, the way the revision grid measures its expanded row. Off,
+     *  every row is CODE_LINE_HEIGHT tall and the track is as wide as the
+     *  longest line (horizontal scroll). */
+    wrap?: boolean
   }
->(function VirtualLines({ count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys }, ref) {
+>(function VirtualLines({ count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys, wrap }, ref) {
   const parentRef = useRef<HTMLDivElement>(null)
+  // Sizes are cached by index (the rows of one diff never move); the
+  // estimate stays the line height and measureElement corrects the wrapped
+  // rows (offsetHeight / the ResizeObserver border box, local px under the
+  // #root zoom), so scrollToIndex, Home/End and the review cursor land on
+  // rows of different heights.
   const virtualizer = useVirtualizer({
     count,
     getScrollElement: () => parentRef.current,
     estimateSize: () => CODE_LINE_HEIGHT,
+    getItemKey: (index) => index,
     overscan: 20,
   })
+  // Toggling wrap changes every row's height: drop the cached sizes so the
+  // rows are measured again (on) or fall back to the estimate (off).
+  const measuredFor = useRef(wrap)
+  useEffect(() => {
+    if (measuredFor.current === wrap) return
+    measuredFor.current = wrap
+    virtualizer.measure()
+  }, [wrap, virtualizer])
 
   useImperativeHandle(
     ref,
@@ -77,6 +96,7 @@ export const VirtualLines = forwardRef<
       ref={parentRef}
       data-testid={testid}
       data-hotkey-surface={hotkeySurface}
+      data-wrap={wrap ? "true" : undefined}
       tabIndex={0}
       role="region"
       aria-label={ariaLabel}
@@ -92,19 +112,29 @@ export const VirtualLines = forwardRef<
       style={sx}
     >
       {header}
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "max-content", minWidth: "100%" }}>
+      <div
+        style={{
+          height: virtualizer.getTotalSize(),
+          position: "relative",
+          width: wrap ? undefined : "max-content",
+          minWidth: "100%",
+        }}
+      >
         {virtualizer.getVirtualItems().map((item) => (
           <div
             key={item.key}
+            ref={wrap ? virtualizer.measureElement : undefined}
             data-index={item.index}
             style={{
               position: "absolute",
               top: 0,
               left: 0,
               minWidth: "100%",
-              height: CODE_LINE_HEIGHT,
+              width: wrap ? "100%" : undefined,
+              height: wrap ? "auto" : CODE_LINE_HEIGHT,
               transform: `translateY(${item.start}px)`,
-              whiteSpace: "pre",
+              whiteSpace: wrap ? "pre-wrap" : "pre",
+              overflowWrap: wrap ? "anywhere" : undefined,
             }}
           >
             {renderLine(item.index)}
