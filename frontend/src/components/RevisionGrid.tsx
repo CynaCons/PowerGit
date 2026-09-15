@@ -212,7 +212,21 @@ export function RevisionGrid({
     [width, widths],
   )
   const resetColumn = (key: ColumnKey) => () => setWidths((w) => ({ ...w, [key]: DEFAULT_WIDTHS[key] }))
-  const foldRow = useCallback(() => setExpandedSha(null), [])
+  // Expanding or folding also resets the previously expanded row's cached
+  // size: folded off-screen (Escape, +n elsewhere) it has no element for
+  // the ResizeObserver to re-measure, and its stale height would leave a
+  // phantom gap in the list until it scrolled back into the overscan.
+  const setExpanded = useCallback(
+    (next: string | null) => {
+      if (expandedSha !== null && expandedSha !== next) {
+        const i = rows.findIndex((r) => r.rev.id === expandedSha)
+        if (i >= 0) virtualizer.resizeItem(i, ROW_HEIGHT)
+      }
+      setExpandedSha(next)
+    },
+    [expandedSha, rows, virtualizer],
+  )
+  const foldRow = useCallback(() => setExpanded(null), [setExpanded])
   const clickRow = useCallback(
     (index: number) => {
       onSelect(index)
@@ -282,7 +296,7 @@ export function RevisionGrid({
             if (expandedSha === null) return
             e.preventDefault()
             e.stopPropagation()
-            setExpandedSha(null)
+            foldRow()
             return
           }
           if (e.altKey || e.ctrlKey || e.metaKey) return
@@ -351,7 +365,7 @@ export function RevisionGrid({
                 onContextMenu={contextRow}
                 onMouseEnter={setHovered}
                 onRefContextMenu={onRefContextMenu}
-                onExpand={setExpandedSha}
+                onExpand={setExpanded}
                 onFold={foldRow}
               />
             )
