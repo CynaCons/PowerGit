@@ -69,9 +69,7 @@ export function orderRefs(refs: string[], ctx: RefContext): string[] {
     else by.set(kind, [ref])
   }
   const current = ctx.current ?? null
-  const locals = (by.get("local") ?? []).sort((a, b) =>
-    a === current ? -1 : b === current ? 1 : a.localeCompare(b),
-  )
+  const locals = (by.get("local") ?? []).sort((a, b) => (a === current ? -1 : b === current ? 1 : a.localeCompare(b)))
   const remotes = (by.get("remote") ?? []).sort((a, b) => a.localeCompare(b))
   const tags = (by.get("tag") ?? []).sort((a, b) => a.localeCompare(b))
   const stashes = by.get("stash") ?? []
@@ -160,6 +158,25 @@ export function textWidthOf(name: string): number {
 /** A chip's width: the name, the padding and the glyph when it carries one. */
 export function chipWidth(ref: string, kind: RefKind): number {
   return textWidthOf(ref) + CHIP_PADDING + (hasGlyph(kind) ? CHIP_GLYPH : 0)
+}
+
+/** Where a chip's click goes: the ref's tip in the ref tree, by the name the
+ *  chip shows (branches, remote-tracking branches and tags; HEAD and stashes
+ *  have no tip to jump to). */
+export function findRefTarget(
+  tree: {
+    branches: { name: string; target: string }[]
+    remotes: { name: string; target: string }[]
+    tags: { name: string; target: string }[]
+  } | null,
+  name: string,
+): string | null {
+  if (!tree) return null
+  for (const list of [tree.branches, tree.remotes, tree.tags]) {
+    const hit = list.find((r) => r.name === name)
+    if (hit) return hit.target
+  }
+  return null
 }
 
 /** Test seam: forget the measured widths (and the canvas). */

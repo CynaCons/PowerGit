@@ -7,8 +7,8 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { SplitHandle } from "./SplitHandle"
 import { BlobPane } from "./BlobPane"
-import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
-import { CommitDetailView } from "./CommitDetailView"
+import { ErrorState } from "./AsyncState"
+import { CommitInfo } from "./CommitDetailView"
 import { DiffTab, type DiffTabActions } from "./DiffTab"
 import { ReviewBar } from "./ReviewBar"
 import type { BrowseRow } from "./browseReset"
@@ -25,6 +25,7 @@ import {
 } from "../engine"
 import type { GraphRow } from "../graph/types"
 import { rowKeysOf, type RowKeys } from "../hooks/useDiffReview"
+import type { GridMenus } from "../hooks/useGridMenus"
 
 type Props = {
   current: GraphRow | undefined
@@ -43,6 +44,13 @@ type Props = {
   onFileHistory?: (path: string, sha?: string | null) => void
   /** v0.16.0: the file the visible tab has selected (Diff list or File Tree), for Ctrl+Shift+H. */
   onSelectedFile?: (path: string | null) => void
+  /** v0.18.3: the Commit tab's Refs row classifies chips as the grid does. */
+  tagNames?: string[]
+  remoteNames?: string[]
+  /** A chip clicked: select that ref's tip in the grid. */
+  onSelectRef?: (name: string) => void
+  /** A chip right-clicked: the grid's ref menu. */
+  menus?: GridMenus
 }
 
 import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
@@ -98,6 +106,10 @@ export function BottomPanel({
   setStatus,
   onFileHistory,
   onSelectedFile,
+  tagNames,
+  remoteNames,
+  onSelectRef,
+  menus,
 }: Props) {
   const engine = useEngine()
   const pendingRow = useMemo(() => pendingOf(current, status), [current, status])
@@ -383,7 +395,17 @@ export function BottomPanel({
           (pendingRow ? (
             <PendingSummary pending={pendingRow} branch={status?.branch ?? null} onOpenCommit={onOpenCommit} />
           ) : (
-            <CommitInfo detail={detail} hasCurrent={current !== undefined} onRetry={reload} busy={busy} />
+            <CommitInfo
+              detail={detail}
+              hasCurrent={current !== undefined}
+              onRetry={reload}
+              busy={busy}
+              tagNames={tagNames}
+              remoteNames={remoteNames}
+              currentBranch={status?.branch}
+              onSelectRef={onSelectRef}
+              onRefContextMenu={menus?.refContextMenu}
+            />
           ))}
         {tab === 1 && (
           <DiffTab
@@ -435,28 +457,5 @@ export function BottomPanel({
         )}
       </Box>
     </Paper>
-  )
-}
-
-function CommitInfo({
-  detail,
-  hasCurrent,
-  onRetry,
-  busy,
-}: {
-  detail: Loadable<CommitDetail>
-  hasCurrent: boolean
-  onRetry: () => void
-  busy: boolean
-}) {
-  return (
-    <Box data-testid="commit-info" sx={{ flex: 1, overflow: "auto", p: detail.kind === "ready" ? 2 : 0 }}>
-      {detail.kind === "error" && <ErrorState message={detail.message} onRetry={onRetry} testid="commit-error" />}
-      {detail.kind === "loading" && busy && <LoadingState label="Loading commit…" testid="commit-loading" />}
-      {detail.kind === "idle" && (
-        <EmptyState text={hasCurrent ? "Loading commit…" : "Select a revision"} testid="commit-empty" />
-      )}
-      {detail.kind === "ready" && <CommitDetailView detail={detail.value} />}
-    </Box>
   )
 }

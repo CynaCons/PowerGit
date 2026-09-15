@@ -408,6 +408,26 @@ html {
   filter: brightness(0.92);
 }
 
+/* The Commit tab's Refs row (v0.18.3, variant A): a caption, then the chips
+   wrapping on as many lines as the panel needs. */
+.commit-refs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+.commit-refs-label {
+  min-width: 32px;
+  margin-right: 2px;
+}
+.commit-refs .msg-refs {
+  flex-wrap: wrap;
+  flex-shrink: 1;
+  min-width: 0;
+  gap: 6px;
+}
+
 /* The expanded row (v0.18.3, variant B, owner: "expand vertically the
    column"): every chip, wrapping, the message under them. The row's height
    comes from the message cell; the virtualizer measures it

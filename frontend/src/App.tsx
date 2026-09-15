@@ -41,6 +41,7 @@ import { setStateSampler } from "./diagnostics"
 import { buildFrontendDump, takeSnapshot } from "./diagnostics/snapshot"
 import { describeThrown } from "./engine"
 import { withArtificialRows } from "./graph/artificial"
+import { findRefTarget } from "./components/refChipsModel"
 import { useAutoFetch } from "./hooks/useAutoFetch"
 import { useHeartbeat } from "./hooks/useHeartbeat"
 import { getThemePreference } from "./theme/appearance"
@@ -149,6 +150,11 @@ export default function App({ base }: { base: EngineClient }) {
     openSettings: settings.toggle,
     openSnapshot: () => void takeDiagnosticSnapshot(),
     selectTarget: (sha: string) => void history.jumpToRef(sha),
+    // A ref chip in the Commit tab (v0.18.3): the tree's click, by name.
+    selectRef: (name: string) => {
+      const sha = findRefTarget(refs, name)
+      if (sha) void history.jumpToRef(sha)
+    },
     collapseLeft: () => setLeftOpen(false),
     expandLeft: () => setLeftOpen(true),
     checkoutRef: (name: string) => void actions.checkout(name, false),
@@ -369,6 +375,10 @@ export default function App({ base }: { base: EngineClient }) {
                         setStatus={repoState.setStatus}
                         onFileHistory={fileHistory.open}
                         onSelectedFile={fileHistory.setBrowseFile}
+                        tagNames={tagNames}
+                        remoteNames={remoteNames}
+                        onSelectRef={chrome.selectRef}
+                        menus={menus}
                       />
                     </>
                   )}
