@@ -94,4 +94,17 @@ test.describe("@dialogs", () => {
     await page.mouse.move(5, 5)
     await expect(page).toHaveScreenshot("settings-page.png")
   })
+
+  // v0.18.7, prototype C: the tile picker with the focus in the search box.
+  // The list is whatever this machine's engine remembers; the baseline is
+  // seeded on the main tree (docs/agents/memories/private-e2e-harness.md).
+  test("recent repositories picker", async ({ page }) => {
+    await appearance(page, "light")
+    await ready(page)
+    await page.getByTestId("recents-button").click()
+    await expect(page.getByTestId("recents-filter")).toBeFocused()
+    await expect(page.getByTestId("recent-card").first()).toBeVisible()
+    await page.mouse.move(5, 5)
+    await expect(page).toHaveScreenshot("recents-picker.png")
+  })
 })
