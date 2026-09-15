@@ -15,6 +15,8 @@ export type HistoryPaneProps = {
   loadingTail: boolean
   remoteNames?: string[]
   tagNames?: string[]
+  /** The checked-out branch: its chip comes first after HEAD (v0.18.3). */
+  currentBranch?: string | null
   /** Initial load of this repository (no rows yet); a background refresh keeps the rows. */
   loading: boolean
   engineError: string | null
@@ -39,6 +41,7 @@ export function HistoryPane({
   rows,
   remoteNames,
   tagNames,
+  currentBranch,
   selected,
   loadingTail,
   loading,
@@ -103,6 +106,7 @@ export function HistoryPane({
           loadingTail={loadingTail}
           remoteNames={remoteNames}
           tagNames={tagNames}
+          currentBranch={currentBranch}
           onNearEnd={onNearEnd}
           // The right-click has already moved the selection; the previous
           // one (still in `selectedSha` during this event) is the other side

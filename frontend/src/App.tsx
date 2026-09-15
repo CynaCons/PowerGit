@@ -343,6 +343,7 @@ export default function App({ base }: { base: EngineClient }) {
                         rows={rows}
                         remoteNames={remoteNames}
                         tagNames={tagNames}
+                        currentBranch={repo?.branch}
                         selected={selected}
                         loadingTail={loadingTail}
                         loading={live && !demo && !loaded}

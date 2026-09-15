@@ -310,6 +310,7 @@ export function FileHistoryView({
         rows={rows}
         remoteNames={remoteNames}
         tagNames={tagNames}
+        currentBranch={view.repo?.branch}
         selected={selected}
         loadingTail={loadingTail}
         loading={view.live && !loaded}

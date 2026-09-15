@@ -6,9 +6,10 @@ import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
 import { useAuthorDiscs } from "../theme/authorDiscs"
 import { GraphOptionsBar } from "./GraphOptionsBar"
-import { RefChips } from "./RefChips"
+import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
+import { chipBudget } from "./gridGeometry"
 
 type Props = {
   rows: GraphRow[]
@@ -24,6 +25,8 @@ type Props = {
   remoteNames?: string[]
   /** Tag names from the ref tree; matching chips get the tag glyph. */
   tagNames?: string[]
+  /** The checked-out branch: its chip comes first after HEAD (v0.18.3). */
+  currentBranch?: string | null
 }
 
 export function RevisionGrid({
@@ -36,6 +39,7 @@ export function RevisionGrid({
   onNearEnd,
   remoteNames,
   tagNames,
+  currentBranch,
 }: Props) {
   const tagSet = useMemo(() => new Set(tagNames ?? []), [tagNames])
   const parentRef = useRef<HTMLDivElement>(null)
@@ -85,6 +89,8 @@ export function RevisionGrid({
   // (owner: "a discreet scroll bar at the bottom of that column ... shift
   // scroll to scroll left or right"). The canvas is translated by it.
   const overflow = Math.max(0, naturalWidth - width)
+  // Ref chips fold by width (v0.18.3): 60 % of the message column.
+  const budget = chipBudget(bodyWidth, width, widths.author, widths.date, widths.sha)
   const [graphScroll, setGraphScroll] = useState(0)
   useEffect(() => {
     if (graphScroll > overflow) setGraphScroll(overflow)
@@ -187,6 +193,23 @@ export function RevisionGrid({
     [width, widths],
   )
   const resetColumn = (key: ColumnKey) => () => setWidths((w) => ({ ...w, [key]: DEFAULT_WIDTHS[key] }))
+  const clickRow = useCallback(
+    (index: number) => {
+      onSelect(index)
+      parentRef.current?.focus()
+    },
+    [onSelect],
+  )
+  const contextRow = useMemo(
+    () =>
+      onRowContextMenu
+        ? (e: React.MouseEvent, index: number) => {
+            onSelect(index)
+            onRowContextMenu(e, index)
+          }
+        : undefined,
+    [onSelect, onRowContextMenu],
+  )
   const handle = (key: ColumnKey) => (
     <div
       className="col-resize"
@@ -280,61 +303,25 @@ export function RevisionGrid({
           />
           {virtualItems.map((item) => {
             const row = rows[item.index]
-            const identity = discs && row.rev.author ? authorIdentity(row.rev.author) : null
-            const same = markedAuthor !== null && row.rev.author === markedAuthor
             return (
-              <div
+              <RevisionRow
                 key={row.rev.id}
-                className={`grid-row${item.index === selected ? " selected" : ""}${same ? " author-same" : ""}`}
-                data-testid="grid-row"
-                data-index={item.index}
-                data-artificial={row.artificial}
-                onClick={() => {
-                  onSelect(item.index)
-                  parentRef.current?.focus()
-                }}
-                onContextMenu={
-                  onRowContextMenu
-                    ? (e) => {
-                        onSelect(item.index)
-                        onRowContextMenu(e, item.index)
-                      }
-                    : undefined
-                }
-                onMouseEnter={() => setHovered(item.index)}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${item.start}px)`,
-                }}
-              >
-                <div className="graph-cell" />
-                <div className="msg">
-                  <RefChips
-                    refs={row.rev.refs}
-                    tagSet={tagSet}
-                    remoteNames={remoteNames}
-                    onRefContextMenu={
-                      onRefContextMenu ? (e, ref, kind) => onRefContextMenu(e, ref, kind, item.index) : undefined
-                    }
-                  />
-                  <span className="msg-text">{row.rev.message}</span>
-                </div>
-                <div className="author">
-                  {identity && (
-                    <span className="author-disc" data-palette={identity.palette}>
-                      {identity.initials}
-                    </span>
-                  )}
-                  {row.rev.author}
-                </div>
-                <div className="date">{row.rev.date}</div>
-                <div className="sha" data-testid="sha-cell" title={row.artificial ? undefined : row.rev.id}>
-                  {row.artificial ? "" : row.rev.id.slice(0, 7)}
-                </div>
-              </div>
+                row={row}
+                index={item.index}
+                start={item.start}
+                selected={item.index === selected}
+                sameAuthor={markedAuthor !== null && row.rev.author === markedAuthor}
+                identity={discs && row.rev.author ? authorIdentity(row.rev.author) : null}
+                budget={budget}
+                tagSet={tagSet}
+                remoteNames={remoteNames}
+                currentBranch={currentBranch}
+                measureRef={virtualizer.measureElement}
+                onClick={clickRow}
+                onContextMenu={contextRow}
+                onMouseEnter={setHovered}
+                onRefContextMenu={onRefContextMenu}
+              />
             )
           })}
         </div>
