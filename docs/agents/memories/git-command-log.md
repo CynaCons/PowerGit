@@ -11,9 +11,11 @@ were reviewed; the owner chose the docked console plus a card on failures.
 `RunTimed` overload, `RunCapped` and `RunTimedWithEnv` go through it. **Every
 git child the engine starts is recorded, reads included.** A timeout or
 cancellation is recorded as exit code `-1` with the exception message and
-then rethrown unchanged. The four children the engine starts detached
-(difftool twice, mergetool, archive) call `RecordDetached`, which logs the
-launch and says the exit code is not observed rather than inventing a zero.
+then rethrown unchanged. The children the engine starts detached (difftool
+twice, mergetool, and the streamed downloads: archive, and since v0.18.6 the
+commit and worktree patches through `StartStreamed`) call `RecordDetached`,
+which logs the launch and says the exit code is not observed rather than
+inventing a zero.
 
 The buffer is in `GitHost.CommandLog.cs`: a lock-guarded queue of 50, ids
 monotonic per session, 8 KB per entry.
