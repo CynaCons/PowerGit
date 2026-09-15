@@ -29,7 +29,7 @@ type Props = {
   onExitHighlight: () => void
 }
 
-const TOGGLE_SX = { py: 0.25, px: 1, fontSize: 12, textTransform: "none" } as const
+const TOGGLE_SX = { py: 0.25, px: 1, fontSize: 12, textTransform: "none", whiteSpace: "nowrap" } as const
 
 // The temporary mode's colour: the review amber (tokens.ts `review`), the
 // one hue outside the blues, so the pill reads as "not the usual state".
@@ -65,6 +65,10 @@ export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHig
         position: "absolute",
         left: 10,
         bottom: 10,
+        // The ancestry state adds the root and Exit: the pill stays one line
+        // and gives the subject up first rather than wrapping its buttons.
+        maxWidth: "calc(100% - 20px)",
+        whiteSpace: "nowrap",
         zIndex: 5,
         bgcolor: expanded ? "background.paper" : "transparent",
         border: expanded ? 1 : 0,
@@ -89,7 +93,7 @@ export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHig
           sx={{ color: temporary ? AMBER : bar.pinned ? "primary.main" : "text.secondary", cursor: "pointer" }}
         />
       </Tooltip>
-      <Box sx={{ display: expanded ? "flex" : "none", alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: expanded ? "flex" : "none", alignItems: "center", gap: 1, minWidth: 0 }}>
         {highlightRoot ? (
           <>
             <Typography variant="caption" color="text.secondary">
@@ -108,7 +112,7 @@ export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHig
               color="text.secondary"
               noWrap
               title={highlightRoot.rev.message}
-              sx={{ maxWidth: 150 }}
+              sx={{ maxWidth: 150, minWidth: 0, flexShrink: 1 }}
             >
               {highlightRoot.rev.message}
             </Typography>
@@ -179,7 +183,7 @@ export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHig
         <PersonOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
         {selectedAuthor ? (
           <>
-            <Typography variant="caption" sx={{ fontWeight: 600 }} data-testid="graph-author-name">
+            <Typography variant="caption" noWrap sx={{ fontWeight: 600 }} data-testid="graph-author-name">
               {selectedAuthor}
             </Typography>
             <Typography variant="caption" color="text.secondary" data-testid="graph-author-count">
