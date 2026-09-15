@@ -432,8 +432,8 @@ html {
    column"): every chip, wrapping, the message under them. The row's height
    comes from the message cell; the virtualizer measures it
    (measureElement) and graph/draw.ts gets the real geometry, so the lanes
-   stay continuous through the taller row. Integer heights on purpose: the
-   chips are 16 px, the text line 18 px, so the canvas and the DOM agree. */
+   stay continuous through the taller row. The text line is pinned to 18 px
+   so the row's height stays an integer and the canvas and the DOM agree. */
 .grid-row.expanded {
   height: auto;
   min-height: var(--pg-row-height, 28px);
@@ -451,9 +451,6 @@ html {
   flex-wrap: wrap;
   row-gap: 3px;
   max-width: 100%;
-}
-.grid-row.expanded .ref {
-  height: 16px;
 }
 .grid-row.expanded .msg-text {
   max-width: 100%;
