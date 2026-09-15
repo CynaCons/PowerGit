@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test"
 
 const ci = !!process.env.CI
+// PW_PORT lets a second harness run beside the default one (a worker on its
+// own Vite + engine: PW_PORT=1441 VITE_ENGINE_URL=... POWERGIT_ENGINE_URL=...).
+// Vite's own port stays 1420 (tauri.conf devUrl); the CLI flag overrides it.
+const port = Number(process.env.PW_PORT ?? 1420)
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -21,7 +25,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://127.0.0.1:1420",
+    baseURL: `http://127.0.0.1:${port}`,
     trace: "off",
     screenshot: "off",
     video: "off",
@@ -34,8 +38,8 @@ export default defineConfig({
     ...(process.env.PW_WEBKIT ? [{ name: "webkit", use: { ...devices["Desktop Safari"] } }] : []),
   ],
   webServer: {
-    command: "npm run dev",
-    url: "http://127.0.0.1:1420",
+    command: port === 1420 ? "npm run dev" : `npx vite --port ${port}`,
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !ci,
     timeout: 60_000,
     stdout: "ignore",

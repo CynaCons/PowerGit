@@ -1,0 +1,851 @@
+<title>PowerGit Branches in the Graph</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee; --shadow: 0 14px 40px rgba(16, 24, 39, 0.22); --menu-shadow: 0 6px 24px rgba(16, 24, 39, 0.18);
+    /* Git Extensions lane set, theme/tokens.ts */
+    --lane1: #f064a0; --lane2: #78b4e6; --lane3: #24c221; --lane4: #a078f0; --lane5: #dd3228; --lane6: #1ac6a6; --lane7: #e7b00f;
+    --non-rel: #a0a0a0; --head-outline: #1a1a1a;
+    /* the ref badge pairs */
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb; --ref-remote-bg: #ecfdf5; --ref-remote-fg: #059669;
+    --ref-tag-bg: #f5f3ff; --ref-tag-fg: #6d28d9; --ref-head-bg: #fef2f2; --ref-head-fg: #dc2626;
+    --ref-extra-bg: #f3f4f6; --ref-extra-fg: #6b7280; --ref-stash-bg: #fef9c3; --ref-stash-fg: #a16207;
+    /* the one colour outside the blues: the temporary mode (review "todo" amber) */
+    --amber: #b7791f; --amber-bg: rgba(183, 121, 31, 0.10); --amber-border: #d99a2b;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+      --page: #0c1117; --shadow: 0 14px 40px rgba(0, 0, 0, 0.5); --menu-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+      --lane1: #f47db1; --lane2: #82bdf0; --lane3: #3ad636; --lane4: #b08cf7; --lane5: #f0655a; --lane6: #2bd4b4; --lane7: #f0be2a;
+      --non-rel: #8b939f; --head-outline: #f1f3f6;
+      --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe; --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+      --ref-tag-bg: #2e1f5e; --ref-tag-fg: #ddd6fe; --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+      --ref-extra-bg: #2c3239; --ref-extra-fg: #c5cbd3; --ref-stash-bg: #3f2a06; --ref-stash-fg: #fde68a;
+      --amber: #e0a83a; --amber-bg: rgba(224, 168, 58, 0.12); --amber-border: #e0a83a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+    --page: #0c1117; --shadow: 0 14px 40px rgba(0, 0, 0, 0.5); --menu-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    --lane1: #f47db1; --lane2: #82bdf0; --lane3: #3ad636; --lane4: #b08cf7; --lane5: #f0655a; --lane6: #2bd4b4; --lane7: #f0be2a;
+    --non-rel: #8b939f; --head-outline: #f1f3f6;
+    --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe; --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+    --ref-tag-bg: #2e1f5e; --ref-tag-fg: #ddd6fe; --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+    --ref-extra-bg: #2c3239; --ref-extra-fg: #c5cbd3; --ref-stash-bg: #3f2a06; --ref-stash-fg: #fde68a;
+    --amber: #e0a83a; --amber-bg: rgba(224, 168, 58, 0.12); --amber-border: #e0a83a;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Ubuntu", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  svg { display: block; }
+  kbd { font: inherit; font-size: 10.5px; font-family: var(--mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--meta); line-height: 15px; }
+
+  /* ---------- page chrome ---------- */
+  .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 9px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .tabs { display: flex; gap: 2px; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: var(--surface-alt); }
+  .tabs button { border: 0; background: transparent; border-radius: 4px; padding: 4px 10px; cursor: pointer; color: var(--text-2); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tabs button .n { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font-size: 11px; font-weight: 600; background: var(--surface); color: var(--meta); border: 1px solid var(--border); }
+  .tabs button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(16, 24, 39, 0.12); }
+  .tabs button.on .n { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .right { display: flex; gap: 10px; margin-left: auto; align-items: center; }
+  .switch { display: flex; gap: 4px; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch button b { font-weight: 700; margin-right: 6px; }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 4px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 20px 20px 56px; }
+  .lead { max-width: 78ch; margin: 0 auto 14px; color: var(--text-2); }
+  .lead h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .lead .try { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 3px 10px; cursor: pointer; color: var(--text); }
+  .lead .try:hover { border-color: var(--primary); color: var(--primary); }
+  .lead .quote { border-left: 2px solid var(--border); padding-left: 10px; color: var(--meta); font-style: italic; margin: 8px 0; }
+
+  .notes { max-width: 1180px; margin: 16px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .notes h3 { font-size: 12px; font-weight: 600; color: var(--meta); margin: 0 0 6px; }
+  .notes ol, .notes ul { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+  .notes li { display: flex; gap: 9px; margin: 0 0 7px; }
+  .notes li .mark { flex: none; margin-top: 1px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+  .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; line-height: 1; font-style: normal; }
+  .win .mark { position: relative; z-index: 3; margin-left: 6px; box-shadow: 0 0 0 2px var(--surface); }
+  @media (max-width: 800px) { .notes { grid-template-columns: 1fr; } }
+
+  /* ---------- the window ---------- */
+  .win { width: 1180px; max-width: 100%; height: 700px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); display: grid; grid-template-rows: 30px 1fr; position: relative; user-select: none; }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--meta); }
+  .titlebar .word { font-weight: 600; color: var(--text); }
+  .titlebar .hair { width: 1px; height: 14px; background: var(--border); }
+  .titlebar .wc { margin-left: auto; display: flex; gap: 14px; color: var(--meta); font-size: 11px; }
+  .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+  .win-wrap { overflow-x: auto; }
+
+  /* left: the Repository panel (RepoTree) */
+  .left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .left .head { display: flex; align-items: center; height: 38px; padding: 0 6px 0 16px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; }
+  .left .head .sp { flex: 1; }
+  .ib { width: 26px; height: 26px; border: 0; background: transparent; border-radius: 5px; display: inline-grid; place-items: center; cursor: pointer; color: var(--meta); }
+  .ib:hover { background: var(--hover); color: var(--text); }
+  .ib.on { background: var(--primary-soft); color: var(--primary); }
+  .ib svg { width: 16px; height: 16px; fill: currentColor; }
+  .left .search { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--meta); font-size: 12.5px; }
+  .left .search svg { width: 14px; height: 14px; fill: currentColor; }
+  .strip { display: flex; align-items: center; gap: 8px; padding: 5px 10px; white-space: nowrap; border-bottom: 1px solid var(--border); background: var(--primary-soft); font-size: 12px; color: var(--text); }
+  .strip .cnt { font-weight: 600; }
+  .strip .sp { flex: 1; }
+  .strip a { color: var(--primary); cursor: pointer; text-decoration: none; }
+  .strip a:hover { text-decoration: underline; }
+  .tree { flex: 1; overflow: auto; }
+  .sec { display: flex; align-items: center; height: 28px; padding-left: 6px; font-size: 12px; font-weight: 500; color: var(--meta); cursor: pointer; }
+  .sec:hover { color: var(--text); }
+  .trow { display: flex; align-items: center; height: 22px; padding-right: 6px; cursor: default; font-size: 12.5px; position: relative; }
+  .trow:hover { background: var(--hover); }
+  .trow.cur { background: var(--sel-bg); }
+  .trow.cur .lbl, .trow.cur .ico { color: var(--primary); font-weight: 700; }
+  .trow.muted .lbl { color: var(--meta); }
+  .trow.hidden-ref .lbl, .trow.hidden-ref .ico { color: var(--disabled); }
+  .slot { width: 16px; flex: none; display: inline-grid; place-items: center; color: var(--meta); }
+  .slot svg { width: 15px; height: 15px; fill: currentColor; }
+  .ico { width: 16px; flex: none; display: inline-grid; place-items: center; margin-right: 4px; color: var(--meta); }
+  .ico svg { width: 13px; height: 13px; fill: currentColor; }
+  .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .cb { width: 14px; height: 14px; flex: none; border: 1.5px solid var(--meta); border-radius: 3px; margin-right: 6px; display: inline-grid; place-items: center; background: var(--surface); cursor: pointer; }
+  .cb svg { width: 11px; height: 11px; fill: none; stroke: var(--on-primary); stroke-width: 2.4; }
+  .cb.on { background: var(--primary); border-color: var(--primary); }
+  .cb.some { border-color: var(--primary); }
+  .cb.some::after { content: ""; width: 7px; height: 2px; background: var(--primary); }
+  .cb.lock { opacity: 0.7; cursor: not-allowed; }
+  .eye { width: 20px; height: 20px; flex: none; display: inline-grid; place-items: center; border: 0; background: transparent; border-radius: 4px; color: var(--meta); cursor: pointer; margin-left: 4px; }
+  .eye svg { width: 14px; height: 14px; fill: currentColor; }
+  .eye.off { color: var(--disabled); }
+  .eye:hover { background: var(--hover); color: var(--text); }
+  .trow .eye.hover-only { visibility: hidden; }
+  .trow:hover .eye.hover-only { visibility: visible; }
+  .lock-ico { width: 12px; height: 12px; fill: currentColor; color: var(--meta); margin-left: 4px; }
+
+  /* right: grid + bottom panel */
+  .rightp { display: grid; grid-template-rows: 1fr 6px 214px; min-height: 0; min-width: 0; }
+  .grid { display: grid; grid-template-rows: 28px 1fr; min-height: 0; position: relative; }
+  .ghead, .row { display: grid; grid-template-columns: 96px 1fr 170px 118px 72px; align-items: center; }
+  .ghead { font-size: 12px; font-weight: 500; color: var(--meta); border-bottom: 1px solid var(--border-soft); }
+  .ghead > div { padding-left: 8px; height: 100%; display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border-soft); }
+  .ghead > div:first-child { border-left: 0; padding-left: 14px; }
+  .fchip { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 4px 0 6px; border-radius: 4px; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .fchip svg { width: 12px; height: 12px; fill: currentColor; }
+  .fchip .x { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 3px; cursor: pointer; }
+  .fchip .x:hover { background: var(--hover); }
+  .gbody { overflow: auto; position: relative; }
+  .gwrap { position: relative; min-height: 100%; }
+  .gsvg { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; }
+  .row { min-height: 28px; height: 28px; border-left: 2px solid transparent; cursor: default; position: relative; }
+  .row.expanded { height: auto; }
+  .row > .cell { height: 100%; display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+  .row:hover:not(.selected) { background: var(--hover); }
+  .row.selected { border-left-color: var(--sel-border); background: var(--sel-bg); }
+  .row .graph-cell { height: 100%; }
+  .msg { padding-left: 12px; gap: 6px; overflow: hidden; }
+  .msg-refs { display: flex; flex: none; align-items: center; gap: 4px; }
+  .msg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.expanded .msg { flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding-top: 5px; padding-bottom: 5px; }
+  .row.expanded .msg-refs { flex-wrap: wrap; row-gap: 3px; max-width: 100%; }
+  .author, .date, .sha { color: var(--meta); font-size: 12px; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .author { padding-left: 8px; gap: 7px; }
+  .disc { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 9.5px; font-weight: 700; flex: none; }
+  .disc.p1 { background: var(--ref-local-bg); color: var(--ref-local-fg); }
+  .disc.p2 { background: var(--ref-tag-bg); color: var(--ref-tag-fg); }
+  .date { padding-left: 8px; }
+  .sha { font-family: var(--mono); font-size: 11px; justify-content: flex-end; padding-right: 8px; }
+  .row.dim .msg-text, .row.dim .author, .row.dim .date, .row.dim .sha { /* text cells are never dimmed (v0.14.0 rule) */ }
+
+  /* ref chips, as app.css draws them */
+  .ref { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; height: 16px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--ref-local-bg); color: var(--ref-local-fg); white-space: nowrap; }
+  .ref svg { width: 11px; height: 11px; fill: currentColor; flex: none; }
+  .ref.remote { background: var(--ref-remote-bg); color: var(--ref-remote-fg); }
+  .ref.tag { background: var(--ref-tag-bg); color: var(--ref-tag-fg); }
+  .ref.head { background: var(--ref-head-bg); color: var(--ref-head-fg); }
+  .ref.extra { background: var(--ref-extra-bg); color: var(--ref-extra-fg); cursor: pointer; }
+  .ref.extra:hover { outline: 1px solid var(--ref-extra-fg); }
+  .ref.clickable { cursor: pointer; }
+  .ref.clickable:hover { filter: brightness(0.92); }
+  .ref.big { height: 20px; font-size: 11px; padding: 0 8px; gap: 4px; }
+  .ref.big svg { width: 12px; height: 12px; }
+
+  /* the popover (variant A) and the menus */
+  .pop { position: absolute; z-index: 12; min-width: 250px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--menu-shadow); padding: 6px 0; font-size: 12.5px; }
+  .pop .ph { display: flex; align-items: center; gap: 6px; padding: 4px 12px 6px; font-size: 11px; color: var(--meta); border-bottom: 1px solid var(--border-soft); margin-bottom: 4px; }
+  .pop .ph .sha { font-family: var(--mono); color: var(--text); padding: 0; font-size: 11px; }
+  .pop .pg { padding: 5px 12px 2px; font-size: 11px; font-weight: 600; color: var(--meta); }
+  .pop .pr { display: flex; align-items: center; gap: 7px; height: 24px; padding: 0 12px; cursor: pointer; }
+  .pop .pr:hover { background: var(--hover); }
+  .pop .pr .ico { margin: 0; }
+  .pop .pr .cur { margin-left: auto; font-size: 10.5px; color: var(--primary); font-weight: 600; }
+  .pop .pf { border-top: 1px solid var(--border-soft); margin-top: 4px; padding: 5px 12px 0; font-size: 11px; color: var(--meta); }
+  .menu { position: absolute; z-index: 12; min-width: 268px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--menu-shadow); padding: 4px 0; font-size: 12.5px; }
+  .menu .mi { display: flex; align-items: center; gap: 10px; height: 26px; padding: 0 12px 0 10px; cursor: pointer; }
+  .menu .mi:hover { background: var(--hover); }
+  .menu .mi.live { color: var(--text); }
+  .menu .mi .mic { width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--meta); flex: none; }
+  .menu .mi .mic svg { width: 15px; height: 15px; fill: currentColor; }
+  .menu .mi .ml { flex: 1; }
+  .menu .mi .ms { color: var(--meta); font-size: 11px; }
+  .menu .sep { height: 1px; background: var(--border-soft); margin: 4px 0; }
+  .menu .mi.dis { color: var(--disabled); cursor: default; }
+  .menu .mi.dis:hover { background: transparent; }
+
+  /* the floating graph options pill (GraphOptionsBar) */
+  .pill { position: absolute; left: 10px; bottom: 10px; z-index: 5; display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 2px 8px; font-size: 12px; opacity: 0.45; cursor: pointer; transition: all 120ms ease; }
+  .pill:hover, .pill.open { opacity: 1; background: var(--surface); border: 1px solid var(--border); padding: 6px 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14); cursor: default; }
+  .pill.temp { opacity: 1; background: var(--surface); border: 1px solid var(--amber-border); padding: 6px 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14); cursor: default; }
+  .pill .body { display: none; align-items: center; gap: 8px; }
+  .pill:hover .body, .pill.open .body, .pill.temp .body { display: flex; }
+  .pill .sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+  .pill .lbl { color: var(--meta); }
+  .pill .who { font-weight: 600; }
+  .pill .cnt { color: var(--meta); }
+  .pill .tog { border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; background: var(--surface); cursor: pointer; color: var(--text-2); }
+  .pill .tog.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .pill .sel { border: 1px solid var(--border); border-radius: 4px; padding: 2px 22px 2px 8px; background: var(--surface); color: var(--text); position: relative; }
+  .pill .sel::after { content: ""; position: absolute; right: 8px; top: 8px; border: 4px solid transparent; border-top-color: var(--meta); }
+  .pill > svg, .pill .body > svg { width: 16px; height: 16px; fill: var(--meta); flex: none; }
+  .pill, .pill .body, .pill .tog, .pill .exit { white-space: nowrap; }
+  .pill.temp > svg { fill: var(--amber); }
+  .pill .root { display: inline-flex; align-items: center; gap: 6px; }
+  .pill .root .sha { font-family: var(--mono); font-size: 11px; color: var(--text); padding: 0; }
+  .pill .root .sub { color: var(--meta); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill .exit { border: 1px solid var(--amber-border); color: var(--amber); background: var(--amber-bg); border-radius: 4px; padding: 2px 9px; cursor: pointer; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+  .pill .exit:hover { filter: brightness(0.95); }
+
+  /* bottom panel */
+  .splitter { background: var(--surface-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .bottom { display: grid; grid-template-rows: 36px 1fr; min-height: 0; }
+  .btabs { display: flex; align-items: stretch; gap: 0; padding: 0 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .btabs div { display: flex; align-items: center; padding: 0 12px; color: var(--meta); border-bottom: 2px solid transparent; }
+  .btabs div.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+  .bbody { padding: 12px 20px; overflow: auto; font-size: 13px; }
+  .bbody .subj { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .bbody .bd { white-space: pre-wrap; color: var(--text); margin: 0 0 8px; font-size: 12.5px; }
+  .bbody .meta { color: var(--text-2); font-size: 12.5px; }
+  .bbody .meta .when { color: var(--disabled); margin-left: 16px; }
+  .bbody .cap { font-family: var(--mono); font-size: 11px; color: var(--meta); margin-top: 6px; }
+  .refline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .refline .rl { font-size: 11px; color: var(--meta); margin-right: 2px; min-width: 32px; }
+  .refline .grp { display: inline-flex; align-items: center; gap: 6px; }
+  .refline .dot { color: var(--border); }
+  .reftext { color: var(--text-2); font-size: 12.5px; margin: 4px 0 8px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .reftext .k { color: var(--meta); }
+  .reftext .v { display: inline-flex; align-items: center; gap: 4px; }
+  .reftext .v svg { width: 12px; height: 12px; fill: var(--meta); }
+  .reftext .v b { font-weight: 500; color: var(--text); }
+  .reftext .v .cur { color: var(--primary); font-weight: 600; }
+
+  /* status bar */
+  .status { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; display: none; }
+</style>
+
+<div class="top">
+  <h1>Branches in the graph</h1>
+  <span class="sub">four change requests, one window — click through the numbered tabs, then A / B where there is a choice</span>
+  <div class="tabs" id="tabs"></div>
+  <div class="right">
+    <div class="switch" id="variants"></div>
+    <div class="theme" id="theme">
+      <button data-t="light">Light</button><button data-t="system" class="on">System</button><button data-t="dark">Dark</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="lead" id="lead"></div>
+  <div class="win-wrap">
+  <div class="win" id="win">
+    <div class="titlebar"><span class="word">PowerGit</span><span class="hair"></span><span>powergit</span><span class="wc"><span>—</span><span>☐</span><span>✕</span></span></div>
+    <div class="shell">
+      <div class="left" id="left"></div>
+      <div class="rightp">
+        <div class="grid">
+          <div class="ghead" id="ghead"></div>
+          <div class="gbody" id="gbody"><div class="gwrap" id="gwrap"><svg class="gsvg" id="gsvg"></svg><div id="rows"></div></div></div>
+          <div class="pill" id="pill"></div>
+        </div>
+        <div class="splitter"></div>
+        <div class="bottom">
+          <div class="btabs"><div class="on">Commit</div><div>Diff (4)</div><div>File tree</div></div>
+          <div class="bbody" id="bbody"></div>
+        </div>
+      </div>
+    </div>
+    <div id="overlay"></div>
+  </div>
+  </div>
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+/* ---------- icons (Material, as the app uses them) ---------- */
+const I = {
+  branch: '<svg viewBox="0 0 24 24"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM13 20.01 4 11V4h7v-.01l9 9-7 7.02zM6.5 5C7.33 5 8 5.67 8 6.5S7.33 8 6.5 8 5 7.33 5 6.5 5.67 5 6.5 5z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>',
+  chevR: '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>',
+  chevD: '<svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>',
+  chevL: '<svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>',
+  funnel: '<svg viewBox="0 0 24 24"><path d="M7 6h10l-5.01 6.3L7 6zm-2.75-.39C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39A.998.998 0 0 0 18.95 4H5.04c-.83 0-1.3.95-.79 1.61z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>',
+  route: '<svg viewBox="0 0 24 24"><path d="M19 15.18V7c0-2.21-1.79-4-4-4s-4 1.79-4 4v10c0 1.1-.9 2-2 2s-2-.9-2-2V8.82C8.16 8.4 9 7.3 9 6c0-1.66-1.34-3-3-3S3 4.34 3 6c0 1.3.84 2.4 2 2.82V17c0 2.21 1.79 4 4 4s4-1.79 4-4V7c0-1.1.9-2 2-2s2 .9 2 2v8.18c-1.16.41-2 1.51-2 2.82 0 1.66 1.34 3 3 3s3-1.34 3-3c0-1.3-.84-2.4-2-2.82z"/></svg>',
+  person: '<svg viewBox="0 0 24 24"><path d="M12 6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2m0 10c2.7 0 5.8 1.29 6 2H6c.23-.72 3.31-2 6-2m0-12C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 10c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
+  lock: '<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
+  open: '<svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  compare: '<svg viewBox="0 0 24 24"><path d="M10 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h5v2h2V1h-2v2zm0 15H5l5-6v6zm9-15h-5v2h5v13l-5-6v9h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>',
+  cherry: '<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 3.87 3.13 7 7 7s7-3.13 7-7c0-3.87-3.13-7-7-7zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm-1 8h2v-4h-2z"/></svg>',
+  tick: '<svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6l4.5-5"/></svg>',
+};
+
+/* ---------- the sample history (this repository, lightly arranged) ---------- */
+const C = [
+  { sha: '46f0260', lane: 0, parents: [3], refs: ['HEAD', 'powergit', 'origin/powergit', 'upstream/powergit', 'release/0.18', 'v0.18.2'], msg: 'test(visual): baselines at v0.18.2', date: '2026-09-12 18:40', body: 'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>' },
+  { sha: '9c1d2e4', lane: 1, parents: [2], refs: ['feature/graph-refs', 'origin/feature/graph-refs'], msg: 'feat(graph): every ref on its row, +n opens the list', date: '2026-09-12 17:05' },
+  { sha: '7b3aa10', lane: 1, parents: [3], refs: [], msg: 'wip(graph): chip budget from the message column width', date: '2026-09-12 15:20' },
+  { sha: '40e69ed', lane: 0, parents: [4], refs: [], msg: 'chore(release): v0.18.2', date: '2026-09-12 14:52' },
+  { sha: 'c0ec344', lane: 0, parents: [7, 5], refs: [], msg: "Merge branch 'wt/v18-polish' into powergit", date: '2026-09-12 14:30' },
+  { sha: 'a6b32c8', lane: 2, parents: [6], refs: ['wt/v18-polish'], msg: 'test(visual): baselines regenerated for the v0.18.2 polish', date: '2026-09-12 14:10' },
+  { sha: '5d0f9b2', lane: 2, parents: [8], refs: [], msg: 'polish(settings): zoom stepper, the gear knows the page is open', date: '2026-09-12 12:45' },
+  { sha: 'd4de2ab', lane: 0, parents: [9], refs: [], msg: 'docs(agents): the v0.18.2 look, what a design pass sees', date: '2026-09-12 11:30' },
+  { sha: '3e4edb5', lane: 2, parents: [9], refs: [], msg: 'polish(ui): kbd chips, one voice in menus and dialogs', date: '2026-09-12 10:15' },
+  { sha: '1274a4d', lane: 0, parents: [10], refs: ['v0.18.1'], msg: 'chore(release): v0.18.1', date: '2026-09-11 22:05' },
+  { sha: 'a275619', lane: 0, parents: [11], refs: [], msg: 'feat(graph): author identity discs, a ring on the selected author', date: '2026-09-11 21:10' },
+  { sha: 'eb8e4e1', lane: 0, parents: [12], refs: ['v0.18.0'], msg: 'chore(release): v0.18.0 — settings as a page', date: '2026-09-11 18:00' },
+  { sha: '1cb846f', lane: 0, parents: [13], refs: [], msg: 'feat(settings): the settings page — search, immediate apply', date: '2026-09-11 16:20' },
+  { sha: '7f0c6a4', lane: 0, parents: [14], refs: ['v0.17.0'], msg: 'chore(release): v0.17.0 — review mode', date: '2026-09-10 20:00' },
+  { sha: 'b7c8d90', lane: 0, parents: [15], refs: [], msg: 'feat(review): mark lines in the Diff tab', date: '2026-09-10 18:40' },
+  { sha: '6e7f8a9', lane: 0, parents: [], refs: [], msg: 'fix(shell): the rail keeps Settings reachable at 150 %', date: '2026-09-10 16:00' },
+  { sha: '8f2c7d3', lane: 1, parents: [17], refs: ['master', 'origin/master'], msg: 'mirror: sync Git Extensions at 7f75cee29', date: '2026-09-10 09:30', author: 'gitextensions-bot' },
+  { sha: '9a11c02', lane: 1, parents: [18], refs: [], msg: 'mirror: Git Extensions release 5.2', date: '2026-09-09 08:00', author: 'gitextensions-bot' },
+  { sha: '2c3d4e5', lane: 1, parents: [], refs: [], msg: 'mirror: Git Extensions upstream', date: '2026-09-01 12:00', author: 'gitextensions-bot' },
+];
+C.forEach((c, i) => { c.i = i; c.author = c.author || 'Constantin Chabirand'; });
+const HEAD = 0;
+const CURRENT = 'powergit';
+const REMOTES = ['origin', 'upstream'];
+const TAGS = new Set(['v0.17.0', 'v0.18.0', 'v0.18.1', 'v0.18.2']);
+const LANE_COLOR = ['var(--lane3)', 'var(--lane2)', 'var(--lane1)', 'var(--lane4)'];
+
+/* every ref → its commit, from the sample history */
+const REFS = [];
+for (const c of C) for (const r of c.refs) if (r !== 'HEAD') REFS.push({ name: r, kind: kindOf(r), target: c.i });
+function kindOf(r) {
+  if (r === 'HEAD') return 'head';
+  if (TAGS.has(r)) return 'tag';
+  const s = r.indexOf('/');
+  if (s > 0 && REMOTES.includes(r.slice(0, s))) return 'remote';
+  return 'local';
+}
+const ALL_REF_NAMES = REFS.map((r) => r.name);
+
+/* ---------- state ---------- */
+const state = {
+  scene: 1, variant: 'A', selected: 0, expanded: null, pop: null, menu: null,
+  tempRoot: null, filterMode: false, shown: new Set(), filtered: false,
+  scope: 'all', ring: true, dim: true,
+};
+const SCENES = {
+  1: { title: 'Refs on the row', variants: { A: 'Fold into +n, open the list', B: 'Expand the row' } },
+  2: { title: 'Refs in the Commit tab', variants: { A: 'Chips under the subject', B: 'A line in the metadata' } },
+  3: { title: 'Highlight ancestry', variants: null },
+  4: { title: 'Choose the branches', variants: { A: 'Filter mode, checkboxes', B: 'Show only…, eyes' } },
+};
+
+/* ---------- helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const initials = (n) => n.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || n.slice(0, 2).toUpperCase();
+/* HEAD, the checked-out branch and its remotes, then every other local
+   branch followed by its own remotes, then the remotes with no local, then
+   tags — so a branch and its remote counterpart always sit together. */
+function orderRefs(refs) {
+  const out = [];
+  const locals = refs.filter((r) => kindOf(r) === 'local').sort((a, b) => (a === CURRENT ? -1 : b === CURRENT ? 1 : a.localeCompare(b)));
+  const remotes = refs.filter((r) => kindOf(r) === 'remote').sort();
+  const tags = refs.filter((r) => kindOf(r) === 'tag').sort();
+  const used = new Set();
+  if (refs.includes('HEAD')) out.push('HEAD');
+  for (const l of locals) { out.push(l); for (const r of remotes) if (r.slice(r.indexOf('/') + 1) === l) { out.push(r); used.add(r); } }
+  for (const r of remotes) if (!used.has(r)) out.push(r);
+  return out.concat(tags);
+}
+function chip(ref, extraCls = '') {
+  const kind = kindOf(ref);
+  const cur = ref === CURRENT ? ' data-current="1"' : '';
+  const glyph = kind === 'local' ? I.branch : kind === 'remote' ? I.cloud : kind === 'tag' ? I.tag : '';
+  return `<span class="ref ${kind === 'local' ? '' : kind} ${extraCls}" data-ref="${esc(ref)}" title="${esc(ref)}"${cur}>${glyph}${esc(ref)}</span>`;
+}
+let measureCtx = null;
+function chipWidth(ref) {
+  if (!measureCtx) { measureCtx = document.createElement('canvas').getContext('2d'); measureCtx.font = '600 10px "Segoe UI", system-ui, sans-serif'; }
+  return measureCtx.measureText(ref).width + 12 + (kindOf(ref) === 'head' ? 0 : 14);
+}
+/* Which chips fit in the budget: as many as fit, in order, then +n. */
+function foldRefs(refs, budget) {
+  const ordered = orderRefs(refs);
+  let used = 0, shown = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const w = chipWidth(ordered[i]) + (i ? 4 : 0);
+    const rest = ordered.length - i - 1;
+    const tail = rest > 0 ? 4 + 26 : 0; // room for the +n chip
+    if (used + w + (i === ordered.length - 1 ? 0 : tail) > budget && shown.length > 0) break;
+    used += w; shown.push(ordered[i]);
+  }
+  if (shown.length === 0 && ordered.length) shown.push(ordered[0]);
+  return { shown, hidden: ordered.slice(shown.length) };
+}
+
+/* reachability among the sample rows (children before parents, like --date-order) */
+function markAncestry(rows, rootIdx) {
+  const marks = new Map(); marks.set(rootIdx, 2);
+  for (const r of rows) {
+    const m = marks.get(r.i); if (!m) continue;
+    r.parents.forEach((p, k) => { const inh = m === 2 && k === 0 ? 2 : 1; const cur = marks.get(p); if (!cur || inh > cur) marks.set(p, inh); });
+  }
+  return marks;
+}
+function inScope(marks, i) { const m = marks.get(i); return !!m && (state.scope === 'all' || m === 2); }
+
+function filterActive() { return state.scene === 4 && (state.variant === 'A' ? state.filterMode : state.filtered); }
+function visibleRows() {
+  if (!filterActive()) return C.map((c) => ({ ...c, vlane: c.lane }));
+  const tips = new Set([HEAD]);
+  for (const r of REFS) if (state.shown.has(r.name)) tips.add(r.target);
+  const keep = new Set();
+  for (const c of C) if (tips.has(c.i)) keep.add(c.i);
+  for (const c of C) if (keep.has(c.i)) for (const p of c.parents) keep.add(p);
+  const rows = C.filter((c) => keep.has(c.i));
+  const lanes = [...new Set(rows.map((c) => c.lane))].sort((a, b) => a - b);
+  return rows.map((c) => ({ ...c, vlane: lanes.indexOf(c.lane) }));
+}
+
+/* ---------- render ---------- */
+function render() {
+  renderTop(); renderLead(); renderLeft(); renderHead(); renderRows(); renderBottom(); renderPill(); renderNotes(); renderOverlay();
+  requestAnimationFrame(drawGraph);
+}
+function renderTop() {
+  $('tabs').innerHTML = Object.entries(SCENES).map(([n, s]) => `<button data-scene="${n}" class="${+n === state.scene ? 'on' : ''}"><span class="n">${n}</span>${s.title}</button>`).join('');
+  const v = SCENES[state.scene].variants;
+  $('variants').innerHTML = v ? Object.entries(v).map(([k, t]) => `<button data-variant="${k}" class="${k === state.variant ? 'on' : ''}"><b>${k}</b>${t}</button>`).join('') : '';
+}
+function renderLead() {
+  const s = state.scene, v = state.variant;
+  let h = '';
+  if (s === 1) h = `<h2>1 · Every ref on its row</h2>
+    <p class="quote">"All branches should be displayed. If there are too many, we need a way to either show a popup to view them all, or expand vertically the column. When my head is on a commit that has both local and remote branches, I shall see all these on the commit."</p>
+    <p>Today a row shows at most <b>three</b> chips and clips the group at 46 % of the column, so the HEAD row loses its remote and its tag. Both variants drop the fixed cap: a row shows every chip that fits in <b>60 % of the message column</b>, in the order HEAD · local · remote · tag, each kind with its glyph (the local branch gets one too). What does not fit becomes a <b>+n</b> chip; the message keeps at least 40 %.</p>
+    ${v === 'A' ? `<p><b>A — the list.</b> +n opens a panel anchored to the chip: every ref on that commit, grouped Local / Remote / Tags, click to jump, right-click for the ref menu. Rows stay 28 px, the graph is untouched. <b>Recommended.</b></p>` : `<p><b>B — the row grows.</b> +n expands that row: the chips wrap on as many lines as they need, the message moves under them, the lanes stretch through the taller row. One row at a time; the − chip, Esc or another click folds it. Costs a variable-height grid (the canvas and the virtualizer assume 28 px rows) — about twice the work of A.</p>`}
+    <p><button class="try" data-act="more">Try it: click the +n chip on the HEAD row</button></p>`;
+  if (s === 2) h = `<h2>2 · The refs in the Commit tab</h2>
+    <p class="quote">"When I click on a commit and view the Commit summary in the bottom panel, I should see the active branches / tags on this commit, with the icon to differentiate the local and remote."</p>
+    <p>The Commit tab gains a <b>Refs</b> line: every ref on the commit, nothing folded, each with its glyph — HEAD, a fork for a local branch, a cloud for a remote one, a tag. Click a chip to select it in the tree, right-click for its menu. The engine already sends the full list (<code>%D</code>); nothing new travels.</p>
+    ${v === 'A' ? `<p><b>A — chips under the subject.</b> The same chips as the grid, one size up, wrapping. Reads at a glance and matches the row above. <b>Recommended.</b></p>` : `<p><b>B — a line in the metadata.</b> "Branches: … · Tags: …" set as text between the body and the author lines, glyphs in front of each name. Quieter; the kind is carried by the glyph alone.</p>`}`;
+  if (s === 3) h = `<h2>3 · Highlight the ancestry of any commit</h2>
+    <p class="quote">"Right click on a commit and hit Highlight ancestry, and then temporarily all the ancestry is highlighted like we do for the current branch. The user should exit this temporary to return to the normal highlighting."</p>
+    <p>Git Extensions has this as <b>Highlight selected branch (until refresh)</b> — Ctrl+Shift+B, or Alt+click. The row menu gets the same entry. The graph then treats that commit as the root: its ancestors keep their colour and ring, everything else goes non-relative grey, exactly the checked-out branch's highlight, and the root gets HEAD's 2 px outline. The options pill turns <b>amber</b> and pins itself open with the root and an <b>Exit</b>. Esc, Exit, another Highlight or a refresh returns to the checked-out branch; the scope, Ring and Dim choices apply unchanged.</p>
+    <p><button class="try" data-act="hl">Try it: highlight the ancestry of a6b32c8 (wt/v18-polish)</button> <span style="color:var(--meta)">— or right-click any row, or Alt+click it</span></p>`;
+  if (s === 4) h = `<h2>4 · Choose the branches the graph shows</h2>
+    <p class="quote">"I need to be able to select which branch I see in the graph. Like a dynamic filtering. It can be a mode, that when entered, I can activate branches on the left side explorer and only these are visible."</p>
+    <p>Both variants reload the graph with only the chosen refs' history: <code>git log</code> gets those refs instead of <code>--branches --remotes --tags</code>, which is Git Extensions' <b>Show filtered branches</b>. The checked-out branch is always in (its pending rows sit on HEAD). Paging, jump-to-ref and the highlight work as before; the choice is remembered per repository.</p>
+    ${v === 'A' ? `<p><b>A — a mode with checkboxes.</b> The funnel in the Repository header enters it: every branch, remote branch and tag gets a checkbox, folders and remotes a tri-state one; the checked-out branch is checked and locked. The strip under the search says what the graph shows, with Show all and Exit; the grid header carries the count with an × that leaves the mode. Entering starts from the checked-out branch alone. <b>Recommended</b> — the mode is visible from three places.</p>
+    <p><button class="try" data-act="mode">Try it: enter filter mode, then tick master or feature/graph-refs</button></p>` : `<p><b>B — no mode, an eye per ref.</b> Right-click a ref in the tree → <b>Show only this in the graph</b>. From then on every ref shows an eye — open when its history is in the graph, closed and dimmed when not — click to toggle; the strip offers Show all. Fewer clicks for "just this branch"; a weaker signal that a filter is on.</p>
+    <p><button class="try" data-act="solo">Try it: show only master</button> <span style="color:var(--meta)">— or right-click a branch in the tree</span></p>`}`;
+  $('lead').innerHTML = h;
+}
+
+/* left panel */
+function renderLeft() {
+  const s = state.scene, v = state.variant;
+  const modeA = s === 4 && v === 'A', modeB = s === 4 && v === 'B';
+  const active = filterActive();
+  const shownCount = active ? state.shown.size : ALL_REF_NAMES.length - 1;
+  let h = `<div class="head">Repository<span class="sp"></span>`;
+  if (modeA) h += `<button class="ib ${state.filterMode ? 'on' : ''}" data-act="mode" title="Choose the branches the graph shows">${I.funnel}</button>${state.filterMode ? '' : '<span class="mark">1</span>'}`;
+  h += `<button class="ib" title="Collapse panel">${I.chevL}</button></div>`;
+  h += `<div class="search">${I.search}<span>Filter refs…</span></div>`;
+  if (active) {
+    h += `<div class="strip"><span>Graph: <span class="cnt">${shownCount + 1} of ${ALL_REF_NAMES.length}</span> refs</span><span class="sp"></span><a data-act="all">Show all</a>${modeA ? `<a data-act="mode">Exit</a>` : ''}<span class="mark" style="margin-left:2px">2</span></div>`;
+  }
+  h += `<div class="tree">`;
+  const leaf = (r, depth) => {
+    const cur = r.name === CURRENT;
+    const on = cur || state.shown.has(r.name);
+    let pre = '';
+    if (modeA && state.filterMode) pre = `<span class="cb ${on ? 'on' : ''} ${cur ? 'lock' : ''}" data-cb="${esc(r.name)}">${on ? I.tick : ''}</span>`;
+    const ico = r.kind === 'tag' ? I.tag : r.kind === 'remote' ? I.cloud : I.branch;
+    let post = '';
+    if (modeB) post = `<button class="eye ${on ? '' : 'off'} ${active ? '' : 'hover-only'}" data-eye="${esc(r.name)}" title="${on ? 'Hide from the graph' : 'Show in the graph'}">${on ? I.eye : I.eyeOff}</button>`;
+    if (modeA && state.filterMode && cur) post = `<svg class="lock-ico" viewBox="0 0 24 24" title="The checked-out branch is always shown"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10z"/></svg>`;
+    const mark = (modeA && state.filterMode && r.name === 'master') || (modeB && active && r.name === 'master') ? '<span class="mark">3</span>' : '';
+    const hiddenCls = active && !on ? 'hidden-ref' : '';
+    return `<div class="trow ${cur ? 'cur' : ''} ${hiddenCls}" data-leaf="${esc(r.name)}" style="padding-left:${6 + depth * 16}px"><span class="slot"></span>${pre}<span class="ico">${ico}</span><span class="lbl">${esc(r.name.split('/').pop())}</span>${post}${mark}</div>`;
+  };
+  const group = (label, depth, children, key) => {
+    const names = children.map((c) => c.name);
+    const onN = names.filter((n) => n === CURRENT || state.shown.has(n)).length;
+    let pre = '';
+    if (modeA && state.filterMode) pre = `<span class="cb ${onN === names.length ? 'on' : onN ? 'some' : ''}" data-cbg="${esc(key)}">${onN === names.length ? I.tick : ''}</span>`;
+    let post = '';
+    if (modeB && active) post = `<button class="eye ${onN ? '' : 'off'}" data-eyeg="${esc(key)}">${onN ? I.eye : I.eyeOff}</button>`;
+    return `<div class="trow muted" style="padding-left:${6 + depth * 16}px"><span class="slot">${I.chevD}</span>${pre}<span class="ico">${key.startsWith('r:') ? I.cloud : I.folder}</span><span class="lbl">${esc(label)}</span>${post}</div>`;
+  };
+  const section = (t) => `<div class="sec"><span class="slot">${I.chevD}</span>${t}</div>`;
+  // Branches
+  h += section('Branches');
+  const locals = REFS.filter((r) => r.kind === 'local');
+  const folders = {};
+  for (const r of locals) { const seg = r.name.split('/'); if (seg.length > 1) (folders[seg[0]] = folders[seg[0]] || []).push(r); }
+  for (const f of Object.keys(folders).sort()) { h += group(f, 0, folders[f], 'b:' + f); for (const r of folders[f]) h += leaf(r, 1); }
+  for (const r of locals.filter((r) => !r.name.includes('/')).sort((a, b) => a.name.localeCompare(b.name))) h += leaf(r, 0);
+  // Remotes
+  h += section('Remotes');
+  for (const rem of REMOTES) {
+    const rs = REFS.filter((r) => r.kind === 'remote' && r.name.startsWith(rem + '/'));
+    h += group(rem, 0, rs, 'r:' + rem);
+    const sub = {};
+    for (const r of rs) { const seg = r.name.split('/').slice(1); if (seg.length > 1) (sub[seg[0]] = sub[seg[0]] || []).push(r); }
+    for (const f of Object.keys(sub).sort()) { h += group(f, 1, sub[f], 'r:' + rem + '/' + f); for (const r of sub[f]) h += leaf(r, 2); }
+    for (const r of rs.filter((r) => r.name.split('/').length === 2)) h += leaf(r, 1);
+  }
+  // Tags
+  h += section('Tags');
+  for (const r of REFS.filter((r) => r.kind === 'tag').sort((a, b) => b.name.localeCompare(a.name))) h += leaf(r, 0);
+  h += section('Submodules');
+  h += `</div>`;
+  $('left').innerHTML = h;
+}
+
+function renderHead() {
+  const active = filterActive();
+  const n = active ? state.shown.size + 1 : 0;
+  const chipH = active ? `<span class="fchip" style="margin-left:auto;margin-right:10px" title="The graph shows the history of ${n} refs">${I.funnel}${n} of ${ALL_REF_NAMES.length} refs<span class="x" data-act="${state.variant === 'A' ? 'mode' : 'all'}" title="Show all refs">${I.close}</span></span><span class="mark" style="margin:0 8px 0 0">4</span>` : '';
+  $('ghead').innerHTML = `<div>Graph</div><div>Message${chipH}</div><div>Author</div><div>Date</div><div>SHA</div>`;
+}
+
+function renderRows() {
+  const rows = visibleRows();
+  state.rows = rows;
+  const msgW = $('gbody').clientWidth - 96 - 170 - 118 - 72 - 2;
+  const budget = Math.round(msgW * 0.6);
+  const marks = markAncestry(rows, state.tempRoot ?? HEAD);
+  let h = '';
+  for (const r of rows) {
+    const sel = r.i === state.selected;
+    const exp = state.scene === 1 && state.variant === 'B' && state.expanded === r.i;
+    let refsH = '';
+    if (r.refs.length) {
+      if (exp) {
+        refsH = orderRefs(r.refs).map((x) => chip(x)).join('') + `<span class="ref extra" data-fold="${r.i}" title="Fold">−</span>`;
+      } else {
+        const f = foldRefs(r.refs, budget);
+        refsH = f.shown.map((x) => chip(x)).join('') + (f.hidden.length ? `<span class="ref extra" data-more="${r.i}" title="${esc(f.hidden.join(', '))}">+${f.hidden.length}</span>` : '');
+      }
+    }
+    const callout = state.scene === 1 && r.i === 0 ? '<span class="mark">1</span>' : state.scene === 1 && r.i === 1 ? '<span class="mark">2</span>' : state.scene === 3 && r.i === 4 && state.tempRoot !== null ? '<span class="mark">3</span>' : '';
+    const dimmed = state.dim && !inScope(marks, r.i);
+    h += `<div class="row ${sel ? 'selected' : ''} ${exp ? 'expanded' : ''} ${dimmed ? 'dim' : ''}" data-row="${r.i}">
+      <div class="cell graph-cell"></div>
+      <div class="cell msg"><span class="msg-refs" title="${esc(r.refs.join(', '))}">${refsH}</span><span class="msg-text">${esc(r.msg)}${callout}</span></div>
+      <div class="cell author"><span class="disc ${r.author.startsWith('git') ? 'p2' : 'p1'}">${initials(r.author)}</span>${esc(r.author)}</div>
+      <div class="cell date">${r.date}</div>
+      <div class="cell sha">${r.sha}</div></div>`;
+  }
+  $('rows').innerHTML = h;
+}
+
+/* the lanes, in SVG, after the DOM has the row heights */
+function drawGraph() {
+  const rows = state.rows || [];
+  const els = [...$('rows').children];
+  const svg = $('gsvg');
+  const total = $('gwrap').scrollHeight;
+  svg.setAttribute('width', 96); svg.setAttribute('height', total);
+  svg.style.height = total + 'px';
+  const cy = els.map((e) => e.offsetTop + e.offsetHeight / 2);
+  const idx = new Map(rows.map((r, k) => [r.i, k]));
+  const x = (l) => 14 + (l + 0.5) * 16;
+  const marks = markAncestry(rows, state.tempRoot ?? HEAD);
+  const dim = state.dim, ring = state.ring;
+  let paths = '', nodes = '';
+  rows.forEach((r, k) => {
+    const lc = r.vlane, xc = x(lc), y0 = cy[k];
+    if (r.parents.length === 0) {
+      const on = inScope(marks, r.i);
+      paths += `<path d="M${xc} ${y0} L${xc} ${total}" stroke="${dim && !on ? 'var(--non-rel)' : LANE_COLOR[lc]}" stroke-width="${dim && on ? 3 : 2}" fill="none"/>`;
+    }
+    r.parents.forEach((p, n) => {
+      const j = idx.get(p); if (j === undefined) return;
+      const lp = rows[j].vlane, xp = x(lp), y1 = cy[j];
+      const on = inScope(marks, r.i) && inScope(marks, p) && (state.scope === 'all' || n === 0);
+      const color = dim && !on ? 'var(--non-rel)' : LANE_COLOR[n > 0 ? lp : lc];
+      const w = dim && on ? 3 : 2;
+      let d;
+      if (lc === lp) d = `M${xc} ${y0} L${xp} ${y1}`;
+      else if (n > 0) { const ym = cy[k + 1] ?? y1; d = `M${xc} ${y0} C${xc} ${(y0 + ym) / 2} ${xp} ${(y0 + ym) / 2} ${xp} ${ym} L${xp} ${y1}`; }
+      else { const ya = cy[j - 1] ?? y0; d = `M${xc} ${y0} L${xc} ${ya} C${xc} ${(ya + y1) / 2} ${xp} ${(ya + y1) / 2} ${xp} ${y1}`; }
+      paths += `<path d="${d}" stroke="${color}" stroke-width="${w}" fill="none" stroke-linejoin="round"/>`;
+    });
+  });
+  rows.forEach((r, k) => {
+    const lc = r.vlane, xc = x(lc), y0 = cy[k];
+    const on = inScope(marks, r.i);
+    const fill = dim && !on ? 'var(--non-rel)' : LANE_COLOR[lc];
+    const isRoot = r.i === HEAD || r.i === state.tempRoot;
+    const outline = isRoot ? `stroke="var(--head-outline)" stroke-width="2"` : ring && on ? `stroke="var(--head-outline)" stroke-width="1.5"` : '';
+    if (r.refs.length) nodes += `<rect x="${xc - 5}" y="${y0 - 5}" width="10" height="10" fill="${fill}" ${outline}/>`;
+    else nodes += `<circle cx="${xc}" cy="${y0}" r="5" fill="${fill}" ${outline}/>`;
+  });
+  svg.innerHTML = paths + nodes;
+}
+
+function renderBottom() {
+  const c = C[state.selected];
+  const v = state.variant, s = state.scene;
+  const refs = orderRefs(c.refs);
+  let refsH = '';
+  if (refs.length) {
+    if (s === 2 && v === 'B') {
+      const g = (kind) => refs.filter((r) => kindOf(r) === kind);
+      const item = (r) => `<span class="v">${kindOf(r) === 'local' ? I.branch : kindOf(r) === 'remote' ? I.cloud : I.tag}<b class="${r === CURRENT ? 'cur' : ''}">${esc(r)}</b></span>`;
+      refsH = `<div class="reftext">${g('local').length ? `<span><span class="k">Branches:</span> ${g('local').map(item).join(' · ')}</span>` : ''}${g('remote').length ? `<span><span class="k">Remote:</span> ${g('remote').map(item).join(' · ')}</span>` : ''}${g('tag').length ? `<span><span class="k">Tags:</span> ${g('tag').map(item).join(' · ')}</span>` : ''}${s === 2 ? '<span class="mark">1</span>' : ''}</div>`;
+    } else {
+      refsH = `<div class="refline"><span class="rl">Refs</span>${refs.map((r) => chip(r, 'big clickable')).join('')}${s === 2 ? '<span class="mark">1</span>' : ''}</div>`;
+    }
+  }
+  $('bbody').innerHTML = `<div class="subj">${esc(c.msg)}</div>${c.body ? `<div class="bd">${esc(c.body)}</div>` : ''}${refsH}
+    <div class="meta">Author: ${esc(c.author)} &lt;cynacons@users.noreply.github.com&gt;<span class="when">${c.date}</span></div>
+    <div class="meta">Committer: ${esc(c.author)} &lt;cynacons@users.noreply.github.com&gt;<span class="when">${c.date}</span></div>
+    <div class="cap">Parents: ${c.parents.map((p) => C[p].sha).join(' ') || '—'}</div>
+    <div class="cap">${c.sha}a8a208200a30b926a30aab613416d2a10</div>`;
+}
+
+function renderPill() {
+  const temp = state.tempRoot !== null;
+  const root = temp ? C[state.tempRoot] : null;
+  const author = C[state.selected].author;
+  const n = C.filter((c) => c.author === author).length;
+  $('pill').className = 'pill' + (temp ? ' temp' : state.scene === 3 ? ' open' : '');
+  $('pill').innerHTML = `${I.route}<div class="body">
+    ${temp ? `<span class="root"><span class="lbl">Ancestry of</span><span class="sha">${root.sha}</span><span class="sub">${esc(root.msg)}</span></span>` : `<span class="lbl">Checked-out branch</span>`}
+    <span class="sel">${state.scope === 'all' ? 'All ancestors' : 'First parent only'}</span>
+    <button class="tog ${state.ring ? 'on' : ''}" data-act="ring">Ring</button>
+    <button class="tog ${state.dim ? 'on' : ''}" data-act="dim">Dim others</button>
+    ${temp ? `<span class="sep"></span><button class="exit" data-act="exit">Exit <kbd>Esc</kbd></button><span class="mark">2</span>` : ''}
+    <span class="sep"></span>${I.person}<span class="who">${esc(author)}</span><span class="cnt">${n} of ${C.length}</span><button class="tog on">Mark</button>
+  </div>`;
+}
+
+function renderNotes() {
+  const s = state.scene, v = state.variant;
+  const li = (n, t) => `<li><span class="mark">${n}</span><span>${t}</span></li>`;
+  const bl = (t) => `<li><span>${t}</span></li>`;
+  let a = '', b = '';
+  if (s === 1) {
+    a = li(1, `<b>The HEAD row shows HEAD, the local branch and its remote</b> — the three the owner asked for — then +3 for upstream/powergit, release/0.18 and v0.18.2. Hover the group for the full list; the row's tooltip names every ref.`)
+      + li(2, `<b>A local and its remote on the same commit</b> both stay visible: two chips fit the budget. The fork glyph on the local chip is new; the cloud and the tag glyph are today's.`)
+      + li(3, v === 'A' ? `<b>The list</b> groups by kind, marks the checked-out branch, and takes the same click (jump to the tip) and right-click (the ref menu) as a chip. Esc or a click outside closes it.` : `<b>The expanded row</b> wraps the chips, moves the message under them and keeps the lanes continuous; the − chip folds it. Only one row is open at a time; scrolling keeps it.`);
+    b = bl(`<b>Budget, not count.</b> <code>RefChips.tsx</code> measures each name once (canvas <code>measureText</code>, cached) and folds at 60 % of the message column width, which <code>RevisionGrid</code> already tracks for the graph cap. The 46 % clip goes; <code>+n</code> gets a real element (<code>data-testid="ref-more"</code>).`)
+      + bl(`<b>Order</b> HEAD · local · remote · tag (tags today sort with locals). The chip <code>title</code> and the group <code>title</code> carry the full list for hover.`)
+      + (v === 'A' ? bl(`<b>Cost A:</b> one popover component (MUI <code>Popover</code>, virtualized above 200 refs), the same <code>onRefContextMenu</code>; the canvas is untouched. About a day with the symptom e2e.`)
+        : bl(`<b>Cost B:</b> per-row heights in the virtualizer (<code>measureElement</code>) and in <code>draw.ts</code> (row tops instead of <code>i × 28</code>, bezier geometry per neighbour height), the selection band and the Shift+wheel scroll follow. Two to three days, and the GE-parity drawing has to be re-proven by the visual @grid subset.`));
+  }
+  if (s === 2) {
+    a = li(1, v === 'A' ? `<b>Refs, nothing folded.</b> HEAD, then the local branches (the checked-out one first), the remote ones, the tags. Chips are 20 px here, 16 px in the grid; click selects the tip in the tree, right-click opens the ref menu the grid already has.` : `<b>Three labelled groups on one line</b> — Branches, Remote, Tags — the checked-out branch in the primary colour, the glyph in front of each name. Wraps on a narrow panel.`);
+    b = bl(`<b>Data is already there:</b> <code>CommitDetail.refs</code> comes from <code>git show --format=%D</code>. <code>CommitDetailView</code> needs the same <code>tagNames</code> / <code>remoteNames</code> the grid gets, threaded through <code>BottomPanel</code>, and the same <code>RefChips</code> with <code>fold={false}</code>.`)
+      + bl(`<b>Also shown in the file history's</b> Commit tab, for free.`)
+      + bl(`<b>Cost:</b> half a day including the e2e ("the Commit tab shows HEAD, powergit and origin/powergit with a cloud on the remote one").`);
+  }
+  if (s === 3) {
+    a = li(1, `<b>Highlight ancestry (until refresh)</b> in the row menu, after Compare, with Ctrl+Shift+B as its shortcut — Git Extensions' names and keys; Alt+click on a row does the same, as in GE.`)
+      + li(2, `<b>The pill is the mode's home:</b> amber border and icon, pinned open, the root's SHA and subject, <b>Exit</b> with Esc. Scope, Ring and Dim keep working on the temporary root. The pill collapses again on Exit.`)
+      + li(3, `<b>Everything outside the ancestry goes grey</b> — here the whole powergit line above the merge and the master line — while a6b32c8's own commits and the shared history below it keep their colours and rings. The root wears HEAD's 2 px outline; HEAD keeps its own.`);
+    b = bl(`<b>One line in <code>ancestry.ts</code>:</b> <code>markAncestry(rows, rootId = HEAD)</code>. The grid keeps a <code>highlightRoot</code> state next to the selection; the memo recomputes only when the root or the rows change, never per click.`)
+      + bl(`<b>Ends on</b> Exit, Esc (when the grid has focus), a second Highlight on another row (moves the root), a refresh that drops the root row, or a repository switch. Not persisted — it is a look, not a setting.`)
+      + bl(`<b>Cost:</b> a day: the ancestry change, the menu item in <code>revisionMenuModel.ts</code>, the pill state, the hotkey in the catalog, one symptom e2e that samples the canvas colours above and below the root (the <code>selected-row-graph.spec</code> pattern).`);
+  }
+  if (s === 4) {
+    a = v === 'A'
+      ? li(1, `<b>The funnel</b> in the Repository header enters filter mode (tinted while on). Entering starts from the checked-out branch alone, so the graph collapses to it immediately and each tick adds a branch.`)
+        + li(2, `<b>The strip</b> says what the graph shows — "Graph: 3 of 13 refs" — with Show all (tick everything, stay in the mode) and Exit (back to every ref, checkboxes gone).`)
+        + li(3, `<b>Checkboxes</b> on every leaf; folders and remotes get a tri-state box that ticks their subtree. The checked-out branch is ticked and locked (the pending rows sit on it, the engine always passes HEAD).`)
+        + li(4, `<b>The grid header</b> repeats the count with an ×, so the filter is visible from the graph itself, not only from the tree.`)
+      : li(1, `<b>Show only this in the graph</b> from the ref's right-click menu (branches, remote branches, tags), next to Checkout. The graph reloads with that ref plus the checked-out branch.`)
+        + li(2, `<b>The strip</b> appears only while a filter is on: the count and Show all.`)
+        + li(3, `<b>An eye on every ref</b> once a filter is on — open when in the graph, closed and greyed when not; click toggles. Without a filter the eye shows on hover only, as "Hide from the graph".`)
+        + li(4, `<b>The grid header</b> carries the count with an × that shows everything again.`);
+    b = bl(`<b>Engine:</b> <code>GET /revisions?ref=refs/heads/x&amp;ref=refs/remotes/origin/y…</code> — full ref names validated against the ref tree (no option injection, no globs), passed to <code>git log</code> as revs on stdin (<code>--stdin</code>, so a thousand refs never hit the 32 K argv limit); HEAD and refs/stash stay. Same DTO, paging and decorations. That is GE's <code>FilterInfo</code> "Show filtered branches" path.`)
+      + bl(`<b>Frontend:</b> <code>RevisionFilter</code> gains <code>refs?: string[]</code>; the filter reaches <code>useHistory</code> like the file history's path filter does, so a change is a reload with the layout worker reset. Selection survives when the commit is still listed. The set is remembered under <code>pg.graphRefs.&lt;repo&gt;</code>.`)
+      + bl(`<b>Cost:</b> two days: engine route + xunit, the tree's ${v === 'A' ? 'mode and checkboxes' : 'menu entries and eyes'}, the strip, the header chip, a symptom e2e on a fixture with two diverged branches ("ticking master makes its commits appear, unticking removes them, powergit cannot be unticked").`);
+  }
+  $('notes').innerHTML = `<div><h3>What you are looking at</h3><ol>${a}</ol></div><div><h3>Under the hood, and what it costs</h3><ul>${b}</ul></div>`;
+}
+
+/* popover, context menus */
+function renderOverlay() {
+  const o = $('overlay');
+  o.innerHTML = '';
+  const win = $('win').getBoundingClientRect();
+  if (state.pop !== null) {
+    const chipEl = document.querySelector(`[data-more="${state.pop}"]`);
+    if (!chipEl) { state.pop = null; return; }
+    const r = chipEl.getBoundingClientRect();
+    const c = C[state.pop];
+    const refs = orderRefs(c.refs).filter((x) => x !== 'HEAD');
+    const grp = (kind, label) => {
+      const list = refs.filter((x) => kindOf(x) === kind);
+      if (!list.length) return '';
+      const ico = kind === 'local' ? I.branch : kind === 'remote' ? I.cloud : I.tag;
+      return `<div class="pg">${label} (${list.length})</div>` + list.map((x) => `<div class="pr" data-jump="${esc(x)}"><span class="ico">${ico}</span>${esc(x)}${x === CURRENT ? '<span class="cur">checked out</span>' : ''}</div>`).join('');
+    };
+    o.innerHTML = `<div class="pop" style="left:${Math.min(r.left - win.left, win.width - 290)}px;top:${r.bottom - win.top + 4}px">
+      <div class="ph"><span>${c.refs.length} refs on</span><span class="sha">${c.sha}</span><span class="mark">3</span></div>
+      ${grp('local', 'Local')}${grp('remote', 'Remote')}${grp('tag', 'Tags')}
+      <div class="pf">Click to select the tip · right-click for the ref menu</div></div>`;
+  }
+  if (state.menu) {
+    const m = state.menu;
+    let items = '';
+    if (m.kind === 'row') {
+      const c = C[m.row];
+      const mi = (ico, label, sc = '', cls = '', act = '') => `<div class="mi ${cls}" ${act ? `data-act="${act}"` : ''}><span class="mic">${ico}</span><span class="ml">${label}</span><span class="ms">${sc}</span></div>`;
+      items = mi(I.open, 'Open commit…', 'Ctrl+Space') + mi(I.branch, 'Checkout branch…') + `<div class="sep"></div>`
+        + mi(I.compare, 'Compare to HEAD') + mi(I.compare, 'Compare to working directory') + `<div class="sep"></div>`
+        + mi(I.route, `Highlight ancestry (until refresh)`, 'Ctrl+Shift+B', 'live', 'hl-row') + `<span class="mark" style="position:absolute;right:-24px;margin-top:-22px">1</span>`
+        + `<div class="sep"></div>` + mi(I.branch, 'Create branch here…') + mi(I.tag, 'Create tag here…') + mi(I.cherry, 'Cherry-pick here…') + `<div class="sep"></div>` + mi(I.copy, 'Copy SHA', 'Ctrl+C');
+    } else {
+      const r = m.ref;
+      const mi = (ico, label, cls = '', act = '') => `<div class="mi ${cls}" ${act ? `data-act="${act}"` : ''}><span class="mic">${ico}</span><span class="ml">${label}</span></div>`;
+      const on = state.shown.has(r) && state.filtered;
+      items = mi(I.eye, 'Show only this in the graph', 'live', 'solo') + `<span class="mark" style="position:absolute;right:-24px;margin-top:-22px">1</span>`
+        + (state.filtered ? mi(on ? I.eyeOff : I.eye, on ? 'Hide from the graph' : 'Show in the graph', 'live', 'toggle-eye') : '')
+        + `<div class="sep"></div>` + mi(I.branch, 'Checkout branch') + mi(I.compare, 'Merge into powergit…') + mi(I.route, 'Rebase powergit onto this…') + `<div class="sep"></div>` + mi(I.close, 'Delete branch…');
+    }
+    o.innerHTML += `<div class="menu" style="left:${Math.min(m.x, win.width - 300)}px;top:${Math.min(m.y, win.height - 300)}px;position:absolute" data-menu-ref="${esc(m.ref || '')}" data-menu-row="${m.row ?? ''}">${items}</div>`;
+  }
+}
+
+/* ---------- actions ---------- */
+function setScene(n) {
+  state.scene = n; state.variant = 'A'; state.selected = 0; state.expanded = null; state.pop = null; state.menu = null;
+  state.tempRoot = null; state.filterMode = false; state.filtered = false; state.shown = new Set();
+  render();
+}
+function enterMode() {
+  state.filterMode = !state.filterMode;
+  state.shown = new Set();
+  render();
+}
+function highlight(i) { state.tempRoot = i; state.menu = null; render(); }
+function exitHighlight() { state.tempRoot = null; render(); }
+function toggleRef(name) {
+  if (name === CURRENT) return;
+  if (state.shown.has(name)) state.shown.delete(name); else state.shown.add(name);
+  render();
+}
+function toggleGroup(key) {
+  const names = groupNames(key);
+  const allOn = names.every((n) => n === CURRENT || state.shown.has(n));
+  for (const n of names) { if (n === CURRENT) continue; if (allOn) state.shown.delete(n); else state.shown.add(n); }
+  render();
+}
+function groupNames(key) {
+  if (key.startsWith('b:')) return REFS.filter((r) => r.kind === 'local' && r.name.startsWith(key.slice(2) + '/')).map((r) => r.name);
+  return REFS.filter((r) => r.kind === 'remote' && r.name.startsWith(key.slice(2) + '/')).map((r) => r.name);
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-scene],[data-variant],[data-t],[data-act],[data-more],[data-fold],[data-cb],[data-cbg],[data-eye],[data-eyeg],[data-row],[data-jump],[data-leaf]');
+  const insidePop = e.target.closest('.pop');
+  if (!insidePop && state.pop !== null && !e.target.closest('[data-more]')) { state.pop = null; renderOverlay(); }
+  if (!e.target.closest('.menu') && state.menu) { state.menu = null; renderOverlay(); }
+  if (!t) return;
+  if (t.dataset.scene) return setScene(+t.dataset.scene);
+  if (t.dataset.variant) { state.variant = t.dataset.variant; state.expanded = null; state.pop = null; state.filterMode = false; state.filtered = false; state.shown = new Set(); return render(); }
+  if (t.dataset.t) { const v = t.dataset.t; document.documentElement.removeAttribute('data-theme'); if (v !== 'system') document.documentElement.setAttribute('data-theme', v); document.querySelectorAll('#theme button').forEach((b) => b.classList.toggle('on', b.dataset.t === v)); return; }
+  if (t.dataset.act) {
+    const a = t.dataset.act;
+    if (a === 'more') { const el = document.querySelector('[data-more="0"]'); if (el) el.click(); return; }
+    if (a === 'hl') return highlight(5);
+    if (a === 'hl-row') { const row = +t.closest('.menu').dataset.menuRow; return highlight(row); }
+    if (a === 'exit') return exitHighlight();
+    if (a === 'ring') { state.ring = !state.ring; return render(); }
+    if (a === 'dim') { state.dim = !state.dim; return render(); }
+    if (a === 'mode') return enterMode();
+    if (a === 'all') { if (state.variant === 'A') { for (const n of ALL_REF_NAMES) state.shown.add(n); } else { state.filtered = false; state.shown = new Set(); } return render(); }
+    if (a === 'solo') { state.filtered = true; state.shown = new Set([t.closest('.menu') ? t.closest('.menu').dataset.menuRef : 'master']); state.menu = null; return render(); }
+    if (a === 'toggle-eye') { const ref = t.closest('.menu').dataset.menuRef; state.menu = null; return toggleRef(ref); }
+    return;
+  }
+  if (t.dataset.more !== undefined) {
+    const i = +t.dataset.more;
+    if (state.scene === 1 && state.variant === 'B') { state.expanded = state.expanded === i ? null : i; state.selected = i; render(); }
+    else { state.pop = state.pop === i ? null : i; state.selected = i; render(); }
+    return;
+  }
+  if (t.dataset.fold !== undefined) { state.expanded = null; return render(); }
+  if (t.dataset.cb !== undefined) return toggleRef(t.dataset.cb);
+  if (t.dataset.cbg !== undefined) return toggleGroup(t.dataset.cbg);
+  if (t.dataset.eye !== undefined) { if (!state.filtered) { state.filtered = true; state.shown = new Set(ALL_REF_NAMES); } return toggleRef(t.dataset.eye); }
+  if (t.dataset.eyeg !== undefined) return toggleGroup(t.dataset.eyeg);
+  if (t.dataset.jump !== undefined) { const r = REFS.find((x) => x.name === t.dataset.jump); state.pop = null; state.selected = r.target; return render(); }
+  if (t.dataset.leaf !== undefined) { const r = REFS.find((x) => x.name === t.dataset.leaf); state.selected = r.target; return render(); }
+  if (t.dataset.row !== undefined) {
+    if (e.altKey && state.scene === 3) return highlight(+t.dataset.row);
+    state.selected = +t.dataset.row; return render();
+  }
+});
+document.addEventListener('contextmenu', (e) => {
+  const row = e.target.closest('[data-row]');
+  const leaf = e.target.closest('[data-leaf]');
+  const win = $('win').getBoundingClientRect();
+  if (row && state.scene === 3) { e.preventDefault(); state.selected = +row.dataset.row; state.menu = { kind: 'row', row: +row.dataset.row, x: e.clientX - win.left, y: e.clientY - win.top }; render(); return; }
+  if (leaf && state.scene === 4 && state.variant === 'B' && leaf.dataset.leaf !== CURRENT) { e.preventDefault(); state.menu = { kind: 'ref', ref: leaf.dataset.leaf, x: e.clientX - win.left, y: e.clientY - win.top }; renderOverlay(); return; }
+  if (e.target.closest('#win')) e.preventDefault();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (state.menu) { state.menu = null; renderOverlay(); return; }
+    if (state.pop !== null) { state.pop = null; renderOverlay(); return; }
+    if (state.expanded !== null) { state.expanded = null; render(); return; }
+    if (state.tempRoot !== null) exitHighlight();
+  }
+  if (e.key === 'B' && e.ctrlKey && e.shiftKey && state.scene === 3) { e.preventDefault(); highlight(state.selected); }
+});
+window.addEventListener('resize', () => { renderRows(); requestAnimationFrame(drawGraph); });
+$('gbody').addEventListener('scroll', () => { if (state.pop !== null || state.menu) { state.pop = null; state.menu = null; renderOverlay(); } });
+
+render();
+</script>
