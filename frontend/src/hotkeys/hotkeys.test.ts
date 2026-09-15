@@ -160,6 +160,7 @@ test("GE default chords we claim", () => {
     "browse.focusCommitInfo": chord("2", { ctrl: true }),
     "browse.focusDiff": chord("3", { ctrl: true }),
     "browse.focusFileTree": chord("4", { ctrl: true }),
+    "browse.highlightAncestry": chord("B", { ctrl: true, shift: true }),
     "diff.stageSelected": chord("S"),
     "diff.unstageSelected": chord("U"),
     "browse.refresh": chord("F5"),

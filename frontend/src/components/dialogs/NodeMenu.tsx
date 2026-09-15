@@ -13,6 +13,7 @@ import EditNoteIcon from "@mui/icons-material/EditNote"
 import LowPriorityIcon from "@mui/icons-material/LowPriority"
 import OpenInBrowserIcon from "@mui/icons-material/OpenInBrowser"
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck"
+import RouteOutlinedIcon from "@mui/icons-material/RouteOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import SettingsBackupRestoreIcon from "@mui/icons-material/SettingsBackupRestore"
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
@@ -53,6 +54,7 @@ const ICONS: Record<MenuIcon, ReactNode> = {
   commit: <EditNoteIcon fontSize="small" />,
   difftool: <CompareIcon fontSize="small" />,
   manipulate: <TuneIcon fontSize="small" />,
+  route: <RouteOutlinedIcon fontSize="small" />,
 }
 
 function Item({

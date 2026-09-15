@@ -29,6 +29,12 @@ type Props = {
   currentBranch?: string | null
   /** v0.18.5: rendered at the end of the Message header cell (the ref filter's chip). */
   headerExtra?: ReactNode
+  /** Highlight ancestry (v0.18.4): the commit whose history is highlighted
+   *  instead of HEAD's, or null. Owned by the history (useHistory). */
+  highlightRoot?: string | null
+  /** Set by Alt+click and the menu, cleared by Escape, Exit and a refresh
+   *  that drops the root row. */
+  onHighlightRoot?: (sha: string | null) => void
 }
 
 export function RevisionGrid({
@@ -43,6 +49,8 @@ export function RevisionGrid({
   tagNames,
   currentBranch,
   headerExtra,
+  highlightRoot = null,
+  onHighlightRoot,
 }: Props) {
   const tagSet = useMemo(() => new Set(tagNames ?? []), [tagNames])
   const parentRef = useRef<HTMLDivElement>(null)
@@ -53,10 +61,23 @@ export function RevisionGrid({
   // --date-order refresh that moves it keeps it open. +n opens, − / +n on
   // another row / Escape close.
   const [expandedSha, setExpandedSha] = useState<string | null>(null)
-  // Branch history highlight (v0.14.0): recomputed only when the rows
-  // change (a refresh that changes nothing keeps the array, see
-  // historyMerge.ts), never per click.
-  const ancestry = useMemo(() => markAncestry(rows), [rows])
+  // Branch history highlight (v0.14.0): recomputed only when the rows or
+  // the root change (a refresh that changes nothing keeps the array, see
+  // historyMerge.ts), never per click. The root is HEAD unless the user
+  // picked a commit (v0.18.4, "Highlight ancestry (until refresh)").
+  const ancestry = useMemo(() => markAncestry(rows, highlightRoot ?? undefined), [rows, highlightRoot])
+  const rootRow = useMemo(
+    () => (highlightRoot === null ? null : (rows.find((r) => r.rev.id === highlightRoot) ?? null)),
+    [rows, highlightRoot],
+  )
+  // A refresh that drops the root row (a rebase rewrote it, a filter that
+  // no longer lists it) ends the highlight instead of dimming everything.
+  // Not while the list is empty: a ref-filter reload (v0.18.5) empties the
+  // rows for a moment and keeps the selection, and the root with it.
+  useEffect(() => {
+    if (highlightRoot !== null && rows.length > 0 && rootRow === null && onHighlightRoot) onHighlightRoot(null)
+  }, [highlightRoot, rows.length, rootRow, onHighlightRoot])
+  const exitHighlight = useCallback(() => onHighlightRoot?.(null), [onHighlightRoot])
   const graphOptions = useGraphOptions()
   // Author identity (v0.18.1, prototype A): a disc per row, and the selected
   // row's author marked on every loaded row by that author (class
@@ -230,12 +251,16 @@ export function RevisionGrid({
     [expandedSha, rows, virtualizer],
   )
   const foldRow = useCallback(() => setExpanded(null), [setExpanded])
+  // Alt+click (Git Extensions' gesture) makes the row the ancestry root; it
+  // still selects. A pending row is not a commit and never a root.
   const clickRow = useCallback(
-    (index: number) => {
+    (index: number, e: React.MouseEvent) => {
       onSelect(index)
+      const row = rows[index]
+      if (e.altKey && onHighlightRoot && row && !row.artificial) onHighlightRoot(row.rev.id)
       parentRef.current?.focus()
     },
-    [onSelect],
+    [onSelect, rows, onHighlightRoot],
   )
   const contextRow = useMemo(
     () =>
@@ -297,12 +322,13 @@ export function RevisionGrid({
         onMouseLeave={() => setHovered(-1)}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
-            // Folds the expanded row; with none, the key goes on (the file
-            // history closes on it).
-            if (expandedSha === null) return
+            // Folds the expanded row, else exits the ancestry highlight;
+            // with neither, the key goes on (the file history closes on it).
+            if (expandedSha !== null) foldRow()
+            else if (highlightRoot !== null) exitHighlight()
+            else return
             e.preventDefault()
             e.stopPropagation()
-            foldRow()
             return
           }
           if (e.altKey || e.ctrlKey || e.metaKey) return
@@ -389,7 +415,12 @@ export function RevisionGrid({
           <div style={{ width: naturalWidth }} />
         </div>
       )}
-      <GraphOptionsBar rows={rows} selectedAuthor={selectedAuthor} />
+      <GraphOptionsBar
+        rows={rows}
+        selectedAuthor={selectedAuthor}
+        highlightRoot={rootRow}
+        onExitHighlight={exitHighlight}
+      />
       {loadingTail && (
         <div className="grid-tail" data-testid="history-tail-loading">
           Loading more history…

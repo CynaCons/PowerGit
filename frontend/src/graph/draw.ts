@@ -174,6 +174,9 @@ export function drawRows(
       drawNode(ctx, xFor(row.lane), centerY, row, laneColors, headOutline, {
         fill: dimming && !highlighted ? nonRelative : null,
         ring: ringing && highlighted,
+        // The temporary root of "Highlight ancestry" (v0.18.4) wears HEAD's
+        // 2 px outline; HEAD keeps its own.
+        root: ancestry !== null && ancestry.temporary && row.rev.id === ancestry.rootId,
         // Pending-change rows (v0.14.1): a dashed hollow node, not a commit.
         hollow: row.artificial !== undefined,
       })
@@ -458,7 +461,7 @@ function bezier(ctx: CanvasRenderingContext2D, e0: Point, c0: Point, c1: Point, 
   ctx.stroke()
 }
 
-type NodeStyle = { fill: string | null; ring: boolean; hollow?: boolean }
+type NodeStyle = { fill: string | null; ring: boolean; root?: boolean; hollow?: boolean }
 
 function drawNode(
   ctx: CanvasRenderingContext2D,
@@ -492,12 +495,13 @@ function drawNode(
     ctx.fill()
   }
 
-  // HEAD keeps its 2px ring; the rest of the highlighted history gets a
-  // thinner one (owner: "a thin black outer boundary, like what we have
-  // for the head").
-  if (row.isHead || style.ring) {
+  // HEAD (and a temporary root) keeps its 2px ring; the rest of the
+  // highlighted history gets a thinner one (owner: "a thin black outer
+  // boundary, like what we have for the head").
+  const bold = row.isHead || style.root === true
+  if (bold || style.ring) {
     ctx.strokeStyle = headOutline
-    ctx.lineWidth = row.isHead ? 2 : 1.5
+    ctx.lineWidth = bold ? 2 : 1.5
     if (row.hasRefs) {
       ctx.strokeRect(Math.round(left) - 1, Math.round(top) - 1, d + 2, d + 2)
     } else {

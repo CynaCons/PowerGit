@@ -66,6 +66,7 @@ export type CommandId =
   | "browse.gitConsole"
   | "browse.appLog"
   | "browse.fileHistory"
+  | "browse.highlightAncestry"
   | "diff.stageSelected"
   | "diff.unstageSelected"
   | "commit.refresh"
@@ -234,6 +235,16 @@ export const CATALOG: CommandDef[] = [
     ge: "ShowHistory",
     scope: "browse",
     chord: chord("H", { ctrl: true, shift: true }),
+    available: true,
+  },
+  // v0.18.4: GE "Highlight selected branch (until refresh)" — the selected
+  // commit's ancestry takes the checked-out branch's highlight until Exit,
+  // Esc or a refresh that drops the row; the same row again exits.
+  {
+    id: "browse.highlightAncestry",
+    ge: "ToggleHighlightSelectedBranch",
+    scope: "browse",
+    chord: chord("B", { ctrl: true, shift: true }),
     available: true,
   },
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { edgeInScope, inScope, markAncestry } from "./ancestry"
+import { withArtificialRows } from "./artificial"
 import { layoutGraph } from "./layout"
 import { syntheticHistory } from "./synthetic"
 import type { Revision } from "./types"
@@ -25,7 +26,8 @@ describe("markAncestry", () => {
   const a = markAncestry(rows)!
 
   it("marks the first-parent line 2 and merged-in work 1", () => {
-    expect(a.headId).toBe(id("head"))
+    expect(a.rootId).toBe(id("head"))
+    expect(a.temporary).toBe(false)
     expect(a.marks.get(id("head"))).toBe(2)
     expect(a.marks.get(id("merge"))).toBe(2)
     expect(a.marks.get(id("main2"))).toBe(2)
@@ -53,6 +55,51 @@ describe("markAncestry", () => {
   it("returns null when HEAD is not among the loaded rows", () => {
     expect(markAncestry(layoutGraph([rev("x", ["y"]), rev("y", [])]))).toBeNull()
     expect(inScope(null, "all", id("x"))).toBe(false)
+  })
+
+  // v0.18.4, owner: "right click on a commit and hit Highlight ancestry and
+  // then temporarily all the ancestry is highlighted like we do for the
+  // current branch."
+  describe("with a temporary root", () => {
+    const t = markAncestry(rows, id("feat2"))!
+
+    it("greys the commits only HEAD reaches and keeps the root's own history", () => {
+      expect(t.rootId).toBe(id("feat2"))
+      expect(t.temporary).toBe(true)
+      expect(t.marks.get(id("feat2"))).toBe(2)
+      expect(t.marks.get(id("feat1"))).toBe(2)
+      expect(t.marks.get(id("base"))).toBe(2)
+      for (const only of ["head", "merge", "main2", "wip"]) expect(t.marks.has(id(only)), only).toBe(false)
+    })
+
+    it("first-parent scope runs from the root, not from HEAD", () => {
+      const m = markAncestry(rows, id("merge"))!
+      expect(m.temporary).toBe(true)
+      expect(inScope(m, "first-parent", id("main2"))).toBe(true)
+      expect(inScope(m, "first-parent", id("feat2"))).toBe(false)
+      expect(inScope(m, "all", id("feat2"))).toBe(true)
+      expect(inScope(m, "all", id("head"))).toBe(false)
+      expect(edgeInScope(m, "first-parent", id("merge"), id("main2"), id("main2"))).toBe(true)
+      expect(edgeInScope(m, "all", id("head"), id("merge"), id("merge"))).toBe(false)
+    })
+
+    it("returns null when the root is not among the loaded rows", () => {
+      expect(markAncestry(rows, id("gone"))).toBeNull()
+    })
+
+    it("HEAD as an explicit root is the default, pending rows included", () => {
+      const pending = withArtificialRows(rows, { unstagedCount: 1, stagedCount: 1 })
+      const explicit = markAncestry(pending, id("head"))!
+      const byDefault = markAncestry(pending)!
+      expect(explicit.temporary).toBe(false)
+      expect([...explicit.marks]).toEqual([...byDefault.marks])
+      expect(explicit.marks.get("WORKTREE")).toBe(2)
+      expect(explicit.marks.get("INDEX")).toBe(2)
+      // A side root never reaches the pending rows: they are HEAD's future.
+      const side = markAncestry(pending, id("feat2"))!
+      expect(side.marks.has("WORKTREE")).toBe(false)
+      expect(side.marks.has("INDEX")).toBe(false)
+    })
   })
 
   it("reaches the root of the synthetic demo history and skips its open branches", () => {

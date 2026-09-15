@@ -7,26 +7,40 @@ import type { GraphRow } from "./types"
 // Marks: 2 = on the first-parent line (the branch's own commits and the
 // merge commits themselves, what `git log --first-parent` lists), 1 =
 // reachable only through a second parent (work that was merged in), absent
-// = not reachable from HEAD among the loaded rows.
+// = not reachable from the root among the loaded rows.
 //
 // One pass suffices because the engine's --date-order never shows a parent
 // before its children (docs/agents/memories/engine-revision-ordering-and-
 // worktree-diff.md): by the time a row is visited, every child that could
-// have marked it already has. Returns null when HEAD is not among the
+// have marked it already has. Returns null when the root is not among the
 // loaded rows — the renderer then changes nothing, rather than dimming a
 // history it cannot judge.
+//
+// v0.18.4 (owner: "right click on a commit and hit Highlight ancestry and
+// then temporarily all the ancestry is highlighted like we do for the
+// current branch"): the root can be any loaded commit. The walk is the
+// same; `temporary` (root ≠ HEAD) tells draw.ts to give the root row HEAD's
+// 2 px outline, and the pending rows — HEAD's future — are marked only when
+// HEAD is the root.
 
 export type Mark = 1 | 2
-export type Ancestry = { headId: string; marks: Map<string, Mark> }
+export type Ancestry = {
+  /** The commit the marks start from: HEAD, or the temporary root. */
+  rootId: string
+  /** The root is not HEAD (Highlight ancestry, until refresh). */
+  temporary: boolean
+  marks: Map<string, Mark>
+}
 export type HighlightScope = "all" | "first-parent"
 
-export function markAncestry(rows: readonly GraphRow[]): Ancestry | null {
-  const head = rows.find((r) => r.isHead)
-  if (!head) return null
+export function markAncestry(rows: readonly GraphRow[], rootId?: string): Ancestry | null {
+  const root = rootId === undefined ? rows.find((r) => r.isHead) : rows.find((r) => r.rev.id === rootId)
+  if (!root) return null
+  const temporary = !root.isHead
   const marks = new Map<string, Mark>()
-  marks.set(head.rev.id, 2)
+  marks.set(root.rev.id, 2)
   // Pending-change rows sit on top of HEAD and are its future: never dimmed.
-  for (const row of rows) if (row.artificial) marks.set(row.rev.id, 2)
+  if (!temporary) for (const row of rows) if (row.artificial) marks.set(row.rev.id, 2)
   for (const row of rows) {
     const mark = marks.get(row.rev.id)
     if (!mark) continue
@@ -38,7 +52,7 @@ export function markAncestry(rows: readonly GraphRow[]): Ancestry | null {
       if (!current || inherited > current) marks.set(p, inherited)
     }
   }
-  return { headId: head.rev.id, marks }
+  return { rootId: root.rev.id, temporary, marks }
 }
 
 /** Whether a commit is part of the highlighted history under `scope`. */

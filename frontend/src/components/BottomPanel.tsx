@@ -225,8 +225,13 @@ export function BottomPanel({
       // Shared with the click-time prefetch (engine/commitCache): usually the
       // requests are already in flight when this runs. Stale answers are
       // ignored via `ctrl`, not aborted, so the cache entry stays usable.
-      if (reloadTick > 0) forgetCommit(engine, commitId, diffOptsRef.current)
-      const data = commitData(engine, commitId, diffOptsRef.current)
+      // The options this request was made with: the key below must name
+      // them, not whatever the user picked while it was in flight, or a
+      // context change made during the round trip is never fetched
+      // (v0.18.4, floating-bars.spec on a slow engine).
+      const opts = diffOptsRef.current
+      if (reloadTick > 0) forgetCommit(engine, commitId, opts)
+      const data = commitData(engine, commitId, opts)
       data.commit
         .then((d) => {
           if (!ctrl.signal.aborted) setDetail({ kind: "ready", value: d })
@@ -244,7 +249,7 @@ export function BottomPanel({
           const first = changes.files[0]?.path ?? null
           setFile(first)
           if (first && changes.firstDiff && changes.firstDiff.path === first) {
-            diffFor.current = `${commitId}|${first}|${JSON.stringify(diffOptsRef.current)}`
+            diffFor.current = `${commitId}|${first}|${JSON.stringify(opts)}`
             setDiff({ kind: "ready", value: changes.firstDiff })
           }
         })

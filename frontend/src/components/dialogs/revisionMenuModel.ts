@@ -26,6 +26,7 @@ export type MenuIcon =
   | "commit"
   | "difftool"
   | "manipulate"
+  | "route"
 
 export type MenuNode = {
   id: string
@@ -253,6 +254,16 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
           hint: input.baseSha === null ? "Select a BASE commit first." : undefined,
         },
       ],
+    },
+
+    // GE "Highlight selected branch (until refresh)" (v0.18.4): the row's
+    // ancestry takes the checked-out branch's highlight until Exit.
+    {
+      id: "ctx-highlight-ancestry",
+      label: "Highlight ancestry (until refresh)",
+      icon: "route",
+      shortcut: shortcutLabel("browse.highlightAncestry"),
+      divider: true,
     },
 
     copySubmenu(input.sha),

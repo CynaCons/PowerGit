@@ -20,7 +20,8 @@ type Props = {
   currentBranch?: string | null
   /** The virtualizer's `measureElement`, so an expanded row's height is real. */
   measureRef: (el: HTMLDivElement | null) => void
-  onClick: (index: number) => void
+  /** The event too: Alt+click makes the row the ancestry root (v0.18.4). */
+  onClick: (index: number, e: React.MouseEvent) => void
   onContextMenu?: (e: React.MouseEvent, index: number) => void
   onMouseEnter: (index: number) => void
   onRefContextMenu?: (e: React.MouseEvent, ref: string, kind: RefMenuKind, index: number) => void
@@ -62,7 +63,7 @@ export function RevisionRow({
       data-testid="grid-row"
       data-index={index}
       data-artificial={row.artificial}
-      onClick={() => onClick(index)}
+      onClick={(e) => onClick(index, e)}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, index) : undefined}
       onMouseEnter={() => onMouseEnter(index)}
       style={{

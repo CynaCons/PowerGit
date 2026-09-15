@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report } from "../diagnostics"
 import { isAbort, type EngineClient, type RevisionFilter } from "../engine"
+import { isArtificialId } from "../graph/artificial"
 import { createLayouter, layoutGraph, type GraphLayouter } from "../graph/layout"
 import { syntheticHistory } from "../graph/synthetic"
 import type { GraphRow, Revision } from "../graph/types"
@@ -40,6 +41,13 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   const [loadingTail, setLoadingTail] = useState(false)
   const [historyNote, setHistoryNote] = useState<string | null>(null)
   const [selectedSha, setSelectedSha] = useState<string | null>(null)
+  // Highlight ancestry (v0.18.4, GE "Highlight selected branch (until
+  // refresh)"): the commit whose history the grid highlights instead of
+  // HEAD's, or null. One per history, so the file history's grid never
+  // inherits the main grid's; a repository switch resets it and the grid
+  // clears it when a refresh drops the row. A look, not a setting: never
+  // persisted.
+  const [highlightRoot, setHighlightRoot] = useState<string | null>(null)
   /** True from the first successful page of the current repo. */
   const [loaded, setLoaded] = useState(false)
 
@@ -265,9 +273,21 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     revisionsRef.current = []
     historyCompleteRef.current = false
     setHistoryComplete(false)
-    if (!opts?.keepSelection) setSelectedSha(null)
+    // A ref-filter change keeps the selection (v0.18.5) and, with it, a
+    // temporary highlight root (v0.18.4): the grid drops the root itself if
+    // the reloaded rows no longer list it. A repository switch clears both.
+    if (!opts?.keepSelection) {
+      setSelectedSha(null)
+      setHighlightRoot(null)
+    }
     setLoaded(false)
     setRevisions([])
+  }, [])
+
+  /** Ctrl+Shift+B: the row becomes the root; the same row again exits.
+   *  A pending row is not a commit and never a root. */
+  const toggleHighlightRoot = useCallback((sha: string | undefined) => {
+    if (sha && !isArtificialId(sha)) setHighlightRoot((root) => (root === sha ? null : sha))
   }, [])
 
   // Owner requirement: with thousands of branches most tips are NOT in the
@@ -310,6 +330,9 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     current,
     selectedSha,
     setSelectedSha,
+    highlightRoot,
+    setHighlightRoot,
+    toggleHighlightRoot,
     loadingTail,
     loaded,
     historyNote,

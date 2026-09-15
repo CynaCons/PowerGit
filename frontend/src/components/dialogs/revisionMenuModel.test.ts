@@ -37,6 +37,7 @@ describe("buildRevisionMenu", () => {
       "ctx-fixup",
       "ctx-squash",
       "ctx-compare",
+      "ctx-highlight-ancestry",
       "ctx-copy",
       "ctx-archive",
       "ctx-open-browser",
@@ -47,7 +48,13 @@ describe("buildRevisionMenu", () => {
     const nodes = build({ refs: ["topic"] })
     expect(nodes[0].divider).toBeFalsy()
     const dividers = nodes.filter((n) => n.divider).map((n) => n.id)
-    expect(dividers).toEqual(["ctx-create-branch", "ctx-cherry-pick", "ctx-compare", "ctx-copy"])
+    expect(dividers).toEqual([
+      "ctx-create-branch",
+      "ctx-cherry-pick",
+      "ctx-compare",
+      "ctx-highlight-ancestry",
+      "ctx-copy",
+    ])
   })
 
   it("carries the same shortcuts the toolbar shows", () => {
@@ -57,6 +64,16 @@ describe("buildRevisionMenu", () => {
     expect(find(nodes, "ctx-rebase")?.shortcut).toBe("Ctrl+Shift+E")
     expect(find(nodes, "ctx-create-branch")?.shortcut).toBe("Ctrl+B")
     expect(find(nodes, "ctx-create-tag")?.shortcut).toBe("Ctrl+T")
+    expect(find(nodes, "ctx-highlight-ancestry")?.shortcut).toBe("Ctrl+Shift+B")
+  })
+
+  it("highlight ancestry sits after Compare, a group of its own, and is never offered on a pending row", () => {
+    const nodes = build()
+    const item = find(nodes, "ctx-highlight-ancestry")
+    expect(item).toMatchObject({ label: "Highlight ancestry (until refresh)", icon: "route", divider: true })
+    expect(item?.disabled).toBeFalsy()
+    expect(ids(nodes).indexOf("ctx-highlight-ancestry")).toBe(ids(nodes).indexOf("ctx-compare") + 1)
+    expect(find(build({ artificial: true }), "ctx-highlight-ancestry")).toBeUndefined()
   })
 
   it("offers Merge only for a branch that is not the current one", () => {
