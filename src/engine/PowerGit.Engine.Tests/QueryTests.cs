@@ -484,6 +484,10 @@ public sealed class QueryTests
         Assert.Contains(both, r => r.Subject == "b-only");
         Assert.DoesNotContain(both, r => r.Subject == "feature-commit");
 
+        // An empty set is the mode with nothing ticked: HEAD alone.
+        IReadOnlyList<RevisionDto> headOnly = host.ListRevisions(filter: new RevisionFilter(Refs: []));
+        Assert.Equal(["main-2", "init"], headOnly.Select(r => r.Subject));
+
         // The unfiltered list is untouched: every branch, and the command
         // line the console shows is the one from before the ref filter.
         IReadOnlyList<RevisionDto> all = host.ListRevisions();

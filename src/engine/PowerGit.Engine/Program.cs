@@ -202,15 +202,17 @@ repo.AddEndpointFilter(async (ctx, next) =>
 // are GE's "Show full history" / "Simplify merges". Same DTO, paging and
 // refs as the unfiltered stream, plus each row's name for the file.
 // v0.18.5: repeated `ref=<full name>` values limit the stream to those refs'
-// history (plus HEAD); an unknown name answers 400 naming it.
+// history plus HEAD (a bare `ref=` is HEAD alone); an unknown name answers
+// 400 naming it.
 repo.MapGet("/revisions", (GitHost git, int? max, int? skip, string? path, bool? follow, bool? exact, bool? full, bool? simplify, HttpContext ctx) =>
 {
     try
     {
+        bool filtered = ctx.Request.Query.ContainsKey("ref");
         string[] refs = [.. ctx.Request.Query["ref"].Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r!)];
-        RevisionFilter? filter = string.IsNullOrWhiteSpace(path) && refs.Length == 0
+        RevisionFilter? filter = string.IsNullOrWhiteSpace(path) && !filtered
             ? null
-            : new RevisionFilter(path, follow ?? true, exact ?? false, full ?? false, simplify ?? false, refs.Length > 0 ? refs : null);
+            : new RevisionFilter(path, follow ?? true, exact ?? false, full ?? false, simplify ?? false, filtered ? refs : null);
         return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0, ctx.RequestAborted, filter));
     }
     catch (OperationCanceledException)

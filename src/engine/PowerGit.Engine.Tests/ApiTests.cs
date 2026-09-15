@@ -190,6 +190,9 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains(both, r => r.Subject == "b-only");
         Assert.DoesNotContain(both, r => r.Subject == "feature-commit");
 
+        RevisionDto[] headOnly = await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?ref=") ?? [];
+        Assert.Equal(["init"], headOnly.Select(r => r.Subject));
+
         HttpResponseMessage unknown = await client.GetAsync($"/repos/{sid}/revisions?ref=refs%2Fheads%2Fa&ref=refs%2Fheads%2Fnope");
         Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
         Assert.Contains("refs/heads/nope", (await unknown.Content.ReadFromJsonAsync<ErrorResponse>())!.Error, StringComparison.Ordinal);

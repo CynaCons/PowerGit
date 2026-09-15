@@ -21,7 +21,7 @@ public sealed partial class GitHost
         string root = RequireRoot();
         string head = Run(root, "rev-parse", "HEAD").StdOut.Trim();
         bool hasStash = Run(root, "rev-parse", "--verify", "-q", "refs/stash").ExitCode == 0;
-        string? stdinRefs = filter?.Refs is { Count: > 0 } wanted ? ValidatedRefLines(root, wanted) : null;
+        string? stdinRefs = filter?.Refs is { } wanted ? ValidatedRefLines(root, wanted) : null;
 
         // Path filter (GE RevisionGridControl.BuildPathFilter + FilterInfo.
         // GetRevisionFilter): `git log --follow` is only reliable for a
@@ -77,7 +77,8 @@ public sealed partial class GitHost
         // They are validated against the repository's real refs first
         // (ValidatedRefLines), so nothing that is not a ref name — least of
         // all an option — ever reaches git. HEAD and refs/stash stay on the
-        // command line as before; the unfiltered command line is unchanged.
+        // command line as before, so an empty set lists HEAD alone (the mode
+        // with nothing ticked); the unfiltered command line is unchanged.
         //
         // --date-order, not --topo-order: GE's default (RevisionSortOrder.
         // GitDefault in RevisionReader.BuildArguments) passes neither sort

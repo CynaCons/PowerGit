@@ -32,8 +32,9 @@ public sealed record RevisionDto(
 /// "Simplify merges" (<c>--simplify-merges</c>, only with the former).
 /// <paramref name="Refs"/> (v0.18.5, GE FilterInfo "Show filtered branches")
 /// limits it to the history of the given full ref names (<c>refs/heads/x</c>,
-/// <c>refs/remotes/origin/x</c>, <c>refs/tags/x</c>) plus HEAD; both filters
-/// are optional and may combine.
+/// <c>refs/remotes/origin/x</c>, <c>refs/tags/x</c>) plus HEAD — an empty
+/// list is HEAD alone; null is every ref. Both filters are optional and may
+/// combine.
 /// </summary>
 public sealed record RevisionFilter(
     string? Path = null,
