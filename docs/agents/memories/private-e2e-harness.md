@@ -29,3 +29,8 @@ configured port stays 1420 for `tauri dev`.
 - Visual baselines screenshot the repository name: never regenerate them
   from a worktree; the coordinator does it on the main tree.
 - Stop only the engine pid the script recorded; never a foreign one.
+- Worktrees share one `.git`: a parallel worker's commits on its branch are
+  new rows in every checkout's graph (`--branches` lists them all) and land
+  through the live refresh mid-spec. `shell.spec` "auto-scroll does not
+  re-center" raced on that once (2026-09-15): its `rows.nth(5)` moved under
+  it. Re-run the one test; it is not a product failure.
