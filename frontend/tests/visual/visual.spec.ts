@@ -73,6 +73,21 @@ test.describe("@bottom", () => {
     await page.getByRole("tab", { name: "File Tree" }).click()
     await expect(panel).toHaveScreenshot("bottom-tree.png")
   })
+
+  // Wrap lines (v0.18.8): the remembered switch on, the pill collapsed, the
+  // rows breaking inside the pane with the gutter at the left.
+  test("diff tab with Wrap lines on", async ({ page }) => {
+    await appearance(page, "light")
+    await page.addInitScript(() => window.localStorage.setItem("pg.diffWrap", "1"))
+    const rows = await ready(page)
+    await rows.nth(3).click()
+    const panel = page.getByTestId("bottom-panel")
+    await page.getByRole("tab", { name: /^Diff/ }).click()
+    await expect(page.getByTestId("diff-loading")).toHaveCount(0, { timeout: 15_000 })
+    await expect(panel.getByTestId("diff-lines")).toHaveAttribute("data-wrap", "true")
+    await page.mouse.move(5, 5)
+    await expect(panel).toHaveScreenshot("bottom-diff-wrap.png")
+  })
 })
 
 test.describe("@dialogs", () => {
