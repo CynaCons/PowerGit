@@ -30,7 +30,15 @@ describe("ref chips model (v0.18.3)", () => {
   it("orders HEAD, the checked-out branch and its remotes, then every other local with its own remotes, the orphan remotes, tags", () => {
     // Owner: "When my head is on a commit that has both local and remote
     // branches, I shall see all these on the commit."
-    const refs = ["v0.18.2", "upstream/powergit", "release/0.18", "origin/powergit", "powergit", "HEAD", "origin/hotfix"]
+    const refs = [
+      "v0.18.2",
+      "upstream/powergit",
+      "release/0.18",
+      "origin/powergit",
+      "powergit",
+      "HEAD",
+      "origin/hotfix",
+    ]
     expect(orderRefs(refs, ctx)).toEqual([
       "HEAD",
       "powergit",

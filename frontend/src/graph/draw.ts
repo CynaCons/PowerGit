@@ -17,6 +17,21 @@ type Point = { x: number; y: number }
 /** Breathing room between the rounded container edge and the first lane. */
 export const GRAPH_LEFT_PAD = 14
 
+/** One row's band in list pixels: the virtualizer's `start` and `size`. */
+export type RowBand = { index: number; start: number; size: number }
+
+/** What drawRows paints (v0.18.3): the canvas top in list pixels, its
+ *  height, and the rows to draw with one neighbour on each side when it
+ *  exists. Rows are ROW_HEIGHT tall except an expanded one (every ref
+ *  shown, components/RevisionRow.tsx); the node sits at the row's middle
+ *  and the lanes to the neighbours span the real centre-to-centre distance,
+ *  so at 28 px everywhere this is exactly `(i - start) * rowHeight`. */
+export type GridGeometry = { top: number; height: number; bands: RowBand[] }
+
+/** The heights of a row and its neighbours: the bezier geometry of a lane
+ *  crossing into the row above or below scales with that distance. */
+type Heights = { prev: number; cur: number; next: number }
+
 type LanesInfo = {
   startLane: number
   centerLane: number
@@ -50,16 +65,15 @@ export function graphWidth(rows: GraphRow[]): number {
 export function drawRows(
   ctx: CanvasRenderingContext2D,
   rows: GraphRow[],
-  start: number,
-  end: number,
-  rowHeight: number,
+  geometry: GridGeometry,
   width: number,
   selected: number,
   hovered = -1,
   ancestry: Ancestry | null = null,
   options: GraphOptions = DEFAULT_GRAPH_OPTIONS,
 ): void {
-  ctx.clearRect(0, 0, width, Math.max(1, end - start) * rowHeight)
+  const { top: origin, bands } = geometry
+  ctx.clearRect(0, 0, width, Math.max(1, geometry.height))
   ctx.lineCap = "butt"
   ctx.lineJoin = "round"
   // Read tokens from the document root, not the canvas element: WebKit has a
@@ -83,11 +97,25 @@ export function drawRows(
   const dimming = ancestry !== null && options.dim
   const ringing = ancestry !== null && options.ring
 
-  for (let i = start; i < end; i++) {
+  for (let k = 0; k < bands.length; k++) {
+    const band = bands[k]
+    const i = band.index
     const row = rows[i]
     if (!row) continue
-    const y = (i - start) * rowHeight
+    const y = band.start - origin
+    const rowHeight = band.size
     const centerY = y + rowHeight / 2
+    // A neighbour outside the bands is assumed as tall as this row; the
+    // bands carry one on each side, so that only happens at the list's ends.
+    const before = bands[k - 1]
+    const after = bands[k + 1]
+    const heights: Heights = {
+      prev: before && before.index === i - 1 ? before.size : rowHeight,
+      cur: rowHeight,
+      next: after && after.index === i + 1 ? after.size : rowHeight,
+    }
+    const up = (heights.prev + rowHeight) / 2
+    const down = (rowHeight + heights.next) / 2
 
     if (i === selected) {
       ctx.fillStyle = selectedFill
@@ -128,16 +156,16 @@ export function drawRows(
       const color = dimming && !onPath ? nonRelative : laneColors[segment.color % laneColors.length]
       const lineWidth = dimming && onPath ? LANE_LINE_WIDTH + 1 : LANE_LINE_WIDTH
 
-      const drawer = new SegmentDrawer(ctx, color, LANE_WIDTH, rowHeight, lineWidth)
+      const drawer = new SegmentDrawer(ctx, color, LANE_WIDTH, lineWidth)
       drawDiagonals(
         drawer,
-        { x: startX, y: centerY - rowHeight },
+        { x: startX, y: centerY - up },
         { x: centerX, y: centerY },
-        { x: endX, y: centerY + rowHeight },
+        { x: endX, y: centerY + down },
         diag,
         previousDiag(segment, rows, i),
         nextDiag(segment, rows, i),
-        rowHeight,
+        heights,
       )
     }
 
@@ -260,6 +288,9 @@ function nextDiag(segment: RowSegment, rows: GraphRow[], index: number): Diagona
   return diagonalInfo(lanesFor(match, next, rows[index], rows[index + 2]))
 }
 
+// `start` and `end` are the neighbours' centres; each point's perpendicular
+// stub is a sixth of its own row's height, and each stroke takes the
+// centre-to-centre distance it spans as its cell height (GE's rowHeight).
 function drawDiagonals(
   drawer: SegmentDrawer,
   start: Point,
@@ -268,27 +299,34 @@ function drawDiagonals(
   current: DiagonalInfo,
   previous: DiagonalInfo | null,
   next: DiagonalInfo | null,
-  rowHeight: number,
+  heights: Heights,
 ): void {
-  const half = rowHeight / 6
+  const up = center.y - start.y
+  const down = end.y - center.y
+  const halfPrev = heights.prev / 6
+  const half = heights.cur / 6
+  const halfNext = heights.next / 6
 
   if (current.drawFromStart && previous) {
     const startX = start.x + previous.horizontalOffset
-    if (previous.drawCenterToEndPerpendicularly) drawer.drawTo(startX, start.y + half)
-    else if (previous.drawCenter) drawer.drawTo(startX, start.y, previous.drawCenterPerpendicularly)
-    else drawer.drawTo(startX, start.y - half)
+    if (previous.drawCenterToEndPerpendicularly) drawer.drawTo(startX, start.y + halfPrev, up)
+    else if (previous.drawCenter) drawer.drawTo(startX, start.y, up, previous.drawCenterPerpendicularly)
+    else drawer.drawTo(startX, start.y - halfPrev, up)
   }
 
+  // The three centre points share an x: a stroke between two of them is a
+  // straight line whatever the cell, so `up` is only read when the stroke
+  // comes from the row above.
   const centerX = center.x + current.horizontalOffset
-  if (current.drawCenterToStartPerpendicularly) drawer.drawTo(centerX, center.y - half)
-  if (current.drawCenter) drawer.drawTo(centerX, center.y, current.drawCenterPerpendicularly)
-  if (current.drawCenterToEndPerpendicularly) drawer.drawTo(centerX, center.y + half)
+  if (current.drawCenterToStartPerpendicularly) drawer.drawTo(centerX, center.y - half, up)
+  if (current.drawCenter) drawer.drawTo(centerX, center.y, up, current.drawCenterPerpendicularly)
+  if (current.drawCenterToEndPerpendicularly) drawer.drawTo(centerX, center.y + half, up)
 
   if (current.drawToEnd && next) {
     const endX = end.x + next.horizontalOffset
-    if (next.drawCenterToStartPerpendicularly) drawer.drawTo(endX, end.y - half)
-    else if (next.drawCenter) drawer.drawTo(endX, end.y, next.drawCenterPerpendicularly)
-    else drawer.drawTo(endX, end.y + half)
+    if (next.drawCenterToStartPerpendicularly) drawer.drawTo(endX, end.y - halfNext, down)
+    else if (next.drawCenter) drawer.drawTo(endX, end.y, down, next.drawCenterPerpendicularly)
+    else drawer.drawTo(endX, end.y + halfNext, down)
   }
 }
 
@@ -300,23 +338,24 @@ class SegmentDrawer {
     private readonly ctx: CanvasRenderingContext2D,
     color: string,
     private readonly laneWidth: number,
-    private readonly rowHeight: number,
     lineWidth: number = LANE_LINE_WIDTH,
   ) {
     ctx.strokeStyle = color
     ctx.lineWidth = lineWidth
   }
 
-  drawTo(x: number, y: number, toPerp = true): void {
+  /** Stroke from the previous point to (x, y); `cellHeight` is the
+   *  centre-to-centre distance of the rows the stroke spans. */
+  drawTo(x: number, y: number, cellHeight: number, toPerp = true): void {
     const to = { x, y }
     if (this.from) {
-      this.stroke(this.from, to, this.fromPerp, toPerp)
+      this.stroke(this.from, to, this.fromPerp, toPerp, cellHeight)
     }
     this.from = to
     this.fromPerp = toPerp
   }
 
-  private stroke(from: Point, to: Point, fromPerp: boolean, toPerp: boolean): void {
+  private stroke(from: Point, to: Point, fromPerp: boolean, toPerp: boolean, cellHeight: number): void {
     const ctx = this.ctx
     if (from.x === to.x) {
       ctx.beginPath()
@@ -329,7 +368,7 @@ class SegmentDrawer {
     const height = to.y - from.y
     const width = to.x - from.x
     const singleLane = Math.abs(width) <= this.laneWidth
-    const cellShift = { x: Math.sign(width) * this.laneWidth, y: this.rowHeight }
+    const cellShift = { x: Math.sign(width) * this.laneWidth, y: cellHeight }
     const diagFrac = 0.25
     const perpOffset = diagFrac * cellShift.y
 

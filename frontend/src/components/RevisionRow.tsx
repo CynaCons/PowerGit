@@ -11,6 +11,8 @@ type Props = {
   /** By the selected row's author (v0.18.1): the disc's ring and the bold name. */
   sameAuthor: boolean
   identity: AuthorIdentity | null
+  /** The row grew to show every ref (v0.18.3, variant B). */
+  expanded: boolean
   /** Pixels the ref chips may take before folding; undefined folds nothing. */
   budget: number | undefined
   tagSet: Set<string>
@@ -22,10 +24,14 @@ type Props = {
   onContextMenu?: (e: React.MouseEvent, index: number) => void
   onMouseEnter: (index: number) => void
   onRefContextMenu?: (e: React.MouseEvent, ref: string, kind: RefMenuKind, index: number) => void
+  /** "+n" clicked: grow this row (the click also selects it, it bubbles). */
+  onExpand: (sha: string) => void
+  /** "-" clicked: back to one line. */
+  onFold: () => void
 }
 
 // One row of the revision grid (split out of RevisionGrid.tsx in v0.18.3 to
-// keep that file under the lint cap; no behaviour change). Absolute and
+// keep that file under the lint cap). Absolute and
 // translated by the virtualizer; the row element stays transparent so the
 // canvas underneath keeps its node (selected-row-graph.spec.ts), the text
 // cells carry the selection tint.
@@ -36,6 +42,7 @@ export function RevisionRow({
   selected,
   sameAuthor,
   identity,
+  expanded,
   budget,
   tagSet,
   remoteNames,
@@ -45,11 +52,13 @@ export function RevisionRow({
   onContextMenu,
   onMouseEnter,
   onRefContextMenu,
+  onExpand,
+  onFold,
 }: Props) {
   return (
     <div
       ref={measureRef}
-      className={`grid-row${selected ? " selected" : ""}${sameAuthor ? " author-same" : ""}`}
+      className={`grid-row${selected ? " selected" : ""}${sameAuthor ? " author-same" : ""}${expanded ? " expanded" : ""}`}
       data-testid="grid-row"
       data-index={index}
       data-artificial={row.artificial}
@@ -72,6 +81,9 @@ export function RevisionRow({
           remoteNames={remoteNames}
           current={currentBranch}
           budget={budget}
+          expanded={expanded}
+          onExpand={() => onExpand(row.rev.id)}
+          onFold={onFold}
           onRefContextMenu={onRefContextMenu ? (e, ref, kind) => onRefContextMenu(e, ref, kind, index) : undefined}
         />
         <span className="msg-text">{row.rev.message}</span>
