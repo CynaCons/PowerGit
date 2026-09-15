@@ -228,6 +228,9 @@ export default function App({ base }: { base: EngineClient }) {
       "browse.gitConsole": () => toggleGitConsole(),
       "browse.appLog": () => openConsoleTab("app"),
       "browse.fileHistory": () => fileHistory.openSelected(current?.rev.id),
+      // Ctrl+Shift+B (v0.18.4). The file history's grid has its own root and
+      // no menu item for it (GE's FormFileHistory has none): pass the key on.
+      "browse.highlightAncestry": () => (fileHistory.target ? false : history.toggleHighlightRoot(current?.rev.id)),
     } satisfies Partial<Record<CommandId, () => void>>,
     hotkeysEnabled,
   )
@@ -350,6 +353,8 @@ export default function App({ base }: { base: EngineClient }) {
                         remoteNames={remoteNames}
                         tagNames={tagNames}
                         currentBranch={repo?.branch}
+                        highlightRoot={history.highlightRoot}
+                        onHighlightRoot={history.setHighlightRoot}
                         selected={selected}
                         loadingTail={loadingTail}
                         loading={live && !demo && !loaded}

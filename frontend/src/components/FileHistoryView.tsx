@@ -312,6 +312,8 @@ export function FileHistoryView({
         remoteNames={remoteNames}
         tagNames={tagNames}
         currentBranch={view.repo?.branch}
+        highlightRoot={history.highlightRoot}
+        onHighlightRoot={history.setHighlightRoot}
         selected={selected}
         loadingTail={loadingTail}
         loading={view.live && !loaded}

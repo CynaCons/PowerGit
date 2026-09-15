@@ -8,12 +8,14 @@ import { useCallback, useEffect, useRef, useState } from "react"
 // OR any of its menus is open OR the user pinned it by clicking the icon;
 // when a menu closes, the next pointer move decides whether the pointer is
 // still inside. Callers keep the expanded body mounted and only hide it.
-export function useFloatingBar() {
+// `forceOpen` (v0.18.4) keeps the pill expanded whatever the pointer does:
+// the graph pill is the home of "Highlight ancestry" while a root is set.
+export function useFloatingBar(forceOpen = false) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [inside, setInside] = useState(false)
   const [menus, setMenus] = useState(0)
   const [pinned, setPinned] = useState(false)
-  const expanded = inside || menus > 0 || pinned
+  const expanded = inside || menus > 0 || pinned || forceOpen
 
   const menuProps = {
     onOpen: () => setMenus((m) => m + 1),
