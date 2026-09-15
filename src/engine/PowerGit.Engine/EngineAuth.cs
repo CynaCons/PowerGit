@@ -9,7 +9,9 @@ namespace PowerGit.Engine;
 /// user's credentials on 127.0.0.1, which any web page can reach, so a
 /// per-launch secret is what keeps a drive-by page from calling /reset.
 /// <c>/events</c> is an EventSource and cannot send headers, so it accepts
-/// the token as a <c>?token=</c> query parameter instead.
+/// the token as a <c>?token=</c> query parameter instead; so do the
+/// streamed downloads (archive, patch), which a browser fetches by
+/// navigating (<see cref="AcceptsQueryToken"/>).
 /// </summary>
 public sealed class EngineAuth(RequestDelegate next, string token)
 {
@@ -50,7 +52,7 @@ public sealed class EngineAuth(RequestDelegate next, string token)
         {
             presented = auth["Bearer ".Length..].Trim();
         }
-        else if (ctx.Request.Path.Value?.EndsWith("/events", StringComparison.Ordinal) == true) // /repos/{id}/events
+        else if (AcceptsQueryToken(ctx.Request.Path.Value))
         {
             presented = ctx.Request.Query["token"];
         }
@@ -64,6 +66,18 @@ public sealed class EngineAuth(RequestDelegate next, string token)
 
         await next(ctx);
     }
+
+    /// <summary>
+    ///  The routes a plain navigation reaches, which cannot carry a header:
+    ///  the EventSource (<c>/repos/{id}/events</c>) and the two streamed
+    ///  downloads (<c>/commits/{id}/archive</c>, <c>/commits/{id}/patch</c>
+    ///  and <c>/worktree/patch</c>, v0.18.6). Everything else is header-only.
+    /// </summary>
+    internal static bool AcceptsQueryToken(string? path)
+        => path is not null
+            && (path.EndsWith("/events", StringComparison.Ordinal)
+                || path.EndsWith("/archive", StringComparison.Ordinal)
+                || path.EndsWith("/patch", StringComparison.Ordinal));
 
     private bool Matches(string presented)
     {

@@ -990,6 +990,35 @@ repo.MapGet("/commits/{id}/archive", (string id, string? format, GitHost git) =>
     }
 });
 
+// v0.18.6 "Save as patch…": one commit in mailbox format, streamed under
+// git's own file name; the pending rows' diff under <repo>-<scope>.patch.
+// Downloads cannot set headers, so these two accept ?token= like /events.
+repo.MapGet("/commits/{id}/patch", (string id, GitHost git) =>
+{
+    try
+    {
+        Stream stream = git.OpenPatch(id, out string fileName, out string contentType);
+        return Results.File(stream, contentType, fileName);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapGet("/worktree/patch", (string? scope, GitHost git) =>
+{
+    try
+    {
+        Stream stream = git.OpenWorktreePatch(scope, out string fileName, out string contentType);
+        return Results.File(stream, contentType, fileName);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
 {
     try

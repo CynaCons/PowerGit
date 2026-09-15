@@ -14,6 +14,7 @@ import LowPriorityIcon from "@mui/icons-material/LowPriority"
 import OpenInBrowserIcon from "@mui/icons-material/OpenInBrowser"
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck"
 import RouteOutlinedIcon from "@mui/icons-material/RouteOutlined"
+import SaveAltOutlinedIcon from "@mui/icons-material/SaveAltOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import SettingsBackupRestoreIcon from "@mui/icons-material/SettingsBackupRestore"
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
@@ -50,6 +51,7 @@ const ICONS: Record<MenuIcon, ReactNode> = {
   compare: <CompareArrowsIcon fontSize="small" />,
   copy: <ContentCopyIcon fontSize="small" />,
   archive: <ArchiveOutlinedIcon fontSize="small" />,
+  patch: <SaveAltOutlinedIcon fontSize="small" />,
   browser: <OpenInBrowserIcon fontSize="small" />,
   commit: <EditNoteIcon fontSize="small" />,
   difftool: <CompareIcon fontSize="small" />,

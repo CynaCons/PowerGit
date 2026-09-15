@@ -324,6 +324,27 @@ fn diagnostic_snapshot(app: AppHandle, frontend: String) -> Result<String, Strin
     Ok(path)
 }
 
+/// Tauri command (v0.18.6, "Save as patch…"): writes `contents` to `path`,
+/// the file the user just picked in the Save dialog. The parent directory
+/// must exist — this never creates one, so a path the dialog did not hand
+/// out cannot grow a tree — and the error text is what the page shows.
+/// The engine stays read-only: it streams the text, the shell writes it.
+#[tauri::command(async)]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    write_text_file_at(&PathBuf::from(&path), &contents)
+}
+
+fn write_text_file_at(path: &std::path::Path, contents: &str) -> Result<(), String> {
+    match path.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() && !dir.is_dir() => {
+            return Err(format!("{}: the folder does not exist", dir.display()));
+        }
+        None => return Err(format!("{}: not a file path", path.display())),
+        _ => {}
+    }
+    fs::write(path, contents).map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// Tauri command (v0.15.6): one step of the recovery ladder (recovery.rs),
 /// from Ctrl+Shift+F1..F9 or Settings -> Tools. Returns the step's key.
 #[tauri::command]
@@ -937,6 +958,7 @@ pub fn run() {
             open_devtools,
             app_location,
             diagnostic_snapshot,
+            write_text_file,
             last_incident,
             log_dir,
             recover
@@ -1119,6 +1141,24 @@ mod tests {
         assert!(may_restart(&state));
         *state.exiting.lock().unwrap() = true;
         assert!(!may_restart(&state));
+    }
+
+    #[test]
+    fn write_text_file_writes_into_an_existing_folder_and_refuses_a_missing_one() {
+        let dir = std::env::temp_dir().join(format!("pg-write-text-{}", generate_token()));
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("0001-change.patch");
+        write_text_file_at(&file, "From abc\n").unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), "From abc\n");
+        // Overwrites in place, as a Save dialog that confirmed the overwrite expects.
+        write_text_file_at(&file, "From def\n").unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), "From def\n");
+
+        let missing = dir.join("nope").join("x.patch");
+        let err = write_text_file_at(&missing, "x").unwrap_err();
+        assert!(err.contains("does not exist"), "{err}");
+        assert!(!dir.join("nope").exists(), "must never create directories");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

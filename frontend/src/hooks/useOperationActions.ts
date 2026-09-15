@@ -1,12 +1,23 @@
-import { describeThrown, type ArchiveFormat, type ConflictTake, type MergeOptions, type RebaseOptions } from "../engine"
+import {
+  describeThrown,
+  type ArchiveFormat,
+  type ConflictTake,
+  type MergeOptions,
+  type PatchScope,
+  type RebaseOptions,
+} from "../engine"
 import type { RebaseTodoEntry } from "../engine"
 import { sequencerOpOf } from "../components/operationText"
 import { getBehaviour, type Behaviour } from "../theme/behaviour"
 import { commitWebUrl } from "../components/dialogs/gitUrls"
+import { revealInFolder } from "../diagnostics/snapshot"
+import type { GraphRow } from "../graph/types"
+import { isTauriShell } from "../shell"
 import type { ConfirmRequest, Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
 import type { Jobs } from "./useJobs"
 import type { RepoState } from "./useRepoState"
+import type { StatusNotes } from "./useStatusNote"
 
 // v0.15.0 operations: merge, rebase (including interactive), the sequencer
 // exits every stopped operation offers, conflict resolution, compare,
@@ -19,13 +30,15 @@ export type OperationDeps = {
   repoState: Pick<RepoState, "status" | "setStatus" | "refresh">
   jobs: Pick<Jobs, "withBusy">
   dialogs: Dialogs
+  /** The status bar's transient line ("Saved 0001-….patch", v0.18.6). */
+  notes: Pick<StatusNotes, "setNote">
 }
 
 /** After anything that can move HEAD or the refs. */
 const FULL = { revisions: true, refs: true, status: true } as const
 
 async function openExternal(url: string): Promise<void> {
-  if ("__TAURI_INTERNALS__" in window) {
+  if (isTauriShell()) {
     const { openUrl } = await import("@tauri-apps/plugin-opener")
     await openUrl(url)
     return
@@ -33,11 +46,31 @@ async function openExternal(url: string): Promise<void> {
   window.open(url, "_blank", "noopener")
 }
 
-export function useOperationActions({ session, repoState, jobs, dialogs }: OperationDeps) {
+/**
+ * The shell's half of "Save as patch…" (v0.18.6): the platform's Save
+ * dialog with git's own file name, then the small `write_text_file`
+ * command — no fs plugin, no engine write. Null when the user cancelled.
+ */
+async function saveTextFile(name: string, text: string): Promise<string | null> {
+  const { save } = await import("@tauri-apps/plugin-dialog")
+  const path = await save({ defaultPath: name, filters: [{ name: "Patch", extensions: ["patch"] }] })
+  if (!path) return null
+  const { invoke } = await import("@tauri-apps/api/core")
+  await invoke("write_text_file", { path, contents: text })
+  return path
+}
+
+/** The pending row's patch scope, or null for a commit row. */
+function patchScopeOf(row: GraphRow): PatchScope | null {
+  return row.artificial === "worktree" || row.artificial === "index" ? row.artificial : null
+}
+
+export function useOperationActions({ session, repoState, jobs, dialogs, notes }: OperationDeps) {
   const { client: engine, setEngineError } = session
   const { status, setStatus, refresh } = repoState
   const { withBusy } = jobs
   const { dialog, open } = dialogs
+  const { setNote } = notes
 
   /**
    * In-app confirmation; replaces window.confirm (v0.15.0). `pref` names the
@@ -171,6 +204,31 @@ export function useOperationActions({ session, repoState, jobs, dialogs }: Opera
     }
   }
 
+  /**
+   * Owner (2026-09-15): "Being able to export a patch from a commit.
+   * Probably from the right click menu." One commit as `git format-patch
+   * -1 --stdout` (GE's flags, binary on), or a pending row's diff. In the
+   * shell the engine's text goes through the Save dialog to disk and the
+   * status bar says where; in a browser the URL form is opened and the
+   * browser downloads it under the same name.
+   */
+  async function savePatch(row: GraphRow) {
+    const scope = patchScopeOf(row)
+    const sha = row.rev.id
+    try {
+      if (!isTauriShell()) {
+        await openExternal(scope ? engine.worktreePatchUrl(scope) : engine.patchUrl(sha))
+        return
+      }
+      const { name, text } = scope ? await engine.worktreePatch(scope) : await engine.patch(sha)
+      const path = await saveTextFile(name, text)
+      if (path === null) return
+      setNote({ text: `Saved ${name}`, action: { label: "Show in folder", run: () => void revealInFolder(path) } })
+    } catch (e) {
+      setEngineError(`Save as patch: ${describeThrown(e)}`)
+    }
+  }
+
   async function openInBrowser(sha: string) {
     try {
       const remotes = await engine.remotes()
@@ -202,6 +260,7 @@ export function useOperationActions({ session, repoState, jobs, dialogs }: Opera
     fixupCommit,
     compare,
     archive,
+    savePatch,
     openInBrowser,
   }
 }

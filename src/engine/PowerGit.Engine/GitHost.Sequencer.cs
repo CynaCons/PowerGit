@@ -656,6 +656,21 @@ public sealed partial class GitHost
 
         fileName = $"{Current!.Name}-{sha.StdOut.Trim()}.{format}";
         contentType = format == "zip" ? "application/zip" : "application/gzip";
+        return StartStreamed(root, ["archive", $"--format={format}", $"--prefix={Current!.Name}/", id]);
+    }
+
+    /// <summary>
+    ///  Starts a git child whose stdout is handed to an HTTP response as it
+    ///  is produced (archive, and since v0.18.6 the patch routes): the
+    ///  output never meets <see cref="GitProcess"/>'s stdout cap, so the
+    ///  child is not run through it. The launch is recorded in the command
+    ///  log with the note that its exit code is not observed; stderr is
+    ///  drained and dropped. Callers verify what they can (the revision,
+    ///  the scope) before the launch, since a failure past this point can
+    ///  only end the stream early.
+    /// </summary>
+    private Stream StartStreamed(string root, IReadOnlyList<string> args)
+    {
         ProcessStartInfo psi = new()
         {
             FileName = _gitPath,
@@ -670,12 +685,12 @@ public sealed partial class GitHost
             psi.Environment[key] = value;
         }
 
-        foreach (string arg in new[] { "archive", $"--format={format}", $"--prefix={Current!.Name}/", id })
+        foreach (string arg in args)
         {
             psi.ArgumentList.Add(arg);
         }
 
-        Process process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start git archive.");
+        Process process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start git {args[0]}.");
         process.BeginErrorReadLine();
         RecordDetached([.. psi.ArgumentList], "(streamed to the download; exit code not observed)");
         return new ProcessOutputStream(process);

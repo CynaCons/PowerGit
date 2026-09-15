@@ -72,6 +72,8 @@ type Props = {
   tagNames: string[]
   /** HEAD of the main history: when it moves (commit, checkout, reset) the filtered list reloads. */
   headId: string | null
+  /** The row menu's "Save as patch…" (v0.18.6), the app's action. */
+  onSavePatch: (row: GraphRow) => void
   onClose: () => void
 }
 
@@ -84,6 +86,7 @@ export function FileHistoryView({
   remoteNames,
   tagNames,
   headId,
+  onSavePatch,
   onClose,
 }: Props) {
   const { path } = target
@@ -333,6 +336,7 @@ export function FileHistoryView({
         options={options}
         onOptions={setOptions}
         onDifftool={openDifftoolFor}
+        onSavePatch={onSavePatch}
         onClose={rowMenu.close}
       />
       <PanelSplitter testid="file-history-splitter" splitter={layout.splitter} />

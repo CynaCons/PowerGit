@@ -22,6 +22,7 @@ export type MenuIcon =
   | "compare"
   | "copy"
   | "archive"
+  | "patch"
   | "browser"
   | "commit"
   | "difftool"
@@ -88,16 +89,18 @@ export function copySubmenu(sha: string): MenuNode {
 export type RevisionMenuInput = {
   sha: string
   subject: string
-  /** Pending-change rows (v0.14.1) are not commits. */
-  artificial: boolean
+  /** Pending-change rows (v0.14.1) are not commits: the working tree's or the index's. */
+  artificial: false | "worktree" | "index"
   /** Refs drawn on this row (HEAD, local branches, remote branches, tags). */
   refs: string[]
   currentBranch: string
   /** All local branch names, so a ref on the row can be told apart from a tag. */
   localBranches: string[]
   tags: string[]
-  /** Staged files: "Create fixup/squash commit" needs something to commit. */
+  /** Staged files: "Create fixup/squash commit" needs something to commit; the Index row's patch needs them too. */
   stagedCount: number
+  /** Unstaged files: what the Working directory row's patch would hold (v0.18.6). */
+  unstagedCount: number
   /** The row that was selected before the right-click, when it is another one. */
   otherSelectedSha: string | null
   /** The commit marked with "Select as BASE", if any. */
@@ -124,9 +127,25 @@ function visible(nodes: MenuNode[]): MenuNode[] {
   return nodes.filter((n) => !n.hidden)
 }
 
+/** "Save as patch…" (v0.18.6): one commit as `git format-patch`, or a pending row's diff. */
+function savePatchItem(input: Pick<RevisionMenuInput, "artificial" | "stagedCount" | "unstagedCount">): MenuNode {
+  if (!input.artificial) return { id: "ctx-save-patch", label: "Save as patch…", icon: "patch" }
+  const count = input.artificial === "index" ? input.stagedCount : input.unstagedCount
+  return {
+    id: "ctx-save-patch",
+    label: "Save changes as patch…",
+    icon: "patch",
+    disabled: count === 0,
+    hint: count === 0 ? "Nothing to save: the row is empty." : undefined,
+  }
+}
+
 export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
   if (input.artificial) {
-    return [{ id: "ctx-open-commit", label: "Open commit dialog…", icon: "commit" }]
+    return [
+      { id: "ctx-open-commit", label: "Open commit dialog…", icon: "commit" },
+      { ...savePatchItem(input), divider: true },
+    ]
   }
   const branches = branchesOnRow(input)
   const tags = tagsOnRow(input)
@@ -268,6 +287,7 @@ export function buildRevisionMenu(input: RevisionMenuInput): MenuNode[] {
 
     copySubmenu(input.sha),
     { id: "ctx-archive", label: "Create archive…", icon: "archive" },
+    savePatchItem(input),
     {
       id: "ctx-open-browser",
       label: "Open in browser",

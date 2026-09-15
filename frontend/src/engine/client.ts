@@ -6,6 +6,8 @@ import type {
   ConflictStage,
   ConflictTake,
   MergeOptions,
+  PatchScope,
+  PatchText,
   RebaseOptions,
   RebaseTodo,
   RebaseTodoEntry,
@@ -154,6 +156,27 @@ async function json<T>(res: Response): Promise<T> {
   }
   if (body === null && res.status !== 204) throw new EngineError("engine returned an empty response", res.status)
   return body as T
+}
+
+/** The `filename=` of a Content-Disposition header (the RFC 5987 `filename*=` form first, when present). */
+export function fileNameOf(contentDisposition: string | null, fallback: string): string {
+  if (!contentDisposition) return fallback
+  const star = /filename\*=(?:UTF-8|utf-8)''([^;]+)/.exec(contentDisposition)
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim()) || fallback
+    } catch {
+      // fall through to the plain form
+    }
+  }
+  const plain = /filename="?([^";]+)"?/.exec(contentDisposition)
+  return plain?.[1].trim() || fallback
+}
+
+/** A streamed patch response as text; a non-2xx answer is the engine's JSON error. */
+async function patchText(res: Response, fallbackName: string): Promise<PatchText> {
+  if (!res.ok) await json(res)
+  return { name: fileNameOf(res.headers.get("Content-Disposition"), fallbackName), text: await res.text() }
 }
 
 const diffParams = (o?: Partial<DiffOptions>) => {
@@ -665,6 +688,35 @@ export class EngineClient {
     )
     if (!res.ok) await json(res)
     return res.blob()
+  }
+
+  // ---- patch (v0.18.6) ----------------------------------------------------
+  // "Save as patch…": the engine streams the text under git's own file
+  // name, the shell writes it where the Save dialog pointed; in a browser
+  // the URL form is navigated to and the browser saves it under that name.
+
+  patchUrl(id: string): string {
+    return `${this.baseUrl}${this.repoPath()}/commits/${encodeURIComponent(id)}/patch?token=${encodeURIComponent(this.token)}`
+  }
+
+  worktreePatchUrl(scope: PatchScope): string {
+    return `${this.baseUrl}${this.repoPath()}/worktree/patch?scope=${scope}&token=${encodeURIComponent(this.token)}`
+  }
+
+  /** `git format-patch -1 --stdout` of one commit, with the name from Content-Disposition. */
+  async patch(id: string): Promise<PatchText> {
+    return patchText(
+      await this.get(`${this.repoPath()}/commits/${encodeURIComponent(id)}/patch`, { timeoutMs: 0 }),
+      `${id.slice(0, 7)}.patch`,
+    )
+  }
+
+  /** `git diff --binary` (worktree) or `git diff --cached --binary` (index) as a patch. */
+  async worktreePatch(scope: PatchScope): Promise<PatchText> {
+    return patchText(
+      await this.get(`${this.repoPath()}/worktree/patch?scope=${scope}`, { timeoutMs: 0 }),
+      `${scope}.patch`,
+    )
   }
 
   async cherryPick(id: string): Promise<RepoStatus> {

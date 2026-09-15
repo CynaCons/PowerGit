@@ -92,6 +92,7 @@ export function AppDialogs({
         tags={tagNames}
         currentBranch={currentBranch}
         stagedCount={status?.stagedCount ?? 0}
+        unstagedCount={status?.unstagedCount ?? 0}
         operation={status?.state ?? "none"}
         actions={actions}
         dialogs={dialogs}

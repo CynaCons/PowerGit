@@ -24,6 +24,7 @@ describe("buildFileHistoryMenu", () => {
       "ctx-copy",
       "fh-difftool",
       "fh-difftool-local",
+      "fh-save-patch",
       "fh-manipulate",
       "fh-follow",
       "fh-follow-exact",
@@ -74,6 +75,7 @@ describe("buildFileHistoryMenu", () => {
       localBranches: ["main"],
       tags: [],
       stagedCount: 0,
+      unstagedCount: 0,
       otherSelectedSha: null,
       baseSha: null,
       webUrl: null,
@@ -81,6 +83,14 @@ describe("buildFileHistoryMenu", () => {
     }).map((n) => n.id)
     expect(browse).toContain("ctx-reset")
     expect(browse).toContain("ctx-checkout")
+  })
+
+  // v0.18.6: the same entry as the Browse menu's, for the commits.
+  it("offers Save as patch… beside the difftools, with the Browse menu's label and icon", () => {
+    const item = build().find((n) => n.id === "fh-save-patch")
+    expect(item).toMatchObject({ label: "Save as patch…", icon: "patch" })
+    expect(item?.disabled).toBeFalsy()
+    expect(item?.divider).toBeFalsy()
   })
 
   it("mirrors the follow options as check items, exact only while following", () => {
@@ -96,7 +106,7 @@ describe("buildFileHistoryMenu", () => {
   it("keeps only the difftool and the follow options on a pending-change row", () => {
     const nodes = build({ artificial: true })
     const disabled = nodes.filter((n) => n.disabled).map((n) => n.id)
-    expect(disabled).toEqual(["ctx-copy", "fh-difftool-local", "fh-manipulate"])
+    expect(disabled).toEqual(["ctx-copy", "fh-difftool-local", "fh-save-patch", "fh-manipulate"])
     expect(nodes.find((n) => n.id === "fh-difftool")?.disabled).toBeFalsy()
     expect(nodes.find((n) => n.id === "fh-follow")?.disabled).toBeFalsy()
   })

@@ -9,8 +9,9 @@ import { copySubmenu, type MenuNode } from "./revisionMenuModel"
 // renames, exact renames and copies only. Its Opening handler disables the
 // commit-only items on the artificial rows and the local difftool on the
 // working-tree row. Save as is not here yet: PowerGit has no save-a-blob
-// route or dialog anywhere. `FileHistoryContextMenu.tsx` only renders what
-// this returns.
+// route or dialog anywhere; "Save as patch…" (v0.18.6) sits where it would,
+// for the commits only (the pending rows' patch is the Browse menu's).
+// `FileHistoryContextMenu.tsx` only renders what this returns.
 
 export type FileHistoryMenuInput = {
   sha: string
@@ -39,6 +40,7 @@ export function buildFileHistoryMenu(input: FileHistoryMenuInput): MenuNode[] {
       disabled: input.artificial,
       hint: input.artificial ? "The row is the local file already." : undefined,
     },
+    { id: "fh-save-patch", label: "Save as patch…", icon: "patch", disabled: input.artificial, hint: commitOnly },
     {
       id: "fh-manipulate",
       label: "Manipulate commit",
