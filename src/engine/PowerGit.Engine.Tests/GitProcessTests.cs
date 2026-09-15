@@ -73,6 +73,26 @@ public sealed class GitProcessTests
     }
 
     [Fact]
+    public void Stdin_payload_reaches_the_child_and_is_closed()
+    {
+        // v0.18.5: the ref filter hands git log its revs on stdin. The child
+        // must see the whole payload and then EOF (a ReadToEnd that never
+        // returns is the symptom of a stdin left open).
+        string payload = string.Concat(Enumerable.Range(0, 2000).Select(i => $"refs/heads/line-{i:D4}\n"));
+        (string file, string[] args) = Shell(
+            "$t = [Console]::In.ReadToEnd(); [Console]::Out.Write($t.Length)",
+            "wc -c | tr -d ' \\n'");
+
+        Stopwatch sw = Stopwatch.StartNew();
+        GitProcess.Result r = GitProcess.Run(file, args, null, 60_000, stdin: payload);
+        sw.Stop();
+
+        Assert.Equal(0, r.ExitCode);
+        Assert.Equal(payload.Length.ToString(), r.StdOut.Trim());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(50), $"took {sw.Elapsed}");
+    }
+
+    [Fact]
     public void Real_git_still_works_through_the_runner()
     {
         GitHost host = new();

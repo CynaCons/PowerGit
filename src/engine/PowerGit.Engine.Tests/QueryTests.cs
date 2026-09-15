@@ -426,6 +426,188 @@ public sealed class QueryTests
         Assert.Equal("dir/", folder[0].Path);
     }
 
+    /// <summary>
+    ///  v0.18.5 ref filter fixture: `main` checked out (init, main-2) with two
+    ///  branches diverged from init, `a` (a-only) and `b` (b-only), and a
+    ///  tag `x` on b's tip. TempRepo's own `feature` branch stays as a fourth
+    ///  line nothing asks for.
+    /// </summary>
+    private static void RefFilterFixture(TempRepo repo)
+    {
+        repo.Run("checkout", "-q", "-b", "a");
+        repo.Write("a-only.txt", "a\n");
+        repo.StageAndCommit("a-only");
+        repo.Run("checkout", "-q", "main");
+        repo.Run("checkout", "-q", "-b", "b");
+        repo.Write("b-only.txt", "b\n");
+        repo.StageAndCommit("b-only");
+        repo.Run("tag", "x");
+        repo.Run("checkout", "-q", "main");
+        repo.Write("main-2.txt", "m\n");
+        repo.StageAndCommit("main-2");
+    }
+
+    [Fact]
+    public void ListRevisions_with_refs_lists_those_refs_and_head_only()
+    {
+        // Owner (v0.18.5): "I need to be able to select which branch I see in
+        // the graph." GE FilterInfo "Show filtered branches": explicit revs to
+        // git log. The checked-out branch is always in (HEAD stays on the
+        // command line), the chosen refs come in, nothing else does.
+        using TempRepo repo = new();
+        RefFilterFixture(repo);
+        GitHost host = new();
+        host.Open(repo.Dir);
+        string head = repo.HeadId();
+
+        IReadOnlyList<RevisionDto> onlyA = host.ListRevisions(filter: new RevisionFilter(Refs: ["refs/heads/a"]));
+        string[] subjects = [.. onlyA.Select(r => r.Subject)];
+        Assert.Contains("a-only", subjects);
+        Assert.Contains("main-2", subjects);
+        Assert.Contains("init", subjects);
+        Assert.DoesNotContain("b-only", subjects);
+        Assert.DoesNotContain("feature-commit", subjects);
+        Assert.Contains(onlyA, r => r.Id == head && r.IsHead);
+        // The ref labels are the same as on the unfiltered stream.
+        Assert.Contains(onlyA, r => r.Refs.Contains("a"));
+
+        // A tag works the same way (b's tip carries it).
+        IReadOnlyList<RevisionDto> tagged = host.ListRevisions(filter: new RevisionFilter(Refs: ["refs/tags/x"]));
+        string[] taggedSubjects = [.. tagged.Select(r => r.Subject)];
+        Assert.Contains("b-only", taggedSubjects);
+        Assert.Contains("main-2", taggedSubjects);
+        Assert.DoesNotContain("a-only", taggedSubjects);
+
+        // Two refs: both histories, in one date-ordered stream.
+        IReadOnlyList<RevisionDto> both = host.ListRevisions(filter: new RevisionFilter(Refs: ["refs/heads/a", "refs/heads/b"]));
+        Assert.Contains(both, r => r.Subject == "a-only");
+        Assert.Contains(both, r => r.Subject == "b-only");
+        Assert.DoesNotContain(both, r => r.Subject == "feature-commit");
+
+        // An empty set is the mode with nothing ticked: HEAD alone.
+        IReadOnlyList<RevisionDto> headOnly = host.ListRevisions(filter: new RevisionFilter(Refs: []));
+        Assert.Equal(["main-2", "init"], headOnly.Select(r => r.Subject));
+
+        // The unfiltered list is untouched: every branch, and the command
+        // line the console shows is the one from before the ref filter.
+        IReadOnlyList<RevisionDto> all = host.ListRevisions();
+        Assert.Contains(all, r => r.Subject == "feature-commit");
+        GitLogEntryDto plain = host.CommandLog().Last(e => e.Command.Contains(" log ", StringComparison.Ordinal));
+        Assert.Contains(" --branches --remotes --tags -n800 ", plain.Command, StringComparison.Ordinal);
+        Assert.DoesNotContain("--stdin", plain.Command, StringComparison.Ordinal);
+        Assert.EndsWith(" HEAD", plain.Command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ListRevisions_with_refs_puts_the_names_on_stdin_and_logs_a_count()
+    {
+        using TempRepo repo = new();
+        RefFilterFixture(repo);
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        host.ListRevisions(filter: new RevisionFilter(Refs: ["refs/heads/a", "refs/tags/x"]));
+        GitLogEntryDto entry = host.CommandLog().Last(e => e.Command.Contains(" log ", StringComparison.Ordinal));
+        Assert.Contains(" --stdin -n800 ", entry.Command, StringComparison.Ordinal);
+        Assert.DoesNotContain("--branches", entry.Command, StringComparison.Ordinal);
+        // The console says how many, never which: the payload can be thousands of names.
+        Assert.EndsWith(" HEAD  (2 refs on stdin)", entry.Command, StringComparison.Ordinal);
+        Assert.DoesNotContain("refs/heads/a", entry.Command, StringComparison.Ordinal);
+        Assert.True(entry.Ok);
+    }
+
+    [Theory]
+    [InlineData("refs/heads/nope")]
+    [InlineData("-c")]
+    [InlineData("--all")]
+    [InlineData("a")]
+    [InlineData("HEAD")]
+    [InlineData("refs/stash")]
+    [InlineData("refs/heads/a..refs/heads/b")]
+    public void ListRevisions_rejects_a_name_that_is_not_one_of_the_repository_refs(string name)
+    {
+        // Only full names the repository actually has under refs/heads,
+        // refs/remotes and refs/tags reach git: no option, no short name, no
+        // revision expression — the route turns the exception into a 400
+        // that names the offender.
+        using TempRepo repo = new();
+        RefFilterFixture(repo);
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(
+            () => host.ListRevisions(filter: new RevisionFilter(Refs: ["refs/heads/a", name])));
+        Assert.Contains(name, ex.Message, StringComparison.Ordinal);
+        // Nothing reached git log.
+        Assert.DoesNotContain(host.CommandLog(), e => e.Command.Contains("--stdin", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ListRevisions_with_a_thousand_refs_succeeds()
+    {
+        // "Show all" on a heavy repository is every ref: on argv that dies
+        // near 900 names on Windows (see ListRevisions_survives_thousands_of_refs);
+        // on stdin it is just a longer payload.
+        using TempRepo repo = new();
+        RefFilterFixture(repo);
+        repo.Run("checkout", "-q", "a");
+        string aTip = repo.HeadId();
+        repo.Run("checkout", "-q", "main");
+        System.Diagnostics.ProcessStartInfo psi = new("git", "update-ref --stdin")
+        {
+            WorkingDirectory = repo.Dir,
+            RedirectStandardInput = true,
+            RedirectStandardError = true,
+        };
+        List<string> names = [];
+        using (System.Diagnostics.Process p = System.Diagnostics.Process.Start(psi)!)
+        {
+            p.StandardInput.NewLine = "\n";
+            for (int i = 0; i < 1000; i++)
+            {
+                string name = $"refs/heads/filter-load/very-long-branch-name-{i:D5}";
+                names.Add(name);
+                p.StandardInput.WriteLine($"create {name} {aTip}");
+            }
+
+            p.StandardInput.Close();
+            Assert.True(p.WaitForExit(60_000), "update-ref timed out");
+            Assert.Equal(0, p.ExitCode);
+        }
+
+        GitHost host = new();
+        host.Open(repo.Dir);
+        IReadOnlyList<RevisionDto> revs = host.ListRevisions(filter: new RevisionFilter(Refs: names));
+        Assert.Contains(revs, r => r.Subject == "a-only");
+        Assert.Contains(revs, r => r.Subject == "main-2");
+        Assert.DoesNotContain(revs, r => r.Subject == "b-only");
+        GitLogEntryDto entry = host.CommandLog().Last(e => e.Command.Contains(" log ", StringComparison.Ordinal));
+        Assert.EndsWith("(1000 refs on stdin)", entry.Command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ListRevisions_combines_a_ref_filter_with_a_path_filter()
+    {
+        using TempRepo repo = new();
+        RefFilterFixture(repo);
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        // a-only.txt only ever changed on `a`; asking for it on `b`'s history
+        // lists nothing, on `a`'s history the one commit.
+        IReadOnlyList<RevisionDto> onA = host.ListRevisions(filter: new RevisionFilter("a-only.txt", Refs: ["refs/heads/a"]));
+        Assert.Equal(["a-only"], onA.Select(r => r.Subject));
+        Assert.Equal("a-only.txt", onA[0].Path);
+        IReadOnlyList<RevisionDto> onB = host.ListRevisions(filter: new RevisionFilter("a-only.txt", Refs: ["refs/heads/b"]));
+        Assert.Empty(onB);
+        // The path a.txt is in every branch's root commit: still listed with
+        // a ref filter, and paging still works on the combined filter.
+        RevisionFilter combined = new("a.txt", Refs: ["refs/heads/a", "refs/heads/b"]);
+        IReadOnlyList<RevisionDto> rooted = host.ListRevisions(filter: combined);
+        Assert.Equal(["init"], rooted.Select(r => r.Subject));
+        Assert.Empty(host.ListRevisions(1, 1, filter: combined));
+    }
+
     private static void CommitAt(string dir, string message, long unixSeconds)
     {
         string date = $"{unixSeconds} +0000";

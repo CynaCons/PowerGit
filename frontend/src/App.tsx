@@ -21,6 +21,7 @@ import { focusGrid } from "./hooks/focusGrid"
 import { useChromeLayout } from "./hooks/useChromeLayout"
 import { useDialogs } from "./hooks/useDialogs"
 import { useFileHistory } from "./hooks/useFileHistory"
+import { useGraphFilterChip, useGraphRefFilter } from "./hooks/useGraphRefFilter"
 import { useGridMenus } from "./hooks/useGridMenus"
 import { useEngineSession } from "./hooks/useEngineSession"
 import { useGitActions } from "./hooks/useGitActions"
@@ -36,16 +37,12 @@ import { useBarLayout } from "./theme/barLayout"
 import { TitleStrip } from "./components/TitleStrip"
 import { CommandRail } from "./components/CommandRail"
 import { IncidentBanner } from "./components/IncidentBanner"
-import { SnapshotDialog, type SnapshotState } from "./components/SnapshotDialog"
-import { setStateSampler } from "./diagnostics"
-import { buildFrontendDump, takeSnapshot } from "./diagnostics/snapshot"
-import { describeThrown } from "./engine"
+import { SnapshotDialog } from "./components/SnapshotDialog"
 import { withArtificialRows } from "./graph/artificial"
 import { findRefTarget } from "./components/refChipsModel"
 import { useAutoFetch } from "./hooks/useAutoFetch"
+import { useDiagnosticSnapshot } from "./hooks/useDiagnosticSnapshot"
 import { useHeartbeat } from "./hooks/useHeartbeat"
-import { getThemePreference } from "./theme/appearance"
-import { getZoom } from "./theme/zoom"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together plus the browse-scope hotkeys. `base`
@@ -55,10 +52,20 @@ export default function App({ base }: { base: EngineClient }) {
   const session = useEngineSession(base)
   const { view, state, client, engineError, setEngineError, recents, forgetRecent, demo } = session
   const { live, offline, repo } = view
-  const history = useHistory({ client, demo, live, setEngineError, onFailure: session.handleFailure })
+  // Which refs the graph shows (v0.18.5): the tree's ticks, per repository.
+  const graphFilter = useGraphRefFilter(client.repoId)
+  const history = useHistory({
+    client,
+    demo,
+    live,
+    setEngineError,
+    onFailure: session.handleFailure,
+    filter: graphFilter.filter,
+  })
   const { rows: engineRows, selectedSha, setSelectedSha, loadingTail, loaded, historyNote } = history
   const repoState = useRepoState({ session, history })
   const { refs, status, stashes, refresh, refreshing, openFolder, remoteNames, defaultRemote, dirty } = repoState
+  const filterChip = useGraphFilterChip(graphFilter, { client, live, refs, history })
   // Pending changes as rows on top of HEAD (v0.14.1): injected after layout,
   // so the engine rows and the worker's append path stay untouched. Selection
   // is resolved here so a pending row can be the current one.
@@ -105,31 +112,16 @@ export default function App({ base }: { base: EngineClient }) {
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
-  const [snapshot, setSnapshot] = useState<SnapshotState>({ phase: "idle" })
   // Owner (v0.14.1): "dump all the information that we need in a file or
   // package, and I'll bring it back to you".
-  const takeDiagnosticSnapshot = async () => {
-    setSnapshot({ phase: "working" })
-    try {
-      const dump = await buildFrontendDump({
-        client,
-        version: view.health?.engine ?? null,
-        phase: state.phase,
-        repo,
-        rows: rows.length,
-        selected: current?.rev.id ?? null,
-        zoom: getZoom(),
-        theme: getThemePreference(),
-      })
-      setSnapshot({ phase: "done", result: await takeSnapshot(dump) })
-    } catch (e) {
-      setSnapshot({ phase: "error", message: describeThrown(e) })
-    }
-  }
-  useEffect(() => {
-    setStateSampler(() => ({ phase: state.phase, rows: rows.length, repo: repo?.name ?? null }))
-    return () => setStateSampler(null)
-  }, [state.phase, rows.length, repo?.name])
+  const { snapshot, takeDiagnosticSnapshot, closeSnapshot } = useDiagnosticSnapshot({
+    client,
+    version: view.health?.engine ?? null,
+    phase: state.phase,
+    repo,
+    rowCount: rows.length,
+    selectedSha: current?.rev.id ?? null,
+  })
   const railBar = useBarLayout() === "rail"
   // The highlight must land in the click's own frame; commit details, files
   // and diff follow in a deferred render and load asynchronously.
@@ -315,6 +307,7 @@ export default function App({ base }: { base: EngineClient }) {
               ) : leftOpen ? (
                 <RepoTree
                   tree={refs}
+                  repoId={client.repoId}
                   onSelectTarget={chrome.selectTarget}
                   onCollapse={chrome.collapseLeft}
                   onCheckoutRef={chrome.checkoutRef}
@@ -355,6 +348,7 @@ export default function App({ base }: { base: EngineClient }) {
                         loading={live && !demo && !loaded}
                         engineError={engineError}
                         view={view}
+                        headerExtra={filterChip}
                         onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
                         onNearEnd={history.onNearEnd}
                         menus={menus}
@@ -412,7 +406,7 @@ export default function App({ base }: { base: EngineClient }) {
           onFileHistory={fileHistory.open}
         />
         <JobPanel jobs={jobs} onClose={() => jobs.setPanelOpen(false)} />
-        <SnapshotDialog state={snapshot} onClose={() => setSnapshot({ phase: "idle" })} />
+        <SnapshotDialog state={snapshot} onClose={closeSnapshot} />
         <RecoveryPanel
           open={recoveryOpen || (state.phase === "engine-failed" && !demo)}
           phase={state}

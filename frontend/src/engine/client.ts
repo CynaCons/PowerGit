@@ -63,12 +63,23 @@ export const READ_TIMEOUT_MS = 30_000
 /** Query string of a path filter; empty without one. Only what differs from
  *  the engine's defaults travels, so an unfiltered request is unchanged. */
 export function filterParams(filter: RevisionFilter | undefined): string {
-  if (!filter || !filter.path) return ""
-  let qs = `&path=${encodeURIComponent(filter.path)}`
-  if (filter.follow === false) qs += "&follow=false"
-  if (filter.exact) qs += "&exact=true"
-  if (filter.full) qs += "&full=true"
-  if (filter.simplify) qs += "&simplify=true"
+  if (!filter) return ""
+  let qs = ""
+  if (filter.path) {
+    qs += `&path=${encodeURIComponent(filter.path)}`
+    if (filter.follow === false) qs += "&follow=false"
+    if (filter.exact) qs += "&exact=true"
+    if (filter.full) qs += "&full=true"
+    if (filter.simplify) qs += "&simplify=true"
+  }
+  // Sorted so the same set is the same URL whatever order the tree ticked
+  // it in (the paging client keys requests by the string). An explicit
+  // empty set is a bare `ref=`: the engine then lists HEAD alone (the
+  // filter mode with nothing ticked).
+  if (filter.refs) {
+    if (filter.refs.length === 0) qs += "&ref="
+    for (const ref of [...filter.refs].sort()) qs += `&ref=${encodeURIComponent(ref)}`
+  }
   return qs
 }
 

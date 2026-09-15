@@ -65,13 +65,22 @@ internal static partial class GitCommandSanitizer
         return masked;
     }
 
-    /// <summary>The sanitized command line the console shows, e.g. <c>git fetch --prune origin</c>.</summary>
-    internal static string CommandLine(IReadOnlyList<string> args)
+    /// <summary>
+    ///  The sanitized command line the console shows, e.g. <c>git fetch --prune origin</c>.
+    ///  A payload on stdin (v0.18.5, <c>log --stdin</c> with the ref filter)
+    ///  is shown as its line count — <c>(3 refs on stdin)</c> — not dumped.
+    /// </summary>
+    internal static string CommandLine(IReadOnlyList<string> args, int stdinLines = 0)
     {
         StringBuilder sb = new("git");
         foreach (string arg in args)
         {
             sb.Append(' ').Append(Quote(Argument(arg)));
+        }
+
+        if (stdinLines > 0)
+        {
+            sb.Append("  (").Append(stdinLines).Append(stdinLines == 1 ? " ref" : " refs").Append(" on stdin)");
         }
 
         return sb.ToString();

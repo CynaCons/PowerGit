@@ -180,6 +180,21 @@ public sealed partial class GitHost
         => RunLogged(args, workingDirectory, timeoutMs, ct, maxStdOutChars, GitEnvironment);
 
     /// <summary>
+    ///  Like <see cref="RunTimed(string?, int, CancellationToken, string[])"/>
+    ///  with a payload on git's stdin (v0.18.5: the ref filter's revs for
+    ///  <c>log --stdin</c>, which argv cannot hold past ~900 refs on
+    ///  Windows). Its own name, not an overload: a <c>string</c> before the
+    ///  params would silently swallow the first argument of every existing
+    ///  <c>RunTimed(cwd, ms, ct, "rev-parse", …)</c> call. The console shows
+    ///  the line count, never the payload.
+    /// </summary>
+    internal CommandResult RunTimedWithStdin(string? workingDirectory, int timeoutMs, CancellationToken ct, string stdin, params string[] args)
+    {
+        GitProcess.Result r = RunLogged(args, workingDirectory, timeoutMs, ct, int.MaxValue, GitEnvironment, stdin: stdin);
+        return new CommandResult(r.ExitCode, r.StdOut, r.StdErr);
+    }
+
+    /// <summary>
     ///  The single choke point where a git child is started <em>and</em>
     ///  recorded (v0.15.1). Everything above — <see cref="Run"/>, the
     ///  RunTimed overloads, <see cref="RunCapped"/>,
@@ -196,18 +211,20 @@ public sealed partial class GitHost
         CancellationToken ct,
         int maxStdOutChars,
         IReadOnlyDictionary<string, string> environment,
-        Func<int, bool>? okWhen = null)
+        Func<int, bool>? okWhen = null,
+        string? stdin = null)
     {
         long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        int stdinLines = stdin is null ? 0 : stdin.Count(c => c == '\n');
         try
         {
-            GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment);
-            RecordCommand(args, r.ExitCode, ElapsedMs(started), r.StdOut, r.StdErr, okWhen);
+            GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment, stdin);
+            RecordCommand(args, r.ExitCode, ElapsedMs(started), r.StdOut, r.StdErr, okWhen, stdinLines);
             return r;
         }
         catch (Exception ex)
         {
-            RecordCommand(args, -1, ElapsedMs(started), null, ex.Message, okWhen);
+            RecordCommand(args, -1, ElapsedMs(started), null, ex.Message, okWhen, stdinLines);
             throw;
         }
     }

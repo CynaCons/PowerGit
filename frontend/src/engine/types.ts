@@ -35,9 +35,13 @@ export type RevisionDto = {
 }
 
 /** v0.16.0: `GET /revisions?path=` — Git Extensions' file history. Every flag
- *  is one of GE's FormFileHistory settings; `follow` defaults to on there too. */
+ *  is one of GE's FormFileHistory settings; `follow` defaults to on there too.
+ *  v0.18.5: `refs` (`GET /revisions?ref=…&ref=…`, GE FilterInfo "Show filtered
+ *  branches") limits the list to the history of those full ref names plus
+ *  HEAD (an empty array: HEAD alone). A ref-only filter has no path; the
+ *  two combine. */
 export type RevisionFilter = {
-  path: string
+  path?: string
   /** "Detect and follow renames" (default true). */
   follow?: boolean
   /** "Detect and follow - exact renames and copies only". */
@@ -46,6 +50,8 @@ export type RevisionFilter = {
   full?: boolean
   /** "Simplify merges" (`--simplify-merges`, only with `full`). */
   simplify?: boolean
+  /** Full ref names (`refs/heads/x`, `refs/remotes/origin/x`, `refs/tags/x`). */
+  refs?: string[]
 }
 
 export type CommitDetail = {

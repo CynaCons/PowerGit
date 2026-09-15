@@ -10,6 +10,10 @@ namespace PowerGit.Engine;
 /// caller's cancellation token start <em>before</em> either stream is awaited,
 /// a timeout or cancellation kills the whole process tree, and the readers
 /// are always drained and the process always disposed afterwards.
+/// v0.18.5: an optional <c>stdin</c> payload (the ref filter's revs for
+/// <c>git log --stdin</c>). stdin is redirected only when a payload is
+/// given; it is written and closed while the readers already drain, so a
+/// child that answers before reading it all can never wedge the write.
 /// </summary>
 internal static class GitProcess
 {
@@ -31,8 +35,12 @@ internal static class GitProcess
         int timeoutMs,
         CancellationToken ct = default,
         int maxStdOutChars = int.MaxValue,
-        IReadOnlyDictionary<string, string>? environment = null)
-        => RunAsync(fileName, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment).GetAwaiter().GetResult();
+        IReadOnlyDictionary<string, string>? environment = null,
+        string? stdin = null)
+        => RunAsync(fileName, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment, stdin).GetAwaiter().GetResult();
+
+    /// <summary>UTF-8 without a byte-order mark: git would read a BOM as the first bytes of the first ref name.</summary>
+    private static readonly Encoding StdinEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     internal static async Task<Result> RunAsync(
         string fileName,
@@ -41,19 +49,24 @@ internal static class GitProcess
         int timeoutMs,
         CancellationToken ct,
         int maxStdOutChars,
-        IReadOnlyDictionary<string, string>? environment)
+        IReadOnlyDictionary<string, string>? environment,
+        string? stdin = null)
     {
         ProcessStartInfo psi = new()
         {
             FileName = fileName,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = false,
+            RedirectStandardInput = stdin is not null,
             UseShellExecute = false,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
+        if (stdin is not null)
+        {
+            psi.StandardInputEncoding = StdinEncoding;
+        }
         if (environment is not null)
         {
             foreach ((string key, string value) in environment)
@@ -92,6 +105,11 @@ internal static class GitProcess
 
         try
         {
+            if (stdin is not null)
+            {
+                await WriteStdinAsync(process, stdin).ConfigureAwait(false);
+            }
+
             await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
         }
         finally
@@ -123,6 +141,38 @@ internal static class GitProcess
         }
 
         return new Result(process.ExitCode, stdout, stderr, StdOutTruncated: false);
+    }
+
+    /// <summary>
+    /// Hands the payload to the child and closes its stdin so it sees EOF.
+    /// A child that exits (or is killed) before reading everything tears the
+    /// pipe down under the write; that is not an error of ours — the exit
+    /// code and stderr say what happened.
+    /// </summary>
+    private static async Task WriteStdinAsync(Process process, string stdin)
+    {
+        try
+        {
+            await process.StandardInput.WriteAsync(stdin).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // Pipe closed by the child.
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        finally
+        {
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (IOException)
+            {
+            }
+        }
     }
 
     private static async Task<string> ReadCappedAsync(StreamReader reader, int maxChars, Action? onCap)

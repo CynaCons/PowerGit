@@ -67,6 +67,14 @@ Git Extensions' `FormFileHistory`: the revision stream limited to one path.
 | SRS-ENG-049 | The revision stream shall accept a path filter and then list only the commits that touched that path, with the same paging, ordering and ref labels as the unfiltered stream, and with each commit's parents rewritten to the nearest listed ancestor so the filtered commits form one connected graph. | GE `FilterInfo.GetRevisionFilter` adds `--parents` with a path filter; the lane layout only ever resolves a row against its listed parents. | Test | `GET /revisions?path=`, `RevisionFilter`, `QueryTests`, `ApiTests` |
 | SRS-ENG-050 | With renames followed (the default) the filter shall include every name the file had along HEAD's history, found by a `--follow` walk, and each listed commit shall carry the file's name at that commit; a folder path (trailing `/`) shall never follow. Renames off, exact renames and copies only, full history and simplified merges shall be selectable, as in GE's file history menus. | GE `RevisionGridControl.BuildPathFilter` takes the two-step route because `git log --follow` skips commits when combined with graph options. | Test | `RevisionDto.Path`, `follow`/`exact`/`full`/`simplify`, `QueryTests` |
 
+## Ref filter (v0.18.5)
+
+Git Extensions' `FilterInfo` "Show filtered branches": the revision stream limited to the history of chosen refs.
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-ENG-051 | The revision stream shall accept a set of full ref names (`refs/heads/`, `refs/remotes/`, `refs/tags/`) and then list the history of those refs plus HEAD (an empty set: HEAD alone), with the same paging, ordering, decorations and optional path filter as the unfiltered stream. Every name shall be checked against the repository's actual refs before any git command sees it; an unknown name, a short name, a revision expression or anything starting with `-` shall be refused with a 400 that names it. The names shall reach `git log` on stdin (`--stdin`), never on the command line, and the command log shall show their count, not the names. An unfiltered request shall produce the same git command line as before the filter existed. | GE `FilterInfo.GetBranchRevisionFilter` ("Show filtered branches") passes explicit revs to `git log`; argv tops out near 900 refs on Windows (the `--branches --remotes --tags` globs of the unfiltered stream exist for that reason), and a "Show all" on a heavy repository is every ref. | Test | `GET /revisions?ref=<name>&ref=…`, `RevisionFilter.Refs`, `GitHost.ValidatedRefLines`, `GitProcess` stdin, `QueryTests`, `ApiTests`, `GitProcessTests` |
+
 ## Windows isolation
 
 | ID | Requirement | Rationale | Verification | Trace |

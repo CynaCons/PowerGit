@@ -68,6 +68,9 @@ public sealed partial class GitHost
     ///  <paramref name="okWhen"/> is the caller's verdict on a real exit code
     ///  (default: zero); a negative code is the engine's "never finished"
     ///  and is never ok, whatever the caller would have accepted.
+    ///  <paramref name="stdinLines"/> (v0.18.5) is how many lines went to
+    ///  git's stdin: the console line says the count, never the payload
+    ///  (a ref filter can be thousands of names).
     /// </summary>
     internal void RecordCommand(
         IReadOnlyList<string> args,
@@ -75,7 +78,8 @@ public sealed partial class GitHost
         long durationMs,
         string? stdOut,
         string? stdErr,
-        Func<int, bool>? okWhen = null)
+        Func<int, bool>? okWhen = null,
+        int stdinLines = 0)
     {
         bool ok = exitCode >= 0 && (okWhen?.Invoke(exitCode) ?? exitCode == 0);
 
@@ -99,7 +103,7 @@ public sealed partial class GitHost
             _commandLog.Enqueue(new GitLogEntryDto(
                 ++_commandLogSeq,
                 DateTime.UtcNow.ToString("O"),
-                GitCommandSanitizer.CommandLine(args),
+                GitCommandSanitizer.CommandLine(args, stdinLines),
                 exitCode,
                 ok,
                 durationMs,

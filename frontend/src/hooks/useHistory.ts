@@ -252,8 +252,11 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     if (!complete && next.length < EAGER_CEILING) void extendHistory(EAGER_CEILING)
   }, [fetchPage, extendHistory])
 
-  // A different repo: drop the loaded history instead of splicing.
-  const resetHistory = useCallback(() => {
+  // A different repo: drop the loaded history instead of splicing. A
+  // different filter on the same repo (v0.18.5, the graph's ref filter)
+  // keeps the selection: the SHA re-resolves to its row when the commit is
+  // still listed and falls back to row 0 otherwise.
+  const resetHistory = useCallback((opts?: { keepSelection?: boolean }) => {
     histGen.current += 1
     abortInflight()
     extendRun.current = null
@@ -262,7 +265,7 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     revisionsRef.current = []
     historyCompleteRef.current = false
     setHistoryComplete(false)
-    setSelectedSha(null)
+    if (!opts?.keepSelection) setSelectedSha(null)
     setLoaded(false)
     setRevisions([])
   }, [])

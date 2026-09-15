@@ -163,6 +163,43 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(5, (await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?max=10"))!.Length);
     }
 
+    // v0.18.5: the graph's ref filter is repeated `ref=` query values (full
+    // names); an unknown one is a 400 that names it.
+    [Fact]
+    public async Task Revisions_route_filters_by_refs_and_rejects_an_unknown_one()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Run("checkout", "-q", "-b", "a");
+        repo.Write("a-only.txt", "a\n");
+        repo.StageAndCommit("a-only");
+        repo.Run("checkout", "-q", "main");
+        repo.Run("checkout", "-q", "-b", "b");
+        repo.Write("b-only.txt", "b\n");
+        repo.StageAndCommit("b-only");
+        repo.Run("checkout", "-q", "main");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        RevisionDto[] onlyA = await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?ref=refs%2Fheads%2Fa") ?? [];
+        Assert.Contains(onlyA, r => r.Subject == "a-only");
+        Assert.DoesNotContain(onlyA, r => r.Subject == "b-only");
+        Assert.Contains(onlyA, r => r.IsHead);
+
+        RevisionDto[] both = await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?ref=refs%2Fheads%2Fa&ref=refs%2Fheads%2Fb") ?? [];
+        Assert.Contains(both, r => r.Subject == "a-only");
+        Assert.Contains(both, r => r.Subject == "b-only");
+        Assert.DoesNotContain(both, r => r.Subject == "feature-commit");
+
+        RevisionDto[] headOnly = await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?ref=") ?? [];
+        Assert.Equal(["init"], headOnly.Select(r => r.Subject));
+
+        HttpResponseMessage unknown = await client.GetAsync($"/repos/{sid}/revisions?ref=refs%2Fheads%2Fa&ref=refs%2Fheads%2Fnope");
+        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+        Assert.Contains("refs/heads/nope", (await unknown.Content.ReadFromJsonAsync<ErrorResponse>())!.Error, StringComparison.Ordinal);
+        HttpResponseMessage option = await client.GetAsync($"/repos/{sid}/revisions?ref=-c");
+        Assert.Equal(HttpStatusCode.BadRequest, option.StatusCode);
+    }
+
     // v0.16.0: the File Tree's blob for the Working directory / Index rows.
     [Fact]
     public async Task Blob_worktree_route_serves_the_disk_or_the_index_and_refuses_a_path_escape()
