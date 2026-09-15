@@ -75,6 +75,14 @@ Git Extensions' `FilterInfo` "Show filtered branches": the revision stream limit
 |---|---|---|---|---|
 | SRS-ENG-051 | The revision stream shall accept a set of full ref names (`refs/heads/`, `refs/remotes/`, `refs/tags/`) and then list the history of those refs plus HEAD (an empty set: HEAD alone), with the same paging, ordering, decorations and optional path filter as the unfiltered stream. Every name shall be checked against the repository's actual refs before any git command sees it; an unknown name, a short name, a revision expression or anything starting with `-` shall be refused with a 400 that names it. The names shall reach `git log` on stdin (`--stdin`), never on the command line, and the command log shall show their count, not the names. An unfiltered request shall produce the same git command line as before the filter existed. | GE `FilterInfo.GetBranchRevisionFilter` ("Show filtered branches") passes explicit revs to `git log`; argv tops out near 900 refs on Windows (the `--branches --remotes --tags` globs of the unfiltered stream exist for that reason), and a "Show all" on a heavy repository is every ref. | Test | `GET /revisions?ref=<name>&ref=…`, `RevisionFilter.Refs`, `GitHost.ValidatedRefLines`, `GitProcess` stdin, `QueryTests`, `ApiTests`, `GitProcessTests` |
 
+## Patch export (v0.18.6)
+
+Git Extensions' `FormFormatPatch` (`git format-patch --find-renames --find-copies --break-rewrites` over a range into a directory), reduced to one commit at a time and handed to the caller as text.
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-ENG-052 | The engine shall stream one commit's patch in mailbox format (`git format-patch -1 --stdout` with `--find-renames --find-copies --break-rewrites`, binary diffs included) as `text/x-patch` under the file name git itself would write (`0001-<%f>.patch`, chopped as git chops it), and the pending changes of the working tree or the index (`git diff --binary`, `git diff --cached --binary`) as `<repo>-worktree.patch` / `<repo>-index.patch`. The revision shall be verified before the stream starts; an unknown revision, a merge commit and an unknown scope shall answer 400 with a message that names the culprit. The engine shall never write the file: the shell or the browser saves it where the user points. The download routes shall accept the engine token in the query, as `/events` does, because a browser download carries no header. | Owner (2026-09-15): "export a patch from a commit … from the right click menu"; the patch must apply whole with `git am`, so GE's flags and `--binary` stay on. | Test | `GET /commits/{id}/patch`, `GET /worktree/patch?scope=`, `GitHost.OpenPatch`, `GitHost.OpenWorktreePatch`, `EngineAuth.AcceptsQueryToken`, `PatchTests` |
+
 ## Windows isolation
 
 | ID | Requirement | Rationale | Verification | Trace |
