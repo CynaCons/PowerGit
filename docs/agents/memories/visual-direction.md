@@ -93,3 +93,18 @@ in the floating pill at the bottom-left of the graph column
 are never dimmed: the message column stays readable, the graph column
 carries the signal. Tag chips carry a tag glyph in violet; remote chips a
 cloud in green.
+
+The same signal can start from any commit (v0.18.4, owner: "right click on
+a commit and hit Highlight ancestry and then temporarily all the ancestry
+is highlighted like we do for the current branch"; GE "Highlight selected
+branch (until refresh)"). The row menu item, Alt+click and Ctrl+Shift+B
+make a row the root: `markAncestry(rows, rootId)` walks from it instead of
+HEAD, the root wears HEAD's 2 px outline (HEAD keeps its own), and the
+scope, Ring and Dim choices apply unchanged. The pill is the mode's home
+and turns **amber** — the review `todo` tokens, the one hue outside the
+blues, so the temporary state never reads as a setting: amber border and
+route icon, "Ancestry of" + the 7-char SHA (mono) + the subject (ellipsis
+at 150 px) in place of "Checked-out branch", an outlined amber Exit with
+an Esc key chip, pinned open until Exit / Esc / a refresh that drops the
+row / a repository switch, then it collapses again. Text cells are still
+never dimmed. Never persisted: it is a look, not a setting.
