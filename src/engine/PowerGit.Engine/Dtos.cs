@@ -44,6 +44,10 @@ public sealed record RevisionFilter(
     bool SimplifyMerges = false,
     IReadOnlyList<string>? Refs = null);
 
+/// <summary>POST /revisions avoids request-line limits for a large ref filter.</summary>
+public sealed record RevisionRequest(string[]? Refs = null, int? Skip = null, int? Max = null,
+    string? Path = null, bool? Follow = null, bool? Exact = null, bool? Full = null, bool? Simplify = null);
+
 public sealed record CommitDetailDto(
     string Id,
     string[] Parents,
@@ -187,7 +191,7 @@ public sealed record ToolInfoDto(string Name, string Label, string? Path, bool F
 
 public sealed record VsCodeInfo(bool Found, string? Path, bool Applied);
 
-public sealed record StageRequest(string[] Paths, bool Unstage = false);
+public sealed record StageRequest(string[] Paths, bool Unstage = false, bool All = false);
 
 public sealed record CommitRequest(string Message, bool Amend = false);
 

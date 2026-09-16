@@ -215,7 +215,9 @@ public sealed partial class GitHost
         string? stdin = null)
     {
         long started = System.Diagnostics.Stopwatch.GetTimestamp();
-        int stdinLines = stdin is null ? 0 : stdin.Count(c => c == '\n');
+        // Revisions are LF-delimited, pathspecs are NUL-delimited. The log
+        // records only their count, never user paths or ref names.
+        int stdinLines = stdin is null ? 0 : stdin.Count(c => c == (stdin.Contains('\0') ? '\0' : '\n'));
         try
         {
             GitProcess.Result r = GitProcess.Run(_gitPath, args, workingDirectory, timeoutMs, ct, maxStdOutChars, environment, stdin);

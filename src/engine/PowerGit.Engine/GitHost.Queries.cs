@@ -1180,17 +1180,21 @@ public sealed partial class GitHost
         return info with { Applied = applied };
     }
 
-    public void Stage(IReadOnlyList<string> paths, bool unstage)
+    public void Stage(IReadOnlyList<string> paths, bool unstage, bool all = false)
     {
         string root = RequireRoot();
-        if (paths.Count == 0)
+        if (all)
         {
+            CommandResult wholeTree = unstage ? Run(root, "restore", "--staged", ".") : Run(root, "add", "-A");
+            if (wholeTree.ExitCode != 0) throw new InvalidOperationException(wholeTree.StdErr.Trim());
             return;
         }
-
-        List<string> args = unstage ? ["restore", "--staged", "--"] : ["add", "--"];
-        args.AddRange(paths);
-        CommandResult result = Run(root, [.. args]);
+        if (paths.Count == 0) return;
+        string stdin = string.Join('\0', paths) + '\0';
+        string[] args = unstage
+            ? ["restore", "--staged", "--pathspec-from-file=-", "--pathspec-file-nul"]
+            : ["add", "--pathspec-from-file=-", "--pathspec-file-nul"];
+        CommandResult result = RunTimedWithStdin(root, 120_000, CancellationToken.None, stdin, args);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(result.StdErr.Trim());

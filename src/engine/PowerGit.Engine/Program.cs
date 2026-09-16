@@ -176,9 +176,13 @@ repo.AddEndpointFilter(async (ctx, next) =>
         || path.EndsWith("/pull", StringComparison.Ordinal)
         || path.EndsWith("/push", StringComparison.Ordinal)
         || path.EndsWith("/cancel", StringComparison.Ordinal);
+    // v0.18.14: the filtered revision stream travels as a POST because its
+    // ref list outgrows a URL, but it is a read like GET /revisions — it must
+    // never queue behind a mutation nor answer 409 while a fetch job runs.
+    bool isReadPost = HttpMethods.IsPost(method) && path.EndsWith("/revisions", StringComparison.Ordinal);
     try
     {
-        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob)
+        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob || isReadPost)
         {
             return await next(ctx);
         }
@@ -223,6 +227,17 @@ repo.MapGet("/revisions", (GitHost git, int? max, int? skip, string? path, bool?
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
+});
+
+repo.MapPost("/revisions", (RevisionRequest body, GitHost git, HttpContext ctx) =>
+{
+    try
+    {
+        RevisionFilter filter = new(body.Path, body.Follow ?? true, body.Exact ?? false, body.Full ?? false, body.Simplify ?? false, body.Refs ?? []);
+        return Results.Ok(git.ListRevisions(body.Max ?? 800, body.Skip ?? 0, ctx.RequestAborted, filter));
+    }
+    catch (OperationCanceledException) { return Results.StatusCode(499); }
+    catch (Exception ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest); }
 });
 
 repo.MapGet("/commits/{id}", (string id, GitHost git, HttpContext ctx) =>
@@ -752,7 +767,7 @@ repo.MapPost("/stage", (StageRequest body, GitHost git) =>
 {
     try
     {
-        git.Stage(body.Paths, body.Unstage);
+        git.Stage(body.Paths, body.Unstage, body.All);
         return Results.Ok(git.GetStatus());
     }
     catch (Exception ex)

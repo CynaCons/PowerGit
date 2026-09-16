@@ -73,7 +73,7 @@ export function useCommitFiles({
     const paths = (files ?? []).map((f) => f.path)
     if (paths.length === 0) return
     try {
-      onStatus(await engine.stage(paths, unstage))
+      onStatus(await engine.stage([], unstage, true))
       setSelStaged(new Set())
       setSelUnstaged(new Set())
     } catch (e) {
