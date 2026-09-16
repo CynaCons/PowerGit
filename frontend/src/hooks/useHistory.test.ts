@@ -6,6 +6,12 @@ import { diagnosticsSnapshot } from "../diagnostics"
 import { EngineError, type EngineClient, type RevisionDto, type RevisionFilter } from "../engine"
 import { useHistory, type History } from "./useHistory"
 
+// vitest runs under Node; the app tsconfig has no node types (layout.memory.test.ts does the same).
+declare const process: {
+  on(e: "unhandledRejection", f: (r: unknown) => void): void
+  off(e: "unhandledRejection", f: (r: unknown) => void): void
+}
+
 // v0.16.0 review, finding 5: "A file-history reload can lose its eager-tail
 // continuation after colliding with an old tail load. While file-history
 // auto-pagination runs, toggle Follow renames; the new eager extension
@@ -329,7 +335,9 @@ describe("useHistory: a failed page fetch", () => {
     const banner = vi.fn()
     const unhandled = vi.fn()
     process.on("unhandledRejection", unhandled)
-    const client = { revisions: () => Promise.reject(new EngineError("request URI too long", 414)) } as unknown as EngineClient
+    const client = {
+      revisions: () => Promise.reject(new EngineError("request URI too long", 414)),
+    } as unknown as EngineClient
 
     function Harness() {
       const history = useHistory({ client, demo: false, live: true, setEngineError: banner, onFailure: failure })
