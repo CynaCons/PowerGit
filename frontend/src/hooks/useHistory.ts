@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report } from "../diagnostics"
-import { isAbort, type EngineClient, type RevisionFilter } from "../engine"
+import { isAbort, type EngineClient, type RevisionDto, type RevisionFilter } from "../engine"
 import { isArtificialId } from "../graph/artificial"
 import { createLayouter, layoutGraph, type GraphLayouter } from "../graph/layout"
 import { syntheticHistory } from "../graph/synthetic"
@@ -63,9 +63,13 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   // extension after a filter change used to attach to the previous
   // filter's aborted run and load nothing).
   const extendRun = useRef<{ gen: number; run: Promise<void> } | null>(null)
-  // Every in-flight page request of the current generation; a reload or a
-  // repo switch aborts them so the engine kills the corresponding git log.
+  // The latest in-flight page request; a repo switch or a filter change
+  // aborts it so the engine kills the corresponding git log.
   const inflight = useRef<AbortController | null>(null)
+  // The reload in flight, keyed by generation like extendRun, and the one
+  // follow-up queued behind it (v0.18.9, see reloadHistory).
+  const reloadRun = useRef<{ gen: number; run: Promise<void> } | null>(null)
+  const reloadQueued = useRef<Promise<void> | null>(null)
 
   const abortInflight = () => {
     inflight.current?.abort()
@@ -238,27 +242,75 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   // (the common case after a commit). Anything odd falls back to a fresh
   // first page and lazy reloading. The last valid graph stays on screen
   // until the new first page is in.
-  const reloadHistory = useCallback(async () => {
-    const gen = ++histGen.current
-    abortInflight()
-    const page = await fetchPage(0)
-    if (histGen.current !== gen) return
-    // Rows keep their identity where nothing changed (historyMerge.ts), so
-    // the layout effect sees an append or nothing at all instead of a
-    // 10k-row reset on every refresh; a no-op refresh skips setState.
-    const { next, complete, unchanged } = mergeReload(page, revisionsRef.current, PAGE, historyCompleteRef.current)
-    if (unchanged) {
+  //
+  // v0.18.9 (owner: the merge overlay stuck at "Merging", then "history:
+  // fetch is aborted" at the top): a reload used to abort the page 0 in
+  // flight, so the change stream's echo of an action killed that action's
+  // own refresh and it failed with the browser's AbortError. Now a reload
+  // requested while one is in flight waits for it and runs once more after
+  // it — one follow-up, shared by every caller that arrives meanwhile — so
+  // a change that landed during the first is picked up and nothing is
+  // aborted. Only resetHistory aborts (a different repository or filter:
+  // the old page is stale for good); a reload it superseded resolves
+  // silently and says so in the app log.
+  const runReload = useCallback(
+    async (gen: number) => {
+      let page: RevisionDto[]
+      try {
+        page = await fetchPage(0)
+      } catch (e) {
+        if (!isAbort(e) && histGen.current === gen) throw e
+        report("info", "history", "history reload superseded")
+        return
+      }
+      if (histGen.current !== gen) {
+        report("info", "history", "history reload superseded")
+        return
+      }
+      // Rows keep their identity where nothing changed (historyMerge.ts), so
+      // the layout effect sees an append or nothing at all instead of a
+      // 10k-row reset on every refresh; a no-op refresh skips setState.
+      const { next, complete, unchanged } = mergeReload(page, revisionsRef.current, PAGE, historyCompleteRef.current)
+      if (unchanged) {
+        setLoaded(true)
+        return
+      }
+      revCount.current = next.length
+      revisionsRef.current = next
+      historyCompleteRef.current = complete
+      setHistoryComplete(complete)
+      setRevisions(next)
       setLoaded(true)
-      return
+      if (!complete && next.length < EAGER_CEILING) void extendHistory(EAGER_CEILING)
+    },
+    [fetchPage, extendHistory],
+  )
+
+  const reloadHistory = useCallback((): Promise<void> => {
+    const start = () => {
+      const gen = ++histGen.current
+      const entry = { gen, run: Promise.resolve() }
+      entry.run = runReload(gen).finally(() => {
+        if (reloadRun.current === entry) reloadRun.current = null
+      })
+      reloadRun.current = entry
+      return entry.run
     }
-    revCount.current = next.length
-    revisionsRef.current = next
-    historyCompleteRef.current = complete
-    setHistoryComplete(complete)
-    setRevisions(next)
-    setLoaded(true)
-    if (!complete && next.length < EAGER_CEILING) void extendHistory(EAGER_CEILING)
-  }, [fetchPage, extendHistory])
+    const current = reloadRun.current
+    if (!current || current.gen !== histGen.current) return start()
+    if (!reloadQueued.current) {
+      const next = () => {
+        // A reset dropped this follow-up meanwhile: the reset's own reload
+        // is the one that matters, and this closure's filter may be stale.
+        if (reloadQueued.current !== queued) return
+        reloadQueued.current = null
+        return start()
+      }
+      const queued: Promise<void> = current.run.then(next, next)
+      reloadQueued.current = queued
+    }
+    return reloadQueued.current
+  }, [runReload])
 
   // A different repo: drop the loaded history instead of splicing. A
   // different filter on the same repo (v0.18.5, the graph's ref filter)
@@ -268,6 +320,9 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     histGen.current += 1
     abortInflight()
     extendRun.current = null
+    // A follow-up reload queued for the old list would fetch with the old
+    // filter; the caller's own reload for the new list replaces it.
+    reloadQueued.current = null
     setLoadingTail(false)
     revCount.current = 0
     revisionsRef.current = []
