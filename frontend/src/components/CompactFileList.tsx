@@ -1,210 +1,42 @@
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
-import ChevronRightIcon from "@mui/icons-material/ChevronRight"
-import Box from "@mui/material/Box"
-import Typography from "@mui/material/Typography"
-import { useMemo, useState } from "react"
-import { MONO_FONT } from "../theme"
+import { useVirtualizer } from "@tanstack/react-virtual"
+import { useEffect, useMemo, useRef, useState } from "react"
 
-const STATUS_COLORS: Record<string, string> = {
-  A: "var(--pg-file-a, #189100)",
-  M: "var(--pg-file-m, #946cd4)",
-  D: "var(--pg-file-d, #d3000B)",
-  R: "var(--pg-file-r, #00a89a)",
-  U: "var(--pg-file-u, #e6a700)",
-  C: "var(--pg-file-c, #c2410c)",
-}
-
-function statusColor(status: string): string {
-  return STATUS_COLORS[status.toUpperCase()] ?? "var(--pg-file-other, #737373)"
-}
-
+const ROW_HEIGHT = 20
+const STATUS_COLORS: Record<string, string> = { A: "var(--pg-file-a, #189100)", M: "var(--pg-file-m, #946cd4)", D: "var(--pg-file-d, #d3000B)", R: "var(--pg-file-r, #00a89a)", U: "var(--pg-file-u, #e6a700)", C: "var(--pg-file-c, #c2410c)" }
+const statusColor = (status: string) => STATUS_COLORS[status.toUpperCase()] ?? "var(--pg-file-other, #737373)"
 export type CompactFile = { path: string; status: string }
-
-// One visual row: either a file (with its index in `files`) or a directory
-// header of the hierarchical mode (v0.13.16, owner: "a directory
-// hierarchical structure like in Git Extensions").
-type Row =
-  | { kind: "file"; file: CompactFile; index: number; depth: number; name: string }
-  | { kind: "dir"; path: string; depth: number; name: string }
-
-function flatRows(files: CompactFile[]): Row[] {
-  return files.map((file, index) => ({ kind: "file", file, index, depth: 0, name: file.path }))
-}
+type Row = { kind: "file"; file: CompactFile; index: number; depth: number; name: string } | { kind: "dir"; path: string; depth: number; name: string }
+const flatRows = (files: CompactFile[]): Row[] => files.map((file, index) => ({ kind: "file", file, index, depth: 0, name: file.path }))
 
 function treeRows(files: CompactFile[], collapsed: Set<string>): Row[] {
-  // Sort so a directory's files follow its header; directories before the
-  // files that sit beside them, like Git Extensions' file tree.
-  const indexed = files.map((file, index) => ({ file, index, parts: file.path.split("/") }))
-  indexed.sort((a, b) => {
-    const n = Math.min(a.parts.length, b.parts.length) - 1
-    for (let i = 0; i < n; i++) {
-      const c = a.parts[i].localeCompare(b.parts[i])
-      if (c !== 0) return c
-    }
-    if (a.parts.length !== b.parts.length) return b.parts.length - a.parts.length
-    return a.parts[n].localeCompare(b.parts[n])
-  })
-  const rows: Row[] = []
-  let open: string[] = []
+  const indexed = files.map((file, index) => ({ file, index, parts: file.path.split("/") })).sort((a, b) => a.file.path.localeCompare(b.file.path))
+  const rows: Row[] = []; let open: string[] = []
   for (const { file, index, parts } of indexed) {
-    const dirs = parts.slice(0, -1)
-    let common = 0
+    const dirs = parts.slice(0, -1); let common = 0
     while (common < dirs.length && common < open.length && open[common] === dirs[common]) common++
     open = open.slice(0, common)
-    for (let d = common; d < dirs.length; d++) {
-      open.push(dirs[d])
-      const path = open.join("/")
-      const hidden = open.slice(0, -1).some((_, i) => collapsed.has(open.slice(0, i + 1).join("/")))
-      if (!hidden) rows.push({ kind: "dir", path, depth: d, name: dirs[d] })
-    }
-    const hiddenFile = dirs.some((_, i) => collapsed.has(dirs.slice(0, i + 1).join("/")))
-    if (!hiddenFile) rows.push({ kind: "file", file, index, depth: dirs.length, name: parts[parts.length - 1] })
+    for (let d = common; d < dirs.length; d++) { open.push(dirs[d]); const path = open.join("/"); if (!open.slice(0, -1).some((_, i) => collapsed.has(open.slice(0, i + 1).join("/")))) rows.push({ kind: "dir", path, depth: d, name: dirs[d] }) }
+    if (!dirs.some((_, i) => collapsed.has(dirs.slice(0, i + 1).join("/")))) rows.push({ kind: "file", file, index, depth: dirs.length, name: parts.at(-1) ?? file.path })
   }
   return rows
 }
 
-// Dense Git Extensions-style change row: colored status letter + path,
-// single line, minimal height. One geometry for every consumer. `tree`
-// groups files under collapsible directory headers and shows file names.
-export function CompactFileList({
-  testid,
-  files,
-  selectedPath,
-  selectedSet,
-  emptyText,
-  tree = false,
-  onSelect,
-  onRowClick,
-  onToggle,
-  onRowContext,
-  onRowDoubleClick,
-}: {
-  testid: string
-  files: CompactFile[]
-  selectedPath?: string | null
-  selectedSet?: Set<string>
-  emptyText: string
-  tree?: boolean
-  onSelect?: (f: CompactFile, index: number) => void
-  onRowClick?: (f: CompactFile, index: number, e: React.MouseEvent) => void
-  onToggle?: (f: CompactFile) => void
-  onRowContext?: (f: CompactFile, index: number, x: number, y: number) => void
-  onRowDoubleClick?: (f: CompactFile, index: number) => void
+export function CompactFileList({ testid, files, selectedPath, selectedSet, emptyText, tree = false, onSelect, onRowClick, onToggle, onRowContext, onRowDoubleClick }: {
+  testid: string; files: CompactFile[]; selectedPath?: string | null; selectedSet?: Set<string>; emptyText: string; tree?: boolean
+  onSelect?: (f: CompactFile, index: number) => void; onRowClick?: (f: CompactFile, index: number, e: React.MouseEvent) => void; onToggle?: (f: CompactFile) => void; onRowContext?: (f: CompactFile, index: number, x: number, y: number) => void; onRowDoubleClick?: (f: CompactFile, index: number) => void
 }) {
-  const isHighlighted = (f: CompactFile) => (selectedSet ? selectedSet.has(f.path) : selectedPath === f.path)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const rows = useMemo(() => (tree ? treeRows(files, collapsed) : flatRows(files)), [files, tree, collapsed])
-  const toggleDir = (path: string) =>
-    setCollapsed((c) => {
-      const next = new Set(c)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-
-  const rowSx = (depth: number) => ({
-    display: "flex",
-    alignItems: "center",
-    gap: 0.75,
-    pl: 1 + depth * 1.5,
-    pr: 1,
-    py: 0.0625,
-    cursor: "default",
-    "&:hover": { bgcolor: "action.hover" },
-    fontFamily: MONO_FONT,
-    fontSize: 11.5,
-    lineHeight: 1.5,
-    whiteSpace: "nowrap",
-    userSelect: "none",
-  })
-
-  return (
-    <Box
-      data-testid={testid}
-      data-hotkey-surface="file-list"
-      data-mode={tree ? "tree" : "flat"}
-      tabIndex={0}
-      sx={{
-        flex: 1,
-        minHeight: 80,
-        overflow: "auto",
-        border: 1,
-        borderColor: "divider",
-        borderRadius: 1,
-        outline: "none",
-        "&:focus-visible": { boxShadow: "inset 0 0 0 1px", borderColor: "primary.main" },
-      }}
-    >
-      {files.length === 0 ? (
-        <Box sx={{ p: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            {emptyText}
-          </Typography>
-        </Box>
-      ) : (
-        rows.map((row) =>
-          row.kind === "dir" ? (
-            <Box
-              key={`${testid}:dir:${row.path}`}
-              data-testid={`${testid}-dir`}
-              data-path={row.path}
-              onClick={() => toggleDir(row.path)}
-              sx={{ ...rowSx(row.depth), color: "text.secondary" }}
-            >
-              {collapsed.has(row.path) ? (
-                <ChevronRightIcon sx={{ fontSize: 14, ml: "-3px" }} />
-              ) : (
-                <ExpandMoreIcon sx={{ fontSize: 14, ml: "-3px" }} />
-              )}
-              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }} title={row.path}>
-                {row.name}
-              </Box>
-            </Box>
-          ) : (
-            <Box
-              key={`${testid}:${row.file.path}`}
-              data-testid={`${testid}-row`}
-              onClick={(e) => {
-                ;(e.currentTarget.parentElement as HTMLElement | null)?.focus()
-                if (onRowClick) onRowClick(row.file, row.index, e)
-                else onSelect?.(row.file, row.index)
-              }}
-              onDoubleClick={
-                onRowDoubleClick
-                  ? () => onRowDoubleClick(row.file, row.index)
-                  : onToggle
-                    ? () => onToggle(row.file)
-                    : undefined
-              }
-              onContextMenu={
-                onRowContext
-                  ? (e) => {
-                      e.preventDefault()
-                      onRowContext(row.file, row.index, e.clientX, e.clientY)
-                    }
-                  : undefined
-              }
-              sx={{ ...rowSx(row.depth), bgcolor: isHighlighted(row.file) ? "action.selected" : "transparent" }}
-            >
-              <Box
-                component="span"
-                sx={{
-                  width: 12,
-                  flexShrink: 0,
-                  fontWeight: 700,
-                  textAlign: "center",
-                  color: statusColor(row.file.status),
-                }}
-              >
-                {row.file.status}
-              </Box>
-              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }} title={row.file.path}>
-                {row.name}
-              </Box>
-            </Box>
-          ),
-        )
-      )}
-    </Box>
-  )
+  const parentRef = useRef<HTMLDivElement>(null); const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const rows = useMemo(() => tree ? treeRows(files, collapsed) : flatRows(files), [files, tree, collapsed])
+  const selectedIndex = rows.findIndex((r) => r.kind === "file" && (selectedSet ? selectedSet.has(r.file.path) : selectedPath === r.file.path)); const cursor = useRef(Math.max(0, selectedIndex))
+  const virtualizer = useVirtualizer({ count: rows.length, getScrollElement: () => parentRef.current, estimateSize: () => ROW_HEIGHT, getItemKey: (i) => { const row = rows[i]; return row.kind === "file" ? `f:${row.file.path}` : `d:${row.path}` }, overscan: 12 })
+  useEffect(() => { if (selectedIndex >= 0) { cursor.current = selectedIndex; virtualizer.scrollToIndex(selectedIndex, { align: "auto" }) } }, [selectedIndex, virtualizer])
+  const activate = (row: Row, event?: React.MouseEvent) => { if (row.kind !== "file") return; if (event && onRowClick) onRowClick(row.file, row.index, event); else onSelect?.(row.file, row.index) }
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => { if (!rows.length) return; if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); cursor.current = Math.max(0, Math.min(rows.length - 1, cursor.current + (e.key === "ArrowDown" ? 1 : -1))); virtualizer.scrollToIndex(cursor.current, { align: "auto" }); return }; const row = rows[cursor.current]; if ((e.key === "Enter" || e.key === " ") && row?.kind === "file") { e.preventDefault(); if (e.key === " ") onToggle?.(row.file); else activate(row) } }
+  return <div ref={parentRef} data-testid={testid} data-hotkey-surface="file-list" data-mode={tree ? "tree" : "flat"} tabIndex={0} onKeyDown={onKeyDown} className="compact-file-list">
+    {files.length === 0 ? <div className="compact-file-empty">{emptyText}</div> : <div className="compact-file-track" style={{ height: virtualizer.getTotalSize() }}>{virtualizer.getVirtualItems().map((item) => { const row = rows[item.index]; const style = { transform: `translateY(${item.start}px)`, height: item.size, paddingLeft: `${8 + row.depth * 12}px` }
+      if (row.kind === "dir") return <div key={item.key} style={style} className="compact-file-row compact-file-dir" data-testid={`${testid}-dir`} data-path={row.path} onClick={() => setCollapsed((old) => { const next = new Set(old); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}><span className="compact-file-chevron">{collapsed.has(row.path) ? "›" : "⌄"}</span><span title={row.path}>{row.name}</span></div>
+      const selected = selectedSet ? selectedSet.has(row.file.path) : selectedPath === row.file.path; const slash = row.name.lastIndexOf("/"); const dir = tree ? "" : row.name.slice(0, slash + 1); const name = tree ? row.name : row.name.slice(slash + 1)
+      return <div key={item.key} style={style} className={`compact-file-row${selected ? " compact-file-selected" : ""}`} data-testid={`${testid}-row`} onClick={(event) => { parentRef.current?.focus(); cursor.current = item.index; activate(row, event) }} onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row.file, row.index) : onToggle ? () => onToggle(row.file) : undefined} onContextMenu={onRowContext ? (event) => { event.preventDefault(); cursor.current = item.index; onRowContext(row.file, row.index, event.clientX, event.clientY) } : undefined}><span className="compact-file-status" style={{ color: statusColor(row.file.status) }}>{row.file.status}</span><span className="compact-file-path" title={row.file.path}><span className="compact-file-dirname">{dir}</span>{name}</span></div>
+    })}</div>}
+  </div>
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   describeThrown,
   isAbort,
@@ -33,6 +33,11 @@ export function pendingOf(current: GraphRow | undefined, status: RepoStatus | nu
   }
 }
 
+/** Keep the derived file list referentially stable while status arrays are stable. */
+export function usePendingOf(current: GraphRow | undefined, status: RepoStatus | null): Pending {
+  return useMemo(() => pendingOf(current, status), [current, status])
+}
+
 /** Loads one pending file's worktree diff; latest selection wins. */
 export function usePendingDiff(pending: Pending, file: string | null, options: DiffOptions): Loadable<DiffDto> {
   const engine = useEngine()
@@ -53,6 +58,9 @@ export function usePendingDiff(pending: Pending, file: string | null, options: D
         if (!ctrl.signal.aborted && !isAbort(e)) setDiff({ kind: "error", message: describeThrown(e) })
       })
     return () => ctrl.abort()
-  }, [engine, pending, file, options])
+  // `pending` is intentionally not a dependency: status polls can create an
+  // equivalent wrapper, while this request only varies by its actual inputs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, pending?.staged, file, options.context, options.ws])
   return diff
 }

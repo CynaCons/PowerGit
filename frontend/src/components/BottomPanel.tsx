@@ -55,7 +55,7 @@ type Props = {
 
 import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
 import { PendingSummary } from "./PendingSummary"
-import { pendingOf, usePendingDiff } from "./pendingRows"
+import { usePendingOf, usePendingDiff } from "./pendingRows"
 
 const FILES_WIDTH_STORAGE_KEY = "pg.bottomFilesWidth"
 const DEFAULT_FILES_WIDTH = 340
@@ -112,7 +112,7 @@ export function BottomPanel({
   menus,
 }: Props) {
   const engine = useEngine()
-  const pendingRow = useMemo(() => pendingOf(current, status), [current, status])
+  const pendingRow = usePendingOf(current, status)
   const actions: DiffTabActions | undefined = useMemo(() => (setStatus ? { setStatus } : undefined), [setStatus])
   const [tabState, setTabState] = useState(0)
   const tab = tabProp ?? tabState
