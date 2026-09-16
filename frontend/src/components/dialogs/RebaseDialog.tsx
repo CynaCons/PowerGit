@@ -19,6 +19,7 @@ export function RebaseDialog({
   open,
   ontoSha,
   currentBranch,
+  dirtyCount,
   interactive: initialInteractive = false,
   onClose,
   onConfirm,
@@ -28,6 +29,7 @@ export function RebaseDialog({
   /** Kept for callers; the band quotes the row. */
   ontoSubject?: string
   currentBranch: string
+  dirtyCount: number
   /** Opened from "Rebase interactively from here…". */
   interactive?: boolean
   onClose: () => void
@@ -40,16 +42,23 @@ export function RebaseDialog({
 
   useEffect(() => {
     if (!open) return
-    setAutostash(false)
+    // Git refuses every rebase with tracked local changes, unlike merge.
+    setAutostash(dirtyCount > 0)
     setInteractive(initialInteractive)
     setAutosquash(false)
     setRebaseMerges(false)
-  }, [open, initialInteractive])
+  }, [open, initialInteractive, dirtyCount])
 
   const { busy, error, submit, dirty, retryWithStash } = useActionDialog({
     open,
     label: "rebase",
-    action: (retryAutostash) => onConfirm({ autostash: retryAutostash || autostash, interactive, autosquash: interactive && autosquash, rebaseMerges }),
+    action: (retryAutostash) =>
+      onConfirm({
+        autostash: retryAutostash || autostash,
+        interactive,
+        autosquash: interactive && autosquash,
+        rebaseMerges,
+      }),
     onClose,
   })
 
@@ -61,7 +70,11 @@ export function RebaseDialog({
       testid="rebase-dialog"
       subject={<QuotedRef name={currentBranch} kind="local" caption="onto" tip={ontoSha} />}
       busy={busy}
-      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "rebase-stash-retry" } : undefined}
+      secondary={
+        dirty
+          ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "rebase-stash-retry" }
+          : undefined
+      }
       primary={{
         label: interactive ? "Edit todo…" : "Rebase",
         onClick: () => void submit(),
@@ -78,7 +91,11 @@ export function RebaseDialog({
           checked={autostash}
           onChange={setAutostash}
           label="Auto stash"
-          explain="set uncommitted changes aside, restore them after"
+          explain={
+            dirtyCount > 0
+              ? "required while local changes are present; restore them after"
+              : "set uncommitted changes aside, restore them after"
+          }
           testid="rebase-autostash"
         />
         <OptionRow

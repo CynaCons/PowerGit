@@ -95,8 +95,11 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
   // promise (the dialog closes), the refresh runs on behind the top bar.
   // v0.18.11: the options are the checkout dialog's (track / reset /
   // detached, keep / stash / discard); `false` is the plain old checkout.
-  async function checkout(ref: string, options: CheckoutOptions | boolean = false) {
-    await withBusy("Checking out", async () => setStatus(await engine.checkout(ref, options)), { refresh: FULL })
+  async function checkout(ref: string, options: CheckoutOptions | boolean = false, inline = false) {
+    await withBusy("Checking out", async () => setStatus(await engine.checkout(ref, options)), {
+      refresh: FULL,
+      propagateError: inline,
+    })
   }
   async function reset(mode: "soft" | "mixed" | "hard") {
     if (dialog.kind !== "reset") return

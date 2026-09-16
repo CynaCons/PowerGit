@@ -98,11 +98,15 @@ export function MergeDialog({
       }
       note={
         dirtyCount > 0 && !autostash
-          ? { text: `${changes}; git refuses to merge without Auto stash.`, tone: "amber" }
+          ? { text: `${changes}; git may merge them directly, or refuse if they overlap.`, tone: "amber" }
           : undefined
       }
       busy={busy}
-      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "merge-stash-retry" } : undefined}
+      secondary={
+        dirty
+          ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "merge-stash-retry" }
+          : undefined
+      }
       primary={{
         label: squash ? "Squash and stage" : "Merge",
         onClick: () => void submit(),

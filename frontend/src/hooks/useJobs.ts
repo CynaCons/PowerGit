@@ -20,6 +20,8 @@ export type JobsDeps = {
  *  promise has resolved. */
 export type BusyOptions = {
   refresh?: RefreshScope
+  /** Dialog-owned actions render a failed engine call inline, not in the global banner. */
+  propagateError?: boolean
 }
 
 export type Jobs = ReturnType<typeof useJobs>
@@ -103,9 +105,10 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
       } catch (e) {
         // Prefix the operation name: a bare browser/DOMException message is
         // otherwise impossible to trace back to what the user clicked.
-        setEngineError(`${label}: ${handleFailure(e, label)}`)
         engineCall.current = false
         finish()
+        if (options?.propagateError) throw e
+        setEngineError(`${label}: ${handleFailure(e, label)}`)
         return
       }
       engineCall.current = false

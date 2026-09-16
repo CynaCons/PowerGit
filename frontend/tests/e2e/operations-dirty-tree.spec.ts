@@ -42,6 +42,10 @@ test.describe("operations on a developer's dirty tree", () => {
     git(root, "checkout", "-q", "main")
     write(root, "fileE", "main\n")
     commit(root, "main advance")
+    git(root, "checkout", "-q", "-b", "pick-source", "HEAD~1")
+    write(root, "fileF", "pick source\n")
+    commit(root, "pick source")
+    git(root, "checkout", "-q", "main")
     dirty(root)
     await openRepoOnEngine(root)
   })
@@ -60,22 +64,41 @@ test.describe("operations on a developer's dirty tree", () => {
     await page.getByTestId("merge-confirm").click()
     await expect(page.getByTestId("merge-dialog")).toHaveCount(0)
     expectDirt(root)
-    // Rebase the feature tip onto main, then return to main for the two sequencer commands.
+    await expect(page.getByRole("alert")).toHaveCount(0)
+
+    // Git always requires a clean tracked tree for rebase. The dirty-tree
+    // default is checked, but exercise the inline recovery path explicitly.
     await row(page, "feature change").click({ button: "right" })
     await page.getByTestId("ctx-rebase").click()
+    await expect(page.getByTestId("rebase-autostash")).toBeChecked()
+    await page.getByTestId("rebase-autostash").click()
     await page.getByTestId("rebase-confirm").click()
-    await expect(page.getByTestId("rebase-dialog")).toHaveCount(0)
+    const rebase = page.getByTestId("rebase-dialog")
+    await expect(rebase).toContainText(/cannot rebase/i)
+    await rebase.getByTestId("rebase-stash-retry").click()
+    await expect(rebase).toHaveCount(0)
     expectDirt(root)
-    await row(page, "feature change").click({ button: "right" })
+    await expect(page.getByRole("alert")).toHaveCount(0)
+
+    await row(page, "pick source").click({ button: "right" })
     await page.getByTestId("ctx-cherry-pick").click()
     await page.getByTestId("cherry-pick-confirm").click()
-    await expect(page.getByTestId("cherry-pick-dialog")).toHaveCount(0)
+    const cherryPick = page.getByTestId("cherry-pick-dialog")
+    await expect(cherryPick).toContainText(/would be overwritten|commit your changes or stash them/i)
+    await cherryPick.getByTestId("cherry-pick-stash-retry").click()
+    await expect(cherryPick).toHaveCount(0)
     expectDirt(root)
-    await row(page, "feature change").click({ button: "right" })
+    await expect(page.getByRole("alert")).toHaveCount(0)
+
+    await row(page, "pick source").click({ button: "right" })
     await page.getByTestId("ctx-revert").click()
     await page.getByTestId("revert-confirm").click()
-    await expect(page.getByTestId("revert-dialog")).toHaveCount(0)
+    const revert = page.getByTestId("revert-dialog")
+    await expect(revert).toContainText(/would be overwritten|commit your changes or stash them/i)
+    await revert.getByTestId("revert-stash-retry").click()
+    await expect(revert).toHaveCount(0)
     expectDirt(root)
+    await expect(page.getByRole("alert")).toHaveCount(0)
   })
 
   for (const mode of ["soft", "mixed", "hard"] as const)
@@ -91,6 +114,7 @@ test.describe("operations on a developer's dirty tree", () => {
         expect(status(root)).not.toMatch(/file[BCD]/)
         expect(existsSync(join(root, "untracked-1"))).toBe(true)
       } else expectDirt(root)
+      await expect(page.getByRole("alert")).toHaveCount(0)
     })
 
   test("checkout keeps non-overlapping dirt", async ({ page }) => {
@@ -103,6 +127,7 @@ test.describe("operations on a developer's dirty tree", () => {
     await expect(page.getByTestId("checkout-dialog")).toHaveCount(0)
     expect(git(root, "branch", "--show-current").trim()).toBe("feature")
     expectDirt(root)
+    await expect(page.getByRole("alert")).toHaveCount(0)
   })
 
   test("a reset confirmed during a fetch waits rather than disappearing", async ({ page }) => {
