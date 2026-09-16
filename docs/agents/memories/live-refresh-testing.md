@@ -50,3 +50,39 @@ that calls `POST /repos/open` on a different (fixture) path must restore the
 real repo in `afterAll`/`finally` before finishing, or every later spec in
 the same Playwright run (and any concurrent worker hitting the same engine)
 will see the wrong — or a since-deleted — repo.
+
+## A reload never aborts a same-filter reload; dialogs close on the engine answer, the refresh runs behind the top bar (v0.18.9)
+Owner (2026-09-16): "When I performed a merge, the overlay bugged at
+'Merging' — I had to close it. Then I had an error message at the top:
+merging 'branch' history: fetch is aborted. Don't know what happened. Merge
+worked in the end, but still weird." Two things, one timeline:
+
+- `useHistory.reloadHistory` used to open with `abortInflight()`. The echo
+  of an action (the `/events` handler above defers it `ECHO_MS + 500` past
+  a refresh in flight, then calls `refresh(scope)`) therefore aborted that
+  action's own page-0 request; `refresh`'s `fail("history")` turned the
+  browser's AbortError ("Fetch is aborted" on WebKitGTK, "signal is aborted
+  without reason" on Chromium) into `history: …` and `withBusy` prefixed the
+  label. Now a reload requested while one is in flight waits for it and
+  runs once more after it (one follow-up shared by every caller). Only
+  `resetHistory` aborts (repository or filter change); a superseded reload
+  resolves silently and logs `history reload superseded` in the app log.
+- `withBusy(label, fn, { refresh: scope })` (useJobs) is two phases: `fn`
+  is the engine call and its answer resolves the promise — that is when
+  `useActionDialog` closes the dialog — while the refresh runs on under the
+  same top-bar label. A refresh failure reads `Refresh after merging topic:
+  …`, never `Merging topic: …`. Every `setStatus(await engine.X()); await
+  refresh(...)` site (merge, continue/skip/abort, resolve, rebase, checkout,
+  reset, stash apply/pop/drop) uses the option; jobs (fetch/pull/push)
+  still await their refresh inside `fn`.
+
+Tests: `src/hooks/useOperationActions.test.ts` replays the timeline against
+the real hooks (fake `EventSource`, fake timers for the echo delay, a
+client answered by hand) and produced the owner's exact banner before the
+fix; `useHistory.test.ts` pins the coalescing; `merge.spec` "merge on a
+slow history" holds every `/revisions` answer after the merge for 3 s and
+records every banner text in-page with a MutationObserver (a "never within
+the next seconds" is not a locator assertion). Harness for composite hook
+tests: hoist `handleFailure`/`setRecents` — a new arrow per render changes
+`refresh`'s identity, the events effect re-subscribes and forgets its
+first message, and the echo never fires.
