@@ -29,6 +29,12 @@ type Props = {
 // the grid's gap, not from borders; the cursor tile wears the selection
 // band. Every class toggled at runtime (cursor) sets its colours itself
 // (docs/agents/memories/webkitgtk-css.md).
+//
+// Sizes (v0.18.9, owner: "larger so that we can actually read the stuff on
+// the cards"): 96 px tall, 16 px side padding, a 36 px disc with 13 px
+// initials, the name at 14 px / 500, the branch chip one size up from the
+// grid's (11 px), the path at 12 px; the tile is never narrower than 340 px
+// (RecentsDialog's grid), where a 20-character name and the chip fit whole.
 export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen, onForget }: Props) {
   const palette = repoPalette(repo.root)
   const parts = pathParts(repo.root, shared)
@@ -44,13 +50,13 @@ export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen
       sx={{
         position: "relative",
         display: "grid",
-        gridTemplateColumns: "30px 1fr auto",
+        gridTemplateColumns: "36px 1fr auto",
         gridTemplateRows: "auto auto",
-        columnGap: "10px",
-        rowGap: "2px",
-        minHeight: 76,
-        px: 1.5,
-        py: 1.25,
+        columnGap: "12px",
+        rowGap: "3px",
+        minHeight: 96,
+        px: 2,
+        py: 1.75,
         cursor: "default",
         borderLeft: "2px solid transparent",
         bgcolor: cursor ? "var(--pg-grid-sel, #dbeafe)" : "background.paper",
@@ -72,13 +78,13 @@ export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen
         aria-hidden
         sx={{
           gridRow: "1 / span 2",
-          width: 30,
-          height: 30,
+          width: 36,
+          height: 36,
           mt: "2px",
           borderRadius: "50%",
           display: "grid",
           placeItems: "center",
-          fontSize: 11.5,
+          fontSize: 13,
           fontWeight: 700,
           letterSpacing: "0.02em",
           userSelect: "none",
@@ -88,17 +94,32 @@ export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen
       >
         {repoInitials(repo.name)}
       </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, fontSize: 13, fontWeight: 500 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, fontSize: 14, fontWeight: 500 }}>
         <Box
           component="span"
           data-testid="recent-name"
-          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1, minWidth: "6ch" }}
+          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1, minWidth: "12ch" }}
         >
           <Marked text={repo.name} range={match.name} />
         </Box>
         {repo.branch && (
-          // The chip gives way before the name does: a long branch truncates.
-          <Box component="span" className="ref" data-testid="recent-branch" title={repo.branch} sx={{ minWidth: 0 }}>
+          // The chip gives way before the name does (the shrink factor is
+          // the name's many times over): a long branch truncates first, the
+          // name only under its 12 ch. One size up from the grid's 10 px
+          // `.ref`, as the Commit tab's `.ref.big` is.
+          <Box
+            component="span"
+            className="ref"
+            data-testid="recent-branch"
+            title={repo.branch}
+            sx={{
+              minWidth: 0,
+              flexShrink: 100,
+              height: 18,
+              fontSize: 11,
+              "& .ref-cloud": { fontSize: "12px !important" },
+            }}
+          >
             <CallSplitIcon className="ref-cloud" />
             <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
               <Marked text={repo.branch} range={match.branch} />
@@ -113,8 +134,8 @@ export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen
         sx={{
           gridColumn: 3,
           fontFamily: MONO_FONT,
-          fontSize: 11,
-          lineHeight: "18px",
+          fontSize: 12,
+          lineHeight: "20px",
           color: cursor ? "primary.main" : "text.disabled",
         }}
       >
@@ -128,7 +149,7 @@ export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen
           gap: 1,
           minWidth: 0,
           fontFamily: MONO_FONT,
-          fontSize: 11,
+          fontSize: 12,
           fontVariantNumeric: "tabular-nums",
           color: "var(--pg-text-meta, #5b6778)",
           whiteSpace: "nowrap",
@@ -181,16 +202,16 @@ export function RecentTile({ repo, match, shared, index, cursor, openNow, onOpen
           }}
           sx={{
             position: "absolute",
-            top: 6,
-            right: 6,
-            width: 20,
-            height: 20,
+            top: 8,
+            right: 8,
+            width: 22,
+            height: 22,
             p: 0,
             color: "text.secondary",
             borderRadius: "4px",
           }}
         >
-          <CloseIcon sx={{ fontSize: 14 }} />
+          <CloseIcon sx={{ fontSize: 15 }} />
         </IconButton>
       )}
     </Box>

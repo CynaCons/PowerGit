@@ -36,14 +36,21 @@ type Props = {
 }
 
 // The Recent repositories picker (v0.18.7, prototype C of
-// docs/prototypes/recents.html; owner: "ok for C"). A flat panel anchored
-// where a command palette opens: a search box with the focus, a hairline
-// grid of tiles three across (two under 700 px), a footer with the count,
-// the key hints and Open folder…. The picker's state lives in
+// docs/prototypes/recents.html; owner: "ok for C"). A flat window centred
+// by MUI and sized to the screen — width min(1120 px, 100vw − 96 px),
+// height min(720 px, 100vh − 96 px) — after the owner (2026-09-16): "the
+// scale and size of the overlay is not good. Should be centered, and
+// larger so that we can actually read the stuff on the cards" (v0.18.9;
+// the 760 px panel pinned 80 px from the top was the command-palette
+// anchor of the prototype). A search box with the focus, a hairline grid
+// of as many 340 px-or-wider tiles as fit (three at 1120), a footer with
+// the count, the key hints and Open folder…. The picker's state lives in
 // RecentsPicker, which mounts with the dialog and dies with it: a fresh
 // filter and cursor on every open without a reset effect, and the pending
 // forget flushes on unmount so a close never loses it.
 export function RecentsDialog({ open, onClose, ...picker }: Props) {
+  // The theme zooms the paper itself (theme/index.ts), so the viewport
+  // lengths divide by the zoom to stay in visual px, as the commit window does.
   const zoom = useZoom()
   return (
     <Dialog
@@ -55,12 +62,8 @@ export function RecentsDialog({ open, onClose, ...picker }: Props) {
       slotProps={{
         paper: {
           sx: {
-            position: "absolute",
-            top: 80 / zoom,
-            m: 0,
-            width: 760,
-            maxWidth: `calc((100vw - 32px) / ${zoom})`,
-            maxHeight: `min(560px, calc((100vh - 96px) / ${zoom}))`,
+            width: `min(1120px, calc((100vw - 96px) / ${zoom}))`,
+            maxHeight: `min(720px, calc((100vh - 96px) / ${zoom}))`,
             display: "flex",
             flexDirection: "column",
           },
@@ -191,15 +194,15 @@ function RecentsPicker({
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1,
-          height: 42,
-          px: 1.75,
+          gap: 1.25,
+          height: 48,
+          px: 2,
           borderBottom: 1,
           borderColor: "divider",
           flex: "none",
         }}
       >
-        <SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+        <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
         <InputBase
           autoFocus
           inputRef={inputRef}
@@ -215,7 +218,7 @@ function RecentsPicker({
             autoComplete: "off",
             spellCheck: false,
           }}
-          sx={{ flex: 1, fontSize: 13.5, "& input": { p: 0 } }}
+          sx={{ flex: 1, fontSize: 15, "& input": { p: 0 } }}
         />
         <Kbd>Esc</Kbd>
       </Box>
@@ -229,8 +232,9 @@ function RecentsPicker({
           minHeight: 0,
           display: list.length > 0 ? "grid" : "block",
           alignContent: "start",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          "@media (max-width: 700px)": { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" },
+          // As many tiles as fit at 340 px or more (three at the 1120 px
+          // width); columnsOf reads the resolved count back for the keys.
+          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
           gap: "1px",
           // The hairlines are the gap showing the soft border through.
           bgcolor: "var(--pg-border-soft, #e6eaf0)",
@@ -267,13 +271,13 @@ function RecentsPicker({
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1.75,
-          height: 34,
-          px: 1.75,
+          gap: 2,
+          height: 38,
+          px: 2,
           borderTop: 1,
           borderColor: "divider",
           bgcolor: "var(--pg-surface-sunken, #f6f8fb)",
-          fontSize: 12,
+          fontSize: 12.5,
           color: "text.secondary",
           flex: "none",
           whiteSpace: "nowrap",
