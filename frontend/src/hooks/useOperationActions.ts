@@ -27,7 +27,7 @@ import type { StatusNotes } from "./useStatusNote"
 
 export type OperationDeps = {
   session: Pick<EngineSession, "client" | "setEngineError">
-  repoState: Pick<RepoState, "status" | "setStatus" | "refresh">
+  repoState: Pick<RepoState, "status" | "setStatus">
   jobs: Pick<Jobs, "withBusy">
   dialogs: Dialogs
   /** The status bar's transient line ("Saved 0001-….patch", v0.18.6). */
@@ -67,7 +67,7 @@ function patchScopeOf(row: GraphRow): PatchScope | null {
 
 export function useOperationActions({ session, repoState, jobs, dialogs, notes }: OperationDeps) {
   const { client: engine, setEngineError } = session
-  const { status, setStatus, refresh } = repoState
+  const { status, setStatus } = repoState
   const { withBusy } = jobs
   const { dialog, open } = dialogs
   const { setNote } = notes
@@ -89,11 +89,11 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
     open({ kind: "merge", branch })
   }
 
+  // Every operation below is two phases under withBusy (v0.18.9): the
+  // engine call, whose answer resolves the promise (the dialog closes),
+  // then the refresh behind the top bar.
   async function merge(options: MergeOptions) {
-    await withBusy(`Merging ${options.branch}`, async () => {
-      setStatus(await engine.merge(options))
-      await refresh(FULL)
-    })
+    await withBusy(`Merging ${options.branch}`, async () => setStatus(await engine.merge(options)), { refresh: FULL })
   }
 
   function openResolveConflicts() {
@@ -103,19 +103,18 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
   /** Commit the merge, or `--continue` the sequencer that stopped. */
   async function continueOperation(message?: string | null) {
     const op = sequencerOpOf(status)
-    await withBusy(op ? "Continuing" : "Committing merge", async () => {
-      setStatus(op ? await engine.sequencerAction(op, "continue") : await engine.mergeContinue(message ?? null))
-      await refresh(FULL)
-    })
+    await withBusy(
+      op ? "Continuing" : "Committing merge",
+      async () =>
+        setStatus(op ? await engine.sequencerAction(op, "continue") : await engine.mergeContinue(message ?? null)),
+      { refresh: FULL },
+    )
   }
 
   async function skipOperation() {
     const op = sequencerOpOf(status)
     if (!op) return
-    await withBusy("Skipping", async () => {
-      setStatus(await engine.sequencerAction(op, "skip"))
-      await refresh(FULL)
-    })
+    await withBusy("Skipping", async () => setStatus(await engine.sequencerAction(op, "skip")), { refresh: FULL })
   }
 
   /** Confirmed unless the user turned that off: aborting throws away whatever the operation did. */
@@ -130,10 +129,11 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
         confirmLabel: "Abort",
         danger: true,
         onConfirm: () =>
-          withBusy("Aborting", async () => {
-            setStatus(op ? await engine.sequencerAction(op, "abort") : await engine.mergeAbort())
-            await refresh(FULL)
-          }),
+          withBusy(
+            "Aborting",
+            async () => setStatus(op ? await engine.sequencerAction(op, "abort") : await engine.mergeAbort()),
+            { refresh: FULL },
+          ),
       },
       "confirmAbortOperation",
     )
@@ -143,10 +143,11 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
    *  Only the status can change, so this does not reload the graph. */
   async function resolve(paths: string[], take: ConflictTake) {
     if (paths.length === 0) return
-    await withBusy(take === "delete" ? "Deleting" : "Resolving", async () => {
-      setStatus(await engine.resolveConflicts(paths, take))
-      await refresh({ status: true })
-    })
+    await withBusy(
+      take === "delete" ? "Deleting" : "Resolving",
+      async () => setStatus(await engine.resolveConflicts(paths, take)),
+      { refresh: { status: true } },
+    )
   }
 
   async function openMergetool(path: string) {
@@ -158,10 +159,7 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
   }
 
   async function rebase(onto: string, options: RebaseOptions) {
-    await withBusy("Rebasing", async () => {
-      setStatus(await engine.rebase(onto, options))
-      await refresh(FULL)
-    })
+    await withBusy("Rebasing", async () => setStatus(await engine.rebase(onto, options)), { refresh: FULL })
   }
 
   /** Captures git's own todo, then opens the editor on it. */
@@ -180,9 +178,8 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
   async function runInteractiveRebase(entries: RebaseTodoEntry[]) {
     if (dialog.kind !== "interactiveRebase") return
     const { onto, options } = dialog
-    await withBusy("Rebasing interactively", async () => {
-      setStatus(await engine.rebase(onto, options, entries))
-      await refresh(FULL)
+    await withBusy("Rebasing interactively", async () => setStatus(await engine.rebase(onto, options, entries)), {
+      refresh: FULL,
     })
   }
 

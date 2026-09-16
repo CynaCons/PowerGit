@@ -3,15 +3,23 @@ import { report } from "../diagnostics"
 import { describeThrown, type EngineClient, type GitJob, type JobStarted } from "../engine"
 import type { SessionEvent } from "../session/state"
 import { focusGrid } from "./focusGrid"
+import type { RefreshScope } from "./useRepoState"
 
 export type JobsDeps = {
   client: EngineClient
   dispatch: (e: SessionEvent) => void
   busy: boolean
   setEngineError: (message: string | null) => void
-  refresh: () => Promise<void>
+  refresh: (scope?: RefreshScope) => Promise<void>
   /** Failure classifier from useEngineSession: returns the message to show. */
   handleFailure: (e: unknown, context: string) => string
+}
+
+/** The second phase of withBusy (v0.18.9): the refresh that follows a
+ *  successful engine call, run behind the top bar after the caller's
+ *  promise has resolved. */
+export type BusyOptions = {
+  refresh?: RefreshScope
 }
 
 export type Jobs = ReturnType<typeof useJobs>
@@ -56,11 +64,24 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
 
   // Shows the topbar progress indicator around any mutating engine call —
   // sync ops (checkout, reset, rebase, stash) give the same feedback as jobs.
+  //
+  // v0.18.9 (owner: "the overlay bugged at 'Merging' — I had to close it"):
+  // the refresh that follows the call is a second phase. The returned
+  // promise resolves when the engine has answered — that is when a dialog
+  // closes — while the refresh runs on under the same top-bar label; a
+  // refresh failure is reported under its own name ("Refresh after merging
+  // topic: …"), never as the operation's. Without `options.refresh` the
+  // call is the whole job, as before.
   const withBusy = useCallback(
-    async (label: string, fn: () => Promise<void>) => {
+    async (label: string, fn: () => Promise<void>, options?: BusyOptions) => {
       if (busy) return
       dispatch({ type: "job-started", label })
       setJobLabel(label)
+      const finish = () => {
+        dispatch({ type: "job-finished" })
+        setJobLabel(null)
+        focusGrid()
+      }
       try {
         await fn()
         setEngineError(null)
@@ -68,13 +89,20 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
         // Prefix the operation name: a bare browser/DOMException message is
         // otherwise impossible to trace back to what the user clicked.
         setEngineError(`${label}: ${handleFailure(e, label)}`)
-      } finally {
-        dispatch({ type: "job-finished" })
-        setJobLabel(null)
-        focusGrid()
+        finish()
+        return
       }
+      const scope = options?.refresh
+      if (!scope) {
+        finish()
+        return
+      }
+      const after = `Refresh after ${label.charAt(0).toLowerCase()}${label.slice(1)}`
+      void refresh(scope)
+        .catch((e: unknown) => setEngineError(`${after}: ${handleFailure(e, after)}`))
+        .finally(finish)
     },
-    [busy, dispatch, setEngineError, handleFailure],
+    [busy, dispatch, setEngineError, handleFailure, refresh],
   )
 
   const recordStart = useCallback((label: string, start: () => Promise<JobStarted>): number => {
