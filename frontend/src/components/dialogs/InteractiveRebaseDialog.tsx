@@ -5,7 +5,6 @@ import Button from "@mui/material/Button"
 import Dialog from "@mui/material/Dialog"
 import DialogActions from "@mui/material/DialogActions"
 import DialogContent from "@mui/material/DialogContent"
-import DialogTitle from "@mui/material/DialogTitle"
 import IconButton from "@mui/material/IconButton"
 import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
@@ -14,6 +13,7 @@ import type { RebaseTodo, RebaseTodoEntry } from "../../engine"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { MONO_FONT } from "../../theme"
 import { OpError } from "./OpDialog"
+import { QuotedRef } from "./QuotedRef"
 import {
   ACTION_LABELS,
   TODO_ACTIONS,
@@ -37,13 +37,13 @@ import {
 export function InteractiveRebaseDialog({
   open,
   todo,
-  ontoSubject,
   currentBranch,
   onClose,
   onConfirm,
 }: {
   open: boolean
   todo: RebaseTodo
+  /** Kept for callers; the band quotes the row. */
   ontoSubject?: string
   currentBranch: string
   onClose: () => void
@@ -65,10 +65,14 @@ export function InteractiveRebaseDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth data-testid="interactive-rebase-dialog">
-      <DialogTitle sx={{ fontSize: 15 }}>
-        {`Rebase '${todo.headName || currentBranch}' onto ${todo.onto.slice(0, 7)}${ontoSubject ? ` (${ontoSubject})` : ""}`}
-      </DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 0.5, minHeight: 280 }}>
+      {/* The A shell's title and band (v0.18.11); the todo editor keeps its own body. */}
+      <div className="op-head">
+        <h2 className="op-title">Interactive rebase</h2>
+      </div>
+      <div className="op-quote">
+        <QuotedRef name={todo.headName || currentBranch} kind="local" caption="onto" tip={todo.onto} />
+      </div>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 0.5, minHeight: 280, pt: 1.5 }}>
         <Typography variant="caption" color="text.secondary">
           The list runs top to bottom — the oldest commit first, as git writes it.
         </Typography>

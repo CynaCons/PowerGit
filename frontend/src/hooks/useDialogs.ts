@@ -49,7 +49,9 @@ export type DialogState =
   | { kind: "merge"; branch?: string }
   | { kind: "resolveConflicts" }
   | { kind: "compare"; from: string; fromLabel?: string; to: string | null; toLabel?: string }
-  | { kind: "deleteBranch" }
+  /** v0.18.11: with `branch` the dialog is the confirmation for that branch; without, the rail's picker. */
+  | { kind: "deleteBranch"; branch?: string }
+  | { kind: "deleteTag"; tag: string }
   | { kind: "confirm"; request: ConfirmRequest }
   | { kind: "remoteConfig"; remote: string }
   | { kind: "createRef"; refKind: "branch" | "tag"; sha: string; subject?: string }

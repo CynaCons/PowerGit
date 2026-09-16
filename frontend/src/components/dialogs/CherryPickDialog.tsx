@@ -1,23 +1,21 @@
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Typography from "@mui/material/Typography"
 import { useEngine } from "../../engine"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
-import { MONO_FONT } from "../../theme"
+import { QuotedRow } from "./QuotedRow"
 
 // Cherry-pick and revert act on a single commit with no extra options, so
 // unlike Checkout/Reset/Rebase they call the engine directly instead of
 // through an App-supplied onConfirm: `busy` disables the actions while the
 // request is in flight and `error` surfaces a failed/conflicted op inline.
+// v0.18.11: on the A shell — the commit quoted as its row, one line of copy.
 export function CherryPickDialog({
   open,
   commit,
-  subject,
   onClose,
 }: {
   open: boolean
   commit: string
+  /** Kept for callers; the band quotes the row. */
   subject?: string
   onClose: () => void
 }) {
@@ -32,29 +30,17 @@ export function CherryPickDialog({
   return (
     <OpDialog
       open={open}
-      title={`Cherry-pick ${commit.slice(0, 7)}${subject ? ` (${subject})` : ""}`}
+      title="Cherry-pick"
       onClose={onClose}
-      actions={
-        <>
-          <Button onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={submit} disabled={busy} data-testid="cherry-pick-confirm">
-            {busy ? "Cherry-picking…" : "Cherry-pick"}
-          </Button>
-        </>
-      }
+      testid="cherry-pick-dialog"
+      subject={<QuotedRow sha={commit} />}
+      busy={busy}
+      primary={{ label: "Cherry-pick", onClick: () => void submit(), testid: "cherry-pick-confirm" }}
     >
-      <Typography variant="body2">
-        Apply commit{" "}
-        <Box component="span" sx={{ fontFamily: MONO_FONT }}>
-          {commit.slice(0, 7)}
-        </Box>
-        {subject ? ` (${subject})` : ""} onto the current branch.
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        If conflicts occur, the cherry-pick stops and a banner offers Resolve / Continue / Skip / Abort.
-      </Typography>
+      <div className="op-text">Applies the commit's changes as a new commit on the current branch.</div>
+      <div className="op-meta">
+        If it conflicts, the cherry-pick stops and a banner offers Resolve / Continue / Skip / Abort.
+      </div>
       <OpError error={error} />
     </OpDialog>
   )

@@ -1,12 +1,8 @@
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Checkbox from "@mui/material/Checkbox"
-import FormControlLabel from "@mui/material/FormControlLabel"
-import Typography from "@mui/material/Typography"
 import { useEffect, useState } from "react"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
-import { MONO_FONT } from "../../theme"
+import { OptionGroup, OptionRow } from "./OptionRow"
+import { QuotedRef } from "./QuotedRef"
 
 /** What the dialog hands back (v0.15.0): GE FormRebase's own checkboxes. */
 export type RebaseFormOptions = {
@@ -16,10 +12,12 @@ export type RebaseFormOptions = {
   rebaseMerges: boolean
 }
 
+// Rebase on the A shell (v0.18.11): the band says "<branch> onto" and
+// quotes the target's row; GE FormRebase's four checkboxes keep their
+// meaning, the explanation after the dash.
 export function RebaseDialog({
   open,
   ontoSha,
-  ontoSubject,
   currentBranch,
   interactive: initialInteractive = false,
   onClose,
@@ -27,6 +25,7 @@ export function RebaseDialog({
 }: {
   open: boolean
   ontoSha: string
+  /** Kept for callers; the band quotes the row. */
   ontoSubject?: string
   currentBranch: string
   /** Opened from "Rebase interactively from here…". */
@@ -57,78 +56,58 @@ export function RebaseDialog({
   return (
     <OpDialog
       open={open}
-      title={`Rebase '${currentBranch}'`}
+      title="Rebase"
       onClose={onClose}
-      actions={
-        <>
-          <Button onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={submit} disabled={busy} data-testid="rebase-confirm">
-            {interactive ? "Edit todo…" : "Rebase"}
-          </Button>
-        </>
-      }
+      testid="rebase-dialog"
+      subject={<QuotedRef name={currentBranch} kind="local" caption="onto" tip={ontoSha} />}
+      busy={busy}
+      primary={{
+        label: interactive ? "Edit todo…" : "Rebase",
+        onClick: () => void submit(),
+        testid: "rebase-confirm",
+      }}
     >
-      <Typography variant="body2">
-        Rebase the current branch <strong>{currentBranch}</strong> onto{" "}
-        <Box component="span" sx={{ fontFamily: MONO_FONT }}>
-          {ontoSha.slice(0, 7)}
-        </Box>
-        {ontoSubject ? ` (${ontoSubject})` : ""}.
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Commits unique to {currentBranch} will be replayed. If a commit conflicts, the rebase stops and a banner offers
-        Resolve / Continue / Skip / Abort.
-      </Typography>
-
-      <FormControlLabel
-        control={
-          <Checkbox
-            size="small"
-            checked={autostash}
-            data-testid="rebase-autostash"
-            onChange={(e) => setAutostash(e.target.checked)}
-          />
-        }
-        label="Auto stash uncommitted changes"
-      />
-      <FormControlLabel
-        control={
-          <Checkbox
-            size="small"
-            checked={interactive}
-            data-testid="rebase-interactive"
-            onChange={(e) => setInteractive(e.target.checked)}
-          />
-        }
-        label="Interactive — edit the list of commits first"
-      />
-      <FormControlLabel
-        // git only honours --autosquash on an interactive rebase, so GE
-        // greys it out with Interactive off rather than hiding it.
-        disabled={!interactive}
-        control={
-          <Checkbox
-            size="small"
-            checked={autosquash}
-            data-testid="rebase-autosquash"
-            onChange={(e) => setAutosquash(e.target.checked)}
-          />
-        }
-        label="Autosquash — order fixup!/squash! commits under their target"
-      />
-      <FormControlLabel
-        control={
-          <Checkbox
-            size="small"
-            checked={rebaseMerges}
-            data-testid="rebase-merges"
-            onChange={(e) => setRebaseMerges(e.target.checked)}
-          />
-        }
-        label="Rebase merges — keep the branch structure"
-      />
+      <div className="op-meta">
+        Commits unique to {currentBranch} are replayed. If one conflicts, the rebase stops and a banner offers Resolve /
+        Continue / Skip / Abort.
+      </div>
+      <OptionGroup>
+        <OptionRow
+          kind="checkbox"
+          checked={autostash}
+          onChange={setAutostash}
+          label="Auto stash"
+          explain="set uncommitted changes aside, restore them after"
+          testid="rebase-autostash"
+        />
+        <OptionRow
+          kind="checkbox"
+          checked={interactive}
+          onChange={setInteractive}
+          label="Interactive"
+          explain="edit the list of commits first"
+          testid="rebase-interactive"
+        />
+        <OptionRow
+          // git only honours --autosquash on an interactive rebase, so GE
+          // greys it out with Interactive off rather than hiding it.
+          kind="checkbox"
+          checked={autosquash}
+          disabled={!interactive}
+          onChange={setAutosquash}
+          label="Autosquash"
+          explain="order fixup!/squash! commits under their target"
+          testid="rebase-autosquash"
+        />
+        <OptionRow
+          kind="checkbox"
+          checked={rebaseMerges}
+          onChange={setRebaseMerges}
+          label="Rebase merges"
+          explain="keep the branch structure"
+          testid="rebase-merges"
+        />
+      </OptionGroup>
       <OpError error={error} />
     </OpDialog>
   )

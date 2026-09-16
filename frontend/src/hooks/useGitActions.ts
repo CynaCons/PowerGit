@@ -2,6 +2,7 @@ import { isArtificialId } from "../graph/artificial"
 import type { CreateRefOptions } from "../components/dialogs/CreateRefDialog"
 import { isRemote } from "../components/refChipsModel"
 import { describeThrown, type CheckoutOptions } from "../engine"
+import { getBehaviour } from "../theme/behaviour"
 import type { Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
@@ -103,45 +104,31 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     await withBusy("Resetting", async () => setStatus(await engine.reset(sha, mode)), { refresh: FULL })
   }
 
-  // v0.15.0: every destructive action asks through the in-app ConfirmDialog
-  // (a window.confirm is an OS prompt in the WebView and blocks automation).
+  // v0.15.0: every destructive action asks in-app (a window.confirm is an
+  // OS prompt in the WebView and blocks automation). v0.18.11: the question
+  // is the Delete branch / Delete tag dialog itself — the chip, its tip and
+  // what the deletion costs — unless Settings, Behaviour turned it off.
+  async function deleteBranch(name: string) {
+    await withBusy("Deleting branch", async () => setRefs(await engine.deleteBranch(name)), {
+      refresh: { revisions: true },
+    })
+  }
+  async function deleteTag(name: string) {
+    await withBusy("Deleting tag", async () => setRefs(await engine.deleteTag(name)), { refresh: { revisions: true } })
+  }
   function removeBranch(name: string) {
-    operations.confirm(
-      {
-        title: `Delete branch '${name}'?`,
-        body: "Commits only on this branch become unreachable.",
-        confirmLabel: "Delete branch",
-        danger: true,
-        onConfirm: async () => {
-          try {
-            setRefs(await engine.deleteBranch(name))
-            await refresh({ revisions: true })
-          } catch (e) {
-            setEngineError(`Delete branch failed: ${describeThrown(e)}`)
-          }
-        },
-      },
-      "confirmDeleteBranch",
-    )
+    if (!getBehaviour().confirmDeleteBranch) {
+      deleteBranch(name).catch((e: unknown) => setEngineError(`Delete branch failed: ${describeThrown(e)}`))
+      return
+    }
+    open({ kind: "deleteBranch", branch: name })
   }
   function removeTag(name: string) {
-    operations.confirm(
-      {
-        title: `Delete tag '${name}'?`,
-        body: "The tag is removed locally; a remote copy stays until it is deleted there too.",
-        confirmLabel: "Delete tag",
-        danger: true,
-        onConfirm: async () => {
-          try {
-            setRefs(await engine.deleteTag(name))
-            await refresh({ revisions: true })
-          } catch (e) {
-            setEngineError(`Delete tag failed: ${describeThrown(e)}`)
-          }
-        },
-      },
-      "confirmDeleteBranch",
-    )
+    if (!getBehaviour().confirmDeleteBranch) {
+      deleteTag(name).catch((e: unknown) => setEngineError(`Delete tag failed: ${describeThrown(e)}`))
+      return
+    }
+    open({ kind: "deleteTag", tag: name })
   }
   async function fetchRemote(name: string) {
     await runJob(`Fetching ${name}`, () => engine.startFetch(name))
@@ -227,6 +214,8 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     reset,
     removeBranch,
     removeTag,
+    deleteBranch,
+    deleteTag,
     fetchRemote,
     openCreateBranch,
     openCreateTag,

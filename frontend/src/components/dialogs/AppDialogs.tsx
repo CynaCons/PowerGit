@@ -13,7 +13,7 @@ import { CheckoutBranchDialog } from "./CheckoutBranchDialog"
 import { CompareDialog } from "./CompareDialog"
 import { ConfirmDialog } from "./ConfirmDialog"
 import { CreateRefDialog } from "./CreateRefDialog"
-import { DeleteBranchDialog } from "./DeleteBranchDialog"
+import { DeleteBranchDialog, DeleteTagDialog } from "./DeleteBranchDialog"
 import { InteractiveRebaseDialog } from "./InteractiveRebaseDialog"
 import { MergeDialog } from "./MergeDialog"
 import { RebaseDialog } from "./RebaseDialog"
@@ -231,11 +231,14 @@ export function AppDialogs({
       {dialog.kind === "deleteBranch" && (
         <DeleteBranchDialog
           open
-          branches={branchNames}
+          branch={dialog.branch}
           currentBranch={currentBranch}
           onClose={() => close("deleteBranch")}
-          onConfirm={actions.removeBranch}
+          onConfirm={actions.deleteBranch}
         />
+      )}
+      {dialog.kind === "deleteTag" && (
+        <DeleteTagDialog open tag={dialog.tag} onClose={() => close("deleteTag")} onConfirm={actions.deleteTag} />
       )}
       {dialog.kind === "confirm" && (
         <ConfirmDialog

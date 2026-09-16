@@ -1,19 +1,18 @@
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Typography from "@mui/material/Typography"
 import { useEngine } from "../../engine"
 import { useActionDialog } from "../../hooks/useActionDialog"
 import { OpDialog, OpError } from "./OpDialog"
-import { MONO_FONT } from "../../theme"
+import { QuotedRow } from "./QuotedRow"
 
+// Revert on the A shell (v0.18.11): the commit quoted as its row, one line
+// of copy; the engine is called directly like the cherry-pick.
 export function RevertDialog({
   open,
   commit,
-  subject,
   onClose,
 }: {
   open: boolean
   commit: string
+  /** Kept for callers; the band quotes the row. */
   subject?: string
   onClose: () => void
 }) {
@@ -28,29 +27,17 @@ export function RevertDialog({
   return (
     <OpDialog
       open={open}
-      title={`Revert ${commit.slice(0, 7)}${subject ? ` (${subject})` : ""}`}
+      title="Revert"
       onClose={onClose}
-      actions={
-        <>
-          <Button onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={submit} disabled={busy} data-testid="revert-confirm">
-            {busy ? "Reverting…" : "Revert"}
-          </Button>
-        </>
-      }
+      testid="revert-dialog"
+      subject={<QuotedRow sha={commit} />}
+      busy={busy}
+      primary={{ label: "Revert", onClick: () => void submit(), testid: "revert-confirm" }}
     >
-      <Typography variant="body2">
-        Create a new commit that undoes{" "}
-        <Box component="span" sx={{ fontFamily: MONO_FONT }}>
-          {commit.slice(0, 7)}
-        </Box>
-        {subject ? ` (${subject})` : ""}.
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        If conflicts occur, the revert stops and a banner offers Resolve / Continue / Skip / Abort.
-      </Typography>
+      <div className="op-text">Creates a new commit that undoes the commit's changes on the current branch.</div>
+      <div className="op-meta">
+        If it conflicts, the revert stops and a banner offers Resolve / Continue / Skip / Abort.
+      </div>
       <OpError error={error} />
     </OpDialog>
   )
