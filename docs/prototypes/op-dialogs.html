@@ -1,0 +1,612 @@
+<title>PowerGit Operation Dialogs</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee; --scrim: rgba(16, 24, 39, 0.28); --shadow: 0 18px 48px rgba(16, 24, 39, 0.26); --menu-shadow: 0 6px 24px rgba(16, 24, 39, 0.18);
+    /* Git Extensions lane set, theme/tokens.ts */
+    --lane1: #f064a0; --lane2: #78b4e6; --lane3: #24c221; --lane4: #a078f0; --lane5: #dd3228; --lane6: #1ac6a6; --lane7: #e7b00f; --head-outline: #1a1a1a;
+    /* the ref badge pairs */
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb; --ref-remote-bg: #ecfdf5; --ref-remote-fg: #059669;
+    --ref-tag-bg: #f5f3ff; --ref-tag-fg: #6d28d9; --ref-head-bg: #fef2f2; --ref-head-fg: #dc2626;
+    /* destructive primaries: the head-ref pair; the "uncommitted changes" note: the review todo amber */
+    --danger-fg: #b91c1c; --danger-bg: #fef2f2; --amber: #b7791f;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+      --page: #0c1117; --scrim: rgba(0, 0, 0, 0.5); --shadow: 0 18px 48px rgba(0, 0, 0, 0.55); --menu-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+      --lane1: #f47db1; --lane2: #82bdf0; --lane3: #3ad636; --lane4: #b08cf7; --lane5: #f0655a; --lane6: #2bd4b4; --lane7: #f0be2a; --head-outline: #f1f3f6;
+      --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe; --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+      --ref-tag-bg: #2e1f5e; --ref-tag-fg: #ddd6fe; --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+      --danger-fg: #fca5a5; --danger-bg: #4a1d1d; --amber: #e0a83a;
+    }
+  }
+  :root[data-theme="dark"], .force-dark {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+    --page: #0c1117; --scrim: rgba(0, 0, 0, 0.5); --shadow: 0 18px 48px rgba(0, 0, 0, 0.55); --menu-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    --lane1: #f47db1; --lane2: #82bdf0; --lane3: #3ad636; --lane4: #b08cf7; --lane5: #f0655a; --lane6: #2bd4b4; --lane7: #f0be2a; --head-outline: #f1f3f6;
+    --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe; --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+    --ref-tag-bg: #2e1f5e; --ref-tag-fg: #ddd6fe; --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+    --danger-fg: #fca5a5; --danger-bg: #4a1d1d; --amber: #e0a83a;
+  }
+  .force-light {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb; --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0; --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb; --page: #e3e7ee; --shadow: 0 18px 48px rgba(16, 24, 39, 0.26);
+    --lane3: #24c221; --lane4: #a078f0; --lane5: #dd3228; --head-outline: #1a1a1a;
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb; --ref-remote-bg: #ecfdf5; --ref-remote-fg: #059669; --ref-tag-bg: #f5f3ff; --ref-tag-fg: #6d28d9; --ref-head-bg: #fef2f2; --ref-head-fg: #dc2626;
+    --danger-fg: #b91c1c; --danger-bg: #fef2f2; --amber: #b7791f;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Ubuntu", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  svg { display: block; }
+  kbd { font: inherit; font-size: 10.5px; font-family: var(--mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--meta); line-height: 15px; }
+  code { font-family: var(--mono); font-size: 12px; }
+
+  /* ---------- page chrome ---------- */
+  .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 9px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .tabs { display: flex; gap: 2px; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: var(--surface-alt); }
+  .tabs button { border: 0; background: transparent; border-radius: 4px; padding: 4px 10px; cursor: pointer; color: var(--text-2); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tabs button .n { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font-size: 11px; font-weight: 600; background: var(--surface); color: var(--meta); border: 1px solid var(--border); }
+  .tabs button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(16, 24, 39, 0.12); }
+  .tabs button.on .n { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .right { display: flex; gap: 10px; margin-left: auto; align-items: center; }
+  .switch { display: flex; gap: 4px; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch button b { font-weight: 700; margin-right: 6px; }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 4px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 20px 20px 56px; }
+  .lead { max-width: 78ch; margin: 0 auto 14px; color: var(--text-2); }
+  .lead h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .lead .quote { border-left: 2px solid var(--border); padding-left: 10px; color: var(--meta); font-style: italic; margin: 8px 0; }
+  .sub-switch { display: flex; gap: 4px; align-items: center; margin: 8px 0 0; font-size: 12px; color: var(--meta); }
+  .sub-switch button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 2px 9px; cursor: pointer; font-size: 12px; }
+  .sub-switch button.on { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+  .notes { max-width: 1180px; margin: 16px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .notes h3 { font-size: 12px; font-weight: 600; color: var(--meta); margin: 0 0 6px; }
+  .notes ol, .notes ul { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+  .notes li { display: flex; gap: 9px; margin: 0 0 7px; }
+  .notes li .mark { flex: none; margin-top: 1px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+  .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; line-height: 1; font-style: normal; }
+  .rule { max-width: 1180px; margin: 18px auto 0; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12.5px; color: var(--text-2); }
+  .rule b { color: var(--text); }
+  @media (max-width: 800px) { .notes { grid-template-columns: 1fr; } }
+
+  /* ---------- the window behind the dialog (1280 × 760 stage) ---------- */
+  .win-wrap { overflow-x: auto; }
+  .win { width: 1280px; max-width: 100%; height: 760px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 14px 40px rgba(16, 24, 39, 0.22); display: grid; grid-template-rows: 30px 1fr 22px; position: relative; user-select: none; }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--meta); }
+  .titlebar .word { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .titlebar .word i { width: 12px; height: 12px; background: var(--primary); display: inline-block; clip-path: polygon(0 0, 40% 0, 100% 100%, 60% 100%); }
+  .titlebar .hair { width: 1px; height: 14px; background: var(--border); }
+  .titlebar .wc { margin-left: auto; display: flex; gap: 18px; color: var(--meta); font-size: 11px; }
+  .shell { display: grid; grid-template-columns: 188px 240px 1fr; min-height: 0; }
+  .status { display: flex; align-items: center; gap: 12px; padding: 0 10px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--meta); }
+  .status .br { color: var(--primary); font-weight: 500; }
+  .status .sp { flex: 1; }
+  /* the command rail, expanded */
+  .rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 6px 0; font-size: 12.5px; min-height: 0; }
+  .ri { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 14px; color: var(--text); white-space: nowrap; }
+  .ri svg { width: 17px; height: 17px; fill: currentColor; color: var(--meta); flex: none; }
+  .ri .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .ri .chev { width: 14px; height: 14px; color: var(--meta); }
+  .ri .cnt { display: inline-grid; place-items: center; min-width: 17px; height: 17px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; padding: 0 5px; }
+  .ri.gap { margin-top: 8px; }
+  .ri.commit svg { color: var(--on-primary); background: var(--primary); border-radius: 5px; padding: 2px; width: 20px; height: 20px; }
+  .rail .grow { flex: 1; }
+  /* the Repository panel */
+  .left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; font-size: 12.5px; }
+  .left .head { display: flex; align-items: center; height: 38px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; gap: 6px; }
+  .left .head .sp { flex: 1; }
+  .left .head svg { width: 16px; height: 16px; fill: currentColor; color: var(--meta); }
+  .left .search { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--border); color: var(--disabled); background: var(--sunken); }
+  .left .search svg { width: 14px; height: 14px; fill: currentColor; }
+  .tree { flex: 1; overflow: hidden; padding-top: 2px; }
+  .trow { display: flex; align-items: center; height: 22px; padding-right: 6px; white-space: nowrap; color: var(--text); }
+  .trow.sec { color: var(--meta); font-weight: 500; }
+  .trow.cur { background: var(--sel-bg); }
+  .trow.cur .lbl, .trow.cur .ico { color: var(--primary); font-weight: 700; }
+  .slot { width: 16px; flex: none; display: inline-grid; place-items: center; color: var(--meta); }
+  .slot svg { width: 15px; height: 15px; fill: currentColor; }
+  .ico { width: 16px; flex: none; display: inline-grid; place-items: center; margin-right: 4px; color: var(--meta); }
+  .ico svg { width: 13px; height: 13px; fill: currentColor; }
+  .trow .lbl { overflow: hidden; text-overflow: ellipsis; }
+  /* the grid + the bottom panel */
+  .rightp { display: grid; grid-template-rows: 1fr 6px 150px; min-height: 0; min-width: 0; }
+  .grid { display: grid; grid-template-rows: 28px 1fr; min-height: 0; position: relative; }
+  .ghead, .row { display: grid; grid-template-columns: 96px 1fr 154px 142px 86px; align-items: center; padding-right: 16px; }
+  .ghead { font-size: 12px; font-weight: 500; color: var(--meta); border-bottom: 1px solid var(--border-soft); }
+  .ghead > div { padding-left: 8px; height: 100%; display: flex; align-items: center; border-left: 1px solid var(--border-soft); }
+  .ghead > div:first-child { border-left: 0; padding-left: 16px; }
+  .gbody { overflow: hidden; position: relative; }
+  .gsvg { position: absolute; top: 0; left: 2px; z-index: 1; pointer-events: none; }
+  .row { height: 28px; border-left: 2px solid transparent; cursor: default; position: relative; }
+  .row.tall { height: 48px; }
+  .row > .cell { height: 100%; display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+  .row.selected { border-left-color: var(--sel-border); background: var(--sel-bg); }
+  .msg { padding-left: 12px; gap: 6px; overflow: hidden; }
+  .row.tall > .cell { height: 28px; align-self: start; }
+  .row.tall .hint { position: absolute; left: 108px; bottom: 5px; }
+  .msg .line { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+  .msg .hint { font-size: 11.5px; color: var(--meta); display: flex; gap: 5px; align-items: center; }
+  .msg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg-text.wd { font-style: italic; color: var(--text-2); }
+  .author, .date, .sha { color: var(--meta); font-size: 12px; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .author { padding-left: 8px; gap: 7px; }
+  .disc { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 9.5px; font-weight: 700; flex: none; background: var(--ref-local-bg); color: var(--ref-local-fg); }
+  .date { padding-left: 8px; }
+  .sha { font-family: var(--mono); font-size: 11px; justify-content: flex-end; padding-right: 8px; }
+  .split { background: var(--page); }
+  .bottom { border-top: 1px solid var(--border); padding: 0 16px; font-size: 12.5px; overflow: hidden; }
+  .bottom .tabs2 { display: flex; gap: 18px; height: 34px; align-items: center; color: var(--meta); border-bottom: 1px solid var(--border-soft); margin-bottom: 8px; }
+  .bottom .tabs2 b { color: var(--primary); font-weight: 500; box-shadow: inset 0 -2px 0 var(--primary); padding: 8px 0; }
+  .bottom h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bottom p { margin: 0 0 3px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scrim { position: absolute; left: 0; top: 30px; right: 0; bottom: 22px; background: var(--scrim); z-index: 4; }
+
+  /* ref chips, as app.css draws them (+ the ghost and the invalid state, new here) */
+  .ref { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; height: 16px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--ref-local-bg); color: var(--ref-local-fg); white-space: nowrap; max-width: 100%; }
+  .ref svg { width: 11px; height: 11px; fill: currentColor; flex: none; }
+  .ref.remote { background: var(--ref-remote-bg); color: var(--ref-remote-fg); }
+  .ref.tag { background: var(--ref-tag-bg); color: var(--ref-tag-fg); }
+  .ref.head { background: var(--ref-head-bg); color: var(--ref-head-fg); }
+  .ref.big { height: 20px; font-size: 11px; padding: 0 8px; gap: 4px; }
+  .ref.big svg { width: 12px; height: 12px; }
+  .ref.ghost { background: transparent; border: 1px dashed var(--meta); color: var(--meta); }
+  .ref.bad { background: var(--ref-head-bg); color: var(--ref-head-fg); }
+  .ref .in { border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; padding: 0; min-width: 8px; width: 8px; }
+  .ref.live { padding-right: 8px; }
+  .why { font-size: 12px; color: var(--ref-head-fg); }
+
+  /* ---------- the dialog shell ---------- */
+  .dlg { width: 520px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); display: flex; flex-direction: column; font-size: 13px; color: var(--text); text-align: left; position: relative; }
+  .dlg.w560 { width: 560px; }
+  .dlg.w600 { width: 600px; }
+  .modal { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); z-index: 6; }
+  .hd { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; }
+  .hd h2 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; white-space: nowrap; }
+  .hd .keys { display: inline-flex; gap: 4px; align-items: center; font-size: 11px; color: var(--meta); }
+  .quote { background: var(--sunken); border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); padding: 2px 16px; }
+  .qrow { display: flex; align-items: center; gap: 8px; height: 30px; min-width: 0; }
+  .qrow .node { width: 12px; height: 12px; flex: none; display: grid; place-items: center; }
+  .qrow .qsha { font-family: var(--mono); font-size: 12px; color: var(--text-2); flex: none; }
+  .qrow .refs { display: inline-flex; gap: 4px; flex: none; max-width: 46%; overflow: hidden; }
+  .qrow .subj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qrow .when { font-size: 12px; color: var(--meta); flex: none; }
+  .qrow .disc { width: 16px; height: 16px; font-size: 8.5px; }
+  .quote .into { display: flex; align-items: center; gap: 6px; height: 16px; font-size: 11px; color: var(--meta); padding-left: 1px; margin: -3px 0; }
+  .quote .into svg { width: 12px; height: 12px; fill: currentColor; }
+  .body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 5px; position: relative; }
+  .lab { display: flex; align-items: center; gap: 8px; font-weight: 500; min-height: 20px; }
+  .lab .as { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--meta); font-weight: 400; min-width: 0; }
+  .lab .cap { font-size: 12px; color: var(--meta); font-weight: 400; }
+  .field input[type="text"], .field textarea { height: 34px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; font: inherit; background: var(--surface); color: var(--text); width: 100%; }
+  .field textarea { height: 56px; padding: 7px 10px; resize: vertical; font-family: inherit; }
+  .field input:focus, .field textarea:focus { outline: 2px solid var(--focus); outline-offset: -1px; border-color: var(--focus); }
+  .field input::placeholder { color: var(--disabled); }
+  .grp { font-weight: 500; margin-bottom: -4px; }
+  .opt { display: flex; align-items: center; gap: 8px; min-height: 22px; cursor: default; }
+  .opt input { width: 14px; height: 14px; margin: 0; accent-color: var(--primary); flex: none; }
+  .opt .ex { color: var(--meta); font-size: 12px; }
+  .opt .ex::before { content: "— "; }
+  .opt.off { color: var(--disabled); }
+  .opt .inl { height: 26px; border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; font: inherit; background: var(--surface); color: var(--text); width: 150px; }
+  .opt .inl:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
+  .note { font-size: 12px; color: var(--meta); padding-left: 22px; margin-top: -6px; }
+  .note.amber, .ft .note.amber { color: var(--amber); }
+  .ft { display: flex; align-items: center; gap: 8px; padding: 10px 16px 12px; border-top: 1px solid var(--border-soft); }
+  .ft .note { flex: 1; min-width: 0; padding: 0; margin: 0; }
+  .btn { height: 30px; padding: 0 14px; border-radius: 5px; border: 1px solid transparent; background: transparent; color: var(--primary); font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.primary:disabled { opacity: 0.45; cursor: default; filter: none; }
+  .btn.danger { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-fg); font-weight: 600; }
+  /* the branch picker: label above, the value is the chip, a searchable list when open */
+  .sel { display: flex; align-items: center; gap: 8px; height: 34px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px 0 10px; cursor: pointer; background: var(--surface); }
+  .sel .chev { margin-left: auto; width: 16px; height: 16px; fill: var(--meta); flex: none; }
+  .sel .tip { font-size: 12px; color: var(--meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .sel.open { outline: 2px solid var(--focus); outline-offset: -1px; border-color: var(--focus); }
+  .menu { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--menu-shadow); z-index: 8; display: flex; flex-direction: column; }
+  .menu .filter { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-bottom: 1px solid var(--border-soft); color: var(--meta); }
+  .menu .filter svg { width: 14px; height: 14px; fill: currentColor; }
+  .menu .filter input { border: 0; outline: 0; flex: 1; font: inherit; background: transparent; color: var(--text); }
+  .menu .list { max-height: 216px; overflow: auto; padding: 4px 0; }
+  .menu .mg { height: 22px; padding: 0 10px; font-size: 11px; color: var(--meta); display: flex; align-items: center; }
+  .menu .it { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 10px; cursor: pointer; }
+  .menu .it .tip { font-size: 12px; color: var(--meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .menu .it .tip code { color: var(--text-2); font-size: 11px; margin-right: 6px; }
+  .menu .it.cur { background: var(--sel-bg); }
+  .menu .it:hover { background: var(--hover); }
+  .menu .empty { padding: 10px; color: var(--meta); font-size: 12px; }
+
+  /* variant B: the popover at the node */
+  .pop { position: absolute; width: 380px; z-index: 6; box-shadow: var(--menu-shadow); }
+  .pop::before { content: ""; position: absolute; left: 12px; top: -6px; width: 10px; height: 10px; background: var(--surface); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+  .pop .hd { height: 36px; }
+  .pop .hd h2 { font-size: 13px; }
+  .pop .body { padding-top: 6px; }
+
+  /* tab 3: the family at 1:1 */
+  .fam { display: grid; grid-template-columns: repeat(2, max-content); justify-content: center; gap: 22px 24px; align-items: start; }
+  .frame { display: flex; flex-direction: column; gap: 7px; }
+  .frame .cap { font-size: 12px; color: var(--meta); display: flex; gap: 8px; align-items: center; }
+  .frame .cap a { color: var(--primary); cursor: pointer; }
+  .frame.other { padding: 22px; background: var(--page); color: var(--text); border-radius: 8px; border: 1px solid var(--border); }
+  .toast { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--text); color: var(--surface); padding: 6px 12px; border-radius: 5px; font-size: 12px; z-index: 9; opacity: 0; transition: opacity 120ms ease; pointer-events: none; }
+  .toast.on { opacity: 1; }
+</style>
+
+<div class="top">
+  <h1>Operation dialogs</h1>
+  <span class="sub">the dialog quotes the graph — the row it acts on, drawn as the graph draws it</span>
+  <div class="tabs" id="tabs"></div>
+  <div class="right">
+    <div class="switch" id="variants"></div>
+    <div class="theme" id="theme"><button data-t="light">Light</button><button data-t="system" class="on">System</button><button data-t="dark">Dark</button></div>
+  </div>
+</div>
+
+<main>
+  <div class="lead" id="lead"></div>
+  <div id="stage"></div>
+  <div class="rule" id="rule"></div>
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+const I = {
+  branch: '<svg viewBox="0 0 24 24"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM13 20.01 4 11V4h7v-.01l9 9-7 7.02zM6.5 5C7.33 5 8 5.67 8 6.5S7.33 8 6.5 8 5 7.33 5 6.5 5.67 5 6.5 5z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>',
+  chevR: '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>',
+  chevD: '<svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>',
+  chevL: '<svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>',
+  funnel: '<svg viewBox="0 0 24 24"><path d="M7 6h10l-5.01 6.3L7 6zm-2.75-.39C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39A.998.998 0 0 0 18.95 4H5.04c-.83 0-1.3.95-.79 1.61z"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  inbox: '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.66-1.34 3-3 3s-3-1.34-3-3H5V5h14v10z"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>',
+  merge: '<svg viewBox="0 0 24 24"><path d="M17 20.41L18.41 19 15 15.59 13.59 17 17 20.41zM7.5 8H11v5.59L5.59 19 7 20.41l6-6V8h3.5L12 3.5 7.5 8z"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>',
+  bug: '<svg viewBox="0 0 24 24"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>',
+  grid: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>',
+  arrowDown: '<svg viewBox="0 0 24 24"><path d="M11 4v12.17l-5.59-5.58L4 12l8 8 8-8-1.41-1.41L13 16.17V4z"/></svg>',
+};
+
+/* git log of C:\dev\public-repo\powergit at v0.18.8, as the graph showed it on 2026-09-16 (HEAD 3363352). */
+const LOG = [
+  { sha: '3363352', lane: 0, parents: ['cb02bc8'], refs: ['HEAD', 'powergit', 'wt/v18-perf', 'wt/v18-picker'], msg: 'plan: v0.18.9 (picker size, author disc) and v0.18.10 (performance audit)', date: '2026-09-16 10:06' },
+  { sha: 'cb02bc8', lane: 0, parents: ['4c62660'], refs: ['origin/powergit'], msg: 'plan(v0.18.8): release record', date: '2026-09-15 22:15' },
+  { sha: '4c62660', lane: 0, parents: ['febf4ba'], refs: [], msg: 'site: showcase screenshots at v0.18.8; feature cards mention refs on rows, the branch filter, ancestry highlight, Save as patch, wrap', date: '2026-09-15 22:13' },
+  { sha: 'febf4ba', lane: 0, parents: ['554953e'], refs: ['v0.18.8'], msg: 'test(visual): baselines at v0.18.8', date: '2026-09-15 21:57' },
+  { sha: '554953e', lane: 0, parents: ['6f69cfb'], refs: [], msg: 'chore(release): v0.18.8', date: '2026-09-15 17:14' },
+  { sha: '6f69cfb', lane: 0, parents: ['db5ed09'], refs: [], msg: 'plan: v0.18.8 is the current iteration', date: '2026-09-15 16:57' },
+  { sha: 'db5ed09', lane: 0, parents: ['f15f6dd'], refs: [], msg: 'plan(v0.18.6-8): merged-tree gates, deviations; visual baselines recents-picker (backdrop settled) and bottom-diff-wrap seeded and looked at', date: '2026-09-15 15:03' },
+  { sha: 'f15f6dd', lane: 0, parents: ['12860fc', '2b0ec3a'], refs: [], msg: "Merge branch 'wt/v18-recents' into powergit — v0.18.7 recent repositories as tiles (prototype C)", date: '2026-09-15 14:50' },
+  { sha: '2b0ec3a', lane: 1, parents: ['3b7e364'], refs: ['wt/v18-recents'], msg: 'style(recents): prettier on recentsModel.test.ts', date: '2026-09-15 14:50' },
+  { sha: '3b7e364', lane: 1, parents: ['c38c316'], refs: [], msg: 'docs(agents): visual direction for the Recent repositories picker; MUI Dialog focus landmine (v0.18.7)', date: '2026-09-15 14:50' },
+  { sha: 'c38c316', lane: 1, parents: ['fe62892'], refs: [], msg: 'feat(recents): the picker from prototype C — tiles, search, keys, Undo (v0.18.7)', date: '2026-09-15 14:47' },
+  { sha: '12860fc', lane: 0, parents: ['8bd401c'], refs: [], msg: 'plan(v0.18.8): tasks ticked after the wt/v18-wrap merge; the empty-last-row quirk backlogged', date: '2026-09-15 14:37' },
+  { sha: '8bd401c', lane: 0, parents: ['eb2b7db', 'cb86a5a'], refs: [], msg: "Merge branch 'wt/v18-wrap' into powergit — v0.18.8 wrap lines in every code view's floating pill", date: '2026-09-15 14:36' },
+  { sha: 'cb86a5a', lane: 2, parents: ['02e11b5'], refs: ['wt/v18-wrap'], msg: 'wrap(v0.18.8): code-wrap memory, GE map line, @bottom visual case with Wrap lines on', date: '2026-09-15 14:36' },
+  { sha: '02e11b5', lane: 2, parents: ['72a4125'], refs: [], msg: "wrap(v0.18.8): symptom e2e — the owner's sentence, every code view, the virtualized diff", date: '2026-09-15 14:33' },
+  { sha: '72a4125', lane: 2, parents: ['9ab1acf'], refs: [], msg: "wrap(v0.18.8): Wrap lines — one remembered switch in every code view's floating pill", date: '2026-09-15 14:29' },
+  { sha: 'eb2b7db', lane: 0, parents: ['61f5eb6'], refs: [], msg: 'plan(v0.18.6): tasks ticked after the wt/v18-patch merge; deviations, gates and three backlog lines', date: '2026-09-15 14:28' },
+];
+const LANE = ['var(--lane4)', 'var(--lane3)', 'var(--lane5)'];
+const LOCAL = ['master', 'powergit', 'wt/console', 'wt/engine', 'wt/v18-ancestry', 'wt/v18-filter', 'wt/v18-patch', 'wt/v18-perf', 'wt/v18-picker', 'wt/v18-recents', 'wt/v18-refs', 'wt/v18-wrap'];
+const REMOTE = ['origin/master', 'origin/powergit', 'origin/wt/v18-picker', 'origin/release/3.4', 'origin/feature/graphperformance', 'upstream/master'];
+const TIP = { powergit: '3363352', 'wt/v18-perf': '3363352', 'wt/v18-picker': '3363352', 'wt/v18-recents': '2b0ec3a', 'wt/v18-wrap': 'cb86a5a', 'origin/powergit': 'cb02bc8', 'origin/wt/v18-picker': '4c62660', master: 'eb2b7db', 'origin/master': 'eb2b7db' };
+const C = Object.fromEntries(LOG.map((c) => [c.sha, c]));
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const kindOf = (r) => r === 'HEAD' ? 'head' : /^v\d/.test(r) ? 'tag' : /^(origin|upstream)\//.test(r) ? 'remote' : 'local';
+const chip = (r, big) => { const k = kindOf(r); return `<span class="ref ${k} ${big ? 'big' : ''}">${k === 'head' ? '' : k === 'tag' ? I.tag : k === 'remote' ? I.cloud : I.branch}${esc(r)}</span>`; };
+const nodeSvg = (c, lane) => { const col = LANE[lane ?? c.lane]; const head = c.refs.includes('HEAD'); const o = head ? `stroke="var(--head-outline)" stroke-width="2"` : ''; return `<svg viewBox="0 0 14 14" width="14" height="14">${c.refs.length ? `<rect x="2" y="2" width="10" height="10" fill="${col}" ${o}/>` : `<circle cx="7" cy="7" r="5" fill="${col}" ${o}/>`}</svg>`; };
+
+/* git check-ref-format, the cases a person actually types, plus "already exists" */
+function refError(name, existing) {
+  if (!name) return null;
+  if (/\s/.test(name)) return 'no spaces';
+  if (name.includes('..')) return 'no ".."';
+  if (name.endsWith('/') || name.startsWith('/') || name.includes('//')) return 'no leading, trailing or double "/"';
+  if (name.endsWith('.lock')) return 'cannot end in ".lock"';
+  if (name.includes('@{')) return 'no "@{"';
+  if (name.endsWith('.') || /(^|\/)\./.test(name)) return 'no "." at the start of a part';
+  if (/[~^:?*\[\\\x00-\x1f\x7f]/.test(name)) return 'no ~ ^ : ? * [ \\';
+  if (name.startsWith('-')) return 'cannot start with "-"';
+  if (existing.includes(name)) return 'already exists';
+  return '';
+}
+function asChip(name, kind, existing) {
+  const err = refError(name, existing);
+  const g = kind === 'tag' ? I.tag : I.branch;
+  if (err === null) return `<span class="ref ghost">${g}<span style="opacity:.7">${kind} name</span></span>`;
+  if (err) return `<span class="ref bad">${g}${esc(name)}</span><span class="why">${esc(err)}</span>`;
+  return `<span class="ref ${kind === 'tag' ? 'tag' : ''}">${g}${esc(name)}</span>`;
+}
+
+/* ---------- state ---------- */
+const state = { tab: 1, variant: 'A', name: '', checkout: true, orphan: false, tag: '', tagMsg: '',
+  co: 'remote', coMode: 'create', coLocal: 'keep', coName: 'wt/v18-picker', pick: null, filter: '',
+  merge: 'wt/v18-recents', ff: 'allow', squash: false, autostash: false, mergeMsg: false, reset: 'hard', delMerged: false };
+const TABS = { 1: 'Create branch', 2: 'Checkout', 3: 'The family' };
+const VARIANTS = { A: 'Quote the row', B: 'At the commit', C: 'In place' };
+const CO = { remote: 'remote branch, no local yet', 'remote-local': 'remote branch, local wt/v18-picker exists', local: 'local branch' };
+
+/* ---------- the window ---------- */
+function winHtml(opts) {
+  const sel = opts.selected;
+  const rail = [['chevL', 'Collapse'], ['grid', 'PowerGit'], ['folder', 'Open repository…'], ['clock', 'Recent repositories'], ['refresh', 'Refresh', 'gap'], ['check', 'Commit', 'commit', '1'], ['inbox', 'Stash', '', '', 1], ['arrowDown', 'Pull', '', '', 1], ['up', 'Push', '', '', 1], ['cloud', 'Fetch', '', '', 1], ['branch', 'Branch', '', '', 1], ['swap', 'Checkout'], ['merge', 'Merge'], ['list', 'Rebase'], ['tag', 'Tag']]
+    .map(([ic, l, cls, cnt, ch]) => `<div class="ri ${cls || ''}">${I[ic]}<span class="lbl">${l}</span>${cnt ? `<span class="cnt">${cnt}</span>` : ''}${ch || cnt ? `<span class="chev">${I.chevR}</span>` : ''}</div>`).join('');
+  const tr = (d, cls, ico, l, chev) => `<div class="trow ${cls || ''}" style="padding-left:${6 + d * 16}px"><span class="slot">${chev ? I[chev] : ''}</span>${ico ? `<span class="ico">${I[ico]}</span>` : ''}<span class="lbl">${l}</span></div>`;
+  const tree = [tr(0, 'sec', '', 'Branches', 'chevD'), tr(1, '', 'branch', 'wt', 'chevD'), ...['console', 'engine', 'v18-ancestry', 'v18-filter', 'v18-patch', 'v18-perf', 'v18-picker', 'v18-recents', 'v18-refs', 'v18-wrap'].map((b) => tr(2, '', 'branch', b)),
+    tr(1, '', 'branch', 'master'), tr(1, 'cur', 'branch', 'powergit'), tr(0, 'sec', '', 'Remotes', 'chevD'), tr(1, '', 'cloud', 'origin', 'chevD'), tr(2, '', 'cloud', 'experimental', 'chevR'), tr(2, '', 'cloud', 'feature', 'chevR'), tr(2, '', 'cloud', 'release', 'chevR'),
+    ...['configdata', 'Convert_to_.NET_Core_3.0', 'LibGit2Sharp', 'master', 'mono', 'powergit', 'translations_ui-3_5_ja'].map((b) => tr(2, '', 'cloud', b)), tr(1, '', 'cloud', 'upstream', 'chevD'), tr(2, '', 'cloud', 'before-squash', 'chevR'), tr(2, '', 'cloud', 'copilot', 'chevR')].join('');
+  const rows = [`<div class="row"><div class="cell"></div><div class="cell msg"><span class="msg-text wd">Working directory (1 file)</span></div><div class="cell author"></div><div class="cell date"></div><div class="cell sha"></div></div>`]
+    .concat(LOG.map((c) => {
+      const refs = (opts.refsOf ? opts.refsOf(c) : c.refs);
+      const rowCls = c.sha === sel ? 'selected' : '';
+      let msg = `<span class="msg-text">${esc(c.msg)}</span>`;
+      if (opts.msgOf && c.sha === sel) msg = opts.msgOf(c, refs);
+      else if (refs.length) msg = refs.map((r) => chip(r)).join('') + msg;
+      return `<div class="row ${rowCls} ${opts.tallSel && c.sha === sel ? 'tall' : ''}" data-sha="${c.sha}"><div class="cell"></div><div class="cell msg">${msg}</div><div class="cell author"><span class="disc">CC</span><span>Constantin Chabirand</span></div><div class="cell date">${c.date}</div><div class="cell sha">${c.sha}</div></div>`;
+    })).join('');
+  const s = C[sel];
+  return `<div class="win-wrap"><div class="win" id="win">
+    <div class="titlebar"><span class="word"><i></i>PowerGit</span><span class="hair"></span><span>PowerGit</span><span class="wc"><span>—</span><span>☐</span><span>✕</span></span></div>
+    <div class="shell">
+      <div class="rail">${rail}<div class="grow"></div><div class="ri">${I.bug}<span class="lbl">Diagnostic snapshot</span></div><div class="ri">${I.gear}<span class="lbl">Settings</span></div></div>
+      <div class="left"><div class="head">Repository<span class="sp"></span>${I.funnel}${I.chevL}</div><div class="search">${I.search}<span>Filter refs…</span></div><div class="tree">${tree}</div></div>
+      <div class="rightp"><div class="grid"><div class="ghead"><div>Graph</div><div>Message</div><div>Author</div><div>Date</div><div>SHA</div></div><div class="gbody" id="gbody"><svg class="gsvg" id="gsvg"></svg><div id="rows">${rows}</div></div></div><div class="split"></div>
+      <div class="bottom"><div class="tabs2"><b>Commit</b><span>Diff (7)</span><span>File tree</span></div><h4>${esc(s.msg)}</h4><p>Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;</p><p>Author: Constantin Chabirand &lt;CynaCons@users.noreply.github.com&gt; &nbsp; ${s.date}</p><p>Parents: ${s.parents.join(' ')}</p></div></div>
+    </div>
+    <div class="status"><span class="br">powergit</span><span>↑1 ↓0 (1 change)</span><span class="sp"></span><span>git 2.38.1.windows.1 · engine 0.18.8</span></div>
+    ${opts.scrim ? '<div class="scrim"></div>' : ''}<div id="overlay"></div><div class="toast" id="toast"></div>
+  </div></div>`;
+}
+function drawGraph() {
+  const svg = $('gsvg'); if (!svg) return;
+  const els = [...$('rows').children];
+  const total = $('rows').offsetHeight;
+  svg.setAttribute('width', 96); svg.setAttribute('height', total); svg.style.height = total + 'px';
+  const cy = Object.fromEntries(els.map((e) => [e.dataset.sha || 'wd', e.offsetTop + e.offsetHeight / 2]));
+  const x = (l) => 14 + (l + 0.5) * 16;
+  let paths = '', nodes = `<circle cx="${x(0)}" cy="${cy.wd}" r="5" fill="none" stroke="${LANE[0]}" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M${x(0)} ${cy.wd + 5} L${x(0)} ${cy['3363352']}" stroke="${LANE[0]}" stroke-width="2" stroke-dasharray="2 2" fill="none"/>`;
+  LOG.forEach((c) => {
+    const xc = x(c.lane), y0 = cy[c.sha];
+    c.parents.forEach((p, n) => {
+      const pc = C[p];
+      if (!pc) { paths += `<path d="M${xc} ${y0} L${xc} ${total}" stroke="${LANE[c.lane]}" stroke-width="2" fill="none"/>`; return; }
+      const xp = x(pc.lane), y1 = cy[p];
+      if (pc.lane === c.lane) paths += `<path d="M${xc} ${y0} L${xp} ${y1}" stroke="${LANE[c.lane]}" stroke-width="2"/>`;
+      else { const ym = y0 + 28; paths += `<path d="M${xc} ${y0} C${xc} ${(y0 + ym) / 2} ${xp} ${(y0 + ym) / 2} ${xp} ${ym} L${xp} ${y1}" stroke="${LANE[pc.lane]}" stroke-width="2" fill="none"/>`; }
+    });
+  });
+  LOG.forEach((c) => {
+    const xc = x(c.lane), y0 = cy[c.sha], f = LANE[c.lane], o = c.refs.includes('HEAD') ? `stroke="var(--head-outline)" stroke-width="2"` : '';
+    nodes += c.refs.length ? `<rect x="${xc - 5}" y="${y0 - 5}" width="10" height="10" fill="${f}" ${o}/>` : `<circle cx="${xc}" cy="${y0}" r="5" fill="${f}" ${o}/>`;
+  });
+  svg.innerHTML = paths + nodes;
+}
+
+/* ---------- the dialog pieces ---------- */
+const qrow = (sha, refsOverride) => { const c = C[sha]; const refs = refsOverride ?? c.refs; return `<div class="qrow">${`<span class="node">${nodeSvg(c)}</span>`}<span class="qsha">${c.sha}</span>${refs.length ? `<span class="refs">${refs.map((r) => chip(r)).join('')}</span>` : ''}<span class="subj">${esc(c.msg)}</span><span class="disc">CC</span><span class="when">${c.date.slice(0, 10)}</span></div>`; };
+const keys = `<span class="keys"><kbd>Enter</kbd><kbd>Esc</kbd></span>`;
+const shell = (title, quote, body, foot, cls = '') => `<div class="dlg ${cls}" role="dialog" aria-label="${esc(title)}"><div class="hd"><h2>${title}</h2>${keys}</div>${quote ? `<div class="quote">${quote}</div>` : ''}<div class="body">${body}</div><div class="ft">${foot}</div></div>`;
+const opt = (type, name, val, on, label, ex, extra = '') => `<label class="opt ${extra.includes('disabled') ? 'off' : ''}"><input type="${type}" name="${name}" value="${val}" ${on ? 'checked' : ''} ${extra}><span>${label}</span>${ex ? `<span class="ex">${ex}</span>` : ''}</label>`;
+const footer = (note, cancel, primary, danger, disabled) => `<span class="note ${note && note.amber ? 'amber' : ''}">${note ? (note.text ?? note) : ''}</span><button class="btn" data-act="cancel">${cancel}</button><button class="btn ${danger ? 'danger' : 'primary'}" data-act="go" ${disabled ? 'disabled' : ''}>${primary}</button>`;
+
+function createBranchBody(withRow) {
+  const err = refError(state.name, LOCAL);
+  return `<div class="field"><div class="lab">Branch name<span class="as">appears as ${asChip(state.name, 'branch', LOCAL)}</span></div><input type="text" id="bn" value="${esc(state.name)}" autocomplete="off" spellcheck="false" aria-label="Branch name"></div>
+    ${opt('checkbox', 'co', '1', state.checkout, 'Check out the new branch')}${opt('checkbox', 'orphan', '1', state.orphan, 'Orphan', 'start a branch with no history')}`;
+}
+const createBranchFoot = () => footer('1 change stays in the working tree.', 'Cancel', state.checkout ? 'Create and check out' : 'Create branch', false, refError(state.name, LOCAL) !== '');
+
+function checkoutDialog() {
+  const remote = state.co !== 'local';
+  const ref = remote ? 'origin/wt/v18-picker' : 'wt/v18-wrap';
+  const tip = TIP[ref];
+  const localExists = state.co === 'remote-local';
+  const resetLoses = localExists; // wt/v18-picker is 2 ahead of origin/wt/v18-picker in this scenario
+  const danger = (remote && state.coMode === 'reset' && resetLoses) || state.coLocal === 'discard';
+  const verb = [remote && state.coMode === 'reset' ? 'Reset' : '', state.coLocal === 'discard' ? 'discard 1 change' : ''].filter(Boolean);
+  const primary = verb.length ? verb.join(', ').replace(/^./, (m) => m.toUpperCase()) + ' and check out' : 'Check out';
+  const picker = `<div class="field"><div class="lab">Branch</div><div class="sel ${state.pick === 'co' ? 'open' : ''}" data-open="co" tabindex="0" role="combobox" aria-expanded="${state.pick === 'co'}">${chip(ref, true)}<span class="tip">${tip} · ${esc(C[tip].msg)}</span>${I.chevD.replace('<svg', '<svg class="chev"')}</div>${state.pick === 'co' ? menuHtml('co', ref) : ''}</div>`;
+  const nameErr = refError(state.coName, localExists ? LOCAL : LOCAL.filter((b) => b !== 'wt/v18-picker'));
+  const as = `<div class="field" style="margin-top:8px"><div class="grp">Check it out as</div>
+    ${opt('radio', 'mode', 'create', state.coMode === 'create', `Create local branch <input class="inl" id="coName" value="${esc(state.coName)}" aria-label="Local branch name"> tracking origin/wt/v18-picker`)}
+    ${nameErr && state.coMode === 'create' ? `<div class="note" style="margin-top:-4px">${asChip(state.coName, 'branch', localExists ? LOCAL : LOCAL.filter((b) => b !== 'wt/v18-picker'))}</div>` : ''}
+    ${opt('radio', 'mode', 'reset', state.coMode === 'reset', 'Reset wt/v18-picker to origin/wt/v18-picker', localExists ? '' : 'no local branch yet', localExists ? '' : 'disabled')}
+    ${localExists ? `<div class="note amber">wt/v18-picker has 2 commits that origin/wt/v18-picker does not; resetting makes them unreachable.</div>` : ''}
+    ${opt('radio', 'mode', 'detach', state.coMode === 'detach', 'Check out the commit', 'detached HEAD')}</div>`;
+  const local = `<div class="field" style="margin-top:8px"><div class="grp">Local changes (1 file)</div>
+    ${opt('radio', 'lc', 'keep', state.coLocal === 'keep', 'Keep', 'carried over if it does not conflict')}${opt('radio', 'lc', 'stash', state.coLocal === 'stash', 'Stash', 'set aside, restored after the checkout')}${opt('radio', 'lc', 'discard', state.coLocal === 'discard', 'Discard', 'reset to HEAD before the checkout')}</div>`;
+  return shell('Check out branch', qrow(tip, remote ? [...C[tip].refs.filter((r) => r !== ref), ref] : C[tip].refs), picker + (remote ? as : '') + local, footer(state.coLocal === 'stash' ? 'Stashed before, popped after the checkout.' : '', 'Cancel', primary, danger), 'w560');
+}
+function menuHtml(which, current) {
+  const q = state.filter.toLowerCase();
+  const it = (r) => `<div class="it ${r === current ? 'cur' : ''}" data-pick="${esc(r)}">${chip(r)}<span class="tip">${TIP[r] ? `<code>${TIP[r]}</code>${esc(C[TIP[r]].msg)}` : ''}</span></div>`;
+  const loc = LOCAL.filter((b) => b !== 'powergit' && b.toLowerCase().includes(q)), rem = REMOTE.filter((b) => b.toLowerCase().includes(q));
+  return `<div class="menu"><div class="filter">${I.search}<input id="mf" placeholder="Type to filter…" value="${esc(state.filter)}" aria-label="Filter branches"></div><div class="list">${loc.length ? `<div class="mg">Branches</div>${loc.map(it).join('')}` : ''}${rem.length ? `<div class="mg">Remotes</div>${rem.map(it).join('')}` : ''}${!loc.length && !rem.length ? `<div class="empty">Nothing matches "${esc(state.filter)}"</div>` : ''}</div></div>`;
+}
+function mergeDialog(open) {
+  const src = state.merge, tip = TIP[src];
+  const picker = `<div class="field"><div class="lab">Merge branch</div><div class="sel ${open ? 'open' : ''}" data-open="merge" tabindex="0" role="combobox" aria-expanded="${!!open}">${chip(src, true)}<span class="tip">${tip} · ${esc(C[tip].msg)}</span>${I.chevD.replace('<svg', '<svg class="chev"')}</div>${open ? menuHtml('merge', src) : ''}</div>`;
+  const body = picker + `<div class="field" style="margin-top:6px"><div class="grp">Fast forward</div>
+    ${opt('radio', 'ff', 'allow', state.ff === 'allow', 'Fast-forward when possible', '', state.squash ? 'disabled' : '')}${opt('radio', 'ff', 'no', state.ff === 'no', 'Always create a merge commit', '', state.squash ? 'disabled' : '')}${opt('radio', 'ff', 'only', state.ff === 'only', 'Fast-forward only', 'refuse otherwise', state.squash ? 'disabled' : '')}</div>
+    <div class="field" style="margin-top:6px">${opt('checkbox', 'squash', '1', state.squash, 'Squash', 'stage the result, do not commit')}${opt('checkbox', 'autostash', '1', state.autostash, 'Auto stash 1 uncommitted change and restore it after')}${opt('checkbox', 'mmsg', '1', state.mergeMsg, 'Specify merge message')}</div>`;
+  const quote = qrow(tip) + `<div class="into">${I.arrowDown}into</div>` + qrow('3363352', ['HEAD', 'powergit']);
+  return shell('Merge', quote, body, footer(state.autostash ? '' : { text: '1 uncommitted change; git refuses to merge without Auto stash.', amber: true }, 'Cancel', state.squash ? 'Squash and stage' : 'Merge'), 'w600');
+}
+function resetDialog() {
+  const hard = state.reset === 'hard';
+  const quote = `<div class="qrow" style="height:26px">${chip('powergit', true)}<span style="color:var(--meta);font-size:12px">moves from 3363352 to</span></div>` + qrow('4c62660');
+  const body = `<div class="field">${opt('radio', 'rs', 'soft', state.reset === 'soft', 'Soft', 'the 2 commits\' changes stay staged')}${opt('radio', 'rs', 'mixed', state.reset === 'mixed', 'Mixed', 'their changes stay in the working tree, unstaged')}${opt('radio', 'rs', 'hard', hard, 'Hard', 'the working tree matches 4c62660; uncommitted changes are discarded')}</div>`;
+  return shell('Reset branch', quote, body, footer(hard ? '' : 'Both commits stay reachable from origin/powergit and wt/v18-picker.', 'Cancel', hard ? 'Reset and discard 1 change' : 'Reset branch', hard));
+}
+function deleteDialog() {
+  const merged = state.delMerged;
+  const body = merged ? `<div>Merged into <b>powergit</b> — nothing is lost.</div>` : `<div>Not merged into <b>powergit</b> — <b>3 commits</b> only on this branch become unreachable.</div>`;
+  return shell('Delete branch', `<div class="qrow" style="height:26px">${chip('wt/v18-wrap', true)}<span style="color:var(--meta);font-size:12px">at</span></div>` + qrow('cb86a5a'), body, footer('', 'Cancel', merged ? 'Delete branch' : 'Delete unmerged branch', !merged));
+}
+function tagDialog() {
+  const existing = ['v0.18.8', 'v0.18.7', 'v0.18.6'];
+  const body = `<div class="field"><div class="lab">Tag name<span class="as">appears as ${asChip(state.tag, 'tag', existing)}</span></div><input type="text" id="tn" value="${esc(state.tag)}" autocomplete="off" spellcheck="false" aria-label="Tag name"></div>
+    <div class="field"><div class="lab">Message<span class="cap">a message makes an annotated tag</span></div><textarea id="tm" aria-label="Tag message">${esc(state.tagMsg)}</textarea></div>`;
+  return shell('Create tag', qrow('4c62660'), body, footer('', 'Cancel', state.tagMsg.trim() ? 'Create annotated tag' : 'Create tag', false, refError(state.tag, existing) !== ''));
+}
+
+/* ---------- render ---------- */
+function render() {
+  $('tabs').innerHTML = Object.entries(TABS).map(([k, t]) => `<button data-tab="${k}" class="${+k === state.tab ? 'on' : ''}"><span class="n">${k}</span>${t}</button>`).join('');
+  $('variants').innerHTML = state.tab === 1 ? Object.entries(VARIANTS).map(([k, t]) => `<button data-variant="${k}" class="${k === state.variant ? 'on' : ''}"><b>${k}</b>${t}</button>`).join('') : '';
+  renderLead(); renderStage(); renderNotes();
+}
+function renderLead() {
+  const v = state.variant, t = state.tab;
+  const sub = (obj, key, cur) => `<div class="sub-switch">${Object.entries(obj).map(([k, l]) => `<button data-${key}="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const h = t === 1 ? {
+    A: `<h2>A · Quote the row — the modal, rebuilt</h2><p class="quote">"The overlay popup for 'Create branch' on the main graph is rather bad visually."</p>
+      <p>Today the title is MUI's 20 px h6 carrying the whole commit subject, and it wraps to four lines. Here the title is two words at 15/600, and the commit is shown as <b>what it is</b>: its grid row, quoted on a sunken band — node in its lane colour, SHA in mono, the chips, the subject on one line, the author disc, the date. Under it, the two inputs the operation has: the name, with an <b>appears as</b> preview that renders the chip the graph will show (dashed until you type, red with the reason when git would refuse it), and the two checkboxes GE has. The footer says what happens to the uncommitted change and the button says what it does. <b>Try it:</b> type <code>wt/v18 picker</code>, then <code>powergit</code>, then <code>wt/v18-proto</code>. <b>Recommended.</b></p>`,
+    B: `<h2>B · At the commit — a popover, no scrim</h2>
+      <p>The row you right-clicked stays selected and readable; the form hangs off its node with a caret, 380 px wide, the same fields as A minus the quoted row (the row <i>is</i> the context). Lighter than a modal, and the graph around it keeps telling you where the branch will go. When the rail's Branch button or <kbd>Ctrl+B</kbd> opens it with no clicked row to anchor to, it falls back to A.</p>`,
+    C: `<h2>C · In place — no dialog at all</h2>
+      <p>Create branch is the one operation whose whole input is a name, so the graph can take it directly: the row grows a dashed fork chip where the chip will live, the caret is inside it, and it turns solid blue when the name is valid, red when it is not. A one-line hint under the row carries the keys. Only for Create branch (and tag); everything else in the family keeps the A shell. <b>Try it:</b> type in the chip on the selected row.</p>`,
+  }[v] : t === 2 ? `<h2>Checkout — a remote branch, a local branch, and what happens to your changes</h2><p class="quote">"When I hit 'checkout branch' on a remote branch, it should offer me the possibility to create a new local branch for that remote branch or to reset the current local existing branch and move it to remote ref."</p>
+      <p>Git Extensions' FormCheckoutBranch, in the A shell: the branch to check out is a picker whose value is the chip (label above the field, never floating, never clipped; open it to search), the quoted row is its tip, then <b>Check it out as</b> — create a local branch (the default when none of that name exists), reset the existing local branch to the remote (enabled when it exists; when that loses commits the note says so and the button turns red), or the commit detached — and <b>Local changes</b>: keep, stash, discard. The button composes the consequence: "Reset and check out", "Discard 1 change and check out".</p>${sub(CO, 'co', state.co)}`
+    : `<h2>The family — Reset, Delete, Merge, Create tag, and one in the other theme</h2>
+      <p>Every small operation dialog in the A shell, 1:1. The quoted band is the one decorated element; the rest is a plain title, labels above inputs, option rows with the explanation after an em dash, a footer with the note on the left and Cancel + the primary on the right. Red only on the primaries that discard something. The Merge picker replaces the clipped MUI Select: label above, the value is the chip, a searchable list when open (second frame); every option on one line, in GE's words, tightened.</p>`;
+  $('lead').innerHTML = h;
+}
+function renderStage() {
+  const t = state.tab, v = state.variant;
+  let html = '';
+  if (t === 1 && v === 'A') html = winHtml({ selected: '4c62660', scrim: true }) ;
+  else if (t === 1 && v === 'B') html = winHtml({ selected: '4c62660' });
+  else if (t === 1 && v === 'C') html = winHtml({ selected: '4c62660', tallSel: true, msgOf: (c) => {
+      const err = refError(state.name, LOCAL);
+      const cls = err === null ? 'ghost' : err ? 'bad' : '';
+      return `<div class="line"><span class="ref live ${cls}">${I.branch}<input class="in" id="bn" value="${esc(state.name)}" aria-label="Branch name" autocomplete="off" spellcheck="false"></span>${err ? `<span class="why">${esc(err)}</span>` : ''}<span class="msg-text">${esc(c.msg)}</span></div><div class="hint"><kbd>Enter</kbd> creates and checks out · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> creates only · <kbd>Esc</kbd> cancels</div>`;
+    } });
+  else if (t === 2) html = winHtml({ selected: state.co === 'local' ? 'cb86a5a' : '4c62660', scrim: true, refsOf: (c) => c.sha === '4c62660' && state.co !== 'local' ? ['origin/wt/v18-picker'] : c.refs });
+  else {
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches ? document.documentElement.dataset.theme !== 'light' : document.documentElement.dataset.theme === 'dark';
+    const fr = (cap, d, cls = '') => `<div class="frame ${cls}"><div class="cap">${cap}</div>${d}</div>`;
+    html = `<div class="fam">${fr('Reset branch — Hard selected, the primary turns red and says the count', resetDialog())}${fr(`Delete branch — ${state.delMerged ? 'merged' : 'unmerged'} <a data-act="del-toggle">show the ${state.delMerged ? 'unmerged' : 'merged'} case</a>`, deleteDialog())}${fr('Merge — the picker value is the chip; nothing wraps at 600', mergeDialog(false))}${fr('Create tag — an appears-as tag chip; a message makes it annotated', tagDialog())}${fr(`${dark ? 'Light' : 'Dark'} theme — the same Create branch (A)`, `<div class="dlg"><div class="hd"><h2>Create branch</h2>${keys}</div><div class="quote">${qrow('4c62660')}</div><div class="body">${createBranchBody()}</div><div class="ft">${createBranchFoot()}</div></div>`, `other ${dark ? 'force-light' : 'force-dark'}`)}${fr('Merge — the picker open: filter on top, chips with their tips, powergit excluded, remotes with the cloud', mergeDialog(true).replace(/name="(ff|sq|as|mm)"/g, 'name="$1-open"'))}</div>`;
+  }
+  $('stage').innerHTML = html;
+  const ov = $('overlay');
+  if (ov && t === 1 && v === 'A') ov.innerHTML = `<div class="modal">${shell('Create branch', qrow('4c62660'), createBranchBody(), createBranchFoot())}</div>`;
+  if (ov && t === 1 && v === 'B') {
+    const row = document.querySelector('.row[data-sha="4c62660"]'), win = $('win');
+    const r = row.getBoundingClientRect(), w = win.getBoundingClientRect();
+    /* the node sits at x = rail 188 + tree 240 + border 2 + lane 22 = 452; the caret is 17 px into the popover */
+    ov.innerHTML = `<div class="dlg pop" style="left:435px;top:${r.bottom - w.top + 8}px" role="dialog" aria-label="Create branch"><div class="hd"><h2>Create branch at 4c62660</h2>${keys}</div><div class="body">${createBranchBody()}<div class="note" style="padding-left:0;margin-top:-2px">1 change stays in the working tree.</div></div><div class="ft">${footer('', 'Cancel', state.checkout ? 'Create and check out' : 'Create branch', false, refError(state.name, LOCAL) !== '')}</div></div>`;
+  }
+  if (ov && t === 2) ov.innerHTML = `<div class="modal">${checkoutDialog()}</div>`;
+  drawGraph();
+  const focus = $('bn') || $('mf');
+  if (focus && !state.noFocus) { focus.focus(); focus.setSelectionRange(focus.value.length, focus.value.length); }
+  const mf = $('mf'); if (mf) { mf.focus(); }
+}
+function renderNotes() {
+  const t = state.tab, v = state.variant;
+  const li = (n, s) => `<li><span class="mark">${n}</span><span>${s}</span></li>`, bl = (s) => `<li><span>${s}</span></li>`;
+  let a = '', b = '';
+  if (t === 1 && v === 'A') {
+    a = li(1, `<b>The quoted row</b> is the graph's own row renderer (<code>RevisionGrid</code>'s cells, the chips from <code>refChipsModel</code>, the disc from <code>authorIdentity</code>) on the sunken surface, 30 px tall, subject ellipsised. It is the only decoration in the dialog.`) + li(2, `<b>Appears as</b> runs <code>git check-ref-format</code>'s rules locally (spaces, "..", "/" at the ends, ".lock", "@{", control characters, ~^:?*[\\) and "already exists" against the loaded refs, before the engine is asked. The primary is dimmed until the name is valid; Enter goes.`) + li(3, `<b>Copy from the user's side:</b> "Create and check out" when the box is ticked, "Create branch" when not; the footer says what happens to the uncommitted change in the interface's voice.`);
+    b = bl(`<b>Component:</b> <code>OpDialog</code> gains a <code>subject</code> slot (a <code>QuotedRow</code> / <code>QuotedRef</code> component that reuses the grid's cell renderers) and drops the 20 px h6 for 15/600; <code>maxWidth</code> becomes an explicit width per dialog (520 / 560). <code>CreateRefDialog</code> gets <code>refNameError()</code> (pure, unit-tested), the appears-as chip, the two checkboxes; <code>onConfirm(name, { checkout, orphan })</code>.`) + bl(`<b>Cost:</b> about a day for the shell and Create branch/tag; a further day to move the rest of the family onto it (tab 3).`);
+  } else if (t === 1 && v === 'B') {
+    a = li(1, `A MUI <code>Popover</code> anchored to the row's node (the graph column knows its x from <code>layout</code>, the row its y), <code>anchorOrigin</code> bottom-left, a caret drawn on the paper. No scrim: the graph stays live behind it, a click outside cancels.`) + li(2, `The row stays selected; the popover never covers it. On Enter the chip appears on that row and the popover is gone.`);
+    b = bl(`<b>Cost:</b> A plus half a day for the anchoring (the node's canvas coordinates → DOM), plus the fallback to A when there is no anchor (rail, Ctrl+B).`) + bl(`<b>Risk:</b> the popover reaches into the bottom panel on the last rows; MUI flips it above the row then, and the caret has to follow.`);
+  } else if (t === 1 && v === 'C') {
+    a = li(1, `The chip is an <code>&lt;input&gt;</code> inside a <code>.ref</code> span, sized to its text; the row grows to 48 px for the hint line, the same device the "+n" expanded row uses (v0.18.3).`) + li(2, `The validation and the appears-as feedback are the chip itself: dashed, blue, or red with the reason next to it.`);
+    b = bl(`<b>Cost:</b> a day (the inline editor in the virtualized row, the keys, the fallback for Create tag), and it does not generalise — every other operation needs the shell anyway.`) + bl(`<b>Question:</b> is a graph row the right place to type? It reads well, but the hint line is the only thing telling a first-time user that Enter also checks out.`);
+  } else if (t === 2) {
+    a = li(1, `<b>The picker</b> is one component for Checkout and Merge: label above, value = chip + the tip's SHA and subject, a searchable list with the checked-out branch excluded, remotes under their own heading with the cloud glyph, every option one line.`) + li(2, `<b>Check it out as</b> maps to GE's three radios; the local branch name is an inline field inside the first option, validated like Create branch. When resetting would leave commits unreachable the note is amber and the primary red; when the local branch is simply behind, the reset is a fast-forward and the button stays blue (rule proposed, see the question).`) + li(3, `<b>Local changes</b> replaces the "Force" checkbox: keep (git carries them if they do not conflict), stash (autostash), discard (reset first) — the last makes the primary red.`);
+    b = bl(`<b>Engine:</b> <code>checkout</code> takes <code>{ ref, as: "create" | "reset" | "detach", localName, track, localChanges: "keep" | "stash" | "discard" }</code>; the ahead/behind count between the local and the remote comes from <code>rev-list --left-right --count</code>, one call when the dialog opens.`) + bl(`<b>Cost:</b> a day and a half: the picker (shared with Merge), the dialog, the engine route, an e2e for each of the three cases.`) + bl(`<b>Question for the owner:</b> when the local branch exists, GE selects "Reset" by default. Here it is the default too, with the red button — or should "Create" stay the default with a suggested name (<code>wt/v18-picker-2</code>) so that Enter never discards?`);
+  } else {
+    a = li(1, `<b>Reset:</b> the band says "powergit moves from 3363352 to 4c62660"; each mode carries its consequence after the dash; Hard makes the primary red and puts the count in it.`) + li(2, `<b>Delete:</b> the chip and its tip row; merged → a quiet note and a blue button; unmerged → the count of commits that become unreachable and a red "Delete unmerged branch".`) + li(3, `<b>Merge:</b> the two tips with "into" between them; the picker is the only field; fast-forward as a labelled radio group; the amber note about the uncommitted change goes away when Auto stash is ticked; Squash renames the button.`) + li(4, `<b>Create tag:</b> the same as Create branch with a violet tag chip and a message field whose caption says what a message does.`);
+    b = bl(`<b>One shell, five dialogs:</b> <code>OpDialog({ title, subject, width, note, primary: { label, danger, disabled } })</code>; Rebase, Cherry-pick and Revert follow with a single quoted row and no inputs (Rebase keeps its four checkboxes).`) + bl(`<b>Cost for the family:</b> two days after the shell exists — mostly moving copy and the engine's counts (ahead/behind, merged-into, dirty count) into the props; visual baselines for each.`);
+  }
+  $('rule').innerHTML = `<b>Rule for the whole family:</b> no label, option or field is ever clipped or wrapped — labels sit above fields, the dialog takes the width of its longest line (520–640), option explanations go after an em dash on the same line or on a 12 px meta line under it, never inside the control.`;
+  $('notes').innerHTML = `<div><h3>What you are looking at</h3><ol>${a}</ol></div><div><h3>How it would be built</h3><ul>${b}</ul></div>`;
+}
+
+/* ---------- interactions ---------- */
+let toastTimer = null;
+function toast(t) { const el = $('toast'); if (!el) return; el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1800); }
+function go() { const t = state.tab; if (t === 1) toast(refError(state.name, LOCAL) ? 'The name is not valid yet' : `Creating ${state.name || 'the branch'} at 4c62660${state.checkout ? ' and checking it out' : ''}…`); else if (t === 2) toast('Checking out…'); }
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-tab],[data-variant],[data-t],[data-co],[data-act],[data-open],[data-pick]');
+  if (!t) { if (state.pick && !e.target.closest('.menu')) { state.pick = null; state.filter = ''; renderStage(); } return; }
+  if (t.dataset.tab) { state.tab = +t.dataset.tab; state.pick = null; return render(); }
+  if (t.dataset.variant) { state.variant = t.dataset.variant; return render(); }
+  if (t.dataset.t) { const v = t.dataset.t; document.documentElement.removeAttribute('data-theme'); if (v !== 'system') document.documentElement.setAttribute('data-theme', v); document.querySelectorAll('#theme button').forEach((b) => b.classList.toggle('on', b.dataset.t === v)); if (state.tab === 3) renderStage(); return; }
+  if (t.dataset.co) { state.co = t.dataset.co; state.coMode = state.co === 'remote-local' ? 'reset' : 'create'; state.pick = null; return render(); }
+  if (t.dataset.open) { state.pick = state.pick === t.dataset.open ? null : t.dataset.open; state.filter = ''; return renderStage(); }
+  if (t.dataset.pick) { if (state.pick === 'merge' || state.tab === 3) state.merge = TIP[t.dataset.pick] ? t.dataset.pick : state.merge; state.pick = null; state.filter = ''; toast(`Picked ${t.dataset.pick}`); return renderStage(); }
+  if (t.dataset.act === 'cancel') return toast('Closes the dialog');
+  if (t.dataset.act === 'go') return go();
+  if (t.dataset.act === 'del-toggle') { state.delMerged = !state.delMerged; return renderStage(); }
+});
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.id === 'bn') { state.name = el.value; const c = el.selectionStart; renderStage(); const n = $('bn'); if (n) n.setSelectionRange(c, c); }
+  else if (el.id === 'tn') { state.tag = el.value; const c = el.selectionStart; renderStage(); const n = $('tn'); if (n) { n.focus(); n.setSelectionRange(c, c); } }
+  else if (el.id === 'tm') { state.tagMsg = el.value; const c = el.selectionStart; renderStage(); const n = $('tm'); if (n) { n.focus(); n.setSelectionRange(c, c); } }
+  else if (el.id === 'coName') { state.coName = el.value; const c = el.selectionStart; renderStage(); const n = $('coName'); if (n) { n.focus(); n.setSelectionRange(c, c); } }
+  else if (el.id === 'mf') { state.filter = el.value; const c = el.selectionStart; renderStage(); const n = $('mf'); if (n) { n.focus(); n.setSelectionRange(c, c); } }
+});
+document.addEventListener('change', (e) => {
+  const el = e.target; if (el.tagName !== 'INPUT' || (el.type !== 'radio' && el.type !== 'checkbox')) return;
+  const n = el.name, v = el.value, on = el.checked;
+  if (n === 'co') state.checkout = on; else if (n === 'orphan') state.orphan = on; else if (n === 'mode') state.coMode = v; else if (n === 'lc') state.coLocal = v;
+  else if (n === 'ff') state.ff = v; else if (n === 'squash') state.squash = on; else if (n === 'autostash') state.autostash = on; else if (n === 'mmsg') state.mergeMsg = on; else if (n === 'rs') state.reset = v;
+  state.noFocus = true; renderStage(); state.noFocus = false;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (state.pick) { state.pick = null; state.filter = ''; renderStage(); } else toast('Cancels'); }
+  else if (e.key === 'Enter' && (e.target.id === 'bn' || e.target.id === 'coName' || e.target.classList.contains('opt'))) { e.preventDefault(); go(); }
+});
+/* the C chip sizes itself to its text */
+new MutationObserver(() => { const i = document.querySelector('.ref.live .in'); if (i) i.style.width = Math.max(8, i.value.length * 6.6 + 2) + 'px'; }).observe($('stage'), { childList: true, subtree: true });
+document.addEventListener('input', (e) => { if (e.target.classList && e.target.classList.contains('in')) e.target.style.width = Math.max(8, e.target.value.length * 6.6 + 2) + 'px'; });
+render();
+</script>

@@ -1,0 +1,507 @@
+<title>PowerGit Graph Navigation</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee; --shadow: 0 18px 48px rgba(16, 24, 39, 0.26); --menu-shadow: 0 6px 24px rgba(16, 24, 39, 0.18);
+    /* Git Extensions lane set, theme/tokens.ts */
+    --lane1: #f064a0; --lane2: #78b4e6; --lane3: #24c221; --lane4: #a078f0; --lane5: #dd3228; --lane6: #1ac6a6; --lane7: #e7b00f; --head-outline: #1a1a1a;
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb; --ref-remote-bg: #ecfdf5; --ref-remote-fg: #059669;
+    --ref-tag-bg: #f5f3ff; --ref-tag-fg: #6d28d9; --ref-head-bg: #fef2f2; --ref-head-fg: #dc2626;
+    --tip-bg: #101827; --tip-fg: #ffffff;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+      --page: #0c1117; --shadow: 0 18px 48px rgba(0, 0, 0, 0.55); --menu-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+      --lane1: #f47db1; --lane2: #82bdf0; --lane3: #3ad636; --lane4: #b08cf7; --lane5: #f0655a; --lane6: #2bd4b4; --lane7: #f0be2a; --head-outline: #f1f3f6;
+      --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe; --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+      --ref-tag-bg: #2e1f5e; --ref-tag-fg: #ddd6fe; --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+      --tip-bg: #e6e9ef; --tip-fg: #10161e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+    --page: #0c1117; --shadow: 0 18px 48px rgba(0, 0, 0, 0.55); --menu-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    --lane1: #f47db1; --lane2: #82bdf0; --lane3: #3ad636; --lane4: #b08cf7; --lane5: #f0655a; --lane6: #2bd4b4; --lane7: #f0be2a; --head-outline: #f1f3f6;
+    --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe; --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+    --ref-tag-bg: #2e1f5e; --ref-tag-fg: #ddd6fe; --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+    --tip-bg: #e6e9ef; --tip-fg: #10161e;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Ubuntu", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  svg { display: block; }
+  kbd { font: inherit; font-size: 10.5px; font-family: var(--mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--meta); line-height: 15px; }
+  code { font-family: var(--mono); font-size: 12px; }
+
+  /* ---------- page chrome ---------- */
+  .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 9px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .right { display: flex; gap: 10px; margin-left: auto; align-items: center; }
+  .switch { display: flex; gap: 4px; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch button b { font-weight: 700; margin-right: 6px; }
+  .switch.states button { font-size: 12px; padding: 3px 9px; }
+  .switch.states button.on { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+  .switch .cap { font-size: 12px; color: var(--meta); align-self: center; margin-right: 2px; }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 4px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 20px 20px 56px; }
+  .lead { max-width: 78ch; margin: 0 auto 14px; color: var(--text-2); }
+  .lead h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .lead .quote { border-left: 2px solid var(--border); padding-left: 10px; color: var(--meta); font-style: italic; margin: 8px 0; }
+  .notes { max-width: 1180px; margin: 16px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .notes h3 { font-size: 12px; font-weight: 600; color: var(--meta); margin: 0 0 6px; }
+  .notes ol, .notes ul { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+  .notes li { display: flex; gap: 9px; margin: 0 0 7px; }
+  .notes li .mark { flex: none; margin-top: 1px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+  .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; line-height: 1; font-style: normal; }
+  .qbox { max-width: 1180px; margin: 18px auto 0; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12.5px; color: var(--text-2); }
+  .qbox b { color: var(--text); }
+  .qbox ul { margin: 4px 0 0; padding-left: 18px; }
+  @media (max-width: 800px) { .notes { grid-template-columns: 1fr; } }
+
+  /* ---------- the window (1280 × 760 stage) ---------- */
+  .win-wrap { overflow-x: auto; }
+  .win { width: 1280px; max-width: 100%; height: 760px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 14px 40px rgba(16, 24, 39, 0.22); display: grid; grid-template-rows: 30px 1fr 22px; position: relative; user-select: none; }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--meta); }
+  .titlebar .word { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .titlebar .word i { width: 12px; height: 12px; background: var(--primary); display: inline-block; clip-path: polygon(0 0, 40% 0, 100% 100%, 60% 100%); }
+  .titlebar .hair { width: 1px; height: 14px; background: var(--border); }
+  .titlebar .wc { margin-left: auto; display: flex; gap: 18px; color: var(--meta); font-size: 11px; }
+  .shell { display: grid; grid-template-columns: 188px 240px 1fr; min-height: 0; }
+  .status { display: flex; align-items: center; gap: 12px; padding: 0 10px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--meta); }
+  .status .br { color: var(--primary); font-weight: 500; }
+  .status .sp { flex: 1; }
+  .rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 6px 0; font-size: 12.5px; min-height: 0; }
+  .ri { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 14px; color: var(--text); white-space: nowrap; }
+  .ri svg { width: 17px; height: 17px; fill: currentColor; color: var(--meta); flex: none; }
+  .ri .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .ri .chev { width: 14px; height: 14px; color: var(--meta); }
+  .ri .cnt { display: inline-grid; place-items: center; min-width: 17px; height: 17px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; padding: 0 5px; }
+  .ri.gap { margin-top: 8px; }
+  .ri.commit svg { color: var(--on-primary); background: var(--primary); border-radius: 5px; padding: 2px; width: 20px; height: 20px; }
+  .rail .grow { flex: 1; }
+  .left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; font-size: 12.5px; }
+  .left .head { display: flex; align-items: center; height: 38px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; gap: 6px; }
+  .left .head .sp { flex: 1; }
+  .left .head svg { width: 16px; height: 16px; fill: currentColor; color: var(--meta); }
+  .left .search { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--border); color: var(--disabled); background: var(--sunken); }
+  .left .search svg { width: 14px; height: 14px; fill: currentColor; }
+  .tree { flex: 1; overflow: hidden; padding-top: 2px; }
+  .trow { display: flex; align-items: center; height: 22px; padding-right: 6px; white-space: nowrap; color: var(--text); }
+  .trow.sec { color: var(--meta); font-weight: 500; }
+  .trow.cur { background: var(--sel-bg); }
+  .trow.cur .lbl, .trow.cur .ico { color: var(--primary); font-weight: 700; }
+  .slot { width: 16px; flex: none; display: inline-grid; place-items: center; color: var(--meta); }
+  .slot svg { width: 15px; height: 15px; fill: currentColor; }
+  .ico { width: 16px; flex: none; display: inline-grid; place-items: center; margin-right: 4px; color: var(--meta); }
+  .ico svg { width: 13px; height: 13px; fill: currentColor; }
+  .trow .lbl { overflow: hidden; text-overflow: ellipsis; }
+  .rightp { display: grid; grid-template-rows: 1fr 6px 150px; min-height: 0; min-width: 0; }
+  .grid { display: grid; grid-template-rows: 28px 1fr; min-height: 0; position: relative; }
+  .ghead, .row { display: grid; grid-template-columns: 96px 1fr 154px 142px 86px; align-items: center; padding-right: 16px; }
+  .ghead { font-size: 12px; font-weight: 500; color: var(--meta); border-bottom: 1px solid var(--border-soft); position: relative; }
+  .ghead > div { padding-left: 8px; height: 100%; display: flex; align-items: center; border-left: 1px solid var(--border-soft); position: relative; }
+  .ghead > div:first-child { border-left: 0; padding-left: 16px; }
+  .gbody { overflow: hidden; position: relative; }
+  .gsvg { position: absolute; top: 0; left: 2px; z-index: 1; pointer-events: none; }
+  .row { height: 28px; border-left: 2px solid transparent; cursor: default; position: relative; }
+  .row > .cell { height: 100%; display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+  .row:hover:not(.selected) > .cell { background: var(--hover); }
+  .row.selected { border-left-color: var(--sel-border); background: var(--sel-bg); }
+  .row.tail .cell { color: var(--meta); font-size: 12px; gap: 8px; }
+  .msg { padding-left: 12px; gap: 6px; overflow: hidden; }
+  .msg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg-text.wd { font-style: italic; color: var(--text-2); }
+  .author, .date, .sha { color: var(--meta); font-size: 12px; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .author { padding-left: 8px; gap: 7px; }
+  .disc { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 9.5px; font-weight: 700; flex: none; background: var(--ref-local-bg); color: var(--ref-local-fg); }
+  .disc.hw { background: var(--ref-remote-bg); color: var(--ref-remote-fg); }
+  .date { padding-left: 8px; }
+  .sha { font-family: var(--mono); font-size: 11px; justify-content: flex-end; padding-right: 8px; }
+  .split { background: var(--page); }
+  .bottom { border-top: 1px solid var(--border); padding: 0 16px; font-size: 12.5px; overflow: hidden; }
+  .bottom .tabs2 { display: flex; gap: 18px; height: 34px; align-items: center; color: var(--meta); border-bottom: 1px solid var(--border-soft); margin-bottom: 8px; }
+  .bottom .tabs2 b { color: var(--primary); font-weight: 500; box-shadow: inset 0 -2px 0 var(--primary); padding: 8px 0; }
+  .bottom h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bottom p { margin: 0 0 3px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ref { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; height: 16px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--ref-local-bg); color: var(--ref-local-fg); white-space: nowrap; }
+  .ref svg { width: 11px; height: 11px; fill: currentColor; flex: none; }
+  .ref.remote { background: var(--ref-remote-bg); color: var(--ref-remote-fg); }
+  .ref.tag { background: var(--ref-tag-bg); color: var(--ref-tag-fg); }
+  .ref.head { background: var(--ref-head-bg); color: var(--ref-head-fg); }
+  .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--primary); animation: spin 0.9s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--tip-bg); color: var(--tip-fg); padding: 6px 12px; border-radius: 5px; font-size: 12px; z-index: 9; opacity: 0; transition: opacity 120ms ease; pointer-events: none; }
+  .toast.on { opacity: 1; }
+
+  /* tooltips: CSS, so the disabled reasons show too (aria-disabled, not disabled) */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after, [data-tip]:focus-visible::after { content: attr(data-tip); position: absolute; z-index: 30; background: var(--tip-bg); color: var(--tip-fg); font-size: 11px; font-weight: 400; padding: 4px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none; line-height: 1.3; }
+  .tip-below[data-tip]:hover::after, .tip-below[data-tip]:focus-visible::after { top: 100%; right: 0; margin-top: 6px; }
+  .tip-left[data-tip]:hover::after, .tip-left[data-tip]:focus-visible::after { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 8px; }
+  .tip-right[data-tip]:hover::after, .tip-right[data-tip]:focus-visible::after { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 8px; }
+
+  /* ---------- A: the header cluster ---------- */
+  .cluster { position: absolute; right: 8px; top: 2px; height: 24px; display: flex; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); overflow: visible; }
+  .nb { height: 22px; display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border: 0; border-left: 1px solid var(--border); background: transparent; color: var(--text-2); font-size: 11.5px; cursor: pointer; white-space: nowrap; }
+  .nb:first-child { border-left: 0; border-radius: 4px 0 0 4px; }
+  .nb:last-child { border-radius: 0 4px 4px 0; }
+  .nb svg { width: 14px; height: 14px; fill: currentColor; }
+  .nb:hover { background: var(--hover); color: var(--text); }
+  .nb.lit { background: var(--primary-soft); color: var(--primary); }
+  .nb.off { color: var(--disabled); opacity: 0.55; cursor: default; }
+  .nb.off:hover { background: transparent; }
+  .badge { display: inline-grid; place-items: center; min-width: 15px; height: 15px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 2px; }
+  .nb .more { width: 12px; height: 12px; margin-left: -2px; opacity: 0.8; }
+  .nb.split { padding-right: 4px; }
+  .nb .spin { width: 11px; height: 11px; }
+
+  /* the parents list (shared by A, B, C) */
+  .plist { position: absolute; z-index: 25; min-width: 300px; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--menu-shadow); padding: 4px 0; font-size: 12.5px; }
+  .plist .ph { padding: 4px 12px 5px; font-size: 11px; color: var(--meta); border-bottom: 1px solid var(--border-soft); margin-bottom: 3px; }
+  .pi { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 12px; cursor: pointer; }
+  .pi:hover { background: var(--hover); }
+  .pi .n { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); display: inline-grid; place-items: center; font-size: 9.5px; color: var(--meta); flex: none; }
+  .pi.first .n { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .pi .t { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .pi kbd { margin-left: auto; }
+
+  /* ---------- B: the compass pill, twin of the options pill ---------- */
+  .pill { position: absolute; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 8px; opacity: 0.45; transition: all 120ms ease; border: 1px solid transparent; }
+  .pill:hover, .pill.open { opacity: 1; background: var(--surface); border-color: var(--border); box-shadow: var(--menu-shadow); }
+  .pill.options { left: 10px; bottom: 10px; }
+  .pill.options svg { width: 18px; height: 18px; fill: var(--meta); }
+  .pill.compass { right: 10px; bottom: 10px; flex-direction: column; gap: 4px; padding: 4px; }
+  .cbtn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); display: grid; place-items: center; cursor: pointer; color: var(--text-2); position: relative; padding: 0; }
+  .cbtn svg { width: 15px; height: 15px; fill: currentColor; }
+  .pill:not(:hover):not(.open) .cbtn { background: transparent; border-color: transparent; }
+  .cbtn:hover { background: var(--hover); color: var(--text); }
+  .cbtn.lit { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+  .cbtn.off { color: var(--disabled); opacity: 0.5; cursor: default; }
+  .cbtn .badge { position: absolute; right: -5px; top: -4px; cursor: pointer; }
+  .cbtn .spin { width: 13px; height: 13px; }
+
+  /* ---------- C: on the node ---------- */
+  .nchev { position: absolute; width: 14px; height: 9px; border: 0; background: transparent; padding: 0; cursor: pointer; z-index: 3; display: none; place-items: center; }
+  .nchev svg { width: 14px; height: 9px; fill: currentColor; }
+  .row.selected .nchev, .row:hover .nchev { display: grid; }
+  .nchev.off { opacity: 0.35; cursor: default; }
+  .nchev .spin { width: 9px; height: 9px; border-width: 1.5px; }
+  .hbtn { position: absolute; right: 6px; top: 4px; height: 20px; display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--meta); font-size: 11px; cursor: pointer; }
+  .hbtn code { font-size: 11px; color: inherit; }
+  .hbtn svg { width: 13px; height: 13px; fill: currentColor; }
+  .hbtn:hover { background: var(--hover); color: var(--text); }
+  .hbtn.lit { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+  .handle { position: absolute; right: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--border); }
+</style>
+
+<div class="top">
+  <h1>Graph navigation</h1>
+  <span class="sub">go to HEAD, to the child, to the parent — three places for the same three buttons</span>
+  <div class="right">
+    <div class="switch" id="variants"></div>
+    <div class="switch states" id="states"></div>
+    <div class="theme" id="theme"><button data-t="light">Light</button><button data-t="system" class="on">System</button><button data-t="dark">Dark</button></div>
+  </div>
+</div>
+
+<main>
+  <div class="lead" id="lead"></div>
+  <div id="stage"></div>
+  <div class="qbox" id="qbox"></div>
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+const I = {
+  branch: '<svg viewBox="0 0 24 24"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM13 20.01 4 11V4h7v-.01l9 9-7 7.02zM6.5 5C7.33 5 8 5.67 8 6.5S7.33 8 6.5 8 5 7.33 5 6.5 5.67 5 6.5 5z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>',
+  chevR: '<svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>',
+  chevD: '<svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>',
+  chevL: '<svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>',
+  funnel: '<svg viewBox="0 0 24 24"><path d="M7 6h10l-5.01 6.3L7 6zm-2.75-.39C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39A.998.998 0 0 0 18.95 4H5.04c-.83 0-1.3.95-.79 1.61z"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  inbox: '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.66-1.34 3-3 3s-3-1.34-3-3H5V5h14v10z"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>',
+  merge: '<svg viewBox="0 0 24 24"><path d="M17 20.41L18.41 19 15 15.59 13.59 17 17 20.41zM7.5 8H11v5.59L5.59 19 7 20.41l6-6V8h3.5L12 3.5 7.5 8z"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>',
+  bug: '<svg viewBox="0 0 24 24"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>',
+  grid: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>',
+  arrowDown: '<svg viewBox="0 0 24 24"><path d="M11 4v12.17l-5.59-5.58L4 12l8 8 8-8-1.41-1.41L13 16.17V4z"/></svg>',
+  route: '<svg viewBox="0 0 24 24"><path d="M19 15.18V7c0-2.21-1.79-4-4-4s-4 1.79-4 4v10c0 1.1-.9 2-2 2s-2-.9-2-2V8.82C8.16 8.4 9 7.3 9 6c0-1.66-1.34-3-3-3S3 4.34 3 6c0 1.3.84 2.4 2 2.82V17c0 2.21 1.79 4 4 4s4-1.79 4-4V7c0-1.1.9-2 2-2s2 .9 2 2v8.18c-1.16.41-2 1.51-2 2.82 0 1.66 1.34 3 3 3s3-1.34 3-3c0-1.3-.84-2.4-2-2.82z"/></svg>',
+  triUp: '<svg viewBox="0 0 14 9"><path d="M7 0l7 9H0z"/></svg>',
+  triDown: '<svg viewBox="0 0 14 9"><path d="M7 9L0 0h14z"/></svg>',
+};
+
+/* git log of C:\dev\public-repo\powergit at v0.18.8, as the graph showed it on 2026-09-16 (HEAD 3363352). */
+const LOG = [
+  { sha: '3363352', lane: 0, parents: ['cb02bc8'], refs: ['HEAD', 'powergit', 'wt/v18-perf', 'wt/v18-picker'], msg: 'plan: v0.18.9 (picker size, author disc) and v0.18.10 (performance audit)', date: '2026-09-16 10:06' },
+  { sha: 'cb02bc8', lane: 0, parents: ['4c62660'], refs: ['origin/powergit'], msg: 'plan(v0.18.8): release record', date: '2026-09-15 22:15' },
+  { sha: '4c62660', lane: 0, parents: ['febf4ba'], refs: [], msg: 'site: showcase screenshots at v0.18.8; feature cards mention refs on rows, the branch filter, ancestry highlight, Save as patch, wrap', date: '2026-09-15 22:13' },
+  { sha: 'febf4ba', lane: 0, parents: ['554953e'], refs: ['v0.18.8'], msg: 'test(visual): baselines at v0.18.8', date: '2026-09-15 21:57' },
+  { sha: '554953e', lane: 0, parents: ['6f69cfb'], refs: [], msg: 'chore(release): v0.18.8', date: '2026-09-15 17:14' },
+  { sha: '6f69cfb', lane: 0, parents: ['db5ed09'], refs: [], msg: 'plan: v0.18.8 is the current iteration', date: '2026-09-15 16:57' },
+  { sha: 'db5ed09', lane: 0, parents: ['f15f6dd'], refs: [], msg: 'plan(v0.18.6-8): merged-tree gates, deviations; visual baselines recents-picker (backdrop settled) and bottom-diff-wrap seeded and looked at', date: '2026-09-15 15:03' },
+  { sha: 'f15f6dd', lane: 0, parents: ['12860fc', '2b0ec3a'], refs: [], msg: "Merge branch 'wt/v18-recents' into powergit — v0.18.7 recent repositories as tiles (prototype C)", date: '2026-09-15 14:50' },
+  { sha: '2b0ec3a', lane: 1, parents: ['3b7e364'], refs: ['wt/v18-recents'], msg: 'style(recents): prettier on recentsModel.test.ts', date: '2026-09-15 14:50' },
+  { sha: '3b7e364', lane: 1, parents: ['c38c316'], refs: [], msg: 'docs(agents): visual direction for the Recent repositories picker; MUI Dialog focus landmine (v0.18.7)', date: '2026-09-15 14:50' },
+  { sha: 'c38c316', lane: 1, parents: ['fe62892'], refs: [], msg: 'feat(recents): the picker from prototype C — tiles, search, keys, Undo (v0.18.7)', date: '2026-09-15 14:47' },
+  { sha: '12860fc', lane: 0, parents: ['8bd401c'], refs: [], msg: 'plan(v0.18.8): tasks ticked after the wt/v18-wrap merge; the empty-last-row quirk backlogged', date: '2026-09-15 14:37' },
+  { sha: '8bd401c', lane: 0, parents: ['eb2b7db', 'cb86a5a'], refs: [], msg: "Merge branch 'wt/v18-wrap' into powergit — v0.18.8 wrap lines in every code view's floating pill", date: '2026-09-15 14:36' },
+  { sha: 'cb86a5a', lane: 2, parents: ['02e11b5'], refs: ['wt/v18-wrap'], msg: 'wrap(v0.18.8): code-wrap memory, GE map line, @bottom visual case with Wrap lines on', date: '2026-09-15 14:36' },
+  { sha: '02e11b5', lane: 2, parents: ['72a4125'], refs: [], msg: "wrap(v0.18.8): symptom e2e — the owner's sentence, every code view, the virtualized diff", date: '2026-09-15 14:33' },
+  { sha: '72a4125', lane: 2, parents: ['9ab1acf'], refs: [], msg: "wrap(v0.18.8): Wrap lines — one remembered switch in every code view's floating pill", date: '2026-09-15 14:29' },
+  { sha: 'eb2b7db', lane: 0, parents: ['61f5eb6'], refs: [], msg: 'plan(v0.18.6): tasks ticked after the wt/v18-patch merge; deviations, gates and three backlog lines', date: '2026-09-15 14:28' },
+];
+/* the other end of the same history: git log --reverse — Git Extensions' first commits (Henk Westhuis, 2008), 17,636 commits down */
+const ROOT = [
+  { sha: 'a733b60', parents: ['5ccb03c'], msg: 'added two fules', date: '2008-12-01 20:25' }, { sha: '5ccb03c', parents: ['21b6b6a'], msg: 'Added gititem', date: '2008-12-01 19:53' },
+  { sha: '21b6b6a', parents: ['27d1239'], msg: 'Commit patch and syntax', date: '2008-12-01 18:57' }, { sha: '27d1239', parents: ['fe209c3'], msg: 'test', date: '2008-11-27 21:21' },
+  { sha: 'fe209c3', parents: ['b46fd59'], msg: 'r', date: '2008-11-27 20:22' }, { sha: 'b46fd59', parents: ['bfcbc83'], msg: 'text', date: '2008-11-27 20:21' },
+  { sha: 'bfcbc83', parents: ['a6a4eab'], msg: 'added files', date: '2008-11-27 20:17' }, { sha: 'a6a4eab', parents: [], msg: 'test', date: '2008-11-27 20:16' },
+].map((c) => ({ ...c, lane: 0, refs: [], author: 'Henk Westhuis', hw: true }));
+const LANE = ['var(--lane4)', 'var(--lane3)', 'var(--lane5)'];
+const HEAD = '3363352';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const kindOf = (r) => r === 'HEAD' ? 'head' : /^v\d/.test(r) ? 'tag' : /^(origin|upstream)\//.test(r) ? 'remote' : 'local';
+const chip = (r) => { const k = kindOf(r); return `<span class="ref ${k}">${k === 'head' ? '' : k === 'tag' ? I.tag : k === 'remote' ? I.cloud : I.branch}${esc(r)}</span>`; };
+
+/* ---------- state ---------- */
+const state = { variant: 'A', st: 'commit', selected: '4c62660', loading: null, list: false, hist: ['4c62660'], hi: 0 };
+const VARIANTS = { A: 'Header cluster', B: 'Compass', C: 'On the node' };
+const STATES = { commit: 'at a commit', head: 'at HEAD', merge: 'at a merge (2 parents)', first: 'at the first commit', loading: 'target not loaded yet' };
+const rowsOf = () => state.st === 'first' ? ROOT : LOG;
+const byId = () => Object.fromEntries(rowsOf().map((c) => [c.sha, c]));
+const cur = () => byId()[state.selected];
+/* the child: the first loaded row (top-down) that lists the commit as a parent — GE's rule */
+const childOf = (sha) => rowsOf().find((c) => c.parents.includes(sha))?.sha ?? null;
+const parentsOf = (sha) => byId()[sha]?.parents ?? [];
+const KEYS = { head: 'Ctrl+Shift+C', child: 'Ctrl+N', parent: 'Ctrl+P' };
+function tipFor(what) {
+  const c = cur();
+  if (what === 'head') return state.selected === HEAD ? `Already at HEAD · ${KEYS.head}` : `Go to HEAD 3363352 · ${KEYS.head}`;
+  if (what === 'child') { const k = childOf(c.sha); return k ? `Go to child ${k} · ${KEYS.child}` : (state.st === 'first' ? `Go to child ${'bfcbc83'} · ${KEYS.child}` : 'No child in the loaded history'); }
+  const ps = parentsOf(c.sha);
+  if (!ps.length) return 'No parent — first commit';
+  if (state.loading) return `Loading history to ${state.loading}…`;
+  return ps.length > 1 ? `Go to first parent ${ps[0]} · ${KEYS.parent} — ${ps.length} parents, open the list` : `Go to parent ${ps[0]} · ${KEYS.parent}`;
+}
+const canChild = () => !!childOf(state.selected);
+const canParent = () => parentsOf(state.selected).length > 0 && !state.loading;
+
+/* ---------- the window ---------- */
+function winHtml() {
+  const sel = state.selected, rows = rowsOf(), ids = byId();
+  const rail = [['chevL', 'Collapse'], ['grid', 'PowerGit'], ['folder', 'Open repository…'], ['clock', 'Recent repositories'], ['refresh', 'Refresh', 'gap'], ['check', 'Commit', 'commit', '1'], ['inbox', 'Stash', '', '', 1], ['arrowDown', 'Pull', '', '', 1], ['up', 'Push', '', '', 1], ['cloud', 'Fetch', '', '', 1], ['branch', 'Branch', '', '', 1], ['swap', 'Checkout'], ['merge', 'Merge'], ['list', 'Rebase'], ['tag', 'Tag']]
+    .map(([ic, l, cls, cnt, ch]) => `<div class="ri ${cls || ''}">${I[ic]}<span class="lbl">${l}</span>${cnt ? `<span class="cnt">${cnt}</span>` : ''}${ch || cnt ? `<span class="chev">${I.chevR}</span>` : ''}</div>`).join('');
+  const tr = (d, cls, ico, l, chev) => `<div class="trow ${cls || ''}" style="padding-left:${6 + d * 16}px"><span class="slot">${chev ? I[chev] : ''}</span>${ico ? `<span class="ico">${I[ico]}</span>` : ''}<span class="lbl">${l}</span></div>`;
+  const tree = [tr(0, 'sec', '', 'Branches', 'chevD'), tr(1, '', 'branch', 'wt', 'chevD'), ...['console', 'engine', 'v18-ancestry', 'v18-filter', 'v18-patch', 'v18-perf', 'v18-picker', 'v18-recents', 'v18-refs', 'v18-wrap'].map((b) => tr(2, '', 'branch', b)),
+    tr(1, '', 'branch', 'master'), tr(1, 'cur', 'branch', 'powergit'), tr(0, 'sec', '', 'Remotes', 'chevD'), tr(1, '', 'cloud', 'origin', 'chevD'), tr(2, '', 'cloud', 'experimental', 'chevR'), tr(2, '', 'cloud', 'feature', 'chevR'), tr(2, '', 'cloud', 'release', 'chevR'),
+    ...['configdata', 'Convert_to_.NET_Core_3.0', 'LibGit2Sharp', 'master', 'mono', 'powergit', 'translations_ui-3_5_ja'].map((b) => tr(2, '', 'cloud', b)), tr(1, '', 'cloud', 'upstream', 'chevD'), tr(2, '', 'cloud', 'before-squash', 'chevR'), tr(2, '', 'cloud', 'copilot', 'chevR')].join('');
+  const wd = state.st === 'first' ? '' : `<div class="row" data-sha="wd"><div class="cell"></div><div class="cell msg"><span class="msg-text wd">Working directory (1 file)</span></div><div class="cell author"></div><div class="cell date"></div><div class="cell sha"></div></div>`;
+  const nodeCtl = (c) => state.variant !== 'C' || c.sha !== sel ? '' : nodeChevrons(c);
+  const body = rows.map((c) => `<div class="row ${c.sha === sel ? 'selected' : ''}" data-sha="${c.sha}"><div class="cell">${nodeCtl(c)}</div><div class="cell msg">${c.refs.map(chip).join('')}<span class="msg-text">${esc(c.msg)}</span></div><div class="cell author"><span class="disc ${c.hw ? 'hw' : ''}">${c.hw ? 'HW' : 'CC'}</span><span>${c.author || 'Constantin Chabirand'}</span></div><div class="cell date">${c.date}</div><div class="cell sha">${c.sha}</div></div>`).join('');
+  const tail = state.loading ? `<div class="row tail" data-sha="tail"><div class="cell"></div><div class="cell msg"><span class="spin"></span><span>Loading history to <code>${state.loading}</code>… (17,619 of 17,636 loaded)</span></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>` : state.st === 'first' ? `<div class="row tail"><div class="cell"></div><div class="cell msg"><span>End of history — 17,636 commits</span></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>` : '';
+  const s = ids[sel];
+  const headCell = state.variant === 'C' ? `<button class="hbtn tip-below ${sel === HEAD ? 'lit' : ''}" data-nav="head" data-tip="${esc(tipFor('head'))}">${I.home}<code>3363352</code></button><span class="handle"></span>` : '';
+  return `<div class="win-wrap"><div class="win" id="win">
+    <div class="titlebar"><span class="word"><i></i>PowerGit</span><span class="hair"></span><span>PowerGit</span><span class="wc"><span>—</span><span>☐</span><span>✕</span></span></div>
+    <div class="shell">
+      <div class="rail">${rail}<div class="grow"></div><div class="ri">${I.bug}<span class="lbl">Diagnostic snapshot</span></div><div class="ri">${I.gear}<span class="lbl">Settings</span></div></div>
+      <div class="left"><div class="head">Repository<span class="sp"></span>${I.funnel}${I.chevL}</div><div class="search">${I.search}<span>Filter refs…</span></div><div class="tree">${tree}</div></div>
+      <div class="rightp"><div class="grid"><div class="ghead"><div>${state.variant === 'C' ? headCell : 'Graph'}</div><div>Message</div><div>Author</div><div>Date</div><div>SHA</div>${state.variant === 'A' ? cluster() : ''}</div><div class="gbody" id="gbody"><svg class="gsvg" id="gsvg"></svg><div id="rows">${wd}${body}${tail}</div>${state.variant === 'B' ? compass() : ''}<div class="pill options" data-tip="Branch history highlight" title="Branch history highlight">${I.route}</div></div></div><div class="split"></div>
+      <div class="bottom"><div class="tabs2"><b>Commit</b><span>Diff${s.hw ? '' : ' (7)'}</span><span>File tree</span></div><h4>${esc(s.msg)}</h4><p>Author: ${s.author || 'Constantin Chabirand'} ${s.hw ? '' : '&lt;CynaCons@users.noreply.github.com&gt;'} &nbsp; ${s.date}</p><p>Parents: ${s.parents.length ? s.parents.join(' ') : '— (the first commit)'}</p></div></div>
+    </div>
+    <div class="status"><span class="br">powergit</span><span>↑1 ↓0 (1 change)</span><span class="sp"></span><span>git 2.38.1.windows.1 · engine 0.18.8</span></div>
+    <div id="overlay"></div><div class="toast" id="toast"></div>
+  </div></div>`;
+}
+function cluster() {
+  const ps = parentsOf(state.selected), many = ps.length > 1;
+  const b = (what, icon, label, extra = '') => { const on = what === 'head' ? true : what === 'child' ? canChild() : canParent() || state.loading; return `<button class="nb tip-below ${what === 'head' && state.selected === HEAD ? 'lit' : ''} ${on ? '' : 'off'} ${many && what === 'parent' ? 'split' : ''}" data-nav="${what}" aria-disabled="${!on}" data-tip="${esc(tipFor(what))}">${state.loading && what === 'parent' ? '<span class="spin"></span>' : icon}<span>${label}</span>${extra}</button>`; };
+  return `<nav class="cluster" aria-label="Go to">${b('head', I.home, 'HEAD')}${b('child', I.up, 'Child')}${b('parent', I.down, 'Parent', many ? `<span class="badge" data-parents="1">${ps.length}</span>${I.chevD.replace('<svg', '<svg class="more" data-parents="1"')}` : '')}</nav>`;
+}
+function compass() {
+  const ps = parentsOf(state.selected), many = ps.length > 1;
+  const b = (what, icon) => { const on = what === 'head' ? true : what === 'child' ? canChild() : canParent() || state.loading; return `<button class="cbtn tip-left ${what === 'head' && state.selected === HEAD ? 'lit' : ''} ${on ? '' : 'off'}" data-nav="${what}" aria-disabled="${!on}" data-tip="${esc(tipFor(what))}">${state.loading && what === 'parent' ? '<span class="spin"></span>' : icon}${many && what === 'parent' ? `<span class="badge" data-parents="1">${ps.length}</span>` : ''}</button>`; };
+  return `<div class="pill compass ${state.list ? 'open' : ''}" role="group" aria-label="Go to">${b('child', I.up)}${b('head', I.home)}${b('parent', I.down)}</div>`;
+}
+function nodeChevrons(c) {
+  const x = 22 + c.lane * 16 - 7, ps = c.parents, col = LANE[c.lane];
+  const up = `<button class="nchev tip-right ${canChild() ? '' : 'off'}" style="left:${x}px;top:1px;color:${col}" data-nav="child" aria-disabled="${!canChild()}" data-tip="${esc(tipFor('child'))}">${I.triUp}</button>`;
+  if (state.loading) return up + `<button class="nchev tip-right" style="left:${x}px;top:19px;color:${col}" data-nav="parent" data-tip="${esc(tipFor('parent'))}"><span class="spin" style="border-top-color:${col}"></span></button>`;
+  if (ps.length > 1) return up + ps.map((p, n) => `<button class="nchev tip-right" style="left:${x + (n === 0 ? -8 : 8)}px;top:19px;color:${col}" data-nav="parent" data-n="${n}" data-tip="Go to parent ${n + 1} ${p} — ${esc(byId()[p]?.msg.slice(0, 48) ?? '')}${n === 0 ? ' · ' + KEYS.parent : ''}">${I.triDown}</button>`).join('');
+  return up + `<button class="nchev tip-right ${canParent() ? '' : 'off'}" style="left:${x}px;top:19px;color:${col}" data-nav="parent" aria-disabled="${!canParent()}" data-tip="${esc(tipFor('parent'))}">${I.triDown}</button>`;
+}
+function drawGraph() {
+  const svg = $('gsvg'); if (!svg) return;
+  const rows = rowsOf(), ids = byId();
+  const els = [...$('rows').children];
+  const total = $('rows').offsetHeight;
+  svg.setAttribute('width', 96); svg.setAttribute('height', total); svg.style.height = total + 'px';
+  const cy = Object.fromEntries(els.map((e) => [e.dataset.sha || 'x', e.offsetTop + e.offsetHeight / 2]));
+  const x = (l) => 14 + (l + 0.5) * 16;
+  let paths = '', nodes = '';
+  if (cy.wd !== undefined) nodes += `<circle cx="${x(0)}" cy="${cy.wd}" r="5" fill="none" stroke="${LANE[0]}" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M${x(0)} ${cy.wd + 5} L${x(0)} ${cy[HEAD]}" stroke="${LANE[0]}" stroke-width="2" stroke-dasharray="2 2" fill="none"/>`;
+  if (state.st === 'first') paths += `<path d="M${x(0)} 0 L${x(0)} ${cy[rows[0].sha]}" stroke="${LANE[0]}" stroke-width="2"/>`;
+  rows.forEach((c) => {
+    const xc = x(c.lane), y0 = cy[c.sha];
+    c.parents.forEach((p) => {
+      const pc = ids[p];
+      if (!pc) { paths += `<path d="M${xc} ${y0} L${xc} ${total}" stroke="${LANE[c.lane]}" stroke-width="2" fill="none"/>`; return; }
+      const xp = x(pc.lane), y1 = cy[p];
+      if (pc.lane === c.lane) paths += `<path d="M${xc} ${y0} L${xp} ${y1}" stroke="${LANE[c.lane]}" stroke-width="2"/>`;
+      else { const ym = y0 + 28; paths += `<path d="M${xc} ${y0} C${xc} ${(y0 + ym) / 2} ${xp} ${(y0 + ym) / 2} ${xp} ${ym} L${xp} ${y1}" stroke="${LANE[pc.lane]}" stroke-width="2" fill="none"/>`; }
+    });
+  });
+  rows.forEach((c) => {
+    const xc = x(c.lane), y0 = cy[c.sha], f = LANE[c.lane], o = c.refs.includes('HEAD') ? `stroke="var(--head-outline)" stroke-width="2"` : '';
+    nodes += c.refs.length ? `<rect x="${xc - 5}" y="${y0 - 5}" width="10" height="10" fill="${f}" ${o}/>` : `<circle cx="${xc}" cy="${y0}" r="5" fill="${f}" ${o}/>`;
+  });
+  svg.innerHTML = paths + nodes;
+}
+function plistHtml() {
+  const c = cur(), ps = c.parents, ids = byId();
+  return `<div class="plist" id="plist" role="menu"><div class="ph">${ps.length} parents of <code>${c.sha}</code> — Ctrl+P goes to the first</div>${ps.map((p, n) => `<div class="pi ${n === 0 ? 'first' : ''}" role="menuitem" data-go="${p}"><span class="n">${n + 1}</span><code>${p}</code><span class="t">${esc(ids[p]?.msg ?? '')}</span>${n === 0 ? '<kbd>Ctrl+P</kbd>' : ''}</div>`).join('')}</div>`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  $('variants').innerHTML = Object.entries(VARIANTS).map(([k, t]) => `<button data-variant="${k}" class="${k === state.variant ? 'on' : ''}"><b>${k}</b>${t}</button>`).join('');
+  $('states').innerHTML = `<span class="cap">State</span>` + Object.entries(STATES).map(([k, t]) => `<button data-state="${k}" class="${k === state.st ? 'on' : ''}">${t}</button>`).join('');
+  renderLead(); renderStage(); renderNotes();
+}
+function renderLead() {
+  const h = {
+    A: `<h2>A · Header cluster — three buttons where the columns are named</h2><p class="quote">"When we're in the main graph, I'd like to have some sort of control buttons for 'go to head', 'go to successor' and 'go to parent'."</p>
+      <p>A segmented group at the right end of the 28 px grid header: <b>HEAD</b>, <b>Child</b>, <b>Parent</b>, icon and a short word each, the Git Extensions keys in the tooltips (Ctrl+Shift+C, Ctrl+N, Ctrl+P). HEAD is tinted while the selection is HEAD. A button that has nowhere to go is dimmed and its tooltip says why ("No child in the loaded history", "No parent — first commit"). On a merge the Parent button wears the count and a chevron that opens the parents with their subjects — the click and Ctrl+P take the first parent, as GE does. Always visible, never in the way of the graph. <b>Recommended.</b></p>`,
+    B: `<h2>B · Compass — a pill at the bottom-right, twin of the options pill</h2>
+      <p>Three 28 px round buttons stacked Child · HEAD · Parent, floating over the graph body at the bottom-right exactly as the branch-history pill floats at the bottom-left: 45 % at rest, full on hover, the same border and shadow. Tooltips open to the left; the count badge on Parent opens the parents list. It reads as a navigation instrument rather than a toolbar, and the header stays as it is. Keyboard: <kbd>Ctrl+N</kbd> / <kbd>Ctrl+P</kbd> / <kbd>Ctrl+Shift+C</kbd>; <kbd>Alt+←</kbd> / <kbd>Alt+→</kbd> walk back and forth along the way you came.</p>`,
+    C: `<h2>C · On the node — the graph itself grows the controls</h2>
+      <p>The selected row's node sprouts two small lane-coloured chevrons, one above (child) and one below (parent), on the selected row and on hover; on a merge the lower chevron splits into two, one per parent, each tooltip naming its commit. HEAD is a small <code>⌂ 3363352</code> button in the Graph header cell, left of the column handle, lit when the selection is HEAD. Nothing new in the chrome; the affordance lives where the eye already is. The cost is discoverability — hover to find it.</p>`,
+  }[state.variant];
+  $('lead').innerHTML = h + `<p style="font-size:12px;color:var(--meta)">Every button works here: click, or use the keys. The <b>State</b> switch puts the selection at a commit, at HEAD, on a merge, on the first commit of the repository, or on the last loaded row whose parent is still being fetched.</p>`;
+}
+function renderStage() {
+  $('stage').innerHTML = winHtml();
+  const ov = $('overlay');
+  if (state.list) {
+    const ps = parentsOf(state.selected); if (ps.length < 2) state.list = false;
+    else {
+      ov.innerHTML = plistHtml();
+      const win = $('win').getBoundingClientRect(), pl = $('plist');
+      if (state.variant === 'A') { const b = document.querySelector('.cluster').getBoundingClientRect(); pl.style.right = (win.right - b.right) + 'px'; pl.style.top = (b.bottom - win.top + 4) + 'px'; }
+      else if (state.variant === 'B') { const b = document.querySelector('.compass').getBoundingClientRect(); pl.style.right = (win.right - b.left + 8) + 'px'; pl.style.top = (b.bottom - win.top - pl.offsetHeight) + 'px'; }
+      else { const r = document.querySelector('.row.selected').getBoundingClientRect(); pl.style.left = (r.left - win.left + 60) + 'px'; pl.style.top = (r.bottom - win.top + 2) + 'px'; }
+    }
+  }
+  /* the end of history sits at the bottom of the body; a fetch in flight shows its tail row */
+  const gb = $('gbody'), rs = $('rows');
+  if (state.st === 'first') rs.style.paddingTop = Math.max(0, gb.clientHeight - rs.scrollHeight) + 'px';
+  drawGraph();
+  if (state.loading) gb.scrollTop = gb.scrollHeight;
+}
+function renderNotes() {
+  const v = state.variant;
+  const li = (n, s) => `<li><span class="mark">${n}</span><span>${s}</span></li>`, bl = (s) => `<li><span>${s}</span></li>`;
+  let a = '', b = '';
+  if (v === 'A') {
+    a = li(1, `<b>Segmented, 24 px, in the header</b> — the header is chrome already (column names, the resize handles), so a control group there costs no graph space and is found at once. The SHA label yields to it; the column is self-evident.`) + li(2, `<b>States that speak:</b> lit HEAD, dimmed buttons with a reason, the "2" badge and chevron on a merge, a spinner while the parent is fetched.`) + li(3, `<b>The list</b> names each parent with its subject and marks the first; Ctrl+P always takes the first, the list is for the other one.`);
+    b = bl(`<b>Component:</b> <code>GraphNav</code> rendered by <code>RevisionGrid</code>'s header; a pure <code>graphNav.ts</code> gives <code>childOf(rows, id)</code> (first loaded row listing it as a parent), <code>parentsOf</code>, and the reasons; keys registered in the browse layer's <code>commandItems</code> so they show in the menu too.`) + bl(`<b>Parent not loaded:</b> <code>selectRevision(sha)</code> already pages until a row is found (the ref-tree click does this); the button shows the spinner until the row arrives and scrolls into view.`) + bl(`<b>Cost:</b> a day: the model and its unit test, the header group, the keys, one e2e per state (child of HEAD, first commit, merge, paging).`);
+  } else if (v === 'B') {
+    a = li(1, `<b>The pill</b> reuses <code>GraphOptionsBar</code>'s recipe: absolute in the graph body, 45 % opacity at rest, border and shadow on hover, so it is one visual family with the options pill on the left.`) + li(2, `<b>Round buttons</b> read as directions (up, home, down) rather than words; the badge opens the parents list, which opens to the left so it never leaves the graph.`) + li(3, `<b>Alt+← / Alt+→</b> walk the history of selections, so Parent-Parent-Parent-back is one key.`);
+    b = bl(`<b>Same model as A</b>; the pill is a sibling of <code>GraphOptionsBar</code> in <code>RevisionGrid</code>, and the two pills share the opacity/hover recipe as one small <code>FloatingPill</code> component.`) + bl(`<b>Cost:</b> A plus half a day for the pill and the history stack; the pill overlaps the last rows' SHA cells at rest (as the options pill overlaps the graph), which the tail row has to tolerate.`);
+  } else {
+    a = li(1, `<b>Chevrons in the lane</b>, 14 × 9 px, in the node's colour, only on the selected row and on hover: the graph canvas already draws there, so the affordance is a DOM overlay positioned from the layout's lane x.`) + li(2, `<b>Two chevrons on a merge</b>, one per parent, each tooltip naming its commit — the only variant where the second parent is one click and no list.`) + li(3, `<b>HEAD in the Graph header cell</b>: a small home button with the SHA in mono, lit when you are there; the column handle stays on its right.`);
+    b = bl(`<b>Same model as A</b>; the overlay is a per-row absolute element inside the virtualized row, so it scrolls with it; on 150 % zoom the 9 px glyph is still 13 px — fine.`) + bl(`<b>Cost:</b> A plus a day: hit-testing next to the canvas, the split on merges, the header button; and a discoverability risk that the menu keys mitigate.`);
+  }
+  $('qbox').innerHTML = `<b>Questions for the owner</b><ul><li>Should <b>Go to child</b> prefer the child in the same lane (so walking up a branch stays on it) rather than GE's "first in the loaded graph"? The mock uses GE's rule.</li><li>On a merge, Ctrl+P goes to the first parent (GE). Is a second key wanted for the second parent (<kbd>Ctrl+Shift+P</kbd>), or is the list / the second chevron enough?</li><li>Is a selection history (<kbd>Alt+←</kbd> / <kbd>Alt+→</kbd>) wanted in every variant, or only where B proposes it? GE has none.</li><li>When the parent is not loaded, should the grid page silently until it arrives (as the ref tree does today) or stop after one page and say so?</li></ul>`;
+  $('notes').innerHTML = `<div><h3>What you are looking at</h3><ol>${a}</ol></div><div><h3>How it would be built</h3><ul>${b}</ul></div>`;
+}
+
+/* ---------- interactions ---------- */
+let toastTimer = null, loadTimer = null;
+function toast(t) { const el = $('toast'); if (!el) return; el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1800); }
+/* the way you came: a list of selections and a cursor; Alt+← / Alt+→ move the cursor */
+function select(sha) {
+  state.hist = state.hist.slice(0, state.hi + 1); state.hist.push(sha); state.hi = state.hist.length - 1;
+  state.selected = sha; state.list = false; renderStage();
+}
+function walk(d) {
+  const i = state.hi + d;
+  if (i < 0 || i >= state.hist.length) return toast(d < 0 ? 'Nothing to go back to' : 'Nothing to go forward to');
+  state.hi = i; state.selected = state.hist[i]; state.list = false; renderStage();
+}
+function setState(k) {
+  state.st = k; state.list = false; state.loading = null; clearTimeout(loadTimer);
+  state.selected = { commit: '4c62660', head: HEAD, merge: 'f15f6dd', first: 'a6a4eab', loading: 'eb2b7db' }[k];
+  state.hist = [state.selected]; state.hi = 0;
+  if (k === 'loading') state.loading = '61f5eb6';
+  render();
+}
+function nav(what, n = 0) {
+  const c = cur();
+  if (what === 'head') { if (state.st === 'first') { toast('Scrolls 17,628 rows up to HEAD 3363352'); return; } if (c.sha === HEAD) return toast('Already at HEAD'); return select(HEAD); }
+  if (what === 'child') { const k = childOf(c.sha); if (!k) return toast(state.st === 'first' ? 'The child bfcbc83 is above the loaded window — scrolls to it' : 'No child in the loaded history'); return select(k); }
+  const ps = c.parents; if (!ps.length) return toast('No parent — this is the first commit');
+  const p = ps[n] ?? ps[0];
+  if (!byId()[p]) { state.loading = p; state.list = false; renderStage(); toast(`Loading history to ${p}…`); clearTimeout(loadTimer); loadTimer = setTimeout(() => { state.loading = null; renderStage(); toast(`${p} arrived — selected and scrolled into view`); }, 1600); return; }
+  select(p);
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-variant],[data-state],[data-t],[data-parents],[data-nav],[data-go],[data-sha]');
+  if (!t) { if (state.list) { state.list = false; renderStage(); } return; }
+  if (t.dataset.variant) { state.variant = t.dataset.variant; state.list = false; return render(); }
+  if (t.dataset.state) return setState(t.dataset.state);
+  if (t.dataset.t) { const v = t.dataset.t; document.documentElement.removeAttribute('data-theme'); if (v !== 'system') document.documentElement.setAttribute('data-theme', v); document.querySelectorAll('#theme button').forEach((b) => b.classList.toggle('on', b.dataset.t === v)); return; }
+  if (t.dataset.parents) { e.stopPropagation(); state.list = !state.list; return renderStage(); }
+  if (t.dataset.go) return select(t.dataset.go);
+  if (t.dataset.nav) { if (t.getAttribute('aria-disabled') === 'true') return toast(t.dataset.tip); return nav(t.dataset.nav, +(t.dataset.n || 0)); }
+  if (t.dataset.sha && t.dataset.sha !== 'wd' && t.dataset.sha !== 'tail') { if (t.dataset.sha !== state.selected) select(t.dataset.sha); }
+});
+document.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (e.ctrlKey && e.shiftKey && k === 'c') { e.preventDefault(); nav('head'); }
+  else if (e.ctrlKey && !e.shiftKey && k === 'n') { e.preventDefault(); nav('child'); }
+  else if (e.ctrlKey && !e.shiftKey && k === 'p') { e.preventDefault(); nav('parent'); }
+  else if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); walk(-1); }
+  else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); walk(1); }
+  else if (e.key === 'Escape' && state.list) { state.list = false; renderStage(); }
+});
+render();
+</script>
