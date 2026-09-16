@@ -275,7 +275,9 @@ public sealed class SequencerTests
         repo.Run("commit", "-m", "tracked-dirty");
         repo.Write("dirty.txt", "changed\n");
 
-        Assert.Throws<InvalidOperationException>(() => host.Rebase(new RebaseRequest("main")));
+        // v0.18.17: git's own refusal, typed so the dialog can offer "Stash and retry".
+        DirtyTreeException dirty = Assert.Throws<DirtyTreeException>(() => host.Rebase(new RebaseRequest("main")));
+        Assert.Contains("cannot rebase", dirty.Message);
 
         RepoStatusDto after = host.Rebase(new RebaseRequest("main", Autostash: true));
         Assert.Equal("none", after.State);
