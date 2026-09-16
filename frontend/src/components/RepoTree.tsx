@@ -123,10 +123,14 @@ function RepoTreeImpl({
   const toggle = (names: string[]) =>
     setGraphRefs(repoId, { refs: toggleNames(getGraphRefs(repoId).refs, names, currentRef) })
   const toggleMode = () => setGraphRefs(repoId, { mode: !mode, refs: [] })
-  const showAll = () =>
+  // Before the ref tree has arrived "all" would be an empty set — HEAD alone
+  // (v0.18.14, a 402-ref fixture clicked Show all faster than /refs answered).
+  const showAll = () => {
+    if (!tree) return
     setGraphRefs(repoId, {
-      refs: [...(tree?.branches ?? []), ...(tree?.remotes ?? []), ...(tree?.tags ?? [])].map((r) => r.fullName),
+      refs: [...tree.branches, ...tree.remotes, ...tree.tags].map((r) => r.fullName),
     })
+  }
 
   const branchRoot = useMemo(() => buildTree(tree?.branches ?? []), [tree])
   const tagRoot = useMemo(() => buildTree(tree?.tags ?? []), [tree])

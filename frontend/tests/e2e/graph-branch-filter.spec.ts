@@ -151,7 +151,9 @@ test.describe("Show all on a large ref set", () => {
     commit(dir, "main-2")
     for (let i = 0; i < 400; i++) git(dir, "branch", `b${i}`)
     await openRepoOnEngine(dir)
-    repoId = ((await (await fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() })).json()) as { id: string }).id
+    repoId = (
+      (await (await fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() })).json()) as { id: string }
+    ).id
   })
 
   test.afterAll(async () => {
@@ -164,7 +166,10 @@ test.describe("Show all on a large ref set", () => {
     await page.goto(`/?repo=${repoId}`)
     await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
     await page.getByTestId("tree-filter-mode").click()
+    // The strip counts the ref tree: wait for the 402 refs to be there before "all".
+    await expect(page.getByTestId("tree-filter-strip")).toContainText("of 403 refs")
     await page.getByTestId("tree-filter-all").click()
+    await expect(page.getByTestId("tree-filter-strip")).toContainText("403 of 403 refs")
     await expect(subjects(page)).toHaveText(["main-2", "b-only", "a-only", "base"])
     await expect(page.getByRole("alert")).toHaveCount(0)
   })
