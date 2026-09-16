@@ -29,12 +29,19 @@ declare global {
   }
 }
 
+// Measured 2026-09-16 with scripts/perf-audit.mjs on PowerGit / flutter /
+// vscode (10k rows loaded, dev build): hover → redraw 32 – 34 ms median,
+// click → Commit tab 140 – 221 ms median, a 6 s scroll 0 – 21 long tasks with
+// frames up to 109 – 192 ms. Budgets are those × 1.5.
 const BUDGET = {
-  hoverToRedrawMedianMs: 60, // measured 31-40 ms
-  selectToCommitTabMedianMs: 400, // measured 150-260 ms
-  scrollLongTasks: 30, // measured 10-20 over 3 s while pages stream in
-  scrollFrameMaxMs: 600, // measured 300-400 ms (a page append)
+  hoverToRedrawMedianMs: 50,
+  selectToCommitTabMedianMs: 330,
+  scrollLongTasks: 16, // per 3 s (vscode: 21 per 6 s)
+  scrollFrameMaxMs: 300,
 }
+
+// The harness's viewport: the grid body shows ~30 rows above the bottom panel.
+test.use({ viewport: { width: 1600, height: 1000 } })
 
 const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b)
@@ -48,17 +55,33 @@ async function booted(page: import("@playwright/test").Page) {
   await expect
     .poll(() => page.getByTestId("grid-body").evaluate((el) => el.firstElementChild!.scrollHeight), { timeout: 60_000 })
     .toBeGreaterThan(1_000 * 28)
+  // Steady state: while the eager pages stream in, each append is a
+  // 150 – 400 ms long task that would land in the numbers (a backlog item of
+  // its own, measured separately by the harness's boot scenario).
+  await expect
+    .poll(
+      async () => {
+        const grid = page.getByTestId("grid-body")
+        const before = await grid.evaluate((el) => el.firstElementChild!.scrollHeight)
+        await new Promise((r) => setTimeout(r, 1000))
+        return before === (await grid.evaluate((el) => el.firstElementChild!.scrollHeight))
+      },
+      { timeout: 90_000, message: "history kept growing for 90 s" },
+    )
+    .toBe(true)
 }
 
 test("hovering rows repaints the graph within budget", async ({ page }) => {
   await booted(page)
-  const view = page.viewportSize()!
+  const body = (await page.getByTestId("grid-body").boundingBox())!
+  const inBody = (b: { y: number; height: number }) => b.y >= body.y && b.y + b.height <= body.y + body.height
   const boxes = []
   for (const h of await page.getByTestId("grid-row").elementHandles()) {
     const b = await h.boundingBox()
-    if (b && b.y >= 0 && b.y + b.height <= view.height) boxes.push(b)
+    // Overscan rows sit in the DOM under the bottom panel; a pointer there hovers nothing.
+    if (b && inBody(b)) boxes.push(b)
   }
-  expect(boxes.length).toBeGreaterThan(10)
+  expect(boxes.length, "rows inside the grid body").toBeGreaterThan(15)
   const latencies: number[] = []
   for (const b of boxes.slice(0, 20)) {
     const t0 = await page.evaluate(() => window.__pgPerf.now())
@@ -68,6 +91,9 @@ test("hovering rows repaints the graph within budget", async ({ page }) => {
     await page.waitForTimeout(60)
   }
   expect(latencies.length, "hovers that repainted the canvas").toBeGreaterThan(15)
+  test
+    .info()
+    .annotations.push({ type: "perf", description: `hover → canvas redraw median ${median(latencies).toFixed(0)} ms` })
   expect(median(latencies), `hover → canvas redraw median ${median(latencies).toFixed(0)} ms`).toBeLessThan(
     BUDGET.hoverToRedrawMedianMs,
   )
@@ -75,15 +101,18 @@ test("hovering rows repaints the graph within budget", async ({ page }) => {
 
 test("selecting rows shows the Commit tab within budget", async ({ page }) => {
   await booted(page)
-  const view = page.viewportSize()!
+  const body = (await page.getByTestId("grid-body").boundingBox())!
+  const inBody = (b: { y: number; height: number }) => b.y >= body.y && b.y + b.height <= body.y + body.height
+  // Click the SHA cell: the message cell may start with a ref chip, and a
+  // chip click selects that ref's tip instead of the row.
   const rows: { x: number; y: number; subject: string }[] = []
   for (const h of await page.locator('[data-testid="grid-row"]:not([data-artificial])').elementHandles()) {
-    const b = await h.boundingBox()
+    const b = await (await h.$('[data-testid="sha-cell"]'))?.boundingBox()
     const subject = ((await h.$eval(".msg-text", (el) => el.textContent)) ?? "").trim()
-    if (b && b.y >= 0 && b.y + b.height <= view.height && subject)
-      rows.push({ x: b.x + 240, y: b.y + b.height / 2, subject })
+    if (b && inBody(b) && subject) rows.push({ x: b.x + b.width / 2, y: b.y + b.height / 2, subject })
   }
   const latencies: number[] = []
+  await page.evaluate(() => window.__pgPerf.start()) // inputs are stamped only inside a window
   for (let i = 0; i < 10; i++) {
     const r = rows[(i * 3) % rows.length]
     await page.mouse.click(r.x, r.y)
@@ -96,6 +125,9 @@ test("selecting rows shows the Commit tab within budget", async ({ page }) => {
     await page.waitForTimeout(150)
   }
   expect(latencies.length).toBe(10)
+  test
+    .info()
+    .annotations.push({ type: "perf", description: `click → Commit tab median ${median(latencies).toFixed(0)} ms` })
   expect(median(latencies), `click → Commit tab median ${median(latencies).toFixed(0)} ms`).toBeLessThan(
     BUDGET.selectToCommitTabMedianMs,
   )
@@ -112,6 +144,7 @@ test("a 3 s wheel scroll keeps long tasks and frame stalls within budget", async
     await page.waitForTimeout(50)
   }
   const stats = await page.evaluate(() => window.__pgPerf.end())
+  test.info().annotations.push({ type: "perf", description: `scroll 3 s: ${JSON.stringify(stats)}` })
   expect(stats.longTasks, `long tasks during scroll: ${JSON.stringify(stats)}`).toBeLessThan(BUDGET.scrollLongTasks)
   expect(stats.frameMaxMs, `longest frame during scroll: ${stats.frameMaxMs} ms`).toBeLessThan(BUDGET.scrollFrameMaxMs)
 })

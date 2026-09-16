@@ -56,7 +56,8 @@ async function visibleRows(page, selector) {
     const b = await h.boundingBox()
     if (!b || b.height <= 0 || b.y < body.y || b.y + b.height > body.y + body.height) continue
     const subject = ((await h.$eval(".msg-text", (el) => el.textContent).catch(() => "")) ?? "").trim()
-    out.push({ ...b, subject })
+    const sha = await (await h.$('[data-testid="sha-cell"]'))?.boundingBox()
+    out.push({ ...b, subject, sha })
   }
   return out
 }
@@ -158,7 +159,9 @@ export async function select(ctx) {
     const commitTab = []
     const highlight = []
     for (const { b, subject } of picks) {
-      await page.mouse.click(b.x + Math.min(240, b.width / 2), b.y + b.height / 2)
+      // The SHA cell, never a ref chip (a chip click selects that ref's tip).
+      const c = b.sha ?? b
+      await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2)
       const clickAt = await page.evaluate(() => window.__pgPerf.lastInput("click"))
       const [hl, ct] = await Promise.all([
         page.evaluate((s) => window.__pgPerf.waitText(".grid-row.selected .msg-text", s, 10000), subject),

@@ -10,10 +10,16 @@ import { PAGE_INSTRUMENTATION } from "../../scripts/perf/metrics.mjs"
 
 const ENGINE_URL = "http://127.0.0.1:7799"
 const N = 2000
+// Measured 2026-09-16 (scripts/perf-audit.mjs --pending 2000, 3 runs, dev
+// build): Working directory row 1,817 ms after navigation, Diff tab file
+// list 2,289 ms, commit window lists 3,671 ms median but 1,927 – 8,628 ms
+// across runs (a status poll landing mid-render doubles it). Budgets are the
+// median × 1.5, except the commit window, which takes its worst run × 1.5 so
+// the gate does not fail on the baseline's own variance.
 const BUDGET = {
-  wdRowMs: 6_000, // boot → "Working directory (2,500 files)"; measured ~3.5 s
-  diffFileListMs: 4_500, // click the row + Diff tab → 2,500 file rows; measured ~3 s
-  commitWindowListsMs: 6_000, // Ctrl+Space → both lists rendered; measured ~4 s
+  wdRowMs: 2_700,
+  diffFileListMs: 3_500,
+  commitWindowListsMs: 13_000,
 }
 
 const headers = () => ({ Authorization: `Bearer ${process.env.VITE_ENGINE_TOKEN ?? ""}` })
@@ -58,7 +64,7 @@ test("the Working directory row, the Diff tab and the commit window open within 
     .first()
   await expect(wd).toBeVisible({ timeout: 60_000 })
   const wdRowMs = Date.now() - t0
-  await expect(wd).toContainText(`(${(N + N / 4).toLocaleString("en-US")} files)`)
+  await expect(wd).toContainText(`(${N + N / 4} files)`)
   expect(wdRowMs, `Working directory row after ${wdRowMs} ms`).toBeLessThan(BUDGET.wdRowMs)
 
   const t1 = Date.now()
@@ -75,6 +81,10 @@ test("the Working directory row, the Diff tab and the commit window open within 
     .poll(() => page.getByTestId("unstaged-list-row").count(), { timeout: 60_000 })
     .toBeGreaterThanOrEqual(N + N / 4)
   const commitWindowListsMs = Date.now() - t2
+  test.info().annotations.push({
+    type: "perf",
+    description: `wd row ${wdRowMs} ms | diff file list ${diffFileListMs} ms | commit window lists ${commitWindowListsMs} ms`,
+  })
   expect(commitWindowListsMs, `commit window lists after ${commitWindowListsMs} ms`).toBeLessThan(
     BUDGET.commitWindowListsMs,
   )

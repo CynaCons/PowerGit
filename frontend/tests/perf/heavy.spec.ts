@@ -54,6 +54,10 @@ test("filter finds one branch among thousands, jump loads history to its tip", a
   await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 15_000 })
 
   // Findability: a substring narrows thousands of refs in well under a second.
+  // The refs must be there first: /refs takes ~1.5 s on 2,500 refs
+  // (for-each-ref with %(refname:short), see docs/perf/audit-2026-09-16.md),
+  // and that load is not what this budget is about.
+  await expect(page.getByTestId("tree-row").first()).toBeVisible({ timeout: 15_000 })
   const filter = page.getByTestId("tree-filter")
   const t0 = Date.now()
   await filter.fill("deep-tip")
