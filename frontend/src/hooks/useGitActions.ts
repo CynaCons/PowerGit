@@ -1,6 +1,7 @@
 import { isArtificialId } from "../graph/artificial"
 import type { CreateRefOptions } from "../components/dialogs/CreateRefDialog"
-import { describeThrown } from "../engine"
+import { isRemote } from "../components/refChipsModel"
+import { describeThrown, type CheckoutOptions } from "../engine"
 import type { Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
@@ -12,7 +13,10 @@ import type { StatusNotes } from "./useStatusNote"
 export type GitActionsDeps = {
   session: Pick<EngineSession, "client" | "view" | "setEngineError">
   history: Pick<History, "current" | "selectedSha" | "setHighlightRoot">
-  repoState: Pick<RepoState, "status" | "setStatus" | "setRefs" | "refresh" | "branchNames" | "openFolder">
+  repoState: Pick<
+    RepoState,
+    "status" | "setStatus" | "setRefs" | "refresh" | "branchNames" | "remoteNames" | "openFolder"
+  >
   jobs: Pick<Jobs, "withBusy" | "runJob">
   dialogs: Dialogs
   notes: Pick<StatusNotes, "setNote">
@@ -34,7 +38,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
   const { client: engine, view, setEngineError } = session
   const repo = view.repo
   const { current } = history
-  const { status, setStatus, setRefs, refresh, branchNames, openFolder } = repoState
+  const { status, setStatus, setRefs, refresh, branchNames, remoteNames, openFolder } = repoState
   const { withBusy, runJob } = jobs
   const { dialog, open, close } = dialogs
   const operations = useOperationActions({ session, repoState, jobs, dialogs, notes })
@@ -88,8 +92,10 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
 
   // Two phases under withBusy (v0.18.9): the engine call resolves the
   // promise (the dialog closes), the refresh runs on behind the top bar.
-  async function checkout(branch: string, force: boolean) {
-    await withBusy("Checking out", async () => setStatus(await engine.checkout(branch, force)), { refresh: FULL })
+  // v0.18.11: the options are the checkout dialog's (track / reset /
+  // detached, keep / stash / discard); `false` is the plain old checkout.
+  async function checkout(ref: string, options: CheckoutOptions | boolean = false) {
+    await withBusy("Checking out", async () => setStatus(await engine.checkout(ref, options)), { refresh: FULL })
   }
   async function reset(mode: "soft" | "mixed" | "hard") {
     if (dialog.kind !== "reset") return
@@ -154,8 +160,16 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     open({ kind: "createRef", refKind: "tag", sha: current.rev.id, subject: current.rev.message })
   }
   function openCheckoutBranch() {
-    const name = repo?.branch ?? branchNames[0]
+    const name = branchNames.find((b) => b !== repo?.branch) ?? repo?.branch ?? branchNames[0]
     if (name) open({ kind: "checkout", branch: name })
+  }
+  /** The tree's and the chips' "Checkout branch": a local branch checks out
+   *  at once, as in Git Extensions' left panel; a remote branch or a tag
+   *  opens the dialog, which asks how (v0.18.11). */
+  function checkoutRef(name: string, kind?: "local" | "remote" | "tag" | "submodule") {
+    const remote = kind ? kind !== "local" : isRemote(name, remoteNames)
+    if (remote) open({ kind: "checkout", branch: name })
+    else void checkout(name, false)
   }
   function openRebase() {
     if (current && !onArtificial) open({ kind: "rebase", onto: current.rev.id, ontoSubject: current.rev.message })
@@ -217,6 +231,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     openCreateBranch,
     openCreateTag,
     openCheckoutBranch,
+    checkoutRef,
     openRebase,
     openMergeBranch,
     deleteBranchPrompt,

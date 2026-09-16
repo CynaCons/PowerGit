@@ -112,7 +112,7 @@ export function AppDialogs({
         target={dialog.kind === "refContext" ? dialog.target : null}
         onClose={() => close("refContext")}
         actions={{
-          onCheckout: (name) => open({ kind: "checkout", branch: name }),
+          onCheckout: (name, kind) => actions.checkoutRef(name, kind),
           onMerge: (name) => actions.openMerge(name),
           onRebaseOnto: (name) => open({ kind: "rebase", onto: name }),
           onDelete: (name, kind) => (kind === "tag" ? actions.removeTag(name) : actions.removeBranch(name)),
@@ -136,7 +136,6 @@ export function AppDialogs({
         <CheckoutBranchDialog
           open
           branch={dialog.branch}
-          branchOptions={branchNames.length > 0 ? branchNames : [dialog.branch]}
           dirtyCount={dirty}
           onClose={() => close("checkout")}
           onConfirm={actions.checkout}

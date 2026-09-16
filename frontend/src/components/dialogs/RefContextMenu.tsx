@@ -30,7 +30,7 @@ export type RefMenuTarget = {
 }
 
 export type RefMenuActions = {
-  onCheckout: (name: string) => void
+  onCheckout: (name: string, kind: RefMenuKind) => void
   onMerge: (name: string) => void
   onRebaseOnto: (name: string) => void
   onDelete: (name: string, kind: RefMenuKind) => void
@@ -137,7 +137,7 @@ export function RefContextMenu({
     if (!target) return
     switch (action) {
       case "checkout":
-        return actions.onCheckout(target.name)
+        return actions.onCheckout(target.name, target.kind)
       case "merge":
         return actions.onMerge(target.name)
       case "rebase":

@@ -25,6 +25,14 @@ export function refNameError(name: string, existing: readonly string[] = []): st
   return null
 }
 
+/** A free local name next to the remote's: `x` when no local `x` exists, else `x-2`, `x-3`… */
+export function suggestLocalName(remote: string, remoteNames: readonly string[], locals: readonly string[]): string {
+  const base = localNameFor(remote, remoteNames)
+  if (!locals.includes(base)) return base
+  for (let n = 2; n < 100; n++) if (!locals.includes(`${base}-${n}`)) return `${base}-${n}`
+  return base
+}
+
 /** A local branch name suggested from a remote-tracking one: `origin/feature/x` → `feature/x`. */
 export function localNameFor(remote: string, remoteNames: readonly string[]): string {
   for (const r of remoteNames) if (remote.startsWith(r + "/")) return remote.slice(r.length + 1)

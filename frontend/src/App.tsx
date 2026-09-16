@@ -155,7 +155,7 @@ export default function App({ base }: { base: EngineClient }) {
     },
     collapseLeft: () => setLeftOpen(false),
     expandLeft: () => setLeftOpen(true),
-    checkoutRef: (name: string) => void actions.checkout(name, false),
+    checkoutRef: (name: string, kind: "local" | "remote" | "tag" | "submodule") => actions.checkoutRef(name, kind),
     configureRemote: (name: string) => open({ kind: "remoteConfig", remote: name }),
     mergeRef: (name: string) => actions.openMerge(name),
     rebaseOnto: (name: string) => open({ kind: "rebase", onto: name }),
