@@ -6,6 +6,7 @@ import { installDiagnostics } from "./diagnostics"
 import { bootstrapEngine } from "./engine"
 import { HotkeyHost } from "./hotkeys"
 import "./styles/app.css"
+import "./styles/op-dialogs.css"
 import "./styles/tokens.css"
 import { AppThemeProvider } from "./theme/AppThemeProvider"
 

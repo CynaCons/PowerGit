@@ -1,4 +1,5 @@
 import type { RepoInfo } from "../../engine"
+import type { GraphRow } from "../../graph/types"
 import { focusGrid } from "../../hooks/focusGrid"
 import type { Dialogs } from "../../hooks/useDialogs"
 import type { GitActions } from "../../hooks/useGitActions"
@@ -20,7 +21,10 @@ import { RefContextMenu } from "./RefContextMenu"
 import { ResetBranchDialog } from "./ResetBranchDialog"
 import { ResolveConflictsDialog } from "./ResolveConflictsDialog"
 import { PullPushPreview } from "./PullPushPreview"
+import { QuoteContext, useQuoteValue } from "./quoteContext"
 import { RevisionContextMenu } from "./RevisionContextMenu"
+
+const NO_ROWS: GraphRow[] = []
 
 export type AppDialogsProps = {
   dialogs: Dialogs
@@ -32,6 +36,8 @@ export type AppDialogsProps = {
   jobs: Jobs
   /** v0.16.0: the commit dialog's "View file history". */
   onFileHistory?: (path: string) => void
+  /** The loaded graph rows (v0.18.11): the dialogs quote a commit as its row draws it. */
+  rows?: GraphRow[]
 }
 
 // Every modal surface of the shell, driven by the single DialogState. The
@@ -47,15 +53,17 @@ export function AppDialogs({
   repoState,
   jobs,
   onFileHistory,
+  rows = NO_ROWS,
 }: AppDialogsProps) {
   const { dialog, open, close } = dialogs
   const { status, setStatus, refs, branchNames, dirty, refresh, openFolder } = repoState
   const ctxTarget = dialog.kind === "context" ? dialog.target : null
   const currentBranch = repo?.branch ?? ""
   const tagNames = (refs?.tags ?? []).map((t) => t.name)
+  const quote = useQuoteValue(rows, refs, currentBranch)
 
   return (
-    <>
+    <QuoteContext.Provider value={quote}>
       <CommitDialog
         repository={repo?.root}
         open={dialog.kind === "commit"}
@@ -279,6 +287,6 @@ export function AppDialogs({
           }}
         />
       )}
-    </>
+    </QuoteContext.Provider>
   )
 }

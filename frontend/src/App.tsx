@@ -417,6 +417,7 @@ export default function App({ base }: { base: EngineClient }) {
           repoState={repoState}
           jobs={jobs}
           onFileHistory={fileHistory.open}
+          rows={rows}
         />
         <JobPanel jobs={jobs} onClose={() => jobs.setPanelOpen(false)} />
         <SnapshotDialog state={snapshot} onClose={closeSnapshot} />

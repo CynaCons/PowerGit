@@ -114,7 +114,8 @@ export function RefChips({
   )
 }
 
-function Glyph({ kind }: { kind: RefKind }) {
+/** The kind's glyph, also on a single chip drawn outside a row (dialogs, v0.18.11). */
+export function Glyph({ kind }: { kind: RefKind }) {
   // v0.13.19, owner: "a little cloud icon on the left of the remote branches";
   // v0.14.0: "tags should be having a different little icon"; v0.18.3: "with
   // the icon to differentiate the local and remote" — the fork on locals.
