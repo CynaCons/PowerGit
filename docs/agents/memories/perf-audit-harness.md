@@ -54,13 +54,23 @@ runs 60+) and cut to the scenario's wall-clock window.
 - `redrawAfter` polls at 16 ms but returns the recorded clearRect time, so
   the latency has 1 ms resolution; `waitText` is a MutationObserver plus a
   25 ms poll (a subject that is already on screen resolves at once).
-- The `select` scenario clicks 240 px into the row so it lands on the
-  message cell; with a wide graph column that is the canvas, which still
-  selects (the row div owns the click). A click on a ref chip would select
-  the ref's tip instead and the subject would never match.
+- The `select` scenario (and `interaction.spec.ts`) clicks the row's SHA
+  cell: the message cell may start with a ref chip, and a chip click
+  selects that ref's tip, so the subject never matches (10 s timeout each;
+  the heavy fixture's `gen/local-…` chips showed it). Targets must also be
+  inside the grid body's box, not the viewport: overscan rows sit under the
+  bottom panel.
 - Heavy scenarios queue behind each other on one CPU: never run two harness
   processes at once, and close other browsers; the medians of 3 runs are
   reported, and the per-run values are in the JSON (`…Runs` arrays).
 - `storm` appends to 200 tracked files and runs 20 `git update-index` in
   2 s; only the index writes reach `/events` (a tracked-file edit is
   invisible to the watcher until the 10 s status poll).
+- `npm run test:perf` (perf-run.mjs) is its own orchestration on :7799 /
+  :1421: the engine needs `POWERGIT_ENGINE_ORIGINS` for :1421 (it sat at
+  "connecting to the engine…" from v0.13.0 to v0.18.10 and `heavy.spec`'s
+  `engine-status` contains "(" assertion passed on that text). Extra
+  arguments reach Playwright: `node scripts/perf-run.mjs --grep pending
+  --reporter=list` (npm on Windows eats `--grep-invert`; call node).
+- The heavy fixture packs its refs (stamp v2): 2,500 loose refs made every
+  `git show %D` 4× slower and the selection budget measured the fixture.
