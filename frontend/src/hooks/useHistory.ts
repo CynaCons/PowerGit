@@ -290,7 +290,11 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     const start = () => {
       const gen = ++histGen.current
       const entry = { gen, run: Promise.resolve() }
-      entry.run = runReload(gen).finally(() => {
+      entry.run = runReload(gen).catch((e) => {
+        if (!isAbort(e) && histGen.current === gen) {
+          setEngineError(`History: ${onFailure(e, "history")}`)
+        }
+      }).finally(() => {
         if (reloadRun.current === entry) reloadRun.current = null
       })
       reloadRun.current = entry
@@ -310,7 +314,7 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
       reloadQueued.current = queued
     }
     return reloadQueued.current
-  }, [runReload])
+  }, [runReload, onFailure, setEngineError])
 
   // A different repo: drop the loaded history instead of splicing. A
   // different filter on the same repo (v0.18.5, the graph's ref filter)

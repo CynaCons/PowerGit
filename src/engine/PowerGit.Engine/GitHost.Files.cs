@@ -302,7 +302,9 @@ public sealed partial class GitHost
             throw new InvalidOperationException("no paths given");
         }
 
-        CommandResult result = Run(root, ["update-index", flag, "--", .. clean]);
+        string stdin = string.Join('\0', clean) + '\0';
+        CommandResult result = RunTimedWithStdin(root, 120_000, CancellationToken.None, stdin,
+            "update-index", "-z", flag, "--stdin");
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(Explain(result, flag));
@@ -362,7 +364,9 @@ public sealed partial class GitHost
             throw new InvalidOperationException("no paths given");
         }
 
-        CommandResult result = Run(root, ["rm", "-r", "-q", "--cached", "--", .. clean]);
+        string stdin = string.Join('\0', clean) + '\0';
+        CommandResult result = RunTimedWithStdin(root, 120_000, CancellationToken.None, stdin,
+            "rm", "-r", "-q", "--cached", "--pathspec-from-file=-", "--pathspec-file-nul");
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(Explain(result, "stop tracking"));

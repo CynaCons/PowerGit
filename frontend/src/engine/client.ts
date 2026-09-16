@@ -327,6 +327,12 @@ export class EngineClient {
 
   /** The revision stream, or with `filter` (v0.16.0) the commits that touched one path. */
   async revisions(max = 800, skip = 0, signal?: AbortSignal, filter?: RevisionFilter): Promise<RevisionDto[]> {
+    if (filter?.refs) {
+      return json<RevisionDto[]>(await this.post(`${this.repoPath()}/revisions`, {
+        refs: filter.refs, max, skip, path: filter.path, follow: filter.follow,
+        exact: filter.exact, full: filter.full, simplify: filter.simplify,
+      }, { signal, timeoutMs: 120_000 }))
+    }
     return json<RevisionDto[]>(
       await this.get(
         `${this.repoPath()}/revisions?max=${max}${skip > 0 ? `&skip=${skip}` : ""}${filterParams(filter)}`,
@@ -567,8 +573,8 @@ export class EngineClient {
     return json<VsCodeInfo>(await this.post(`${this.repoPath()}/tools/vscode`))
   }
 
-  async stage(paths: string[], unstage = false): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/stage`, { paths, unstage }))
+  async stage(paths: string[], unstage = false, all = false): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/stage`, { paths, unstage, all }))
   }
 
   async createCommit(message: string, amend = false): Promise<{ id: string }> {

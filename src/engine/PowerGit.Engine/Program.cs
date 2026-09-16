@@ -225,6 +225,17 @@ repo.MapGet("/revisions", (GitHost git, int? max, int? skip, string? path, bool?
     }
 });
 
+repo.MapPost("/revisions", (RevisionRequest body, GitHost git, HttpContext ctx) =>
+{
+    try
+    {
+        RevisionFilter filter = new(body.Path, body.Follow ?? true, body.Exact ?? false, body.Full ?? false, body.Simplify ?? false, body.Refs ?? []);
+        return Results.Ok(git.ListRevisions(body.Max ?? 800, body.Skip ?? 0, ctx.RequestAborted, filter));
+    }
+    catch (OperationCanceledException) { return Results.StatusCode(499); }
+    catch (Exception ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest); }
+});
+
 repo.MapGet("/commits/{id}", (string id, GitHost git, HttpContext ctx) =>
 {
     try
@@ -752,7 +763,7 @@ repo.MapPost("/stage", (StageRequest body, GitHost git) =>
 {
     try
     {
-        git.Stage(body.Paths, body.Unstage);
+        git.Stage(body.Paths, body.Unstage, body.All);
         return Results.Ok(git.GetStatus());
     }
     catch (Exception ex)
