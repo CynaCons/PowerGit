@@ -29,6 +29,10 @@ type Props = {
   currentBranch?: string | null
   /** v0.18.5: rendered at the end of the Message header cell (the ref filter's chip). */
   headerExtra?: ReactNode
+  /** v0.18.12: the compass, floated at the bottom-right of the body (GraphCompass). */
+  compass?: ReactNode
+  /** v0.18.12: the SHA the history is paging towards; the tail names it. */
+  loadingTarget?: string | null
   /** Highlight ancestry (v0.18.4): the commit whose history is highlighted
    *  instead of HEAD's, or null. Owned by the history (useHistory). */
   highlightRoot?: string | null
@@ -49,6 +53,8 @@ export function RevisionGrid({
   tagNames,
   currentBranch,
   headerExtra,
+  compass,
+  loadingTarget = null,
   highlightRoot = null,
   onHighlightRoot,
 }: Props) {
@@ -421,9 +427,10 @@ export function RevisionGrid({
         highlightRoot={rootRow}
         onExitHighlight={exitHighlight}
       />
-      {loadingTail && (
+      {compass}
+      {(loadingTail || loadingTarget) && (
         <div className="grid-tail" data-testid="history-tail-loading">
-          Loading more history…
+          {loadingTarget ? `Loading history to ${loadingTarget.slice(0, 7)}…` : "Loading more history…"}
         </div>
       )}
     </div>

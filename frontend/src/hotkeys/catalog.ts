@@ -67,6 +67,11 @@ export type CommandId =
   | "browse.appLog"
   | "browse.fileHistory"
   | "browse.highlightAncestry"
+  | "browse.goToParent"
+  | "browse.goToChild"
+  | "browse.goToHead"
+  | "browse.navigateBack"
+  | "browse.navigateForward"
   | "diff.stageSelected"
   | "diff.unstageSelected"
   | "commit.refresh"
@@ -245,6 +250,36 @@ export const CATALOG: CommandDef[] = [
     ge: "ToggleHighlightSelectedBranch",
     scope: "browse",
     chord: chord("B", { ctrl: true, shift: true }),
+    available: true,
+  },
+  // v0.18.12: the compass's chords, GE RevisionGridControl defaults. Go to
+  // parent is the first parent (the way back remembered), go to child the
+  // first child in the loaded graph, Ctrl+Shift+C the checked-out commit;
+  // Alt+← / Alt+→ walk the selection history. Neither Ctrl+N nor Ctrl+P is
+  // a text-edit key, so they fire from a text field too, like every other
+  // Ctrl chord in this scope — and are swallowed, so the browser's new
+  // window and print never open.
+  { id: "browse.goToParent", ge: "GoToParent", scope: "browse", chord: chord("P", { ctrl: true }), available: true },
+  { id: "browse.goToChild", ge: "GoToChild", scope: "browse", chord: chord("N", { ctrl: true }), available: true },
+  {
+    id: "browse.goToHead",
+    ge: "SelectCurrentRevision",
+    scope: "browse",
+    chord: chord("C", { ctrl: true, shift: true }),
+    available: true,
+  },
+  {
+    id: "browse.navigateBack",
+    ge: "NavigateBackward",
+    scope: "browse",
+    chord: chord("ArrowLeft", { alt: true }),
+    available: true,
+  },
+  {
+    id: "browse.navigateForward",
+    ge: "NavigateForward",
+    scope: "browse",
+    chord: chord("ArrowRight", { alt: true }),
     available: true,
   },
 

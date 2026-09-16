@@ -67,7 +67,8 @@ export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHig
         bottom: 10,
         // The ancestry state adds the root and Exit: the pill stays one line
         // and gives the subject up first rather than wrapping its buttons.
-        maxWidth: "calc(100% - 20px)",
+        // The compass (v0.18.12) has the 48 px at the right end.
+        maxWidth: "calc(100% - 68px)",
         whiteSpace: "nowrap",
         zIndex: 5,
         bgcolor: expanded ? "background.paper" : "transparent",

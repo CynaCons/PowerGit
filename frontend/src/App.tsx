@@ -22,6 +22,7 @@ import { useChromeLayout } from "./hooks/useChromeLayout"
 import { useDialogs } from "./hooks/useDialogs"
 import { useFileHistory } from "./hooks/useFileHistory"
 import { useGraphFilterChip, useGraphRefFilter } from "./hooks/useGraphRefFilter"
+import { useGraphNav } from "./hooks/useGraphNav"
 import { useGridMenus } from "./hooks/useGridMenus"
 import { useEngineSession } from "./hooks/useEngineSession"
 import { useGitActions } from "./hooks/useGitActions"
@@ -115,6 +116,8 @@ export default function App({ base }: { base: EngineClient }) {
   const { clearNote } = notes
   useEffect(() => clearNote(), [clearNote, selectedSha])
   const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs, notes }))
+  // The compass and its chords (v0.18.12); the file history has neither.
+  const nav = useGraphNav({ rows, current, history, notes, refs, repo, graphFilter, client, fileHistory, dialogs })
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)
@@ -212,9 +215,7 @@ export default function App({ base }: { base: EngineClient }) {
           ;(document.querySelector('[data-testid="tree-filter"]') as HTMLElement | null)?.focus()
         })
       },
-      "browse.focusRevisionGrid": () => {
-        focusGrid()
-      },
+      "browse.focusRevisionGrid": focusGrid,
       "browse.focusCommitInfo": () => setBottomTab(0),
       "browse.focusDiff": () => setBottomTab(1),
       "browse.focusFileTree": () => setBottomTab(2),
@@ -361,6 +362,7 @@ export default function App({ base }: { base: EngineClient }) {
                         engineError={engineError}
                         view={view}
                         headerExtra={filterChip}
+                        nav={nav}
                         onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
                         onNearEnd={history.onNearEnd}
                         menus={menus}

@@ -33,3 +33,9 @@ Port `GitExtensionsControl.IsTextEditKey`: bare `A`–`Z` / digits / OEM / Space
 - Alt+click on a row (GE's `Alt+LButton`) sets the root in `RevisionGrid.clickRow` and still selects — `RevisionRow.onClick` passes the event for that.
 - Escape in the grid's `onKeyDown`, in this order: fold the expanded ref row (v0.18.3), else exit the highlight, else pass on (the file history closes on it). Not in the catalog: Escape is a key the surfaces own.
 
+## Graph navigation (v0.18.12)
+- `browse.goToParent` Ctrl+P (`GoToParent`), `browse.goToChild` Ctrl+N (`GoToChild`), `browse.goToHead` Ctrl+Shift+C (`SelectCurrentRevision`), `browse.navigateBack` Alt+Left / `browse.navigateForward` Alt+Right (`NavigateBackward` / `NavigateForward`). GE's defaults from `HotkeySettingsManager` lines 283-301; the BrowserBack/Forward alternates are not bound.
+- Registered by `hooks/useGraphNav.ts` on a **second browse layer** of its own (`useHotkeyLayer("browse", …, enabled)`), not in App's handler map: App.tsx sits on the 400-line cap. Two layers of the same scope are fine — `dispatchLayers` walks them all and the ids do not overlap. The layer is off with `dialogs.hotkeysEnabled` false and while the file history is open (GE's FormFileHistory has no navigation either).
+- The handlers never return false: Ctrl+P must not reach the browser's print, Ctrl+N its new window, Alt+← its history, even with nowhere to go.
+- Ctrl+Shift+C is a text-edit key (`isTextEditKey`: Ctrl+C with Shift ignored), so a focused text field keeps it; Ctrl+P / Ctrl+N are not, so they fire from a text field like every other Ctrl chord. Ctrl+Shift+P stays Quick pull.
+- There is no hotkey table in Settings (only the Diagnostics section lists the recovery steps); the catalog and `hotkeys.test.ts` "GE default chords we claim" are the listing.

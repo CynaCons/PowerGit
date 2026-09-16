@@ -25,6 +25,9 @@ export function Kbd({ children }: { children: ReactNode }) {
         // Inside a disabled button the key greys with its label (the look
         // pass: a chip darker than "Stage" read as the live part).
         ".Mui-disabled &": { color: "inherit" },
+        // Inside a tooltip (the compass, v0.18.12) the chip takes the
+        // tooltip's white ink and a translucent edge.
+        ".MuiTooltip-tooltip &": { color: "inherit", borderColor: "rgba(255, 255, 255, 0.45)" },
       }}
     >
       {children}
