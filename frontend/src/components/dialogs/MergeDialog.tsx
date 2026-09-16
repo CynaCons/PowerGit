@@ -58,10 +58,10 @@ export function MergeDialog({
     setMessage("")
   }, [open, first])
 
-  const { busy, error, submit } = useActionDialog({
+  const { busy, error, submit, dirty, retryWithStash } = useActionDialog({
     open,
     label: "merge",
-    action: () =>
+    action: (retryAutostash) =>
       onConfirm({
         branch: selected,
         // GE greys fast-forward out for a squash merge: a squash never
@@ -69,7 +69,7 @@ export function MergeDialog({
         ff: squash ? "allow" : ff,
         squash,
         message: useMessage && message.trim() ? message.trim() : null,
-        autostash,
+        autostash: retryAutostash || autostash,
         noCommit: false,
       }),
     onClose,
@@ -98,10 +98,15 @@ export function MergeDialog({
       }
       note={
         dirtyCount > 0 && !autostash
-          ? { text: `${changes}; git refuses to merge without Auto stash.`, tone: "amber" }
+          ? { text: `${changes}; git may merge them directly, or refuse if they overlap.`, tone: "amber" }
           : undefined
       }
       busy={busy}
+      secondary={
+        dirty
+          ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "merge-stash-retry" }
+          : undefined
+      }
       primary={{
         label: squash ? "Squash and stage" : "Merge",
         onClick: () => void submit(),

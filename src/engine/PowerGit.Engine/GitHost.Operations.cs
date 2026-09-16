@@ -46,11 +46,9 @@ public sealed partial class GitHost
 
         bool force = request.Force || changes == "discard";
         bool dirty = IsDirty(root);
-        if (changes == "" && !force && dirty)
-        {
-            throw new InvalidOperationException(
-                "The working tree has uncommitted changes. Commit or stash them first, or force the checkout to discard them.");
-        }
+        // v0.18.17: no pre-refusal of a dirty tree — git carries the changes
+        // over and refuses only when they would be overwritten (the typed
+        // dirty error below, which the dialog turns into "Stash and retry").
 
         bool stashed = false;
         if (changes == "stash" && dirty)
@@ -95,6 +93,11 @@ public sealed partial class GitHost
             {
                 // The checkout did not happen: put the changes back where they were.
                 Run(root, "stash", "pop");
+            }
+
+            if (IsDirtyTreeRefusal(error))
+            {
+                throw new DirtyTreeException($"Checkout failed. {error}", []);
             }
 
             throw new InvalidOperationException(error);

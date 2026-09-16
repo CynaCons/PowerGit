@@ -168,14 +168,18 @@ public sealed class SequencerTests
     }
 
     [Fact]
-    public void Merge_on_a_dirty_tree_needs_autostash()
+    public void Merge_on_a_dirty_non_overlapping_tree_succeeds_without_autostash()
     {
         using TempRepo repo = new();
         GitHost host = Host(repo);
         repo.Write("a.txt", "dirty\n");
 
-        Assert.Throws<InvalidOperationException>(() => host.Merge(new MergeRequest("feature")));
+        RepoStatusDto direct = host.Merge(new MergeRequest("feature"));
+        Assert.Equal("none", direct.State);
+        Assert.Equal("dirty", repo.Read("a.txt").Trim());
+        Assert.True(File.Exists(Path.Combine(repo.Dir, "b.txt")));
 
+        // Autostash remains a supported explicit route for changes that overlap.
         RepoStatusDto after = host.Merge(new MergeRequest("feature", Autostash: true));
         Assert.Equal("none", after.State);
         Assert.Equal("dirty", repo.Read("a.txt").Trim()); // autostash re-applied
@@ -271,11 +275,50 @@ public sealed class SequencerTests
         repo.Run("commit", "-m", "tracked-dirty");
         repo.Write("dirty.txt", "changed\n");
 
-        Assert.Throws<InvalidOperationException>(() => host.Rebase(new RebaseRequest("main")));
+        // v0.18.17: git's own refusal, typed so the dialog can offer "Stash and retry".
+        DirtyTreeException dirty = Assert.Throws<DirtyTreeException>(() => host.Rebase(new RebaseRequest("main")));
+        Assert.Contains("cannot rebase", dirty.Message);
 
         RepoStatusDto after = host.Rebase(new RebaseRequest("main", Autostash: true));
         Assert.Equal("none", after.State);
         Assert.Equal("changed", repo.Read("dirty.txt").Trim());
+    }
+
+    [Fact]
+    public void Rebase_on_a_dirty_tree_without_autostash_is_dirty_and_autostash_restores_index()
+    {
+        using TempRepo repo = new();
+        GitHost host = Host(repo);
+        host.Checkout("feature", force: false);
+        repo.Write("a.txt", "unstaged\n");
+        repo.Write("dirty-index.txt", "staged\n");
+        repo.Run("add", "dirty-index.txt");
+
+        DirtyTreeException refused = Assert.Throws<DirtyTreeException>(() => host.Rebase(new RebaseRequest("main")));
+        Assert.Contains("cannot rebase", refused.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("your index contains uncommitted changes", refused.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("none", host.Rebase(new RebaseRequest("main", Autostash: true)).State);
+        Assert.Equal("unstaged", repo.Read("a.txt").Trim());
+        Assert.Equal("staged", repo.Read("dirty-index.txt").Trim());
+        Assert.Contains("A  dirty-index.txt", repo.Output("status", "--porcelain"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cherry_pick_on_a_staged_unrelated_file_is_dirty_and_autostash_restores_index()
+    {
+        using TempRepo repo = new();
+        GitHost host = Host(repo);
+        string commit = repo.Output("rev-parse", "feature");
+        repo.Write("dirty-index.txt", "staged\n");
+        repo.Run("add", "dirty-index.txt");
+
+        DirtyTreeException refused = Assert.Throws<DirtyTreeException>(() => host.CherryPick(commit));
+        Assert.Contains("would be overwritten by", refused.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("none", host.CherryPick(commit, autostash: true).State);
+        Assert.Equal("staged", repo.Read("dirty-index.txt").Trim());
+        Assert.Contains("A  dirty-index.txt", repo.Output("status", "--porcelain"), StringComparison.Ordinal);
     }
 
     [Fact]

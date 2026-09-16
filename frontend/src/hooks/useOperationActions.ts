@@ -92,8 +92,11 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
   // Every operation below is two phases under withBusy (v0.18.9): the
   // engine call, whose answer resolves the promise (the dialog closes),
   // then the refresh behind the top bar.
-  async function merge(options: MergeOptions) {
-    await withBusy(`Merging ${options.branch}`, async () => setStatus(await engine.merge(options)), { refresh: FULL })
+  async function merge(options: MergeOptions, inline = false) {
+    await withBusy(`Merging ${options.branch}`, async () => setStatus(await engine.merge(options)), {
+      refresh: FULL,
+      propagateError: inline,
+    })
   }
 
   function openResolveConflicts() {
@@ -158,8 +161,11 @@ export function useOperationActions({ session, repoState, jobs, dialogs, notes }
     }
   }
 
-  async function rebase(onto: string, options: RebaseOptions) {
-    await withBusy("Rebasing", async () => setStatus(await engine.rebase(onto, options)), { refresh: FULL })
+  async function rebase(onto: string, options: RebaseOptions, inline = false) {
+    await withBusy("Rebasing", async () => setStatus(await engine.rebase(onto, options)), {
+      refresh: FULL,
+      propagateError: inline,
+    })
   }
 
   /** Captures git's own todo, then opens the editor on it. */

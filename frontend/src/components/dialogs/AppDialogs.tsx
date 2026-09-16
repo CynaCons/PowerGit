@@ -138,7 +138,7 @@ export function AppDialogs({
           branch={dialog.branch}
           dirtyCount={dirty}
           onClose={() => close("checkout")}
-          onConfirm={actions.checkout}
+          onConfirm={(ref, options) => actions.checkout(ref, options, true)}
         />
       )}
       {dialog.kind === "reset" && (
@@ -159,6 +159,7 @@ export function AppDialogs({
           ontoSha={dialog.onto}
           ontoSubject={dialog.ontoSubject}
           currentBranch={currentBranch}
+          dirtyCount={dirty}
           interactive={dialog.interactive}
           onClose={() => close("rebase")}
           onConfirm={async (options) => {
@@ -167,7 +168,7 @@ export function AppDialogs({
               await actions.openInteractiveRebase(dialog.onto, dialog.ontoSubject, rest)
               return
             }
-            await actions.rebase(dialog.onto, rest)
+            await actions.rebase(dialog.onto, rest, true)
           }}
         />
       )}
@@ -189,7 +190,7 @@ export function AppDialogs({
           branchOptions={branchNames}
           dirtyCount={dirty}
           onClose={() => close("merge")}
-          onConfirm={actions.merge}
+          onConfirm={(options) => actions.merge(options, true)}
         />
       )}
       {dialog.kind === "resolveConflicts" && (

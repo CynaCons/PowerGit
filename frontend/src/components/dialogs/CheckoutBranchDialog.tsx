@@ -93,14 +93,14 @@ export function CheckoutBranchDialog({
     ? `${verbs.join(", ").replace(/^./, (m) => m.toUpperCase())} and check out`
     : "Check out"
 
-  const { busy, error, submit } = useActionDialog({
+  const { busy, error, submit, dirty, retryWithStash } = useActionDialog({
     open,
     label: "checkout",
-    action: () =>
+    action: (retryAutostash) =>
       onConfirm(selected, {
         as: remote ? mode : tag ? "detached" : undefined,
         name: remote && mode !== "detached" ? (mode === "reset" ? localName : name.trim()) : undefined,
-        localChanges: dirtyCount > 0 ? local : "keep",
+        localChanges: dirtyCount > 0 ? (retryAutostash ? "stash" : local) : "keep",
       }),
     onClose,
   })
@@ -125,6 +125,11 @@ export function CheckoutBranchDialog({
       subject={tip ? <QuotedRow sha={tip} /> : undefined}
       note={local === "stash" && dirtyCount > 0 ? "Stashed before, popped after the checkout." : undefined}
       busy={busy}
+      secondary={
+        dirty
+          ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "checkout-stash-retry" }
+          : undefined
+      }
       primary={{
         label: primaryLabel,
         onClick: () => void submit(),

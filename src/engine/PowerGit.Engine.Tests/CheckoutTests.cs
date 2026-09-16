@@ -184,23 +184,29 @@ public sealed class CheckoutTests
         Assert.Equal("feature", after.Branch);
         Assert.True(File.Exists(Path.Combine(repo.Dir, "c.txt")));
 
-        // a.txt differs between the branches: git refuses, and says so.
+        // a.txt differs between the branches: git refuses, and says so — typed
+        // (v0.18.17) so the dialog can offer "Stash and retry".
         repo.Write("a.txt", "dirty\n");
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+        DirtyTreeException ex = Assert.Throws<DirtyTreeException>(
             () => host.Checkout(new CheckoutRequest("main", LocalChanges: "keep")));
         Assert.Contains("a.txt", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Legacy_shape_keeps_the_dirty_guard_and_force()
+    public void Legacy_shape_carries_a_change_git_can_carry_and_force_discards()
     {
+        // v0.18.17: no pre-refusal of a dirty tree (owner: "whenever I do a
+        // merge or a reset, usually it fails"); git carries a.txt over since
+        // feature does not touch it, and force still discards.
         using TempRepo repo = new();
         GitHost host = new();
         host.Open(repo.Dir);
         File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "dirty\n");
 
-        Assert.Throws<InvalidOperationException>(() => host.Checkout(new CheckoutRequest("feature")));
-        Assert.Equal("feature", host.Checkout(new CheckoutRequest("feature", Force: true)).Branch);
+        Assert.Equal("feature", host.Checkout(new CheckoutRequest("feature")).Branch);
+        Assert.Equal("dirty", File.ReadAllText(Path.Combine(repo.Dir, "a.txt")).Trim());
+        Assert.Equal("main", host.Checkout(new CheckoutRequest("main", Force: true)).Branch);
+        Assert.NotEqual("dirty", File.ReadAllText(Path.Combine(repo.Dir, "a.txt")).Trim());
     }
 
     [Fact]

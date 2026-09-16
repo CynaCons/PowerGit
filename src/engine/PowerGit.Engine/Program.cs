@@ -780,6 +780,10 @@ repo.MapPost("/checkout", (CheckoutRequest body, GitHost git) =>
     {
         return Results.Ok(git.Checkout(body));
     }
+    catch (DirtyTreeException dirty)
+    {
+        return Results.Json(new DirtyResponse(dirty.Message, dirty.Files), statusCode: StatusCodes.Status409Conflict);
+    }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
@@ -821,6 +825,10 @@ repo.MapPost("/merge", (MergeRequest body, GitHost git) =>
     {
         return Results.Ok(git.Merge(body));
     }
+    catch (DirtyTreeException dirty)
+    {
+        return Results.Json(new DirtyResponse(dirty.Message, dirty.Files), statusCode: StatusCodes.Status409Conflict);
+    }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
@@ -856,6 +864,10 @@ repo.MapPost("/rebase", (RebaseRequest body, GitHost git) =>
     try
     {
         return Results.Ok(git.Rebase(body));
+    }
+    catch (DirtyTreeException dirty)
+    {
+        return Results.Json(new DirtyResponse(dirty.Message, dirty.Files), statusCode: StatusCodes.Status409Conflict);
     }
     catch (Exception ex)
     {
@@ -1033,11 +1045,15 @@ repo.MapGet("/worktree/patch", (string? scope, GitHost git) =>
     }
 });
 
-repo.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
+repo.MapPost("/commits/{id}/cherry-pick", (string id, CommitOperationRequest? body, GitHost git) =>
 {
     try
     {
-        return Results.Ok(git.CherryPick(id));
+        return Results.Ok(git.CherryPick(id, body?.Autostash ?? false));
+    }
+    catch (DirtyTreeException dirty)
+    {
+        return Results.Json(new DirtyResponse(dirty.Message, dirty.Files), statusCode: StatusCodes.Status409Conflict);
     }
     catch (Exception ex)
     {
@@ -1045,11 +1061,15 @@ repo.MapPost("/commits/{id}/cherry-pick", (string id, GitHost git) =>
     }
 });
 
-repo.MapPost("/commits/{id}/revert", (string id, GitHost git) =>
+repo.MapPost("/commits/{id}/revert", (string id, CommitOperationRequest? body, GitHost git) =>
 {
     try
     {
-        return Results.Ok(git.Revert(id));
+        return Results.Ok(git.Revert(id, body?.Autostash ?? false));
+    }
+    catch (DirtyTreeException dirty)
+    {
+        return Results.Json(new DirtyResponse(dirty.Message, dirty.Files), statusCode: StatusCodes.Status409Conflict);
     }
     catch (Exception ex)
     {

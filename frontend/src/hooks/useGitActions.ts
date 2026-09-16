@@ -95,8 +95,11 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
   // promise (the dialog closes), the refresh runs on behind the top bar.
   // v0.18.11: the options are the checkout dialog's (track / reset /
   // detached, keep / stash / discard); `false` is the plain old checkout.
-  async function checkout(ref: string, options: CheckoutOptions | boolean = false) {
-    await withBusy("Checking out", async () => setStatus(await engine.checkout(ref, options)), { refresh: FULL })
+  async function checkout(ref: string, options: CheckoutOptions | boolean = false, inline = false) {
+    await withBusy("Checking out", async () => setStatus(await engine.checkout(ref, options)), {
+      refresh: FULL,
+      propagateError: inline,
+    })
   }
   async function reset(mode: "soft" | "mixed" | "hard") {
     if (dialog.kind !== "reset") return
@@ -152,10 +155,14 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
   }
   /** The tree's and the chips' "Checkout branch": a local branch checks out
    *  at once, as in Git Extensions' left panel; a remote branch or a tag
-   *  opens the dialog, which asks how (v0.18.11). */
+   *  opens the dialog, which asks how (v0.18.11). v0.18.17: with uncommitted
+   *  changes the dialog opens for a local branch too — its Local changes
+   *  group (keep / stash / discard) is where git's refusal can be answered,
+   *  a bare checkout has nowhere to put it but the banner. */
   function checkoutRef(name: string, kind?: "local" | "remote" | "tag" | "submodule") {
     const remote = kind ? kind !== "local" : isRemote(name, remoteNames)
-    if (remote) open({ kind: "checkout", branch: name })
+    const dirty = (status?.unstaged.length ?? 0) + (status?.staged.length ?? 0) > 0
+    if (remote || dirty) open({ kind: "checkout", branch: name })
     else void checkout(name, false)
   }
   function openRebase() {
