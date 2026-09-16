@@ -19,6 +19,7 @@
     "test:resolution": "playwright test --config playwright.resolution.config.ts",
     "test:live": "node scripts/test-live.mjs",
     "test:perf": "node scripts/perf-run.mjs",
+    "perf:audit": "node scripts/perf-audit.mjs",
     "lint": "eslint src tests scripts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

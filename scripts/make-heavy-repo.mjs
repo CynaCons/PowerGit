@@ -21,7 +21,7 @@ const opt = (name, def) => {
 export async function ensureHeavyRepo({ commits = 50_000, branches = 2_000, tags = 500 } = {}) {
   const root = join(tmpdir(), "powergit-heavy-repo")
   const manifestPath = join(root, "heavy-repo.json")
-  const stamp = `v1:${commits}:${branches}:${tags}`
+  const stamp = `v2:${commits}:${branches}:${tags}`
 
   if (existsSync(manifestPath)) {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
@@ -123,6 +123,11 @@ export async function ensureHeavyRepo({ commits = 50_000, branches = 2_000, tags
     throw new Error(`git update-ref failed: ${upd.stderr}`)
   }
 
+  // update-ref --stdin leaves 2,500 loose ref files; every `git show %D` /
+  // `log --decorate` then reads them all (321 ms vs 84 ms packed on Windows,
+  // measured 2026-09-16) and the selection budget in tests/perf measured a
+  // fixture artifact instead of the app. Pack them, as gc would.
+  git("pack-refs", "--all")
   git("checkout", "-f", "main")
 
   const manifest = {

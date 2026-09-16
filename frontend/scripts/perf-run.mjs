@@ -6,6 +6,7 @@
 
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -37,6 +38,12 @@ const engine = spawn(cmd, args, {
     DOTNET_ROOT: join(process.env.LOCALAPPDATA ?? "", "Microsoft", "dotnet"),
     POWERGIT_ENGINE_URL: ENGINE_URL,
     POWERGIT_ENGINE_TOKEN: ENGINE_TOKEN,
+    // The perf Vite server is on :1421 and the engine only allows :1420 by
+    // default (CORS lockdown, v0.13.0): without this the UI never connects.
+    POWERGIT_ENGINE_ORIGINS: "http://127.0.0.1:1421,http://localhost:1421",
+    // Its own recents store: the fixtures must not land in the owner's
+    // Recent repositories (docs/agents/memories/private-e2e-harness.md).
+    POWERGIT_DATA_DIR: process.env.POWERGIT_DATA_DIR ?? join(tmpdir(), "powergit-perf-data"),
   },
   stdio: ["ignore", "ignore", "inherit"],
 })
@@ -66,7 +73,8 @@ try {
   })
   if (!open.ok) throw new Error(`failed to open heavy repo: ${await open.text()}`)
 
-  const result = spawnSync("npx", ["playwright", "test", "-c", "playwright.perf.config.ts"], {
+  // Extra arguments go to Playwright: `npm run test:perf -- --grep pending`.
+  const result = spawnSync("npx", ["playwright", "test", "-c", "playwright.perf.config.ts", ...process.argv.slice(2)], {
     cwd: frontendDir,
     stdio: "inherit",
     shell: true,
