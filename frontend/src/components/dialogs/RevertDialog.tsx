@@ -17,10 +17,10 @@ export function RevertDialog({
   onClose: () => void
 }) {
   const engine = useEngine()
-  const { busy, error, submit } = useActionDialog({
+  const { busy, error, submit, dirty, retryWithStash } = useActionDialog({
     open,
     label: "revert",
-    action: () => engine.revert(commit).then(() => undefined),
+    action: (autostash) => engine.revert(commit, autostash).then(() => undefined),
     onClose,
   })
 
@@ -32,6 +32,7 @@ export function RevertDialog({
       testid="revert-dialog"
       subject={<QuotedRow sha={commit} />}
       busy={busy}
+      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "revert-stash-retry" } : undefined}
       primary={{ label: "Revert", onClick: () => void submit(), testid: "revert-confirm" }}
     >
       <div className="op-text">Creates a new commit that undoes the commit's changes on the current branch.</div>

@@ -168,14 +168,18 @@ public sealed class SequencerTests
     }
 
     [Fact]
-    public void Merge_on_a_dirty_tree_needs_autostash()
+    public void Merge_on_a_dirty_non_overlapping_tree_succeeds_without_autostash()
     {
         using TempRepo repo = new();
         GitHost host = Host(repo);
         repo.Write("a.txt", "dirty\n");
 
-        Assert.Throws<InvalidOperationException>(() => host.Merge(new MergeRequest("feature")));
+        RepoStatusDto direct = host.Merge(new MergeRequest("feature"));
+        Assert.Equal("none", direct.State);
+        Assert.Equal("dirty", repo.Read("a.txt").Trim());
+        Assert.True(File.Exists(Path.Combine(repo.Dir, "b.txt")));
 
+        // Autostash remains a supported explicit route for changes that overlap.
         RepoStatusDto after = host.Merge(new MergeRequest("feature", Autostash: true));
         Assert.Equal("none", after.State);
         Assert.Equal("dirty", repo.Read("a.txt").Trim()); // autostash re-applied

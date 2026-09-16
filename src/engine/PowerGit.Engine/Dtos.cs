@@ -341,7 +341,12 @@ public sealed record StashApplyRequest(string Reference, bool Pop = false);
 public sealed record DifftoolRequest(string Commit, string Path, bool Local = false);
 
 /// <summary>409 body: a mutation collided with a running operation on the same session (v0.13.6).</summary>
-public sealed record BusyResponse(string Error, string Running);
+public sealed record BusyResponse(string Error, string Running, string Code = "busy");
+
+/// <summary>409 body when git itself says an operation would overwrite local work.</summary>
+public sealed record DirtyResponse(string Error, string[] Files, string Code = "dirty");
+
+public sealed record CommitOperationRequest(bool Autostash = false);
 
 /// <summary>GET /repos entry (v0.13.11): session plus lifecycle facts for diagnostics.</summary>
 public sealed record SessionDto(string Id, string Name, string Root, string Branch, string LastUsed, bool Busy, int Watchers);

@@ -292,6 +292,12 @@ public sealed class RepoBusyException(string running) : InvalidOperationExceptio
     public string Running { get; } = running;
 }
 
+/// <summary>Git refused an operation because it would overwrite local work (HTTP 409).</summary>
+public sealed class DirtyTreeException(string message, string[] files) : InvalidOperationException(message)
+{
+    public string[] Files { get; } = files;
+}
+
 public sealed record HealthResponse(
     string Engine,
     string Status,

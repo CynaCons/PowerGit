@@ -93,6 +93,7 @@ export class EngineError extends Error {
     message: string,
     readonly status: number,
     readonly running?: string,
+    readonly code?: string,
   ) {
     super(message)
     this.name = "EngineError"
@@ -152,10 +153,11 @@ async function json<T>(res: Response): Promise<T> {
     }
   }
   if (!res.ok) {
-    const obj = body && typeof body === "object" ? (body as { error?: unknown; running?: unknown }) : null
+    const obj = body && typeof body === "object" ? (body as { error?: unknown; running?: unknown; code?: unknown }) : null
     const err = obj && typeof obj.error === "string" ? obj.error : ""
     const running = obj && typeof obj.running === "string" ? obj.running : undefined
-    throw new EngineError(err || `http ${res.status}`, res.status, running)
+    const code = obj && typeof obj.code === "string" ? obj.code : undefined
+    throw new EngineError(err || `http ${res.status}`, res.status, running, code)
   }
   if (body === null && res.status !== 204) throw new EngineError("engine returned an empty response", res.status)
   return body as T
@@ -749,12 +751,12 @@ export class EngineClient {
     )
   }
 
-  async cherryPick(id: string): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/cherry-pick`))
+  async cherryPick(id: string, autostash = false): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/cherry-pick`, { autostash }))
   }
 
-  async revert(id: string): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/revert`))
+  async revert(id: string, autostash = false): Promise<RepoStatus> {
+    return json<RepoStatus>(await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/revert`, { autostash }))
   }
 
   /** Opens `path` at `commit` in the user's configured external diff tool.

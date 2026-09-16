@@ -54,12 +54,6 @@ public sealed partial class GitHost
         }
 
         RequireNoOperation(root);
-        if (!request.Autostash && HasTrackedChanges(root))
-        {
-            throw new InvalidOperationException(
-                "The working tree has uncommitted changes. Commit or stash them first, or merge with autostash.");
-        }
-
         List<string> args = ["merge", ff switch { "only" => "--ff-only", "no" => "--no-ff", _ => "--ff" }];
         if (request.Squash)
         {
@@ -170,12 +164,6 @@ public sealed partial class GitHost
         }
 
         RequireNoOperation(root);
-        if (!request.Autostash && HasTrackedChanges(root))
-        {
-            throw new InvalidOperationException(
-                "The working tree has uncommitted changes. Commit or stash them before rebasing, or rebase with autostash.");
-        }
-
         if (request.Todo is not null)
         {
             return RunInteractiveRebase(root, request);
@@ -372,7 +360,7 @@ public sealed partial class GitHost
 
     // ------------------------------------------------- cherry-pick / revert
 
-    public RepoStatusDto CherryPick(string commitId)
+    public RepoStatusDto CherryPick(string commitId, bool autostash = false)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(commitId))
@@ -381,16 +369,10 @@ public sealed partial class GitHost
         }
 
         RequireNoOperation(root);
-        if (HasTrackedChanges(root))
-        {
-            throw new InvalidOperationException(
-                "The working tree has uncommitted changes. Commit or stash them before cherry-picking.");
-        }
-
-        return FinishOperation(root, RunTimed(root, SequencerTimeoutMs, "cherry-pick", commitId), "Cherry-pick");
+        return RunWithAutostash(root, autostash, "Cherry-pick", () => RunTimed(root, SequencerTimeoutMs, "cherry-pick", commitId));
     }
 
-    public RepoStatusDto Revert(string commitId)
+    public RepoStatusDto Revert(string commitId, bool autostash = false)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(commitId))
@@ -399,13 +381,7 @@ public sealed partial class GitHost
         }
 
         RequireNoOperation(root);
-        if (HasTrackedChanges(root))
-        {
-            throw new InvalidOperationException(
-                "The working tree has uncommitted changes. Commit or stash them before reverting.");
-        }
-
-        return FinishOperation(root, RunTimed(root, SequencerTimeoutMs, "revert", "--no-edit", commitId), "Revert");
+        return RunWithAutostash(root, autostash, "Revert", () => RunTimed(root, SequencerTimeoutMs, "revert", "--no-edit", commitId));
     }
 
     /// <summary>
@@ -742,6 +718,25 @@ public sealed partial class GitHost
     private static string ErrorText(CommandResult result)
         => string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
 
+    private RepoStatusDto RunWithAutostash(string root, bool autostash, string what, Func<CommandResult> operation)
+    {
+        bool stashed = false;
+        if (autostash && HasTrackedChanges(root))
+        {
+            CommandResult stash = RunTimed(root, SequencerTimeoutMs, "stash", "push", "-m", "powergit autostash");
+            if (stash.ExitCode != 0) throw new InvalidOperationException($"{what} autostash failed. {ErrorText(stash)}".Trim());
+            stashed = !stash.StdOut.Contains("No local changes", StringComparison.OrdinalIgnoreCase);
+        }
+        RepoStatusDto status = FinishOperation(root, operation(), what);
+        if (stashed)
+        {
+            CommandResult pop = RunTimed(root, SequencerTimeoutMs, "stash", "pop");
+            if (pop.ExitCode != 0)
+                throw new InvalidOperationException($"{what} succeeded, but restoring the autostash failed; the stash was kept. {ErrorText(pop)}".Trim());
+        }
+        return status;
+    }
+
     /// <summary>Tracked-file changes only: untracked files never block a merge or rebase (and autostash would not stash them).</summary>
     private bool HasTrackedChanges(string root)
         => !string.IsNullOrWhiteSpace(Run(root, "status", "--porcelain=v1", "-uno").StdOut);
@@ -775,7 +770,20 @@ public sealed partial class GitHost
         if (result.ExitCode != 0 && GetOperationState(root).State == "none")
         {
             CleanupPowergitDir(root);
-            throw new InvalidOperationException($"{what} failed. {ErrorText(result)}".Trim());
+            string error = ErrorText(result);
+            if (error.Contains("Your local changes to the following files would be overwritten by", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("Please commit your changes or stash them", StringComparison.OrdinalIgnoreCase))
+            {
+                string[] files = error.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(line => !line.StartsWith("Your local", StringComparison.OrdinalIgnoreCase)
+                        && !line.StartsWith("Please commit", StringComparison.OrdinalIgnoreCase)
+                        && !line.StartsWith("Aborting", StringComparison.OrdinalIgnoreCase)
+                        && !line.StartsWith("error:", StringComparison.OrdinalIgnoreCase))
+                    .Where(line => !line.StartsWith("Updating ", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                throw new DirtyTreeException($"{what} failed. {error}".Trim(), files);
+            }
+            throw new InvalidOperationException($"{what} failed. {error}".Trim());
         }
 
         RepoStatusDto status = GetStatus();

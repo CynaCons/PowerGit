@@ -20,10 +20,10 @@ export function CherryPickDialog({
   onClose: () => void
 }) {
   const engine = useEngine()
-  const { busy, error, submit } = useActionDialog({
+  const { busy, error, submit, dirty, retryWithStash } = useActionDialog({
     open,
     label: "cherry-pick",
-    action: () => engine.cherryPick(commit).then(() => undefined),
+    action: (autostash) => engine.cherryPick(commit, autostash).then(() => undefined),
     onClose,
   })
 
@@ -35,6 +35,7 @@ export function CherryPickDialog({
       testid="cherry-pick-dialog"
       subject={<QuotedRow sha={commit} />}
       busy={busy}
+      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "cherry-pick-stash-retry" } : undefined}
       primary={{ label: "Cherry-pick", onClick: () => void submit(), testid: "cherry-pick-confirm" }}
     >
       <div className="op-text">Applies the commit's changes as a new commit on the current branch.</div>

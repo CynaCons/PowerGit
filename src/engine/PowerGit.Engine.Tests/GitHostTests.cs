@@ -166,7 +166,7 @@ public sealed class GitHostTests
     }
 
     [Fact]
-    public void CherryPick_requires_clean_tree()
+    public void CherryPick_allows_a_dirty_non_overlapping_tree()
     {
         using TempRepo repo = new();
         GitHost host = new();
@@ -174,7 +174,9 @@ public sealed class GitHostTests
         string featureCommitId = host.ListRevisions(10).First(r => r.Subject == "feature-commit").Id;
 
         File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "dirty\n");
-        Assert.Throws<InvalidOperationException>(() => host.CherryPick(featureCommitId));
+        RepoStatusDto result = host.CherryPick(featureCommitId);
+        Assert.Equal("none", result.State);
+        Assert.Equal("dirty", File.ReadAllText(Path.Combine(repo.Dir, "a.txt")).Trim());
     }
 
     [Fact]

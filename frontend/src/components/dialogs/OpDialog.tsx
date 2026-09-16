@@ -43,6 +43,7 @@ export function OpDialog({
   width = OP_DIALOG_WIDTH,
   note,
   primary,
+  secondary,
   actions,
   busy = false,
   cancelLabel = "Cancel",
@@ -58,6 +59,7 @@ export function OpDialog({
   width?: number
   note?: OpNote
   primary?: OpPrimary
+  secondary?: OpPrimary
   /** Custom action row (the dialogs not on the primary contract). */
   actions?: ReactNode
   /** Disables Cancel and the primary while the engine answers. */
@@ -118,6 +120,7 @@ export function OpDialog({
             <Button size="small" onClick={onClose} disabled={busy} sx={{ height: 30, px: 1.75, fontWeight: 500 }}>
               {cancelLabel}
             </Button>
+            {secondary && <Button size="small" onClick={secondary.onClick} disabled={busy || secondary.disabled} data-testid={secondary.testid}>{secondary.label}</Button>}
             {primary && (
               <Button
                 size="small"

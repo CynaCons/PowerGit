@@ -81,8 +81,14 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
     async (label: string, fn: () => Promise<void>, options?: BusyOptions) => {
       if (settling.current) {
         await settling.current
-        if (engineCall.current) return
-      } else if (busy || engineCall.current) return
+      }
+      // A dialog can be confirmed while fetch/pull/push owns the write gate.
+      // Never silently discard it: wait for the in-process call to release it,
+      // then run this operation under its own label.
+      while (engineCall.current) {
+        setJobLabel(`Waiting for ${jobLabel ?? "operation"}…`)
+        await new Promise<void>((resolve) => setTimeout(resolve, 50))
+      }
       engineCall.current = true
       dispatch({ type: "job-started", label })
       setJobLabel(label)
@@ -117,7 +123,7 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
         })
       settling.current = tail
     },
-    [busy, dispatch, setEngineError, handleFailure, refresh],
+    [jobLabel, dispatch, setEngineError, handleFailure, refresh],
   )
 
   const recordStart = useCallback((label: string, start: () => Promise<JobStarted>): number => {

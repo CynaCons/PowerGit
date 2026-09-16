@@ -46,10 +46,10 @@ export function RebaseDialog({
     setRebaseMerges(false)
   }, [open, initialInteractive])
 
-  const { busy, error, submit } = useActionDialog({
+  const { busy, error, submit, dirty, retryWithStash } = useActionDialog({
     open,
     label: "rebase",
-    action: () => onConfirm({ autostash, interactive, autosquash: interactive && autosquash, rebaseMerges }),
+    action: (retryAutostash) => onConfirm({ autostash: retryAutostash || autostash, interactive, autosquash: interactive && autosquash, rebaseMerges }),
     onClose,
   })
 
@@ -61,6 +61,7 @@ export function RebaseDialog({
       testid="rebase-dialog"
       subject={<QuotedRef name={currentBranch} kind="local" caption="onto" tip={ontoSha} />}
       busy={busy}
+      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "rebase-stash-retry" } : undefined}
       primary={{
         label: interactive ? "Edit todo…" : "Rebase",
         onClick: () => void submit(),

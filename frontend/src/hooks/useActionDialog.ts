@@ -1,37 +1,19 @@
 import { useEffect, useState } from "react"
-import { describeThrown } from "../engine"
+import { describeThrown, EngineError } from "../engine"
 
-export type ActionDialogOptions = {
-  open: boolean
-  // Operation name for the inline error ("checkout failed: …").
-  label: string
-  action: () => Promise<void>
-  onClose: () => void
-}
+export type ActionDialogOptions = { open: boolean; label: string; action: (autostash?: boolean) => Promise<void>; onClose: () => void }
 
-// The busy/error shape every git-operation dialog shares: the error resets
-// when the dialog opens, `submit` runs the action, closes on success and
-// surfaces a failed/conflicted op inline otherwise. `busy` is exposed for
-// dialogs that disable their buttons while the request is in flight.
+/** Keeps an operation error in its dialog; a git dirty-tree response may retry with a tracked-file autostash. */
 export function useActionDialog({ open, label, action, onClose }: ActionDialogOptions) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (open) setError(null)
-  }, [open])
-
-  async function submit() {
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => { if (open) { setError(null); setDirty(false) } }, [open])
+  async function run(autostash = false) {
     setBusy(true)
-    try {
-      await action()
-      onClose()
-    } catch (e) {
-      setError(`${label} failed: ${describeThrown(e)}`)
-    } finally {
-      setBusy(false)
-    }
+    try { await action(autostash); onClose() }
+    catch (e) { setDirty(e instanceof EngineError && e.code === "dirty"); setError(`${label} failed: ${describeThrown(e)}`) }
+    finally { setBusy(false) }
   }
-
-  return { busy, error, setError, submit }
+  return { busy, error, setError, submit: () => run(), dirty, retryWithStash: () => run(true) }
 }
