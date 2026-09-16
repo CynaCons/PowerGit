@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 
+import { pickBranch } from "../dialogHelpers"
 import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
 // v0.15.0, owner: "integrate merges ... by reintegrating what Git Extensions
@@ -45,8 +46,7 @@ test.describe("merge with conflicts", () => {
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
 
     await page.getByTestId("merge-button").click()
-    await expect(page.getByTestId("merge-branch")).toBeVisible()
-    await page.getByTestId("merge-branch").selectOption("topic")
+    await pickBranch(page, "merge-branch", "topic")
     await page.getByTestId("merge-confirm").click()
 
     // A stopped merge is a state, not an error: the banner appears instead.
@@ -91,6 +91,41 @@ test.describe("merge with conflicts", () => {
     await expect(page.getByTestId("grid-row").first()).toHaveText(tip ?? "")
   })
 
+  // v0.18.11, owner: the "Merge branch" label of the old floating-label
+  // select was cut by DialogContent's overflow. On the A shell the label
+  // sits above the field, inside the dialog, and no option row wraps.
+  test("the Merge branch label is whole, above its field, and nothing wraps at 600", async ({ page }) => {
+    await page.goto("/")
+    await expect(page.getByTestId("grid-row").first()).toBeVisible()
+
+    await page.getByTestId("merge-button").click()
+    const dialog = page.getByTestId("merge-dialog")
+    await expect(dialog).toBeVisible()
+    const field = dialog.getByTestId("merge-branch-field")
+    const label = field.locator(".op-label")
+    await expect(label).toHaveText("Merge branch")
+    const d = await dialog.boundingBox()
+    const l = await label.boundingBox()
+    const p = await page.getByTestId("merge-branch").boundingBox()
+    expect(d && l && p).toBeTruthy()
+    // The label's box is inside the dialog's, and above the picker's.
+    expect(l!.x).toBeGreaterThanOrEqual(d!.x)
+    expect(l!.y).toBeGreaterThanOrEqual(d!.y)
+    expect(l!.x + l!.width).toBeLessThanOrEqual(d!.x + d!.width)
+    expect(l!.y + l!.height).toBeLessThanOrEqual(p!.y)
+    expect(d!.width).toBe(600)
+    // Every option is one line: a wrapped row would be twice as tall.
+    for (const row of await dialog.locator(".op-opt").all()) {
+      const b = await row.boundingBox()
+      expect(b!.height).toBeLessThanOrEqual(28)
+    }
+    // The two tips are quoted with "into" between them.
+    await expect(dialog.getByTestId("quoted-row")).toHaveCount(2)
+    await expect(dialog.locator(".op-into")).toHaveText("into")
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
+  })
+
   test("fast-forward only refuses a diverged branch and says so", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
@@ -98,7 +133,7 @@ test.describe("merge with conflicts", () => {
     await page.getByTestId("merge-button").click()
     // Wait for the branch list before changing options; its initial load
     // initializes the dialog defaults.
-    await page.getByTestId("merge-branch").selectOption("topic")
+    await pickBranch(page, "merge-branch", "topic")
     await page.getByTestId("merge-ff-only").click()
     await page.getByTestId("merge-confirm").click()
 
@@ -172,7 +207,7 @@ test.describe("merge on a slow history", () => {
     })
 
     await page.getByTestId("merge-button").click()
-    await page.getByTestId("merge-branch").selectOption("topic")
+    await pickBranch(page, "merge-branch", "topic")
     const merged = page.waitForResponse((r) => r.request().method() === "POST" && /\/merge$/.test(r.url()))
     slow = true
     await page.getByTestId("merge-confirm").click()
