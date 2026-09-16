@@ -4,6 +4,7 @@ import { changeKindOf, describeThrown, type ChangeKind, type RefTree, type RepoS
 import { syntheticRefTree, syntheticStatus } from "../graph/synthetic"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
+import { statusEquals } from "./statusEquals"
 
 const ECHO_MS = 700
 const STATUS_POLL_MS = 10_000
@@ -57,7 +58,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       }
       if (s.revisions) jobs.push(reloadHistory().catch(fail("history")))
       if (s.refs) jobs.push(client.refs().then(setRefs).catch(fail("refs")))
-      if (s.status) jobs.push(client.status().then(setStatus).catch(fail("status")))
+      if (s.status) jobs.push(client.status().then((next) => setStatus((previous) => statusEquals(previous, next) ? previous : next)).catch(fail("status")))
       if (s.stashes)
         jobs.push(
           client
