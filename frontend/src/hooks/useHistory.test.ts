@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, createElement, useEffect } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { diagnosticsSnapshot } from "../diagnostics"
-import type { EngineClient, RevisionDto, RevisionFilter } from "../engine"
+import { EngineError, type EngineClient, type RevisionDto, type RevisionFilter } from "../engine"
 import { useHistory, type History } from "./useHistory"
 
 // v0.16.0 review, finding 5: "A file-history reload can lose its eager-tail
@@ -306,5 +306,49 @@ describe("useHistory: a reload while one is in flight (v0.18.9)", () => {
     expect(latest?.loaded).toBe(true)
     expect(latest?.rows.every((r) => r.rev.id.startsWith("B"))).toBe(true)
     expect(failures).toEqual([])
+  })
+})
+
+describe("useHistory: a failed page fetch", () => {
+  let root: Root
+  let container: HTMLDivElement
+
+  beforeEach(() => {
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  it("reports 'History:' through the failure handler and never an unhandled rejection", async () => {
+    const failure = vi.fn(() => "request URI too long")
+    const banner = vi.fn()
+    const unhandled = vi.fn()
+    process.on("unhandledRejection", unhandled)
+    const client = { revisions: () => Promise.reject(new EngineError("request URI too long", 414)) } as unknown as EngineClient
+
+    function Harness() {
+      const history = useHistory({ client, demo: false, live: true, setEngineError: banner, onFailure: failure })
+      useEffect(() => {
+        void history.reloadHistory()
+      }, [history])
+      return null
+    }
+
+    try {
+      await act(async () => {
+        root.render(createElement(Harness))
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(failure).toHaveBeenCalledWith(expect.any(EngineError), "history")
+      expect(banner).toHaveBeenCalledWith(expect.stringContaining("History:"))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off("unhandledRejection", unhandled)
+    }
   })
 })

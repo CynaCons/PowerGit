@@ -130,3 +130,42 @@ test.describe("choose the branches the graph shows", () => {
     await expect(page.getByTestId("graph-filter-count")).toHaveText("2 of 3 refs")
   })
 })
+
+test.describe("Show all on a large ref set", () => {
+  let dir: string
+  let previous: string | null = null
+  let repoId = ""
+
+  test.beforeAll(async () => {
+    previous = await currentRepoPath()
+    dir = makeRepo("pg-graph-filter-many-")
+    git(dir, "checkout", "-q", "-b", "a")
+    write(dir, "a.txt", "a\n")
+    commit(dir, "a-only")
+    git(dir, "checkout", "-q", "main")
+    git(dir, "checkout", "-q", "-b", "b")
+    write(dir, "b.txt", "b\n")
+    commit(dir, "b-only")
+    git(dir, "checkout", "-q", "main")
+    write(dir, "m.txt", "m\n")
+    commit(dir, "main-2")
+    for (let i = 0; i < 400; i++) git(dir, "branch", `b${i}`)
+    await openRepoOnEngine(dir)
+    repoId = ((await (await fetch(`${ENGINE_URL}/repos/current`, { headers: engineHeaders() })).json()) as { id: string }).id
+  })
+
+  test.afterAll(async () => {
+    await openRepoOnEngine(previous ?? process.cwd())
+    await removeRepo(dir)
+  })
+
+  test("Show all on 400 refs draws the graph", async ({ page }) => {
+    test.setTimeout(120_000)
+    await page.goto(`/?repo=${repoId}`)
+    await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
+    await page.getByTestId("tree-filter-mode").click()
+    await page.getByTestId("tree-filter-all").click()
+    await expect(subjects(page)).toHaveText(["main-2", "b-only", "a-only", "base"])
+    await expect(page.getByRole("alert")).toHaveCount(0)
+  })
+})
