@@ -125,6 +125,8 @@ export class ParentChildMemory {
   private parentStack: string[] = []
   /** The SHA a navigation is moving to; the next settle() with it keeps the stacks. */
   private expected: string | null = null
+  /** The selection the stacks were last settled for. */
+  private settled: string | null = null
 
   /** Where "go to child" returns to, if the last move was "go to parent" from there. */
   get previousChild(): string | null {
@@ -134,6 +136,17 @@ export class ParentChildMemory {
   /** Where "go to parent" returns to, if the last move was "go to child" from there. */
   get previousParent(): string | null {
     return this.parentStack.length > 0 ? this.parentStack[this.parentStack.length - 1] : null
+  }
+
+  /** The way back as seen from `sha`: the stacks when a move to it is under
+   *  way, or when none is and they were settled for it; nothing for any
+   *  other row (a render can ask before the selection effect has settled
+   *  the change, and the row a move leaves keeps the graph's own answer
+   *  while the target pages in). */
+  wayBackFrom(sha: string): { child: string | null; parent: string | null } {
+    const valid = this.expected !== null ? sha === this.expected : sha === this.settled
+    if (!valid) return { child: null, parent: null }
+    return { child: this.previousChild, parent: this.previousParent }
   }
 
   /** Moving from `from` down to `parent`: the way back is `from`. */
@@ -153,17 +166,16 @@ export class ParentChildMemory {
   /** The selection changed to `sha`: our own move keeps the memory, any
    *  other change (a click, a key, a refresh) clears it, as GE does. */
   settle(sha: string | null): void {
-    if (sha !== null && sha === this.expected) {
-      this.expected = null
-      return
-    }
-    this.clear()
+    if (sha === null || sha !== this.expected) this.clear()
+    this.expected = null
+    this.settled = sha
   }
 
   clear(): void {
     this.childStack = []
     this.parentStack = []
     this.expected = null
+    this.settled = null
   }
 }
 
@@ -222,8 +234,9 @@ export function navTargets(rows: GraphRow[], selected: GraphRow | undefined, mem
   }
   const sha = selected.rev.id
   const parents = parentsOf(rows, sha)
-  const parent = memory?.previousParent ?? parents[0] ?? null
-  const child = memory?.previousChild ?? firstChildOf(rows, sha)
+  const back = memory?.wayBackFrom(sha)
+  const parent = back?.parent ?? parents[0] ?? null
+  const child = back?.child ?? firstChildOf(rows, sha)
   const atHead = head !== null && head === sha
   return {
     sha,

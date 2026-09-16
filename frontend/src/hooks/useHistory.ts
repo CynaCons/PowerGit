@@ -348,8 +348,8 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   // Owner requirement: with thousands of branches most tips are NOT in the
   // loaded history — jumping to a ref keeps loading pages until its commit
   // appears (or the ceiling is hit) instead of silently doing nothing.
-  const jumpToRef = useCallback(
-    async (sha: string) => {
+  const loadUntil = useCallback(
+    async (sha: string): Promise<Revision | undefined> => {
       const find = () => revisionsRef.current.find((r) => r.id.startsWith(sha) || sha.startsWith(r.id))
       let hit = find()
       const gen = histGen.current
@@ -361,6 +361,14 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
         if (revCount.current === before) break // fetch failed; don't spin
       }
       setHistoryNote(null)
+      return hit
+    },
+    [extendHistory],
+  )
+
+  const jumpToRef = useCallback(
+    async (sha: string) => {
+      const hit = await loadUntil(sha)
       if (hit) {
         setSelectedSha(hit.id)
       } else {
@@ -369,7 +377,26 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
         )
       }
     },
-    [extendHistory, setEngineError],
+    [loadUntil, setEngineError],
+  )
+
+  // The compass (v0.18.12): a parent or HEAD below the loaded window pages
+  // the same way, the grid's tail names the target while it does
+  // ("Loading history to febf4ba…"), and a miss is the caller's to say —
+  // "Not in the loaded history" is a note, not an error banner.
+  const [loadingTarget, setLoadingTarget] = useState<string | null>(null)
+  const jumpToCommit = useCallback(
+    async (sha: string): Promise<boolean> => {
+      setLoadingTarget(sha)
+      try {
+        const hit = await loadUntil(sha)
+        if (hit) setSelectedSha(hit.id)
+        return hit !== undefined
+      } finally {
+        setLoadingTarget(null)
+      }
+    },
+    [loadUntil],
   )
 
   const onNearEnd = useCallback(() => {
@@ -389,11 +416,14 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     setHighlightRoot,
     toggleHighlightRoot,
     loadingTail,
+    loadingTarget,
+    historyComplete,
     loaded,
     historyNote,
     reloadHistory,
     resetHistory,
     jumpToRef,
+    jumpToCommit,
     onNearEnd,
   }
 }

@@ -5,9 +5,11 @@ import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
 import type { ReactNode } from "react"
 import type { GraphRow } from "../graph/types"
+import type { GraphNav } from "../hooks/useGraphNav"
 import type { GridMenus } from "../hooks/useGridMenus"
 import type { SessionView } from "../session/state"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
+import { GraphCompass } from "./GraphCompass"
 import { RevisionGrid } from "./RevisionGrid"
 
 export type HistoryPaneProps = {
@@ -29,6 +31,8 @@ export type HistoryPaneProps = {
   emptyText?: string
   /** v0.18.5: the graph's ref filter chip, at the end of the Message header. */
   headerExtra?: ReactNode
+  /** v0.18.12: the compass's targets and actions (useGraphNav); the file history has none. */
+  nav?: GraphNav
   onSelect: (index: number) => void
   onNearEnd: () => void
   /** The row and ref-chip menus (v0.16.0, shared with the file history). */
@@ -57,6 +61,7 @@ export function HistoryPane({
   view,
   emptyText,
   headerExtra,
+  nav,
   onSelect,
   onNearEnd,
   menus,
@@ -120,6 +125,8 @@ export function HistoryPane({
           onHighlightRoot={onHighlightRoot}
           onNearEnd={onNearEnd}
           headerExtra={headerExtra}
+          compass={nav && <GraphCompass rows={rows} nav={nav} />}
+          loadingTarget={nav?.loadingTarget}
           // The right-click has already moved the selection; the previous
           // one (still in `selectedSha` during this event) is the other side
           // of "Compare selected commits".

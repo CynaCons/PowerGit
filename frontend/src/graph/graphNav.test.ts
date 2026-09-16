@@ -171,6 +171,22 @@ describe("ParentChildMemory (GE's way back)", () => {
     expect(navTargets(rows, row("main2"), m).child).toBe(id("merge")) // the loaded graph's answer
   })
 
+  it("a row the memory was not settled for sees no way back (the render before the effect)", () => {
+    const m = new ParentChildMemory()
+    m.toParent(id("main2"), id("base"))
+    m.settle(id("base"))
+    // The user clicks wip: the grid renders with wip selected before the
+    // selection effect settles the memory, and must not offer main2.
+    expect(navTargets(rows, row("wip"), m).child).toBeNull()
+    expect(navTargets(rows, row("wip"), m).childReason).toBe("no-child")
+    // The move under way is visible before it settles; the row it leaves
+    // keeps the graph's own answer while the target pages in.
+    m.settle(id("wip"))
+    m.toParent(id("wip"), id("base"))
+    expect(navTargets(rows, row("base"), m).child).toBe(id("wip"))
+    expect(navTargets(rows, row("wip"), m).child).toBeNull()
+  })
+
   it("a remembered child wins even when the loaded graph has none (from above the window)", () => {
     const m = new ParentChildMemory()
     m.toParent(id("above"), id("head"))
