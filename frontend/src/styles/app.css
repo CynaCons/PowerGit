@@ -28,7 +28,7 @@ html {
 .grid-row {
   display: grid;
   /* v0.14.3: the three metadata widths come from RevisionGrid (gridColumns.ts). */
-  --col-a: var(--col-author, 154px);
+  --col-a: var(--col-author, 162px);
   --col-d: var(--col-date, 142px);
   --col-s: var(--col-sha, 86px);
   grid-template-columns: var(--graph-width, 96px) minmax(120px, 1fr) var(--col-a) var(--col-d) var(--col-s);
@@ -44,7 +44,7 @@ html {
 @media (max-width: 1200px) {
   .grid-header,
   .grid-row {
-    --col-a: var(--col-author, 128px); /* v0.18.1: room for the author disc */
+    --col-a: var(--col-author, 136px); /* v0.18.1: room for the author disc; v0.18.9: + the 8 px cell padding */
     --col-d: var(--col-date, 106px);
     --col-s: var(--col-sha, 68px);
     grid-template-columns: var(--graph-width, 96px) minmax(100px, 1fr) var(--col-a) var(--col-d) var(--col-s);
@@ -503,6 +503,17 @@ html {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* v0.18.9, owner: "the author col has the author icons truncated on the
+   left — move the col left boundary by a few pixels to ensure we don't cut
+   our author icons." Author and Date line up under their headers (the
+   `.grid-header > div` 8 px below), and the disc's selected-author ring
+   (3.5 px, v0.18.1) has room inside the cell's overflow: hidden. The SHA
+   cell is right-aligned and keeps its own padding. */
+.author,
+.date {
+  padding-left: 8px;
 }
 
 .sha {
