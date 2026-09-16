@@ -148,6 +148,35 @@ test.describe("author identity in the graph", () => {
     expect(tinted).toBe(0)
   })
 
+  // Owner (2026-09-16): "in the main view, the author col has the author
+  // icons truncated on the left — we should probably move the col left
+  // boundary by a few pixels to ensure we don't cut our author icons."
+  // (v0.18.9). The cell clips its overflow, so the disc needs room inside
+  // it for the 3.5 px ring: 8 px, the header's own padding.
+  test("the disc sits 8 px inside the author cell so a marked row's ring is whole; the default Author column is 162 px", async ({
+    page,
+  }) => {
+    await rowsBy(page, "ml").first().click()
+    const marked = rowsBy(page, "ml").nth(1)
+    await expect(marked).toHaveClass(/author-same/)
+    await expect(marked).not.toHaveClass(/selected/)
+    expect(await boxShadow(marked.locator(".author-disc"))).not.toBe("none")
+    const cell = (await marked.locator(".author").boundingBox())!
+    const disc = (await marked.locator(".author-disc").boundingBox())!
+    expect(disc.x - cell.x).toBeGreaterThanOrEqual(8)
+    // The ring (2 px surface + 3.5 px primary) lies inside the cell's box.
+    expect(disc.x - 4).toBeGreaterThanOrEqual(cell.x)
+    expect(disc.y - 4).toBeGreaterThanOrEqual(cell.y)
+    expect(disc.y + disc.height + 4).toBeLessThanOrEqual(cell.y + cell.height)
+
+    // A fresh context (nothing user-set) shows DEFAULT_WIDTHS.author on the header and the cell.
+    const colAuthor = await page
+      .locator(".grid-header")
+      .evaluate((el) => getComputedStyle(el).getPropertyValue("--col-author"))
+    expect(colAuthor.trim()).toBe("162px")
+    expect(Math.round(cell.width)).toBe(162)
+  })
+
   test("Mark off removes the rings and keeps the discs", async ({ page }) => {
     await rowsBy(page, "ml").first().click()
     await expect(page.locator(".grid-row.author-same")).toHaveCount(2)

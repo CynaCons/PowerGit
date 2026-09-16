@@ -17,8 +17,9 @@ describe("grid column widths (v0.14.3)", () => {
   it("defaults when nothing is stored or the value is garbage", () => {
     const s = memory()
     expect(loadWidths(s)).toEqual(DEFAULT_WIDTHS)
-    // v0.18.1: the disc needs the room; a user-set width still wins.
-    expect(DEFAULT_WIDTHS.author).toBe(154)
+    // v0.18.1: the disc needs the room; v0.18.9: and the cell's 8 px left
+    // padding, so the disc's ring is whole. A user-set width still wins.
+    expect(DEFAULT_WIDTHS.author).toBe(162)
     s.setItem(STORAGE_KEY, "{nope")
     expect(loadWidths(s)).toEqual(DEFAULT_WIDTHS)
     s.setItem(STORAGE_KEY, JSON.stringify({ author: "wide", sha: 60 }))

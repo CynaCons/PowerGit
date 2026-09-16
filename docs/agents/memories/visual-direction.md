@@ -117,11 +117,13 @@ overlay? Show me visual prototypes to improve that UI" → "ok for C" of
 today). The v0.4.6 dialog was the last place the rounded-card kit survived
 (a centred modal, two columns of outlined cards, the full path on every
 one). The picker (`components/RecentsDialog.tsx`, `RecentTile.tsx`,
-`recentsModel.ts`) opens where a command palette opens — 80 px from the
-top, 760 wide — with the focus in the search box, and is a hairline grid
-of tiles three across (two under 700 px): no cards, no shadows, the lines
-are the 1 px gap on `--pg-border-soft`. One bold element per tile: a
-30 px initials disc (the name's first two words, camel-case counted,
+`recentsModel.ts`) opens centred, sized to the window — min(1120 px,
+100vw − 96) by min(720 px, 100vh − 96), v0.18.9 after the owner found the
+760 px command-palette panel of the prototype too small to read (see
+recents-picker.md) — with the focus in the search box, and is a hairline
+grid of tiles 340 px or wider, as many across as fit (three at 1120): no
+cards, no shadows, the lines are the 1 px gap on `--pg-border-soft`. One
+bold element per tile: a 36 px initials disc (the name's first two words, camel-case counted,
 PowerGit → PG) coloured by a stable hash of the *path* onto the six
 ref-badge pairs — the author-disc device of v0.18.1, so two repositories
 called `api` never share a disc. Then the name at 500 with a fork-glyph
