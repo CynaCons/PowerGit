@@ -14,7 +14,14 @@ import { layoutGraph } from "./layout"
 import type { Revision } from "./types"
 
 function rev(id: string, parents: string[], refs: string[] = []): Revision {
-  return { id: id.padEnd(40, "0"), parents: parents.map((p) => p.padEnd(40, "0")), message: id, author: "a", date: "", refs }
+  return {
+    id: id.padEnd(40, "0"),
+    parents: parents.map((p) => p.padEnd(40, "0")),
+    message: id,
+    author: "a",
+    date: "",
+    refs,
+  }
 }
 const id = (s: string) => s.padEnd(40, "0")
 
