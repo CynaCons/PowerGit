@@ -37,6 +37,7 @@ Which GE form each PowerGit surface answers to. GE's source is on the
 | Git Extensions | PowerGit |
 |---|---|
 | `FormMergeBranch` | `dialogs/MergeDialog.tsx` (ff only / allow / no-ff, squash, message, autostash) |
+| `FormCheckoutBranch` | `dialogs/CheckoutBranchDialog.tsx` (v0.18.11): a remote offers tracking local creation, resetting an existing local to the remote, or detached checkout; dirty work is Keep, Stash, or Discard. |
 | `FormRebase` | `dialogs/RebaseDialog.tsx` + `dialogs/InteractiveRebaseDialog.tsx`; its Continue / Skip / Abort / Solve-conflicts buttons live in `components/OperationBanner.tsx` instead, because the state outlives any dialog |
 | `FormResolveConflicts` | `dialogs/ResolveConflictsDialog.tsx`; the stage-based `HandleConflictSelectSide` in `GitModule.cs` is the model for `POST /conflicts/resolve` |
 | `RevisionGridControl` context menu | `dialogs/revisionMenuModel.ts` (the item model) rendered by `dialogs/RevisionContextMenu.tsx`; ref chips get `dialogs/RefContextMenu.tsx` |
