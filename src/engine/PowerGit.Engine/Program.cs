@@ -780,6 +780,10 @@ repo.MapPost("/checkout", (CheckoutRequest body, GitHost git) =>
     {
         return Results.Ok(git.Checkout(body));
     }
+    catch (DirtyTreeException dirty)
+    {
+        return Results.Json(new DirtyResponse(dirty.Message, dirty.Files), statusCode: StatusCodes.Status409Conflict);
+    }
     catch (Exception ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);

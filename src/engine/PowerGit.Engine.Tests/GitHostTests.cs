@@ -69,7 +69,7 @@ public sealed class GitHostTests
     }
 
     [Fact]
-    public void Checkout_moves_head_and_guards_dirty_tree()
+    public void Checkout_moves_head_and_carries_a_dirty_tree()
     {
         using TempRepo repo = new();
         GitHost host = new();
@@ -78,11 +78,13 @@ public sealed class GitHostTests
         RepoStatusDto onFeature = host.Checkout("feature", force: false);
         Assert.Equal("feature", onFeature.Branch);
 
+        // v0.18.17: a change git can carry over is carried, not refused.
         File.WriteAllText(Path.Combine(repo.Dir, "a.txt"), "dirty\n");
-        Assert.Throws<InvalidOperationException>(() => host.Checkout("main", force: false));
+        Assert.Equal("main", host.Checkout("main", force: false).Branch);
+        Assert.Equal("dirty", File.ReadAllText(Path.Combine(repo.Dir, "a.txt")).Trim());
 
-        RepoStatusDto forced = host.Checkout("main", force: true);
-        Assert.Equal("main", forced.Branch);
+        RepoStatusDto forced = host.Checkout("feature", force: true);
+        Assert.Equal("feature", forced.Branch);
     }
 
     [Fact]

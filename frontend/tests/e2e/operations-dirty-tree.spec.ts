@@ -17,10 +17,13 @@ function dirty(root: string) {
   write(root, "untracked-1", "one\n")
   write(root, "untracked-2", "two\n")
 }
-function expectDirt(root: string) {
+// `afterGitAutostash`: git's own --autostash (merge, rebase) brings the
+// staged file back modified but unstaged; the engine's stash around
+// cherry-pick and revert pops with --index and keeps it staged.
+function expectDirt(root: string, afterGitAutostash = false) {
   expect(status(root)).toMatch(/ M fileB/)
   expect(status(root)).toMatch(/ M fileC/)
-  expect(status(root)).toMatch(/M {2}fileD/)
+  expect(status(root)).toMatch(afterGitAutostash ? /[ M]M? {1,2}fileD/ : /M {2}fileD/)
   expect(status(root)).toMatch(/\?\? untracked-1/)
   expect(status(root)).toMatch(/\?\? untracked-2/)
 }
@@ -62,9 +65,15 @@ test.describe("operations on a developer's dirty tree", () => {
     await page.getByTestId("merge-button").click()
     await pickBranch(page, "merge-branch", "feature")
     await page.getByTestId("merge-confirm").click()
+    // git merge tolerates unstaged changes to files it does not touch, but
+    // aborts on anything staged ("changes registered in the index relative
+    // to HEAD", git-merge(1)): the dialog keeps git's words and offers the
+    // stash; after the retry the staged file is staged again (pop --index).
+    await expect(page.getByTestId("merge-dialog")).toContainText("would be overwritten by merge")
+    await page.getByTestId("merge-stash-retry").click()
     await expect(page.getByTestId("merge-dialog")).toHaveCount(0)
-    expectDirt(root)
-    await expect(page.getByRole("alert")).toHaveCount(0)
+    expectDirt(root, true)
+    await expect(page.getByTestId("error-banner")).toHaveCount(0)
 
     // Git always requires a clean tracked tree for rebase. The dirty-tree
     // default is checked, but exercise the inline recovery path explicitly.
@@ -77,9 +86,12 @@ test.describe("operations on a developer's dirty tree", () => {
     await expect(rebase).toContainText(/cannot rebase/i)
     await rebase.getByTestId("rebase-stash-retry").click()
     await expect(rebase).toHaveCount(0)
-    expectDirt(root)
-    await expect(page.getByRole("alert")).toHaveCount(0)
+    expectDirt(root, true)
+    await expect(page.getByTestId("error-banner")).toHaveCount(0)
 
+    // git's autostash above left fileD unstaged; stage it again so the
+    // cherry-pick meets the index git refuses to touch.
+    dirty(root)
     await row(page, "pick source").click({ button: "right" })
     await page.getByTestId("ctx-cherry-pick").click()
     await page.getByTestId("cherry-pick-confirm").click()
@@ -88,8 +100,9 @@ test.describe("operations on a developer's dirty tree", () => {
     await cherryPick.getByTestId("cherry-pick-stash-retry").click()
     await expect(cherryPick).toHaveCount(0)
     expectDirt(root)
-    await expect(page.getByRole("alert")).toHaveCount(0)
+    await expect(page.getByTestId("error-banner")).toHaveCount(0)
 
+    dirty(root)
     await row(page, "pick source").click({ button: "right" })
     await page.getByTestId("ctx-revert").click()
     await page.getByTestId("revert-confirm").click()
@@ -98,7 +111,7 @@ test.describe("operations on a developer's dirty tree", () => {
     await revert.getByTestId("revert-stash-retry").click()
     await expect(revert).toHaveCount(0)
     expectDirt(root)
-    await expect(page.getByRole("alert")).toHaveCount(0)
+    await expect(page.getByTestId("error-banner")).toHaveCount(0)
   })
 
   for (const mode of ["soft", "mixed", "hard"] as const)
@@ -113,8 +126,8 @@ test.describe("operations on a developer's dirty tree", () => {
       if (mode === "hard") {
         expect(status(root)).not.toMatch(/file[BCD]/)
         expect(existsSync(join(root, "untracked-1"))).toBe(true)
-      } else expectDirt(root)
-      await expect(page.getByRole("alert")).toHaveCount(0)
+      } else expectDirt(root, mode === "mixed") // --mixed resets the index: fileD is back to unstaged
+      await expect(page.getByTestId("error-banner")).toHaveCount(0)
     })
 
   test("checkout keeps non-overlapping dirt", async ({ page }) => {
@@ -127,7 +140,7 @@ test.describe("operations on a developer's dirty tree", () => {
     await expect(page.getByTestId("checkout-dialog")).toHaveCount(0)
     expect(git(root, "branch", "--show-current").trim()).toBe("feature")
     expectDirt(root)
-    await expect(page.getByRole("alert")).toHaveCount(0)
+    await expect(page.getByTestId("error-banner")).toHaveCount(0)
   })
 
   test("a reset confirmed during a fetch waits rather than disappearing", async ({ page }) => {

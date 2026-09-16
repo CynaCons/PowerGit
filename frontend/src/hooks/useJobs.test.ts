@@ -49,7 +49,7 @@ describe("useJobs", () => {
       })
     })
     await act(() => Promise.resolve())
-    let queued: Promise<void>
+    let queued: Promise<void> | undefined
     act(() => {
       queued = latest!.withBusy("Resetting", async () => {
         started.push("reset")
