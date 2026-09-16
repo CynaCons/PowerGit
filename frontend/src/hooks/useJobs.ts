@@ -71,10 +71,19 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
   // closes — while the refresh runs on under the same top-bar label; a
   // refresh failure is reported under its own name ("Refresh after merging
   // topic: …"), never as the operation's. Without `options.refresh` the
-  // call is the whole job, as before.
+  // call is the whole job, as before. A call that arrives while another's
+  // engine call is in flight is dropped, as before; one that arrives during
+  // a refresh phase waits for it — its dialog already closed on the answer,
+  // and the toolbar's dialogs open while the bar is busy.
+  const engineCall = useRef(false)
+  const settling = useRef<Promise<void> | null>(null)
   const withBusy = useCallback(
     async (label: string, fn: () => Promise<void>, options?: BusyOptions) => {
-      if (busy) return
+      if (settling.current) {
+        await settling.current
+        if (engineCall.current) return
+      } else if (busy || engineCall.current) return
+      engineCall.current = true
       dispatch({ type: "job-started", label })
       setJobLabel(label)
       const finish = () => {
@@ -89,18 +98,24 @@ export function useJobs({ client, dispatch, busy, setEngineError, refresh, handl
         // Prefix the operation name: a bare browser/DOMException message is
         // otherwise impossible to trace back to what the user clicked.
         setEngineError(`${label}: ${handleFailure(e, label)}`)
+        engineCall.current = false
         finish()
         return
       }
+      engineCall.current = false
       const scope = options?.refresh
       if (!scope) {
         finish()
         return
       }
       const after = `Refresh after ${label.charAt(0).toLowerCase()}${label.slice(1)}`
-      void refresh(scope)
+      const tail: Promise<void> = refresh(scope)
         .catch((e: unknown) => setEngineError(`${after}: ${handleFailure(e, after)}`))
-        .finally(finish)
+        .finally(() => {
+          if (settling.current === tail) settling.current = null
+          finish()
+        })
+      settling.current = tail
     },
     [busy, dispatch, setEngineError, handleFailure, refresh],
   )

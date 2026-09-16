@@ -271,6 +271,43 @@ describe("merge: the dialog closes when git answers and the refresh runs behind 
     expect(latest?.busy).toBe(false)
   })
 
+  it("an operation confirmed while the previous one's refresh runs waits for it instead of being dropped", async () => {
+    await boot()
+    const first = track(
+      latest!.merge({ branch: "topic", ff: "allow", squash: false, message: null, autostash: false, noCommit: false }),
+    )
+    await flush()
+    mergeAnswer!.resolve(status())
+    await flush()
+    expect(first.settled).toBe(true)
+    expect(latest?.busyLabel).toBe("Merging topic")
+
+    // The toolbar's dialogs open while the bar is busy: a second operation
+    // confirmed now must not vanish into withBusy's busy guard.
+    mergeAnswer = null
+    const second = track(
+      latest!.merge({ branch: "other", ff: "allow", squash: false, message: null, autostash: false, noCommit: false }),
+    )
+    await flush()
+    expect(second.settled).toBe(false)
+    expect(mergeAnswer).toBeNull()
+    expect(latest?.busyLabel).toBe("Merging topic")
+
+    // The first refresh lands: the second operation starts.
+    calls[1].answer(MERGED)
+    await flush()
+    expect(latest?.busyLabel).toBe("Merging other")
+    expect(mergeAnswer).not.toBeNull()
+    mergeAnswer!.resolve(status())
+    await flush()
+    expect(second.settled).toBe(true)
+    expect(calls).toHaveLength(3)
+    calls[2].answer(MERGED)
+    await flush()
+    expect(latest?.busy).toBe(false)
+    expect(latest?.engineError).toBeNull()
+  })
+
   it("a merge git refuses is still the merge's error, and no refresh runs", async () => {
     await boot()
     const merging = track(
