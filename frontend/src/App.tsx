@@ -169,7 +169,6 @@ export default function App({ base }: { base: EngineClient }) {
   })
   // Row and ref-chip menus, shared by the main grid and the file history's.
   const menus = useGridMenus(open, repo?.branch)
-
   const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
 
   useHotkeyLayer(
@@ -428,10 +427,7 @@ export default function App({ base }: { base: EngineClient }) {
           phase={state}
           view={view}
           onClose={() => setRecoveryOpen(false)}
-          onRetry={() => {
-            setRecoveryOpen(false)
-            session.retry()
-          }}
+          onRetry={() => (setRecoveryOpen(false), session.retry())}
           onOpenRepository={() => {
             setRecoveryOpen(false)
             void openFolder()
