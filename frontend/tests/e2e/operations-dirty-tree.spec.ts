@@ -27,8 +27,12 @@ function expectDirt(root: string, afterGitAutostash = false) {
   expect(status(root)).toMatch(/\?\? untracked-1/)
   expect(status(root)).toMatch(/\?\? untracked-2/)
 }
-function row(page: Page, text: string) {
-  return page.getByTestId("grid-row").filter({ hasText: text }).first()
+// By the whole subject: "files" must not match "Working directory (3 files)".
+function row(page: Page, subject: string) {
+  return page
+    .getByTestId("grid-row")
+    .filter({ has: page.locator(".msg-text", { hasText: new RegExp(`^${subject}$`) }) })
+    .first()
 }
 
 test.describe("operations on a developer's dirty tree", () => {
