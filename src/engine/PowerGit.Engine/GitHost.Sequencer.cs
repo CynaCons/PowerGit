@@ -730,7 +730,10 @@ public sealed partial class GitHost
         RepoStatusDto status = FinishOperation(root, operation(), what);
         if (stashed)
         {
-            CommandResult pop = RunTimed(root, SequencerTimeoutMs, "stash", "pop");
+            // `stash push` captures both the worktree and index by default;
+            // restore both sides too, otherwise a staged file becomes merely
+            // unstaged after a successful cherry-pick/revert retry.
+            CommandResult pop = RunTimed(root, SequencerTimeoutMs, "stash", "pop", "--index");
             if (pop.ExitCode != 0)
                 throw new InvalidOperationException($"{what} succeeded, but restoring the autostash failed; the stash was kept. {ErrorText(pop)}".Trim());
         }
@@ -771,8 +774,7 @@ public sealed partial class GitHost
         {
             CleanupPowergitDir(root);
             string error = ErrorText(result);
-            if (error.Contains("Your local changes to the following files would be overwritten by", StringComparison.OrdinalIgnoreCase)
-                || error.Contains("Please commit your changes or stash them", StringComparison.OrdinalIgnoreCase))
+            if (IsDirtyTreeRefusal(error))
             {
                 string[] files = error.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .Where(line => !line.StartsWith("Your local", StringComparison.OrdinalIgnoreCase)
@@ -794,6 +796,14 @@ public sealed partial class GitHost
 
         return status;
     }
+
+    private static bool IsDirtyTreeRefusal(string error)
+        => error.Contains("would be overwritten by", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("cannot rebase: You have unstaged changes", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("your index contains uncommitted changes", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Please commit or stash them", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Please commit your changes or stash them", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("commit your changes or stash them to proceed", StringComparison.OrdinalIgnoreCase);
 
     private string PowerGitDir(string root, bool create)
     {

@@ -283,6 +283,43 @@ public sealed class SequencerTests
     }
 
     [Fact]
+    public void Rebase_on_a_dirty_tree_without_autostash_is_dirty_and_autostash_restores_index()
+    {
+        using TempRepo repo = new();
+        GitHost host = Host(repo);
+        host.Checkout("feature", force: false);
+        repo.Write("a.txt", "unstaged\n");
+        repo.Write("dirty-index.txt", "staged\n");
+        repo.Run("add", "dirty-index.txt");
+
+        DirtyTreeException refused = Assert.Throws<DirtyTreeException>(() => host.Rebase(new RebaseRequest("main")));
+        Assert.Contains("cannot rebase", refused.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("your index contains uncommitted changes", refused.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("none", host.Rebase(new RebaseRequest("main", Autostash: true)).State);
+        Assert.Equal("unstaged", repo.Read("a.txt").Trim());
+        Assert.Equal("staged", repo.Read("dirty-index.txt").Trim());
+        Assert.Contains("A  dirty-index.txt", repo.Output("status", "--porcelain"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cherry_pick_on_a_staged_unrelated_file_is_dirty_and_autostash_restores_index()
+    {
+        using TempRepo repo = new();
+        GitHost host = Host(repo);
+        string commit = repo.Output("rev-parse", "feature");
+        repo.Write("dirty-index.txt", "staged\n");
+        repo.Run("add", "dirty-index.txt");
+
+        DirtyTreeException refused = Assert.Throws<DirtyTreeException>(() => host.CherryPick(commit));
+        Assert.Contains("would be overwritten by", refused.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("none", host.CherryPick(commit, autostash: true).State);
+        Assert.Equal("staged", repo.Read("dirty-index.txt").Trim());
+        Assert.Contains("A  dirty-index.txt", repo.Output("status", "--porcelain"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Rebase_while_another_operation_runs_is_refused()
     {
         using TempRepo repo = new();
