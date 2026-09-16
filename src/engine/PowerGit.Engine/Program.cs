@@ -176,9 +176,13 @@ repo.AddEndpointFilter(async (ctx, next) =>
         || path.EndsWith("/pull", StringComparison.Ordinal)
         || path.EndsWith("/push", StringComparison.Ordinal)
         || path.EndsWith("/cancel", StringComparison.Ordinal);
+    // v0.18.14: the filtered revision stream travels as a POST because its
+    // ref list outgrows a URL, but it is a read like GET /revisions — it must
+    // never queue behind a mutation nor answer 409 while a fetch job runs.
+    bool isReadPost = HttpMethods.IsPost(method) && path.EndsWith("/revisions", StringComparison.Ordinal);
     try
     {
-        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob)
+        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob || isReadPost)
         {
             return await next(ctx);
         }
