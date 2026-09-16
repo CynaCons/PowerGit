@@ -161,6 +161,11 @@ test("GE default chords we claim", () => {
     "browse.focusDiff": chord("3", { ctrl: true }),
     "browse.focusFileTree": chord("4", { ctrl: true }),
     "browse.highlightAncestry": chord("B", { ctrl: true, shift: true }),
+    "browse.goToParent": chord("P", { ctrl: true }),
+    "browse.goToChild": chord("N", { ctrl: true }),
+    "browse.goToHead": chord("C", { ctrl: true, shift: true }),
+    "browse.navigateBack": chord("ArrowLeft", { alt: true }),
+    "browse.navigateForward": chord("ArrowRight", { alt: true }),
     "diff.stageSelected": chord("S"),
     "diff.unstageSelected": chord("U"),
     "browse.refresh": chord("F5"),
@@ -361,4 +366,29 @@ test("a handler returning false passes the key to the layer below; a missing han
   stack[1].handlers.current = {}
   expect(dispatchLayers(fakeEvent("F5", {}, reviewSurface()), stack)).toBe(true)
   expect(calls).toEqual(["review.top", "commit.refresh", "browse.refresh"])
+})
+
+// v0.18.12: the compass's chords.
+test("Ctrl+P / Ctrl+N / Ctrl+Shift+C / Alt+Left / Alt+Right are the graph navigation, GE ids kept", () => {
+  const ctx = { editing: false, multiLine: false, fileListFocused: false, reviewFocused: false }
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("p", { ctrl: true })), ctx)).toBe("browse.goToParent")
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("n", { ctrl: true })), ctx)).toBe("browse.goToChild")
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("C", { ctrl: true, shift: true })), ctx)).toBe("browse.goToHead")
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("ArrowLeft", { alt: true })), ctx)).toBe("browse.navigateBack")
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("ArrowRight", { alt: true })), ctx)).toBe("browse.navigateForward")
+  const ge = (id: string) => CATALOG.find((c) => c.id === id)?.ge
+  expect(ge("browse.goToParent")).toBe("GoToParent")
+  expect(ge("browse.goToChild")).toBe("GoToChild")
+  expect(ge("browse.goToHead")).toBe("SelectCurrentRevision")
+  expect(ge("browse.navigateBack")).toBe("NavigateBackward")
+  expect(ge("browse.navigateForward")).toBe("NavigateForward")
+  // Ctrl+Shift+P stays Quick pull (GE): the shift decides.
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("P", { ctrl: true, shift: true })), ctx)).toBe("browse.quickPull")
+  // Ctrl+Shift+C is a text-edit key (GE IsTextEditKey ignores Shift on
+  // Ctrl+C), so a text field keeps it; Ctrl+P and Ctrl+N are not, so they
+  // fire from a text field like every other Ctrl chord — and are swallowed.
+  const editing = { ...ctx, editing: true }
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("C", { ctrl: true, shift: true })), editing)).toBeNull()
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("p", { ctrl: true })), editing)).toBe("browse.goToParent")
+  expect(resolveHotkey("browse", fromEvent(fakeEvent("ArrowLeft", { alt: true })), editing)).toBe("browse.navigateBack")
 })
