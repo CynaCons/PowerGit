@@ -44,6 +44,7 @@ test.describe("revision context menu", () => {
     write(repoDir, "b.txt", "b\n")
     commit(repoDir, "second")
     git(repoDir, "branch", "topic")
+    git(repoDir, "branch", "powergit")
     git(repoDir, "tag", "v1.0")
     write(repoDir, "c.txt", "c\n")
     commit(repoDir, "third")
@@ -114,6 +115,33 @@ test.describe("revision context menu", () => {
     await page.getByRole("button", { name: "Cancel" }).click()
   })
 
+  // v0.18.11: the branch preview is the immediate, visible reason Enter is
+  // unavailable; it must agree with both git's ref syntax and loaded refs.
+  test("Create branch shows an invalid red appears-as chip and enables only a valid name", async ({ page }) => {
+    await openMenu(page)
+    await page.getByTestId("ctx-create-branch").click()
+    const dialog = page.getByTestId("create-ref-dialog")
+    const name = page.getByTestId("create-ref-name")
+    const preview = page.getByTestId("appears-as")
+    const confirm = page.getByTestId("create-ref-confirm")
+    await expect(dialog).toBeVisible()
+
+    await name.fill("wt/v18 x")
+    await expect(preview).toHaveClass(/invalid/)
+    await expect(page.getByTestId("create-ref-field")).toContainText(/space/i)
+    await expect(confirm).toBeDisabled()
+
+    await name.fill("powergit")
+    await expect(preview).toHaveClass(/invalid/)
+    await expect(page.getByTestId("create-ref-field")).toContainText(/already exists/i)
+    await expect(confirm).toBeDisabled()
+
+    await name.fill("wt/v18-valid")
+    await expect(preview).not.toHaveClass(/invalid/)
+    await expect(confirm).toBeEnabled()
+    await page.keyboard.press("Escape")
+  })
+
   test("the delete submenus list the row's own refs", async ({ page }) => {
     await openMenu(page)
     await page.getByTestId("ctx-delete-branch").click()
@@ -122,10 +150,13 @@ test.describe("revision context menu", () => {
     await page.getByTestId("ctx-delete-tag").click()
     const sub = page.locator("#revision-context-menu-sub")
     await expect(sub.getByTestId("ctx-delete-tag-v1.0")).toBeVisible()
-    // Deleting asks in-app, never through a native prompt.
+    // Deleting asks in-app, never through a native prompt (v0.18.11: the
+    // Delete tag dialog on the shell, the tag quoted with its tip).
     await sub.getByTestId("ctx-delete-tag-v1.0").click()
-    await expect(page.getByTestId("confirm-dialog")).toBeVisible()
-    await page.getByTestId("confirm-dialog-cancel").click()
+    await expect(page.getByTestId("delete-tag-dialog")).toBeVisible()
+    await expect(page.getByTestId("delete-tag-dialog").getByTestId("quoted-ref")).toContainText("v1.0")
+    await page.getByRole("button", { name: "Cancel" }).click()
+    await expect(page.getByTestId("delete-tag-dialog")).toHaveCount(0)
   })
 
   test("Compare offers the pairs and opens the compare view", async ({ page }) => {

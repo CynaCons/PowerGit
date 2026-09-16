@@ -15,7 +15,7 @@ type Props = {
   repoId?: string | null
   onSelectTarget?: (sha: string) => void
   onCollapse?: () => void
-  onCheckoutRef?: (name: string) => void
+  onCheckoutRef?: (name: string, kind: "local" | "remote" | "tag" | "submodule") => void
   onDeleteBranch?: (name: string) => void
   onDeleteTag?: (name: string) => void
   onFetchRemote?: (name: string) => void
@@ -397,7 +397,7 @@ function RepoTreeImpl({
         variant="tree"
         onClose={() => setCtx(null)}
         actions={{
-          onCheckout: (name) => onCheckoutRef?.(name),
+          onCheckout: (name, kind) => onCheckoutRef?.(name, kind),
           onMerge: (name) => onMergeRef?.(name),
           onRebaseOnto: (name) => onRebaseOnto?.(name),
           onDelete: (name, kind) => (kind === "tag" ? onDeleteTag?.(name) : onDeleteBranch?.(name)),

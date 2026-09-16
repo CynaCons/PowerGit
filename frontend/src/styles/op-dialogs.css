@@ -1,0 +1,523 @@
+/* The operation dialogs' A shell (v0.18.11, docs/prototypes/op-dialogs.html
+   tab 1 A): a 15/600 title with the key hints at its right, a sunken band
+   that quotes the row or ref the operation acts on, labels ABOVE fields,
+   option rows with the explanation after an em dash, a footer with the note
+   at the left and Cancel + the primary at the right. Rule for the family:
+   no label, option or field is ever clipped or wrapped. Every colour is
+   literal with a token fallback and set on the class itself
+   (docs/agents/memories/webkitgtk-css.md); no color-mix, no inset shorthand,
+   no nesting. */
+
+.op-dialog {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: var(--pg-text, #101827);
+  background: var(--pg-surface, #ffffff);
+  /* The picker's list hangs below the field; nothing in the shell clips. */
+  overflow: visible;
+}
+
+.op-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  flex: none;
+}
+.op-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--pg-text, #101827);
+}
+.op-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* The quoted band: the one decorated element. */
+.op-quote {
+  background: var(--pg-surface-sunken, #f6f8fb);
+  border-top: 1px solid var(--pg-border-soft, #e6eaf0);
+  border-bottom: 1px solid var(--pg-border-soft, #e6eaf0);
+  padding: 2px 16px;
+  flex: none;
+  min-width: 0;
+}
+.op-qrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  min-width: 0;
+}
+.op-qrow.short {
+  height: 26px;
+}
+.op-qrow .op-node {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.op-qrow .op-node svg {
+  display: block;
+}
+.op-qrow .op-qsha {
+  font-family: var(--pg-font-mono, "Fira Code", Consolas, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--pg-text-secondary, #334155);
+  flex: none;
+}
+.op-qrow .msg-refs {
+  flex: none;
+  max-width: 46%;
+  overflow: hidden;
+}
+.op-qrow .op-subj {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pg-text, #101827);
+}
+.op-qrow .op-subj.muted {
+  color: var(--pg-text-meta, #5b6778);
+}
+.op-qrow .op-when {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.op-qrow .author-disc {
+  width: 16px;
+  height: 16px;
+  font-size: 8.5px;
+  margin-right: 0;
+}
+.op-qrow .op-caption {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  white-space: nowrap;
+}
+.op-qrow .op-caption .mono {
+  font-size: 12px;
+}
+/* "into" between the two rows of a merge. */
+.op-into {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 16px;
+  font-size: 11px;
+  color: var(--pg-text-meta, #5b6778);
+  padding-left: 1px;
+  margin: -3px 0;
+}
+.op-into svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.op-body {
+  padding: 12px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: visible;
+  min-width: 0;
+}
+
+/* A field: the label above, an optional right-side slot ("appears as"), the
+   input, an optional 12 px meta line under it (the reason a name is bad). */
+.op-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: relative;
+  min-width: 0;
+}
+.op-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  min-height: 20px;
+  color: var(--pg-text, #101827);
+  white-space: nowrap;
+}
+.op-label .op-label-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  font-weight: 400;
+  min-width: 0;
+}
+.op-label .op-label-cap {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  font-weight: 400;
+}
+.op-input {
+  display: block;
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--pg-border, #d6dce5);
+  border-radius: 5px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--pg-surface, #ffffff);
+  color: var(--pg-text, #101827);
+  box-sizing: border-box;
+  outline: none;
+}
+.op-input.multi {
+  height: 56px;
+  padding: 7px 10px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.op-input:focus {
+  outline: 2px solid var(--pg-focus-ring, #2563eb);
+  outline-offset: -1px;
+  border-color: var(--pg-focus-ring, #2563eb);
+}
+.op-input::placeholder {
+  color: var(--pg-text-disabled, #64748b);
+}
+.op-input:disabled {
+  color: var(--pg-text-disabled, #64748b);
+}
+.op-meta {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+}
+.op-meta.error {
+  color: var(--pg-ref-head-fg, #dc2626);
+}
+.op-meta.amber {
+  color: var(--pg-review-todo, #b7791f);
+}
+.op-meta b {
+  font-weight: 600;
+  color: var(--pg-text, #101827);
+}
+.op-text b {
+  font-weight: 600;
+}
+
+/* A group of option rows: a 500 caption, then the rows. */
+.op-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.op-group-label {
+  font-weight: 500;
+  margin-bottom: 2px;
+  color: var(--pg-text, #101827);
+  white-space: nowrap;
+}
+/* One option: the 14 px native control (accent-coloured), the label, the
+   explanation after an em dash on the same line, an optional inline slot. */
+.op-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  cursor: default;
+  white-space: nowrap;
+  min-width: 0;
+  color: var(--pg-text, #101827);
+}
+.op-opt input[type="checkbox"],
+.op-opt input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--pg-primary, #1553c9);
+  cursor: default;
+}
+.op-opt .op-ex {
+  color: var(--pg-text-meta, #5b6778);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-opt .op-ex::before {
+  content: "— ";
+}
+.op-opt.off {
+  color: var(--pg-text-disabled, #64748b);
+}
+.op-opt.off .op-ex {
+  color: var(--pg-text-disabled, #64748b);
+}
+.op-opt .op-inline {
+  height: 26px;
+  border: 1px solid var(--pg-border, #d6dce5);
+  border-radius: 4px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--pg-surface, #ffffff);
+  color: var(--pg-text, #101827);
+  width: 160px;
+  box-sizing: border-box;
+  outline: none;
+}
+.op-opt .op-inline:focus {
+  outline: 2px solid var(--pg-focus-ring, #2563eb);
+  outline-offset: -1px;
+}
+/* A note under an option (the divergence, the invalid name), 12 px, indented past the control. */
+.op-opt-note {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  padding-left: 22px;
+  margin-top: -3px;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: normal;
+}
+.op-opt-note.amber {
+  color: var(--pg-review-todo, #b7791f);
+}
+.op-opt-note.error {
+  color: var(--pg-ref-head-fg, #dc2626);
+}
+
+/* The footer: the note at the left, Cancel + the primary at the right. */
+.op-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--pg-border-soft, #e6eaf0);
+  flex: none;
+  min-width: 0;
+}
+.op-foot .op-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.op-foot .op-note.amber {
+  color: var(--pg-review-todo, #b7791f);
+}
+.op-foot .op-note.error {
+  color: var(--pg-ref-head-fg, #dc2626);
+  white-space: normal;
+}
+/* The destructive primary: red text and border on the pale head-ref fill,
+   a touch stronger on hover. The blue primary is MUI's contained button. */
+.op-btn-danger.MuiButton-root {
+  background: var(--pg-ref-head-bg, #fef2f2);
+  color: var(--pg-ref-head-fg, #dc2626);
+  border: 1px solid var(--pg-ref-head-fg, #dc2626);
+  font-weight: 600;
+}
+.op-btn-danger.MuiButton-root:hover {
+  background: var(--pg-ref-head-bg, #fef2f2);
+  color: var(--pg-ref-head-fg, #dc2626);
+  filter: brightness(0.96);
+}
+.op-btn-danger.MuiButton-root.Mui-disabled {
+  opacity: 0.45;
+  color: var(--pg-ref-head-fg, #dc2626);
+  border-color: var(--pg-ref-head-fg, #dc2626);
+}
+
+/* The "appears as" chip in its red state, with the reason beside it. */
+.ref.invalid {
+  background: var(--pg-ref-head-bg, #fef2f2);
+  color: var(--pg-ref-head-fg, #dc2626);
+}
+.ref.ghost {
+  background: transparent;
+  border: 1px dashed var(--pg-text-meta, #5b6778);
+  color: var(--pg-text-meta, #5b6778);
+}
+.op-why {
+  font-size: 12px;
+  color: var(--pg-ref-head-fg, #dc2626);
+  white-space: nowrap;
+}
+
+/* The branch picker: the value is the chip + the tip; a searchable list
+   hangs under the field when open (inside the dialog, so the zoom and the
+   focus trap need no portal). */
+.op-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  width: 100%;
+  border: 1px solid var(--pg-border, #d6dce5);
+  border-radius: 5px;
+  padding: 0 8px 0 10px;
+  cursor: pointer;
+  background: var(--pg-surface, #ffffff);
+  color: var(--pg-text, #101827);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.op-picker:focus-visible {
+  outline: 2px solid var(--pg-focus-ring, #2563eb);
+  outline-offset: -1px;
+}
+.op-picker.open {
+  outline: 2px solid var(--pg-focus-ring, #2563eb);
+  outline-offset: -1px;
+  border-color: var(--pg-focus-ring, #2563eb);
+}
+.op-picker .op-tip {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.op-picker .op-tip .mono {
+  color: var(--pg-text-secondary, #334155);
+  font-size: 11px;
+}
+.op-picker .op-chev {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--pg-text-meta, #5b6778);
+}
+.op-picker .op-empty {
+  color: var(--pg-text-disabled, #64748b);
+}
+.op-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--pg-surface, #ffffff);
+  border: 1px solid var(--pg-border, #d6dce5);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(16, 24, 39, 0.18);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+}
+.op-menu .op-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--pg-border-soft, #e6eaf0);
+  color: var(--pg-text-meta, #5b6778);
+}
+.op-menu .op-filter svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  flex: none;
+}
+.op-menu .op-filter input {
+  border: 0;
+  outline: 0;
+  flex: 1;
+  font: inherit;
+  font-size: 13px;
+  background: transparent;
+  color: var(--pg-text, #101827);
+  min-width: 0;
+}
+.op-menu .op-list {
+  max-height: 216px;
+  overflow: auto;
+  padding: 4px 0;
+}
+.op-menu .op-mg {
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--pg-text-meta, #5b6778);
+  display: flex;
+  align-items: center;
+}
+.op-menu .op-it {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+  cursor: pointer;
+  color: var(--pg-text, #101827);
+  min-width: 0;
+}
+.op-menu .op-it .op-tip {
+  font-size: 12px;
+  color: var(--pg-text-meta, #5b6778);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.op-menu .op-it .op-tip .mono {
+  color: var(--pg-text-secondary, #334155);
+  font-size: 11px;
+  margin-right: 6px;
+}
+.op-menu .op-it.cur {
+  background: var(--pg-grid-sel, #dbeafe);
+  color: var(--pg-text, #101827);
+}
+.op-menu .op-it:hover {
+  background: var(--pg-grid-hover, rgba(37, 99, 235, 0.08));
+  color: var(--pg-text, #101827);
+}
+.op-menu .op-none {
+  padding: 10px;
+  color: var(--pg-text-meta, #5b6778);
+  font-size: 12px;
+}
+
+/* The blue primary, disabled: the prototype dims it rather than greying it,
+   so "Create and check out" still reads as the action the name unlocks. */
+.op-foot .MuiButton-contained.Mui-disabled {
+  background: var(--pg-primary, #1553c9);
+  color: var(--pg-on-primary, #ffffff);
+  opacity: 0.45;
+}

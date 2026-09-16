@@ -611,7 +611,7 @@ repo.MapPost("/branches/create", (CreateRefRequest body, GitHost git) =>
 {
     try
     {
-        git.CreateBranch(body.Name, body.Commit);
+        git.CreateBranch(body.Name, body.Commit, body.Checkout, body.Orphan);
         return Results.Ok(git.GetRefs());
     }
     catch (Exception ex)
@@ -624,7 +624,7 @@ repo.MapPost("/tags/create", (CreateRefRequest body, GitHost git) =>
 {
     try
     {
-        git.CreateTag(body.Name, body.Commit);
+        git.CreateTag(body.Name, body.Commit, body.Message);
         return Results.Ok(git.GetRefs());
     }
     catch (Exception ex)
@@ -778,7 +778,21 @@ repo.MapPost("/checkout", (CheckoutRequest body, GitHost git) =>
 {
     try
     {
-        return Results.Ok(git.Checkout(body.Ref, body.Force));
+        return Results.Ok(git.Checkout(body));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+// v0.18.11: how two refs diverge, for the Checkout dialog's "Reset local
+// branch x to origin/x" note and Delete branch's "merged into" line.
+repo.MapGet("/branches/divergence", (string local, string remote, GitHost git) =>
+{
+    try
+    {
+        return Results.Ok(git.Divergence(local, remote));
     }
     catch (Exception ex)
     {

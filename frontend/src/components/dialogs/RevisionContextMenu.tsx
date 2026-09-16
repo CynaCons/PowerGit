@@ -113,9 +113,14 @@ export function RevisionContextMenu({
       case "ctx-open-commit":
         return actions.openCommit()
       case "ctx-checkout":
+        // The row's local branch, else its remote one (the dialog then
+        // offers GE's three ways, v0.18.11), else the checked-out branch.
         return dialogs.open({
           kind: "checkout",
-          branch: row.rev.refs.find((r) => branches.includes(r)) ?? currentBranch,
+          branch:
+            row.rev.refs.find((r) => branches.includes(r)) ??
+            row.rev.refs.find((r) => r !== "HEAD" && !tags.includes(r)) ??
+            currentBranch,
         })
       case "ctx-merge":
         return actions.openMerge(node.value)

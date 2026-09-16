@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 
+import { pickBranch } from "../dialogHelpers"
 import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
 // v0.15.1, the Git console the owner picked out of the design review ("B + D"):
@@ -106,8 +107,7 @@ test.describe("git console", () => {
 
     // main and topic diverged: git refuses a fast-forward-only merge.
     await page.getByTestId("merge-button").click()
-    await expect(page.getByTestId("merge-branch")).toBeVisible()
-    await page.getByTestId("merge-branch").selectOption("topic")
+    await pickBranch(page, "merge-branch", "topic")
     await page.getByTestId("merge-ff-only").click()
     await page.getByTestId("merge-confirm").click()
 
@@ -155,8 +155,7 @@ test.describe("git console", () => {
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
 
     await page.getByTestId("merge-button").click()
-    await expect(page.getByTestId("merge-branch")).toBeVisible()
-    await page.getByTestId("merge-branch").selectOption("topic")
+    await pickBranch(page, "merge-branch", "topic")
     await page.getByTestId("merge-ff-only").click()
     await page.getByTestId("merge-confirm").click()
 
