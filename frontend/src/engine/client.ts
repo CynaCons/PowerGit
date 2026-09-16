@@ -1,7 +1,10 @@
 import type {
   ArchiveFormat,
   ChangeKind,
+  CheckoutOptions,
   CommitDetail,
+  CreateBranchOptions,
+  Divergence,
   ConflictFile,
   ConflictStage,
   ConflictTake,
@@ -497,12 +500,29 @@ export class EngineClient {
     return json<RemoteInfo>(await this.put(`${this.repoPath()}/remotes`, { name, url }))
   }
 
-  async createBranch(name: string, commit?: string): Promise<RefTree> {
-    return json<RefTree>(await this.post(`${this.repoPath()}/branches/create`, { name, commit }))
+  async createBranch(name: string, commit?: string, options?: CreateBranchOptions): Promise<RefTree> {
+    return json<RefTree>(
+      await this.post(`${this.repoPath()}/branches/create`, {
+        name,
+        commit,
+        checkout: options?.checkout ?? false,
+        orphan: options?.orphan ?? false,
+      }),
+    )
   }
 
-  async createTag(name: string, commit?: string): Promise<RefTree> {
-    return json<RefTree>(await this.post(`${this.repoPath()}/tags/create`, { name, commit }))
+  /** A message makes the tag annotated (`tag -a -m`). */
+  async createTag(name: string, commit?: string, message?: string | null): Promise<RefTree> {
+    return json<RefTree>(await this.post(`${this.repoPath()}/tags/create`, { name, commit, message: message ?? null }))
+  }
+
+  /** `rev-list --left-right --count local...remote` (v0.18.11). */
+  async divergence(local: string, remote: string): Promise<Divergence> {
+    return json<Divergence>(
+      await this.get(
+        `${this.repoPath()}/branches/divergence?local=${encodeURIComponent(local)}&remote=${encodeURIComponent(remote)}`,
+      ),
+    )
   }
 
   async deleteBranch(name: string): Promise<RefTree> {
@@ -555,8 +575,18 @@ export class EngineClient {
     return json<{ id: string }>(await this.post(`${this.repoPath()}/commit`, { message, amend }))
   }
 
-  async checkout(ref: string, force = false): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/checkout`, { ref, force }))
+  /** `{ref, force}` is the pre-v0.18.11 shape; the options are Git Extensions' checkout dialog. */
+  async checkout(ref: string, options: boolean | CheckoutOptions = false): Promise<RepoStatus> {
+    const o = typeof options === "boolean" ? { force: options } : options
+    return json<RepoStatus>(
+      await this.post(`${this.repoPath()}/checkout`, {
+        ref,
+        force: o.force ?? false,
+        as: o.as ?? null,
+        name: o.name ?? null,
+        localChanges: o.localChanges ?? null,
+      }),
+    )
   }
 
   async reset(commit: string, mode: "soft" | "mixed" | "hard"): Promise<RepoStatus> {

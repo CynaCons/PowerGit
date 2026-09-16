@@ -1,4 +1,5 @@
 import { isArtificialId } from "../graph/artificial"
+import type { CreateRefOptions } from "../components/dialogs/CreateRefDialog"
 import { describeThrown } from "../engine"
 import type { Dialogs } from "./useDialogs"
 import type { EngineSession } from "./useEngineSession"
@@ -66,14 +67,23 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     })
   }
 
-  async function createRef(name: string) {
+  // v0.18.11: GE's "Checkout after create" and "Orphan" ride on the create
+  // route; a checked-out branch changes the status too, so that refresh is
+  // the full one, run behind the top bar after the dialog has closed.
+  async function createRef(name: string, options: CreateRefOptions) {
     if (dialog.kind !== "createRef") return
-    const tree =
-      dialog.refKind === "branch"
-        ? await engine.createBranch(name, dialog.sha)
-        : await engine.createTag(name, dialog.sha)
-    setRefs(tree)
-    await refresh({ revisions: true })
+    const branch = dialog.refKind === "branch"
+    const moves = branch && (options.checkout || options.orphan)
+    await withBusy(
+      branch ? "Creating branch" : "Creating tag",
+      async () =>
+        setRefs(
+          branch
+            ? await engine.createBranch(name, dialog.sha, { checkout: options.checkout, orphan: options.orphan })
+            : await engine.createTag(name, dialog.sha, options.message),
+        ),
+      { refresh: moves ? FULL : { revisions: true } },
+    )
   }
 
   // Two phases under withBusy (v0.18.9): the engine call resolves the

@@ -1216,7 +1216,15 @@ public sealed partial class GitHost
         return Run(root, "rev-parse", "HEAD").StdOut.Trim();
     }
 
-    public void CreateBranch(string name, string? commit)
+    /// <summary>
+    ///  <c>git branch name [commit]</c>; with <paramref name="checkout"/>
+    ///  <c>git checkout -b name [commit]</c> (Git Extensions' "Checkout after
+    ///  create"); with <paramref name="orphan"/> <c>git checkout --orphan name
+    ///  [commit]</c> — a branch with no history, always checked out, the
+    ///  start point's tree left in the index (GE chkCreateOrphan without the
+    ///  clear-working-directory option). v0.18.11.
+    /// </summary>
+    public void CreateBranch(string name, string? commit, bool checkout = false, bool orphan = false)
     {
         string root = RequireRoot();
         if (string.IsNullOrWhiteSpace(name))
@@ -1224,7 +1232,32 @@ public sealed partial class GitHost
             throw new InvalidOperationException("branch name is required");
         }
 
-        List<string> args = ["branch", name];
+        List<string> args = orphan ? ["checkout", "--orphan", name] : checkout ? ["checkout", "-b", name] : ["branch", name];
+        if (!string.IsNullOrWhiteSpace(commit))
+        {
+            args.Add(commit.Trim());
+        }
+
+        CommandResult result = Run(root, [.. args]);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
+        }
+    }
+
+    /// <summary>
+    ///  <c>git tag name [commit]</c>, or with a <paramref name="message"/> the
+    ///  annotated <c>git tag -a name -m message [commit]</c> (v0.18.11).
+    /// </summary>
+    public void CreateTag(string name, string? commit, string? message = null)
+    {
+        string root = RequireRoot();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("tag name is required");
+        }
+
+        List<string> args = string.IsNullOrWhiteSpace(message) ? ["tag", name] : ["tag", "-a", name, "-m", message.Trim()];
         if (!string.IsNullOrWhiteSpace(commit))
         {
             args.Add(commit.Trim());
@@ -1237,25 +1270,35 @@ public sealed partial class GitHost
         }
     }
 
-    public void CreateTag(string name, string? commit)
+    /// <summary>
+    ///  How two refs diverge (v0.18.11): <c>rev-list --left-right --count
+    ///  left...right</c> — Ahead = commits only on <paramref name="left"/>,
+    ///  Behind = only on <paramref name="right"/>. The Checkout dialog asks
+    ///  with the local and its remote ("x has 2 commits that origin/x does
+    ///  not"); Delete branch with the branch and the checked-out one (Ahead
+    ///  0 means merged). An unknown ref is an error, not (0, 0).
+    /// </summary>
+    public DivergenceDto Divergence(string left, string right)
     {
         string root = RequireRoot();
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
         {
-            throw new InvalidOperationException("tag name is required");
+            throw new InvalidOperationException("both refs are required");
         }
 
-        List<string> args = ["tag", name];
-        if (!string.IsNullOrWhiteSpace(commit))
-        {
-            args.Add(commit.Trim());
-        }
-
-        CommandResult result = Run(root, [.. args]);
+        CommandResult result = Run(root, "rev-list", "--left-right", "--count", $"{left.Trim()}...{right.Trim()}");
         if (result.ExitCode != 0)
         {
-            throw new InvalidOperationException(result.StdErr.Trim());
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
         }
+
+        string[] parts = result.StdOut.Trim().Split('\t', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 2 && int.TryParse(parts[0], out int ahead) && int.TryParse(parts[1], out int behind))
+        {
+            return new DivergenceDto(ahead, behind);
+        }
+
+        throw new InvalidOperationException($"unexpected rev-list output: {result.StdOut.Trim()}");
     }
 
     private DiffDto GetUntrackedDiff(string root, string path, int context, bool ignoreWhitespace)

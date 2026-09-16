@@ -2,25 +2,113 @@ namespace PowerGit.Engine;
 
 public sealed partial class GitHost
 {
+    /// <summary>The pre-v0.18.11 call: <c>checkout ref</c>, <c>-f</c> with force, a dirty tree refused otherwise.</summary>
     public RepoStatusDto Checkout(string branch, bool force)
+        => Checkout(new CheckoutRequest(branch, force));
+
+    /// <summary>
+    ///  Git Extensions FormCheckoutBranch (v0.18.11): the three ways to check
+    ///  a remote branch out (<see cref="CheckoutRequest"/>) and what happens
+    ///  to the local changes. "stash" pushes a stash before and pops it
+    ///  after; a pop that conflicts leaves the stash and reports the
+    ///  conflict as the operation's error, the checkout itself having
+    ///  happened. "discard" is <c>checkout -f</c>. "keep" lets git carry the
+    ///  changes over and refuse when they would be overwritten. Without
+    ///  <c>localChanges</c> the old guard applies: a dirty tree is refused
+    ///  unless <c>force</c>.
+    /// </summary>
+    public RepoStatusDto Checkout(CheckoutRequest request)
     {
         string root = RequireRoot();
-        if (string.IsNullOrWhiteSpace(branch))
+        string target = request.Ref?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(target))
         {
-            throw new InvalidOperationException("branch is required");
+            throw new InvalidOperationException("ref is required");
         }
 
-        if (!force && IsDirty(root))
+        string mode = request.As ?? "";
+        if (mode is not ("" or "track" or "reset" or "detached"))
+        {
+            throw new InvalidOperationException($"unsupported checkout mode '{mode}'");
+        }
+
+        string changes = request.LocalChanges ?? "";
+        if (changes is not ("" or "keep" or "stash" or "discard"))
+        {
+            throw new InvalidOperationException($"unsupported localChanges '{changes}'");
+        }
+
+        string name = request.Name?.Trim() ?? "";
+        if (mode is "track" or "reset" && string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("a local branch name is required");
+        }
+
+        bool force = request.Force || changes == "discard";
+        bool dirty = IsDirty(root);
+        if (changes == "" && !force && dirty)
         {
             throw new InvalidOperationException(
                 "The working tree has uncommitted changes. Commit or stash them first, or force the checkout to discard them.");
         }
 
-        List<string> args = force ? ["checkout", "-f", branch] : ["checkout", branch];
+        bool stashed = false;
+        if (changes == "stash" && dirty)
+        {
+            CommandResult push = Run(root, "stash", "push", "-m", $"powergit: before checking out {target}");
+            if (push.ExitCode != 0)
+            {
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(push.StdErr) ? push.StdOut.Trim() : push.StdErr.Trim());
+            }
+
+            // A tree whose only changes are untracked files: "No local changes to save", exit 0, nothing to pop.
+            stashed = !push.StdOut.Contains("No local changes to save", StringComparison.Ordinal);
+        }
+
+        List<string> args = ["checkout"];
+        if (force)
+        {
+            args.Add("-f");
+        }
+
+        switch (mode)
+        {
+            case "track":
+                args.AddRange(["-b", name, "--track", target]);
+                break;
+            case "reset":
+                args.AddRange(["-B", name, target]);
+                break;
+            case "detached":
+                args.AddRange(["--detach", target]);
+                break;
+            default:
+                args.Add(target);
+                break;
+        }
+
         CommandResult result = Run(root, [.. args]);
         if (result.ExitCode != 0)
         {
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
+            string error = string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
+            if (stashed)
+            {
+                // The checkout did not happen: put the changes back where they were.
+                Run(root, "stash", "pop");
+            }
+
+            throw new InvalidOperationException(error);
+        }
+
+        if (stashed)
+        {
+            CommandResult pop = Run(root, "stash", "pop");
+            if (pop.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Checked out {target}, but restoring the stashed changes conflicts; the stash was kept. "
+                    + (string.IsNullOrWhiteSpace(pop.StdErr) ? pop.StdOut.Trim() : pop.StdErr.Trim()));
+            }
         }
 
         return GetStatus();

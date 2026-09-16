@@ -127,6 +127,7 @@ export function AppDialogs({
           commit={dialog.sha}
           subject={dialog.subject}
           existingNames={dialog.refKind === "branch" ? branchNames : tagNames}
+          dirtyCount={dirty}
           onClose={() => close("createRef")}
           onConfirm={actions.createRef}
         />

@@ -186,6 +186,23 @@ export type MergeOptions = {
 
 export type RebaseOptions = { autosquash: boolean; rebaseMerges: boolean; autostash: boolean }
 
+/** POST /checkout (v0.18.11, Git Extensions FormCheckoutBranch): how a remote
+ *  branch is checked out — "track" creates `name` tracking `ref`, "reset"
+ *  moves the existing local `name` onto `ref` (`checkout -B`), "detached"
+ *  checks the commit out — and what happens to the local changes: "keep"
+ *  lets git carry them (and refuse a conflict), "stash" pushes a stash first
+ *  and pops it after, "discard" is `checkout -f`. Without `localChanges` the
+ *  pre-v0.18.11 guard applies (a dirty tree is refused unless `force`). */
+export type CheckoutAs = "track" | "reset" | "detached"
+export type LocalChanges = "keep" | "stash" | "discard"
+export type CheckoutOptions = { as?: CheckoutAs; name?: string; localChanges?: LocalChanges; force?: boolean }
+
+/** GET /branches/divergence?local=&remote=: commits only on each side. */
+export type Divergence = { ahead: number; behind: number }
+
+/** POST /branches/create extras (v0.18.11): check the new branch out, or start it with no history (always checked out). */
+export type CreateBranchOptions = { checkout?: boolean; orphan?: boolean }
+
 /** A todo line as git generated it (POST /rebase/todo). Lines without a sha
  *  (label, reset, merge, exec, …) are read-only. */
 export type RebaseTodoLine = { action: string; sha: string | null; subject: string | null; raw: string }

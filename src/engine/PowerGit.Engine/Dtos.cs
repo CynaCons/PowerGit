@@ -191,7 +191,28 @@ public sealed record StageRequest(string[] Paths, bool Unstage = false);
 
 public sealed record CommitRequest(string Message, bool Amend = false);
 
-public sealed record CheckoutRequest(string Ref, bool Force = false);
+/// <summary>
+/// POST /checkout. The pre-v0.18.11 shape is <c>{ref, force}</c>: check the
+/// ref out, <c>-f</c> with force. v0.18.11 (Git Extensions FormCheckoutBranch)
+/// adds <paramref name="As"/> — "track" creates <paramref name="Name"/> tracking
+/// the remote <paramref name="Ref"/> (<c>checkout -b name --track ref</c>),
+/// "reset" moves the existing local <paramref name="Name"/> onto it
+/// (<c>checkout -B name ref</c>), "detached" checks the commit out
+/// (<c>checkout --detach ref</c>) — and <paramref name="LocalChanges"/>: "keep"
+/// lets git carry the changes over (and fail if they conflict), "stash" pushes
+/// a stash first and pops it after, "discard" is <c>checkout -f</c>. Without
+/// <paramref name="LocalChanges"/> the old guard holds: a dirty tree is refused
+/// unless <paramref name="Force"/>.
+/// </summary>
+public sealed record CheckoutRequest(
+    string Ref,
+    bool Force = false,
+    string? As = null,
+    string? Name = null,
+    string? LocalChanges = null);
+
+/// <summary>GET /branches/divergence?local=&amp;remote=: <c>rev-list --left-right --count local...remote</c>.</summary>
+public sealed record DivergenceDto(int Ahead, int Behind);
 
 public sealed record ResetRequest(string Commit, string Mode);
 
@@ -246,7 +267,19 @@ public sealed record PullRequest(bool Rebase = false);
 
 public sealed record PushRequest(bool ForceWithLease = false);
 
-public sealed record CreateRefRequest(string Name, string? Commit = null);
+/// <summary>
+/// POST /branches/create and /tags/create. v0.18.11: a branch can be checked
+/// out as it is created (<c>checkout -b</c>, Git Extensions' "Checkout after
+/// create") or started with no history (<c>checkout --orphan</c>, GE's
+/// chkCreateOrphan; always checked out); a tag with a <paramref name="Message"/>
+/// is annotated (<c>tag -a -m</c>).
+/// </summary>
+public sealed record CreateRefRequest(
+    string Name,
+    string? Commit = null,
+    bool Checkout = false,
+    bool Orphan = false,
+    string? Message = null);
 
 public sealed record JobStartedDto(string Id, string Kind);
 

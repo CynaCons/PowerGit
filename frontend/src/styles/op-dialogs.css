@@ -513,3 +513,11 @@
   color: var(--pg-text-meta, #5b6778);
   font-size: 12px;
 }
+
+/* The blue primary, disabled: the prototype dims it rather than greying it,
+   so "Create and check out" still reads as the action the name unlocks. */
+.op-foot .MuiButton-contained.Mui-disabled {
+  background: var(--pg-primary, #1553c9);
+  color: var(--pg-on-primary, #ffffff);
+  opacity: 0.45;
+}
