@@ -19,6 +19,11 @@ export type GitActionsDeps = {
 
 export type GitActions = ReturnType<typeof useGitActions>
 
+/** After anything that can move HEAD or the refs. */
+const FULL = { revisions: true, refs: true, status: true } as const
+/** After a stash moved: the pending row, the count and the list. */
+const STASHES = { revisions: true, status: true, stashes: true } as const
+
 // Every git operation the shell can start, shared by the command bar, the
 // hotkeys, the context menus, the operation banner and the ref tree so all
 // entry points agree. The v0.15.0 operations (merge, rebase, sequencer,
@@ -71,19 +76,15 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     await refresh({ revisions: true })
   }
 
+  // Two phases under withBusy (v0.18.9): the engine call resolves the
+  // promise (the dialog closes), the refresh runs on behind the top bar.
   async function checkout(branch: string, force: boolean) {
-    await withBusy("Checking out", async () => {
-      setStatus(await engine.checkout(branch, force))
-      await refresh({ revisions: true, refs: true, status: true })
-    })
+    await withBusy("Checking out", async () => setStatus(await engine.checkout(branch, force)), { refresh: FULL })
   }
   async function reset(mode: "soft" | "mixed" | "hard") {
     if (dialog.kind !== "reset") return
     const sha = dialog.row.rev.id
-    await withBusy("Resetting", async () => {
-      setStatus(await engine.reset(sha, mode))
-      await refresh({ revisions: true, refs: true, status: true })
-    })
+    await withBusy("Resetting", async () => setStatus(await engine.reset(sha, mode)), { refresh: FULL })
   }
 
   // v0.15.0: every destructive action asks through the in-app ConfirmDialog
@@ -169,10 +170,11 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
 
   // Quick stash actions on stash@{0}; the full list lives in the dialog.
   function applyLatestStash(pop: boolean) {
-    void withBusy(pop ? "Popping stash" : "Applying stash", async () => {
-      setStatus(await engine.applyStash("stash@{0}", pop))
-      await refresh({ revisions: true, status: true, stashes: true })
-    })
+    void withBusy(
+      pop ? "Popping stash" : "Applying stash",
+      async () => setStatus(await engine.applyStash("stash@{0}", pop)),
+      { refresh: STASHES },
+    )
   }
   function dropLatestStash() {
     operations.confirm({
@@ -181,10 +183,13 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
       confirmLabel: "Drop stash",
       danger: true,
       onConfirm: () =>
-        withBusy("Dropping stash", async () => {
-          await engine.dropStash("stash@{0}")
-          await refresh({ revisions: true, status: true, stashes: true })
-        }),
+        withBusy(
+          "Dropping stash",
+          async () => {
+            await engine.dropStash("stash@{0}")
+          },
+          { refresh: STASHES },
+        ),
     })
   }
 

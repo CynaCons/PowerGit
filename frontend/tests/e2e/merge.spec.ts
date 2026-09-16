@@ -110,3 +110,88 @@ test.describe("merge with conflicts", () => {
     await expect(page.getByTestId("op-banner")).toHaveCount(0)
   })
 })
+
+// v0.18.9, owner (2026-09-16): "When I performed a merge, the overlay bugged
+// at 'Merging' — I had to close it. Then I had an error message at the top:
+// merging 'branch' history: fetch is aborted. Don't know what happened.
+// Merge worked in the end, but still weird." A clean merge on a repository
+// whose first history page takes seconds: the dialog awaited that page,
+// and the change stream's echo of the merge started a second reload that
+// aborted the first — the banner then read the browser's AbortError under
+// the merge's label.
+test.describe("merge on a slow history", () => {
+  test.slow()
+
+  let repoDir: string
+  let previousRepo: string | null = null
+
+  test.beforeEach(async () => {
+    previousRepo ??= await currentRepoPath()
+    // main and topic touch different files: the merge is clean and, with
+    // both sides moved, needs a merge commit.
+    repoDir = makeRepo("pg-merge-slow-")
+    git(repoDir, "branch", "topic")
+    write(repoDir, "a.txt", "main side\n")
+    commit(repoDir, "main change")
+    git(repoDir, "checkout", "-q", "topic")
+    write(repoDir, "b.txt", "topic side\n")
+    commit(repoDir, "topic change")
+    git(repoDir, "checkout", "-q", "main")
+    await openRepoOnEngine(repoDir)
+  })
+
+  test.afterEach(async () => {
+    await openRepoOnEngine(previousRepo ?? process.cwd())
+    await removeRepo(repoDir)
+  })
+
+  test("the merge dialog closes as soon as the engine answers, no abort error afterwards", async ({ page }) => {
+    await page.goto("/")
+    await expect(page.getByTestId("grid-row").first()).toBeVisible()
+    await expect(page.getByTestId("status-refreshing")).toHaveCount(0)
+
+    // Every banner text that ever shows, recorded in-page: a "never within
+    // the next seconds" is not something a locator assertion can say.
+    await page.evaluate(() => {
+      const seen: string[] = []
+      ;(window as unknown as { __banners: string[] }).__banners = seen
+      new MutationObserver(() => {
+        const text = document.querySelector('[data-testid="error-banner"]')?.textContent
+        if (text) seen.push(text)
+      }).observe(document.body, { childList: true, subtree: true, characterData: true })
+    })
+
+    // A big repository's first page: every history request after the merge
+    // takes 3 s to answer (simulated latency, not a wait in the test).
+    let slow = false
+    await page.route("**/repos/*/revisions?*", async (route) => {
+      if (!slow) return route.continue()
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      // The request may have been aborted meanwhile — that is the defect.
+      await route.continue().catch(() => undefined)
+    })
+
+    await page.getByTestId("merge-button").click()
+    await page.getByTestId("merge-branch").selectOption("topic")
+    const merged = page.waitForResponse((r) => r.request().method() === "POST" && /\/merge$/.test(r.url()))
+    slow = true
+    await page.getByTestId("merge-confirm").click()
+    expect((await merged).ok()).toBe(true)
+
+    // git has answered: the dialog closes now, while the refresh runs on
+    // behind the top bar's indicator.
+    await expect(page.getByTestId("merge-dialog")).toHaveCount(0, { timeout: 1500 })
+    await expect(page.getByTestId("topbar-progress")).toContainText("Merging topic")
+
+    // The delayed page lands with the merge commit; then the echo's own
+    // reload, coalesced behind it, lands too and the bar goes quiet. Both
+    // refreshes are over by then: the whole window the abort used to hit.
+    await expect(page.getByTestId("grid-row").first()).toContainText("Merge branch 'topic'")
+    await expect(page.getByTestId("topbar-progress")).toHaveCount(0)
+    await expect(page.getByTestId("status-refreshing")).toHaveCount(0)
+
+    const banners = await page.evaluate(() => (window as unknown as { __banners: string[] }).__banners)
+    expect(banners.filter((t) => /abort/i.test(t))).toEqual([])
+    await expect(page.getByTestId("error-banner")).toHaveCount(0)
+  })
+})

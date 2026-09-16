@@ -2,6 +2,7 @@
 import { act, createElement, useEffect } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { diagnosticsSnapshot } from "../diagnostics"
 import type { EngineClient, RevisionDto, RevisionFilter } from "../engine"
 import { useHistory, type History } from "./useHistory"
 
@@ -144,5 +145,166 @@ describe("useHistory: a filter change while a tail page is unresolved", () => {
     expect(latest?.rows.every((r) => r.rev.id.startsWith("B"))).toBe(true)
     expect(latest?.loadingTail).toBe(false)
     expect(calls).toHaveLength(4)
+  })
+})
+
+// v0.18.9, owner (2026-09-16): "When I performed a merge, the overlay bugged
+// at 'Merging' — I had to close it. Then I had an error message at the top:
+// merging 'branch' history: fetch is aborted. Don't know what happened.
+// Merge worked in the end, but still weird." The merge's own refresh was
+// awaiting page 0 when the engine's change stream echoed the merge and the
+// deferred refresh called reloadHistory again — which aborted the first
+// request. The browser's AbortError ("Fetch is aborted" on WebKitGTK) then
+// surfaced under the merge label. A reload never aborts a same-filter
+// reload: it waits for the one in flight and runs once more after it.
+describe("useHistory: a reload while one is in flight (v0.18.9)", () => {
+  const calls: Call[] = []
+  // Like fetch: the request rejects with the browser's AbortError when its
+  // signal fires. (The describe above keeps a fake that never rejects, for
+  // the tail it leaves unresolved on purpose.)
+  const client = {
+    revisions: (_max: number, skip: number, signal?: AbortSignal, filter?: RevisionFilter) =>
+      new Promise<RevisionDto[]>((resolve, reject) => {
+        calls.push({ skip, filter, signal, answer: resolve })
+        signal?.addEventListener("abort", () => reject(new DOMException("Fetch is aborted", "AbortError")))
+      }),
+  } as unknown as EngineClient
+  const setEngineError = () => undefined
+  const failures: string[] = []
+  const onFailure = (e: unknown, context: string) => {
+    failures.push(`${context}: ${String(e)}`)
+    return String(e)
+  }
+  let latest: History | null = null
+  let root: Root
+  let container: HTMLDivElement
+
+  function Harness({ filter }: { filter: RevisionFilter }) {
+    const history = useHistory({ client, demo: false, live: true, setEngineError, onFailure, filter })
+    latest = history
+    const { resetHistory, reloadHistory } = history
+    useEffect(() => {
+      resetHistory()
+      void reloadHistory()
+    }, [resetHistory, reloadHistory])
+    return null
+  }
+
+  const render = (filter: RevisionFilter) => act(async () => root.render(createElement(Harness, { filter })))
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+  const answer = async (call: Call, rows: RevisionDto[]) => {
+    call.answer(rows)
+    await settle()
+  }
+  /** Tracks a promise without awaiting it: did it settle, and how. */
+  const track = (p: Promise<unknown>) => {
+    const state = { settled: false, rejected: null as unknown }
+    p.then(
+      () => (state.settled = true),
+      (e: unknown) => {
+        state.settled = true
+        state.rejected = e
+      },
+    )
+    return state
+  }
+  const supersededReports = () =>
+    diagnosticsSnapshot().filter((e) => e.source === "history" && /superseded/.test(e.message)).length
+
+  beforeEach(() => {
+    calls.length = 0
+    failures.length = 0
+    latest = null
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  it("coalesces: the second reload waits for the first, then runs once more; nothing is aborted or rejected", async () => {
+    const filter: RevisionFilter = { path: "doc.txt", follow: false }
+    await render(filter)
+    // The merge's refresh: page 0 in flight.
+    expect(calls.map((c) => c.skip)).toEqual([0])
+    // The change stream's echo: a second reload while the first awaits.
+    const second = track(latest!.reloadHistory())
+    await settle()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].signal?.aborted).toBe(false)
+
+    // The first answer is applied (short page: the list is complete, no
+    // eager tail), and only then does the follow-up ask for page 0 again.
+    await answer(calls[0], page("A", 0, 5))
+    expect(latest?.rows.map((r) => r.rev.id)).toEqual(page("A", 0, 5).map((r) => r.id))
+    expect(calls).toHaveLength(2)
+    expect(calls[1].skip).toBe(0)
+    expect(second.settled).toBe(false)
+
+    // The follow-up brings the commit that landed meanwhile.
+    await answer(calls[1], [...page("M", 0, 1), ...page("A", 0, 5)])
+    expect(second.settled).toBe(true)
+    expect(second.rejected).toBeNull()
+    expect(latest?.rows.map((r) => r.rev.id)[0]).toBe("M000000")
+    expect(latest?.rows).toHaveLength(6)
+    expect(calls).toHaveLength(2)
+    expect(calls.some((c) => c.signal?.aborted)).toBe(false)
+    expect(failures).toEqual([])
+  })
+
+  it("three overlapping reloads share one follow-up", async () => {
+    const filter: RevisionFilter = { path: "doc.txt", follow: false }
+    await render(filter)
+    const second = track(latest!.reloadHistory())
+    const third = track(latest!.reloadHistory())
+    await settle()
+    expect(calls).toHaveLength(1)
+    await answer(calls[0], page("A", 0, 5))
+    expect(calls).toHaveLength(2)
+    await answer(calls[1], page("A", 0, 5))
+    expect(second.settled).toBe(true)
+    expect(third.settled).toBe(true)
+    expect(second.rejected).toBeNull()
+    expect(third.rejected).toBeNull()
+    expect(calls).toHaveLength(2)
+  })
+
+  it("resetHistory during a reload still aborts it; the reload resolves silently and says so in the app log", async () => {
+    const filter: RevisionFilter = { path: "doc.txt", follow: false }
+    await render(filter)
+    const first = track(latest!.reloadHistory())
+    await settle()
+    const before = supersededReports()
+    // A repository switch: the old page 0 is stale for good.
+    await act(async () => latest!.resetHistory())
+    await settle()
+    expect(calls[0].signal?.aborted).toBe(true)
+    expect(first.settled).toBe(true)
+    expect(first.rejected).toBeNull()
+    expect(supersededReports()).toBe(before + 1)
+    expect(failures).toEqual([])
+    expect(latest?.rows).toHaveLength(0)
+  })
+
+  it("a filter change during a reload aborts the old one and requests the new filter's page 0 at once", async () => {
+    const follow: RevisionFilter = { path: "doc.txt", follow: true }
+    const noFollow: RevisionFilter = { path: "doc.txt", follow: false }
+    await render(follow)
+    expect(calls.map((c) => [c.skip, c.filter])).toEqual([[0, follow]])
+
+    await render(noFollow)
+    await settle()
+    expect(calls[0].signal?.aborted).toBe(true)
+    expect(calls).toHaveLength(2)
+    expect([calls[1].skip, calls[1].filter]).toEqual([0, noFollow])
+    expect(calls[1].signal?.aborted).toBe(false)
+
+    await answer(calls[1], page("B", 0, 5))
+    expect(latest?.loaded).toBe(true)
+    expect(latest?.rows.every((r) => r.rev.id.startsWith("B"))).toBe(true)
+    expect(failures).toEqual([])
   })
 })
