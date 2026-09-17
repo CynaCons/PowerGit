@@ -171,12 +171,25 @@ export function RevisionGrid({
   // px under the #root zoom). Sizes are cached by SHA, not index, so a
   // refresh that shifts the rows keeps the tall one tall and no other.
   const getItemKey = useCallback((index: number) => rows[index]?.rev.id ?? index, [rows])
+  // react-virtual defaults useFlushSync to true: every 28 px range change
+  // during a scroll wraps the rerender in ReactDOM.flushSync on the
+  // SyncLane, which forces the canvas effect below to flush and repaint
+  // before the frame does instead of coalescing with it (v0.18.18,
+  // docs/perf/reactivity-review-2026-09-17.md finding 3). Nothing here
+  // needs the range updated synchronously within the same event: the
+  // jump-to-selected effect below calls scrollToIndex and returns without
+  // reading getVirtualItems() again, and useGraphNav's select() /
+  // useHistory's jumpToRef+jumpToCommit only ever call setSelectedSha and
+  // let the next render pick up the new range. A batched render is safe
+  // and lets several scroll events land in one commit per frame; overscan
+  // 12 (336 px) covers the one-frame lag.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     getItemKey,
     overscan: 12,
+    useFlushSync: false,
   })
   const measureRow = useCallback((el: HTMLDivElement | null) => virtualizer.measureElement(el), [virtualizer])
 
