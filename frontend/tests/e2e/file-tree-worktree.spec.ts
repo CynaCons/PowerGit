@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
@@ -12,6 +12,15 @@ import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, w
 // repository with one committed file edited on disk and another one staged
 // (then edited again, so disk and index differ), and checks what each
 // pseudo row's File Tree shows for both files.
+
+// The bottom panel renders deferred: for a few frames after a row click the
+// tree is still the previous row's, and a click into it (or its context
+// menu) would act on that row. Wait until the tree belongs to the clicked
+// row before touching it.
+async function selectRow(page: Page, row: Locator, id: string) {
+  await row.click()
+  await expect(page.getByTestId("commit-file-tree-wrap")).toHaveAttribute("data-row", id)
+}
 
 test("File Tree of the Working directory row shows the file as it is on disk, of the Index row as staged", async ({
   page,
@@ -44,6 +53,7 @@ test("File Tree of the Working directory row shows the file as it is on disk, of
     // --- Working directory: HEAD's tree, content from the disk -------------
     await worktreeRow.click()
     await page.getByRole("tab", { name: "File Tree" }).click()
+    await expect(page.getByTestId("commit-file-tree-wrap")).toHaveAttribute("data-row", "WORKTREE")
     const tree = page.getByTestId("commit-file-tree")
     const notes = tree.locator('[data-path="notes.txt"]')
     await expect(notes).toBeVisible()
@@ -54,7 +64,7 @@ test("File Tree of the Working directory row shows the file as it is on disk, of
     await expect(blob).toContainText("plus an unstaged line")
 
     // --- Index: HEAD's tree, content from the index -------------------------
-    await indexRow.click()
+    await selectRow(page, indexRow, "INDEX")
     await expect(tree.locator('[data-path="a.txt"]')).toBeVisible()
     await tree.locator('[data-path="a.txt"]').click()
     await expect(blob).toContainText("a staged in the index")
@@ -65,12 +75,14 @@ test("File Tree of the Working directory row shows the file as it is on disk, of
     await expect(blob).not.toContainText("edited in the working tree")
 
     // --- A real commit again: the tree is that commit's --------------------
-    await rows.filter({ hasText: "notes" }).first().click()
+    const notesRow = rows.filter({ hasText: "notes" }).first()
+    const notesSha = (await notesRow.getByTestId("sha-cell").getAttribute("title")) ?? ""
+    await selectRow(page, notesRow, notesSha)
     await tree.locator('[data-path="notes.txt"]').click()
     await expect(blob).toContainText("notes as committed")
 
     // --- File history from the pending row: View reads the working tree ----
-    await worktreeRow.click()
+    await selectRow(page, worktreeRow, "WORKTREE")
     await tree.locator('[data-path="notes.txt"]').click({ button: "right" })
     await page.getByTestId("ctx-tree-file-history").click()
     const view = page.getByTestId("file-history")

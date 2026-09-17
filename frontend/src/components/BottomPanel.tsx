@@ -452,6 +452,11 @@ export function BottomPanel({
             <Box
               sx={{ width: `var(--pg-files-width, ${filesWidth}px)`, flexShrink: 0, overflow: "auto" }}
               data-testid="commit-file-tree-wrap"
+              // The row the tree belongs to, for specs that click into the
+              // tree right after selecting a row: the panel's render is
+              // deferred, so the tree can still be the previous row's for a
+              // few frames (v0.18.18, file-tree-worktree.spec).
+              data-row={current?.rev.id}
             >
               <CommitFileTree
                 commitId={commitId ?? (pendingRow ? headId : null)}
