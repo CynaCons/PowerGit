@@ -40,8 +40,11 @@ test("click → diff on screen latency", async ({ page }) => {
       const q = (id: string) => document.querySelector(`[data-testid="${id}"]`)
       const filesText = () => q("file-list")?.textContent ?? ""
       const diffText = () => q("diff-lines")?.textContent ?? ""
+      const selectedPath = () =>
+        q("file-list")?.querySelector(".compact-file-selected")?.getAttribute("data-path") ?? ""
       const filesBefore = filesText()
       const diffBefore = diffText()
+      const pathBefore = selectedPath()
       const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
       const t0 = performance.now()
       el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
@@ -53,12 +56,17 @@ test("click → diff on screen latency", async ({ page }) => {
         const now = performance.now() - t0
         if (toClass < 0 && el.classList.contains("selected")) toClass = now
         if (toFiles < 0 && filesText() !== filesBefore && filesText().length > 0) toFiles = now
+        // A --no-ff merge of a one-commit branch and that commit show the
+        // same patch for the same first file, so the text cannot change: once
+        // the file list has moved on and the same path is selected with no
+        // loading marker, the diff on screen is the new commit's.
+        const sameFileSamePatch =
+          toFiles >= 0 && selectedPath() === pathBefore && diffText() === diffBefore && diffText().length > 0
         if (
           toDiff < 0 &&
           !q("diff-loading") &&
           q("diff-lines") !== null &&
-          diffText() !== diffBefore &&
-          diffText().length > 0
+          ((diffText() !== diffBefore && diffText().length > 0) || sameFileSamePatch)
         )
           toDiff = now
         if (toClass >= 0 && toFiles >= 0 && toDiff >= 0) break
