@@ -21,6 +21,9 @@ export function PanelSplitter({ testid, splitter }: { testid: string; splitter: 
         height: 5,
         flexShrink: 0,
         cursor: "row-resize",
+        // Belt and braces with onDividerDown's preventDefault (v0.18.18):
+        // Chromium does not start a selection from a user-select:none target.
+        userSelect: "none",
         bgcolor: "background.default",
         borderTop: 1,
         borderColor: "divider",

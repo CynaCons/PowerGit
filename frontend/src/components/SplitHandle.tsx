@@ -39,7 +39,13 @@ export function SplitHandle({
     return Math.min(Math.max(width, min), max)
   }
 
+  // Left button only, default-prevented before the capture so the compat
+  // mousedown never arms a text-selection drag across the diff text next
+  // to the handle (v0.18.18, docs/perf/reactivity-review-2026-09-17.md
+  // second pass finding 6); same shape as the grid's column handles.
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
     drag.current = { startX: e.clientX, startWidth: widthRef.current }
     setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -89,6 +95,9 @@ export function SplitHandle({
         width: 8,
         flexShrink: 0,
         cursor: "col-resize",
+        // Belt and braces with the preventDefault above: Chromium does not
+        // start a selection from a user-select:none mousedown target.
+        userSelect: "none",
         bgcolor: dragging ? "primary.dark" : "divider",
         "&:hover": { bgcolor: dragging ? "primary.dark" : "primary.main" },
       }}
