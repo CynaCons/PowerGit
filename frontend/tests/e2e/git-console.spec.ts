@@ -168,8 +168,10 @@ test.describe("git console", () => {
     await expect(card).toHaveCount(0, { timeout: 9_000 })
 
     // Gone from the corner, still in the console — successes are silent and
-    // failures are never lost. (Hotkeys are muted while a dialog is up; the
-    // merge dialog has closed itself by now.)
+    // failures are never lost. (Hotkeys are muted while a dialog is up: since
+    // v0.18.17 the refusal stays in the merge dialog, so leave it first.)
+    await expect(page.getByTestId("merge-confirm")).toBeEnabled()
+    await page.getByTestId("merge-dialog").getByRole("button", { name: "Cancel" }).click()
     await expect(page.getByTestId("merge-dialog")).toHaveCount(0)
     await page.keyboard.press("Control+`")
     await page.getByTestId("git-console-filter").fill("merge --ff-only")
