@@ -12,6 +12,7 @@ import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
 import { chipBudget, gridGeometry, type RowBand } from "./gridGeometry"
 import { useHeldKey } from "./heldKey"
+import { useViewportAnchor } from "../hooks/useViewportAnchor"
 
 type Props = {
   rows: GraphRow[]
@@ -227,6 +228,8 @@ export function RevisionGrid({
 
   const virtualItems = virtualizer.getVirtualItems()
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
+  useViewportAnchor(rows, selected, virtualItems, virtualizer, parentRef, lastScrolledSha)
+
   // The canvas geometry: the visible bands plus a neighbour on each side
   // (graph/draw.ts). getVirtualItems() is memoised inside the virtualizer,
   // so this only recomputes when a row moved or changed height.
