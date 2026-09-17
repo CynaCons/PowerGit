@@ -5,6 +5,7 @@ import { authorIdentity } from "../graph/authorIdentity"
 import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
 import { useAuthorDiscs } from "../theme/authorDiscs"
+import { getZoom } from "../theme/zoom"
 import { GraphOptionsBar } from "./GraphOptionsBar"
 import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
@@ -283,7 +284,13 @@ export function RevisionGrid({
   }, [rows, geometry, selected, hovered, width, graphScroll, ancestry, graphOptions])
 
   // Header drag handles: pointer capture on the handle, width follows the
-  // pointer; double-click restores the default.
+  // pointer; double-click restores the default. clientX is visual px while
+  // the widths are local px under the #root zoom (theme/zoom.ts), so the
+  // delta is divided by the zoom or the edge outruns the pointer at 150 %
+  // and lags it at 70 % (v0.18.18, docs/perf/reactivity-review-2026-09-17.md
+  // second pass finding 3). getZoom() is read inside the closure so the
+  // callback needs no new dependency; a zoom change mid-drag is not a case
+  // worth handling (Ctrl+= with a button held).
   const dragStart = useCallback(
     (key: ColumnKey) => (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0) return
@@ -294,7 +301,7 @@ export function RevisionGrid({
       handle.setPointerCapture(e.pointerId)
       handle.dataset.active = "true"
       const move = (ev: PointerEvent) => {
-        setWidths((w) => ({ ...w, [key]: clampWidth(key, startWidth + ev.clientX - startX) }))
+        setWidths((w) => ({ ...w, [key]: clampWidth(key, startWidth + (ev.clientX - startX) / getZoom()) }))
       }
       const up = () => {
         delete handle.dataset.active
