@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { edgeInScope, inScope, markAncestry } from "./ancestry"
+import { edgeInScope, extendAncestry, inScope, markAncestry } from "./ancestry"
 import { withArtificialRows } from "./artificial"
 import { layoutGraph } from "./layout"
 import { syntheticHistory } from "./synthetic"
@@ -119,5 +119,22 @@ describe("markAncestry", () => {
     const unmarked = rows.filter((r) => !a.marks.has(r.rev.id))
     expect(unmarked.length).toBeGreaterThan(0)
     for (const r of unmarked) expect(byId.get(r.rev.id)?.isHead).toBe(false)
+  })
+
+  it("matches a full walk when a merge history is appended", () => {
+    const prefix = rows.slice(0, 3)
+    const appended = rows.slice(0, 6)
+    const incremental = extendAncestry(prefix, markAncestry(prefix), appended)!
+    expect([...incremental.marks]).toEqual([...markAncestry(appended)!.marks])
+  })
+
+  it("matches a full walk for a 10k-row append and recomputes for a new root", () => {
+    const rows = layoutGraph(syntheticHistory(10_000))
+    const prefix = rows.slice(0, 5_000)
+    const incremental = extendAncestry(prefix, markAncestry(prefix), rows)!
+    expect([...incremental.marks]).toEqual([...markAncestry(rows)!.marks])
+    const root = rows[100].rev.id
+    const changedRoot = extendAncestry(prefix, markAncestry(prefix), rows, root)
+    expect([...changedRoot!.marks]).toEqual([...markAncestry(rows, root)!.marks])
   })
 })

@@ -39,7 +39,6 @@ const BUDGET = {
   bootToTenThousandRowsMs: 12_000,
   hoverToRedrawMedianMs: 50,
   selectToCommitTabMedianMs: 330,
-  scrollLongTasks: 16, // per 3 s (vscode: 21 per 6 s)
   scrollFrameMaxMs: 300,
 }
 
@@ -138,18 +137,18 @@ test("selecting rows shows the Commit tab within budget", async ({ page }) => {
   )
 })
 
-test("a 3 s wheel scroll keeps long tasks and frame stalls within budget", async ({ page }) => {
+test("a 6 s wheel scroll has no long task and keeps frame stalls within budget", async ({ page }) => {
   await booted(page)
   const box = (await page.getByTestId("grid-body").boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.evaluate(() => window.__pgPerf.start())
   const t0 = Date.now()
-  while (Date.now() - t0 < 3000) {
+  while (Date.now() - t0 < 6000) {
     await page.mouse.wheel(0, 400)
     await page.waitForTimeout(50)
   }
   const stats = await page.evaluate(() => window.__pgPerf.end())
-  test.info().annotations.push({ type: "perf", description: `scroll 3 s: ${JSON.stringify(stats)}` })
-  expect(stats.longTasks, `long tasks during scroll: ${JSON.stringify(stats)}`).toBeLessThan(BUDGET.scrollLongTasks)
+  test.info().annotations.push({ type: "perf", description: `scroll 6 s: ${JSON.stringify(stats)}` })
+  expect(stats.longTaskMaxMs, `longest task during scroll: ${JSON.stringify(stats)}`).toBeLessThanOrEqual(50)
   expect(stats.frameMaxMs, `longest frame during scroll: ${stats.frameMaxMs} ms`).toBeLessThan(BUDGET.scrollFrameMaxMs)
 })

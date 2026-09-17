@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { markAncestry } from "../graph/ancestry"
+import { extendAncestry } from "../graph/ancestry"
 import { authorIdentity } from "../graph/authorIdentity"
 import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
@@ -63,6 +63,15 @@ export function RevisionGrid({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollbarRef = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(-1)
+  // Menus are supplied by panes that may recreate their handlers while the
+  // graph rows themselves have not changed. Keep the row-facing callbacks
+  // stable so React.memo can retain every unaffected visible row.
+  const rowContextMenuRef = useRef(onRowContextMenu)
+  const refContextMenuRef = useRef(onRefContextMenu)
+  useEffect(() => {
+    rowContextMenuRef.current = onRowContextMenu
+    refContextMenuRef.current = onRefContextMenu
+  }, [onRowContextMenu, onRefContextMenu])
   // The one row grown to show every ref (v0.18.3, variant B), by SHA so a
   // --date-order refresh that moves it keeps it open. +n opens, − / +n on
   // another row / Escape close.
@@ -71,7 +80,13 @@ export function RevisionGrid({
   // the root change (a refresh that changes nothing keeps the array, see
   // historyMerge.ts), never per click. The root is HEAD unless the user
   // picked a commit (v0.18.4, "Highlight ancestry (until refresh)").
-  const ancestry = useMemo(() => markAncestry(rows, highlightRoot ?? undefined), [rows, highlightRoot])
+  const ancestryCache = useRef<{ rows: GraphRow[]; ancestry: ReturnType<typeof extendAncestry> } | undefined>(undefined)
+  const ancestry = useMemo(() => {
+    const previous = ancestryCache.current
+    const next = extendAncestry(previous?.rows, previous?.ancestry, rows, highlightRoot ?? undefined)
+    ancestryCache.current = { rows, ancestry: next }
+    return next
+  }, [rows, highlightRoot])
   const rootRow = useMemo(
     () => (highlightRoot === null ? null : (rows.find((r) => r.rev.id === highlightRoot) ?? null)),
     [rows, highlightRoot],
@@ -116,8 +131,14 @@ export function RevisionGrid({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const naturalWidth = graphWidth(rows)
-  const autoWidth = bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth
+  // Lane width only changes with the graph rows. Hover, selection, scroll
+  // geometry and column drags all re-render this component without changing
+  // those rows, so never make those paths rescan the complete history.
+  const naturalWidth = useMemo(() => graphWidth(rows), [rows])
+  const autoWidth = useMemo(
+    () => (bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth),
+    [bodyWidth, naturalWidth],
+  )
   const width = widths.graph ?? autoWidth
   // Horizontal scroll of the graph column when the lanes do not fit
   // (owner: "a discreet scroll bar at the bottom of that column ... shift
@@ -157,6 +178,7 @@ export function RevisionGrid({
     getItemKey,
     overscan: 12,
   })
+  const measureRow = useCallback((el: HTMLDivElement | null) => virtualizer.measureElement(el), [virtualizer])
 
   const virtualItems = virtualizer.getVirtualItems()
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
@@ -268,15 +290,19 @@ export function RevisionGrid({
     },
     [onSelect, rows, onHighlightRoot],
   )
-  const contextRow = useMemo(
-    () =>
-      onRowContextMenu
-        ? (e: React.MouseEvent, index: number) => {
-            onSelect(index)
-            onRowContextMenu(e, index)
-          }
-        : undefined,
-    [onSelect, onRowContextMenu],
+  const contextRow = useCallback(
+    (e: React.MouseEvent, index: number) => {
+      onSelect(index)
+      rowContextMenuRef.current?.(e, index)
+    },
+    [onSelect],
+  )
+  const hoverRow = useCallback((index: number) => setHovered(index), [])
+  const refContextRow = useCallback(
+    (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => {
+      refContextMenuRef.current?.(e, ref, kind, index)
+    },
+    [],
   )
   const handle = (key: ColumnKey) => (
     <div
@@ -391,6 +417,7 @@ export function RevisionGrid({
                 index={item.index}
                 start={item.start}
                 selected={item.index === selected}
+                hovered={item.index === hovered}
                 sameAuthor={markedAuthor !== null && row.rev.author === markedAuthor}
                 identity={discs && row.rev.author ? authorIdentity(row.rev.author) : null}
                 expanded={row.rev.id === expandedSha}
@@ -398,11 +425,11 @@ export function RevisionGrid({
                 tagSet={tagSet}
                 remoteNames={remoteNames}
                 currentBranch={currentBranch}
-                measureRef={virtualizer.measureElement}
+                measureRef={measureRow}
                 onClick={clickRow}
                 onContextMenu={contextRow}
-                onMouseEnter={setHovered}
-                onRefContextMenu={onRefContextMenu}
+                onMouseEnter={hoverRow}
+                onRefContextMenu={refContextRow}
                 onExpand={setExpanded}
                 onFold={foldRow}
               />
