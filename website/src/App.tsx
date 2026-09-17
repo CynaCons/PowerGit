@@ -21,15 +21,15 @@ const FEATURES = [
   },
   {
     title: "Keyboard muscle memory",
-    body: "Git Extensions defaults: Ctrl+Space commit, Ctrl+, settings, arrows on the graph, F5 refresh, Ctrl+B panel, Ctrl+= / Ctrl+- / Ctrl+0 zoom. Letter keys never steal from the commit message.",
+    body: "Git Extensions defaults: Ctrl+Space commit, Ctrl+, settings, arrows on the graph, Ctrl+P / Ctrl+N / Ctrl+Shift+C for parent, child and HEAD (a compass on the graph does the same), F5 refresh, Ctrl+B panel, Ctrl+= / Ctrl+- / Ctrl+0 zoom. Letter keys never steal from the commit message.",
   },
   {
     title: "Heavy repos stay fluid",
-    body: "Paged history, a virtualised ref tree with filter, jump-to-ref that loads until the tip is visible, and refreshes that reuse unchanged rows instead of re-laying out the graph.",
+    body: "Measured on vscode and flutter: 3,000-row history pages, a ref tree that no longer waits on git for short names, virtualised pending-file lists that open a 10,000-file commit window at once, and paths that reach git on stdin so Stage all never hits the command-line limit.",
   },
   {
     title: "Branch ops with GE guards",
-    body: "Checkout, reset (soft/mixed/hard), rebase, cherry-pick, revert and Save as patch from the graph's right-click menu, with the same prompts and guards as Git Extensions.",
+    body: "Merge, checkout, reset, rebase, cherry-pick, revert and Save as patch from the graph. The dialog quotes the commit or branch it acts on; git decides on a dirty tree, and when it refuses you get its own words and a Stash and retry. A remote branch checks out as a tracking branch, a reset of the local one, or detached.",
   },
   {
     title: "Frameless and portable",
