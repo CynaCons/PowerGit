@@ -63,6 +63,15 @@ export function RevisionGrid({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollbarRef = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(-1)
+  // Menus are supplied by panes that may recreate their handlers while the
+  // graph rows themselves have not changed. Keep the row-facing callbacks
+  // stable so React.memo can retain every unaffected visible row.
+  const rowContextMenuRef = useRef(onRowContextMenu)
+  const refContextMenuRef = useRef(onRefContextMenu)
+  useEffect(() => {
+    rowContextMenuRef.current = onRowContextMenu
+    refContextMenuRef.current = onRefContextMenu
+  }, [onRowContextMenu, onRefContextMenu])
   // The one row grown to show every ref (v0.18.3, variant B), by SHA so a
   // --date-order refresh that moves it keeps it open. +n opens, − / +n on
   // another row / Escape close.
@@ -284,16 +293,16 @@ export function RevisionGrid({
   const contextRow = useCallback(
     (e: React.MouseEvent, index: number) => {
       onSelect(index)
-      onRowContextMenu?.(e, index)
+      rowContextMenuRef.current?.(e, index)
     },
-    [onSelect, onRowContextMenu],
+    [onSelect],
   )
   const hoverRow = useCallback((index: number) => setHovered(index), [])
   const refContextRow = useCallback(
     (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => {
-      onRefContextMenu?.(e, ref, kind, index)
+      refContextMenuRef.current?.(e, ref, kind, index)
     },
-    [onRefContextMenu],
+    [],
   )
   const handle = (key: ColumnKey) => (
     <div
