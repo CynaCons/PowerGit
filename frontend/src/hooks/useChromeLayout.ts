@@ -22,7 +22,7 @@ export function useChromeLayout() {
   const [leftOpen, setLeftOpen] = useState(true)
   const [bottomTab, setBottomTab] = useState(0)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const dragState = useRef<{ startY: number; startH: number } | null>(null)
+  const dragState = useRef<{ startY: number; startH: number; height: number } | null>(null)
 
   useEffect(() => {
     const el = contentRef.current
@@ -39,18 +39,29 @@ export function useChromeLayout() {
   const maxBottom = contentHeight > 0 ? Math.max(120, contentHeight - 140) : Number.POSITIVE_INFINITY
   const bottomHeight = Math.min(requestedBottom, maxBottom)
 
+  useEffect(() => {
+    if (!dragState.current) contentRef.current?.style.setProperty("--pg-bottom-height", `${bottomHeight}px`)
+  }, [bottomHeight])
+
   const onDividerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    dragState.current = { startY: e.clientY, startH: bottomHeight }
+    dragState.current = { startY: e.clientY, startH: bottomHeight, height: bottomHeight }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onDividerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragState.current) return
     const dy = (dragState.current.startY - e.clientY) / zoom
     const max = (contentRef.current?.clientHeight ?? 600) - 140
-    setBottomHeight(Math.min(Math.max(120, dragState.current.startH + dy), Math.max(120, max)))
+    const height = Math.min(Math.max(120, dragState.current.startH + dy), Math.max(120, max))
+    dragState.current.height = height
+    // Keep the existing clamp and drag maths, but bypass App during the
+    // gesture; state is committed only when the pointer is released
+    // (v0.18.18, owner: "slow, sluggish, lagging").
+    contentRef.current?.style.setProperty("--pg-bottom-height", `${height}px`)
   }
   const onDividerUp = () => {
+    const height = dragState.current?.height
     dragState.current = null
+    if (height !== undefined) setBottomHeight(height)
   }
 
   // Command-bar overflow, the standard desktop/Fluent pattern: labels drop

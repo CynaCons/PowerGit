@@ -109,7 +109,7 @@ export function DiffTab({
     <>
       <Box
         sx={{
-          width: filesWidth,
+          width: `var(--pg-files-width, ${filesWidth}px)`,
           flexShrink: 0,
           // The list scrolls inside; the mode button below is anchored
           // to this box's visible bottom, not to the scrolled content

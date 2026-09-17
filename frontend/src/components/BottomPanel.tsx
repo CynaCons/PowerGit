@@ -344,8 +344,13 @@ export function BottomPanel({
     min: MIN_FILES_WIDTH,
     maxRatio: MAX_FILES_WIDTH_RATIO,
     getContainerWidth: () => panelRef.current?.clientWidth ?? filesWidth,
-    onChange: setFilesWidth,
-    onCommit: writeStoredFilesWidth,
+    // SplitHandle moves this inherited variable directly, then commits state
+    // on release so diff rows do not re-render per pointermove (v0.18.18).
+    onChange: (width: number) => panelRef.current?.style.setProperty("--pg-files-width", `${width}px`),
+    onCommit: (width: number) => {
+      setFilesWidth(width)
+      writeStoredFilesWidth(width)
+    },
   }
 
   // Files tab double-click: opens the file in the configured external diff
@@ -369,7 +374,13 @@ export function BottomPanel({
   return (
     <Paper
       data-testid="bottom-panel"
-      sx={{ height, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
+      sx={{
+        height: `var(--pg-bottom-height, ${height}px)`,
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
     >
       <Box sx={{ display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
         <Tabs
@@ -438,7 +449,10 @@ export function BottomPanel({
         )}
         {tab === 2 && (
           <>
-            <Box sx={{ width: filesWidth, flexShrink: 0, overflow: "auto" }} data-testid="commit-file-tree-wrap">
+            <Box
+              sx={{ width: `var(--pg-files-width, ${filesWidth}px)`, flexShrink: 0, overflow: "auto" }}
+              data-testid="commit-file-tree-wrap"
+            >
               <CommitFileTree
                 commitId={commitId ?? (pendingRow ? headId : null)}
                 onSelectFile={(path) => setTreeFile(path)}
