@@ -19,8 +19,8 @@ import type { StatusNotes } from "./useStatusNote"
 // note instead of an error banner.
 
 export type GraphNavDeps = {
-  /** The grid's rows, pending rows included (App's `rows`). */
-  rows: GraphRow[]
+  /** Worker-layout rows without pending rows; its prefix survives appends. */
+  engineRows: GraphRow[]
   /** The selected row (App's `current`). */
   current: GraphRow | undefined
   history: Pick<History, "setSelectedSha" | "jumpToCommit" | "loadingTarget">
@@ -42,7 +42,7 @@ export type GraphNavDeps = {
 export type GraphNav = ReturnType<typeof useGraphNav>
 
 export function useGraphNav({
-  rows,
+  engineRows,
   current,
   history,
   notes,
@@ -76,12 +76,12 @@ export function useGraphNav({
   // Recomputed with the rows or the selection. The memory answers for the
   // selected row only when it moved there itself or settled on it, so the
   // render before the effect above cannot show a stale way back.
-  const targets = useMemo<NavTargets>(() => navTargets(rows, current, memory.current), [rows, current])
+  const targets = useMemo<NavTargets>(() => navTargets(engineRows, current, memory.current), [engineRows, current])
 
   /** Selects a loaded row directly; pages to one below the window. */
   const select = useCallback(
     (sha: string) => {
-      if (rowOf(rows, sha)) {
+      if (rowOf(engineRows, sha)) {
         setSelectedSha(sha)
         return
       }
@@ -91,7 +91,7 @@ export function useGraphNav({
         notes.setNote({ text: filtered ? "Not in the filtered graph" : "Not in the loaded history" })
       })
     },
-    [rows, setSelectedSha, jumpToCommit, notes, filtered],
+    [engineRows, setSelectedSha, jumpToCommit, notes, filtered],
   )
 
   /** Ctrl+P / the ↓ button: the remembered way back, else the first parent;
