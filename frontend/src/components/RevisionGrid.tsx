@@ -10,6 +10,7 @@ import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
 import { chipBudget, gridGeometry, type RowBand } from "./gridGeometry"
+import { useHeldKey } from "./heldKey"
 
 type Props = {
   rows: GraphRow[]
@@ -343,28 +344,8 @@ export function RevisionGrid({
     [],
   )
   const hoverRow = useCallback((index: number) => setHovered(index), [])
-  // A held ArrowDown / ArrowUp / PageDown / PageUp (v0.18.18): Windows
-  // auto-repeats at ~30 Hz and every repeat used to select on its own -
-  // one synchronous App render per event, plus a scroll task once the
-  // selection reached the viewport edge - about three times the repeat
-  // interval in dev, so the keydown queue backed up and the selection went
-  // on moving after the key was released
-  // (docs/perf/reactivity-review-2026-09-17.md second pass, finding 2). A
-  // repeat now only advances the pending index and one requestAnimationFrame
-  // selects the latest; the first press (not a repeat) still selects at
-  // once, so a tap feels as it did. The pending index stays the base for
-  // the next repeat until the key is released: a repeat can land before
-  // React has committed the frame's selection, and starting over from the
-  // `selected` prop then would stall a step. Releasing the key, leaving
-  // the grid or unmounting drops what is pending (the hold has ended).
-  const heldKey = useRef<{ index: number; frame: number } | null>(null)
-  const releaseKey = useCallback(() => {
-    const held = heldKey.current
-    if (held === null) return
-    if (held.frame !== 0) cancelAnimationFrame(held.frame)
-    heldKey.current = null
-  }, [])
-  useEffect(() => releaseKey, [releaseKey])
+  // Held arrow / page keys select once per frame (heldKey.ts, v0.18.18).
+  const heldKey = useHeldKey(onSelectRef)
   const refContextRow = useCallback(
     (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => {
       refContextMenuRef.current?.(e, ref, kind, index)
@@ -419,8 +400,8 @@ export function RevisionGrid({
         data-testid="grid-body"
         tabIndex={0}
         onMouseLeave={() => setHovered(-1)}
-        onKeyUp={releaseKey}
-        onBlur={releaseKey}
+        onKeyUp={heldKey.release}
+        onBlur={heldKey.release}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             // Folds the expanded row, else exits the ancestry highlight;
@@ -435,7 +416,7 @@ export function RevisionGrid({
           if (e.altKey || e.ctrlKey || e.metaKey) return
           if (rows.length === 0) return
           const last = rows.length - 1
-          const cur = heldKey.current?.index ?? (selected < 0 ? 0 : selected)
+          const cur = heldKey.pending() ?? (selected < 0 ? 0 : selected)
           const page = Math.max(1, Math.floor((parentRef.current?.clientHeight ?? ROW_HEIGHT) / ROW_HEIGHT) - 1)
           let next: number
           switch (e.key) {
@@ -462,19 +443,11 @@ export function RevisionGrid({
           }
           e.preventDefault()
           if (e.repeat && e.key !== "Home" && e.key !== "End") {
-            const held = heldKey.current ?? { index: next, frame: 0 }
-            held.index = next
-            if (held.frame === 0) {
-              held.frame = requestAnimationFrame(() => {
-                held.frame = 0
-                onSelectRef.current(held.index)
-              })
-            }
-            heldKey.current = held
+            heldKey.repeat(next)
             return
           }
           // A press (or Home/End) supersedes whatever a hold had pending.
-          releaseKey()
+          heldKey.release()
           onSelect(next)
         }}
       >

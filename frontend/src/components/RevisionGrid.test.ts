@@ -142,7 +142,8 @@ describe("RevisionGrid held keys", () => {
     host = document.createElement("div")
     document.body.append(host)
     root = createRoot(host)
-    const render = (sel: number) => act(() => root!.render(createElement(RevisionGrid, { rows, selected: sel, onSelect })))
+    const render = (sel: number) =>
+      act(() => root!.render(createElement(RevisionGrid, { rows, selected: sel, onSelect })))
     render(selected)
     return { body: host.querySelector<HTMLDivElement>(".grid-body")!, render }
   }
