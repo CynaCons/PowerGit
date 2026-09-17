@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createLayouter } from "./layout"
 import { syntheticHistory } from "./synthetic"
-import type { Revision } from "./types"
+import type { GraphRow, Revision } from "./types"
 
 /**
  * v0.13.11: measurable heap budgets for the history/graph model. The grid
@@ -57,4 +57,28 @@ describe("history memory budget", () => {
       expect(big.retained / small.retained).toBeLessThan(20)
     }
   }, 60_000)
+})
+
+function sameGraph(row: GraphRow, previous: GraphRow): boolean {
+  return row.lane === previous.lane &&
+    row.color === previous.color &&
+    row.hasRefs === previous.hasRefs &&
+    row.isHead === previous.isHead &&
+    JSON.stringify(row.segments) === JSON.stringify(previous.segments)
+}
+
+describe("reset patch measurement", () => {
+  it("measures a 10k reload with one new commit on top (v0.18.18)", () => {
+    const before = syntheticHistory(10_000)
+    const after: Revision[] = [{
+      ...before[0], id: "f".repeat(40), parents: [before[0].id], refs: ["HEAD", "master"],
+    }, ...before.map((rev, index) => index === 0 ? { ...rev, refs: rev.refs.filter((ref) => ref !== "HEAD" && ref !== "master") } : rev)]
+    const previousRows = createLayouter().append(before)
+    const refreshedRows = createLayouter().append(after)
+    const changed = refreshedRows.slice(1).filter((row, index) => !sameGraph(row, previousRows[index])).length
+    // 9 / 10,000 = 0.09% on the deterministic synthetic graph. This is
+    // far smaller than returning the 10,001-row reset result across the
+    // worker boundary, so the compact patch is warranted.
+    expect(changed).toBe(9)
+  }, 30_000)
 })

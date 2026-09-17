@@ -1,5 +1,5 @@
 import type { RevisionDto } from "../engine"
-import type { Revision } from "../graph/types"
+import type { GraphRow, Revision } from "../graph/types"
 
 // Refresh merge for the revision list (v0.13.20, field report from a
 // 10k-revision repository): every refresh used to rebuild page 0 through
@@ -79,4 +79,18 @@ export function mergeReload(page: RevisionDto[], old: Revision[], pageSize: numb
   }
   const unchanged = next.length === old.length && next.every((r, i) => r === old[i])
   return { next: unchanged ? old : next, complete, unchanged }
+}
+
+/** Applies a worker reset patch without replacing graph rows whose commit and
+ * geometry are unchanged. A new top commit shifts indexes, so matching by
+ * SHA (not position) is what preserves RevisionRow's memo identity. */
+export function applyGraphResetPatch(previous: GraphRow[], revisions: Revision[], patches: Map<number, GraphRow>): GraphRow[] {
+  const byId = new Map(previous.map((row) => [row.rev.id, row]))
+  return revisions.map((revision, index) => {
+    const patch = patches.get(index)
+    if (patch) return { ...patch, rev: revision }
+    const prior = byId.get(revision.id)
+    if (!prior) throw new Error(`layout reset omitted new row ${revision.id}`)
+    return prior.rev === revision ? prior : { ...prior, rev: revision }
+  })
 }
