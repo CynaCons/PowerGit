@@ -29,17 +29,32 @@ vi.mock("./RevisionRow", async () => {
 })
 
 vi.mock("@tanstack/react-virtual", () => ({
-  useVirtualizer: ({ count }: { count: number }) => {
-    if (virtualizerProbe.value) return virtualizerProbe.value
-    const items = Array.from({ length: count }, (_, index) => ({ index, start: index * 28, size: 28, end: (index + 1) * 28 }))
-    virtualizerProbe.value = {
-      getTotalSize: () => count * 28,
-      getVirtualItems: () => items,
-      measurementsCache: items,
-      measureElement: () => undefined,
-      scrollToIndex: () => undefined,
+  useVirtualizer: ({ count, getItemKey }: { count: number; getItemKey: (index: number) => string | number }) => {
+    const items = Array.from({ length: count }, (_, index) => ({
+      index,
+      key: getItemKey(index),
+      start: index * 28,
+      size: 28,
+      end: (index + 1) * 28,
+    }))
+    if (!virtualizerProbe.value) {
+      virtualizerProbe.value = {
+        getTotalSize: () => 0,
+        getVirtualItems: () => [],
+        measurementsCache: [],
+        measureElement: () => undefined,
+        scrollToIndex: () => undefined,
+      }
     }
-    return virtualizerProbe.value
+    const probe = virtualizerProbe.value as {
+      getTotalSize: () => number
+      getVirtualItems: () => typeof items
+      measurementsCache: typeof items
+    }
+    probe.getTotalSize = () => count * 28
+    probe.getVirtualItems = () => items
+    probe.measurementsCache = items
+    return probe
   },
 }))
 
@@ -100,5 +115,33 @@ describe("RevisionGrid graph width", () => {
     rowRenderCount.count = 0
     act(() => render(1))
     expect(rowRenderCount.count).toBe(2)
+  })
+
+  it("keeps the visible row at its offset when a reload prepends rows, but leaves the top at zero", () => {
+    const makeRows = (from: number, count: number) =>
+      layoutGraph(
+        Array.from({ length: count }, (_, offset) => revision(`r${String(from + offset).padStart(4, "0")}`, [])),
+      )
+    const rows = makeRows(5, 30)
+    const prepended = [...makeRows(0, 5), ...rows]
+    host = document.createElement("div")
+    document.body.append(host)
+    root = createRoot(host)
+    const render = (nextRows: typeof rows) =>
+      root!.render(createElement(RevisionGrid, { rows: nextRows, selected: -1, onSelect: () => undefined }))
+
+    act(() => render(rows))
+    const body = host.querySelector<HTMLElement>('[data-testid="grid-body"]')!
+    body.scrollTop = 287
+    act(() => render(rows))
+    const oldOffset = 10 * 28 - body.scrollTop
+    act(() => render(prepended))
+    expect(body.scrollTop).toBe(427)
+    expect(15 * 28 - body.scrollTop).toBe(oldOffset)
+
+    body.scrollTop = 0
+    act(() => render(rows))
+    act(() => render(prepended))
+    expect(body.scrollTop).toBe(0)
   })
 })

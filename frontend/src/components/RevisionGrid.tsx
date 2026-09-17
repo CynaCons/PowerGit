@@ -10,6 +10,7 @@ import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
 import { chipBudget, gridGeometry, type RowBand } from "./gridGeometry"
+import { useViewportAnchor } from "../hooks/useViewportAnchor"
 
 type Props = {
   rows: GraphRow[]
@@ -217,6 +218,8 @@ export function RevisionGrid({
 
   const virtualItems = virtualizer.getVirtualItems()
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
+  useViewportAnchor(rows, selected, virtualItems, virtualizer, parentRef, lastScrolledSha)
+
   // The canvas geometry: the visible bands plus a neighbour on each side
   // (graph/draw.ts). getVirtualItems() is memoised inside the virtualizer,
   // so this only recomputes when a row moved or changed height.
@@ -335,13 +338,10 @@ export function RevisionGrid({
     },
     [rows, onHighlightRoot],
   )
-  const contextRow = useCallback(
-    (e: React.MouseEvent, index: number) => {
-      onSelectRef.current(index)
-      rowContextMenuRef.current?.(e, index)
-    },
-    [],
-  )
+  const contextRow = useCallback((e: React.MouseEvent, index: number) => {
+    onSelectRef.current(index)
+    rowContextMenuRef.current?.(e, index)
+  }, [])
   const hoverRow = useCallback((index: number) => setHovered(index), [])
   const refContextRow = useCallback(
     (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => {
