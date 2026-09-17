@@ -31,7 +31,7 @@ vi.mock("./RevisionRow", async () => {
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count }: { count: number }) => {
     if (virtualizerProbe.value) return virtualizerProbe.value
-    const items = Array.from({ length: count }, (_, index) => ({ index, start: index * 28, size: 28 }))
+    const items = Array.from({ length: count }, (_, index) => ({ index, start: index * 28, size: 28, end: (index + 1) * 28 }))
     virtualizerProbe.value = {
       getTotalSize: () => count * 28,
       getVirtualItems: () => items,
