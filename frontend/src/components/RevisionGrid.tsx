@@ -68,10 +68,12 @@ export function RevisionGrid({
   // stable so React.memo can retain every unaffected visible row.
   const rowContextMenuRef = useRef(onRowContextMenu)
   const refContextMenuRef = useRef(onRefContextMenu)
+  const onSelectRef = useRef(onSelect)
   useEffect(() => {
     rowContextMenuRef.current = onRowContextMenu
     refContextMenuRef.current = onRefContextMenu
-  }, [onRowContextMenu, onRefContextMenu])
+    onSelectRef.current = onSelect
+  }, [onRowContextMenu, onRefContextMenu, onSelect])
   // The one row grown to show every ref (v0.18.3, variant B), by SHA so a
   // --date-order refresh that moves it keeps it open. +n opens, − / +n on
   // another row / Escape close.
@@ -283,19 +285,19 @@ export function RevisionGrid({
   // still selects. A pending row is not a commit and never a root.
   const clickRow = useCallback(
     (index: number, e: React.MouseEvent) => {
-      onSelect(index)
+      onSelectRef.current(index)
       const row = rows[index]
       if (e.altKey && onHighlightRoot && row && !row.artificial) onHighlightRoot(row.rev.id)
       parentRef.current?.focus()
     },
-    [onSelect, rows, onHighlightRoot],
+    [rows, onHighlightRoot],
   )
   const contextRow = useCallback(
     (e: React.MouseEvent, index: number) => {
-      onSelect(index)
+      onSelectRef.current(index)
       rowContextMenuRef.current?.(e, index)
     },
-    [onSelect],
+    [],
   )
   const hoverRow = useCallback((index: number) => setHovered(index), [])
   const refContextRow = useCallback(
