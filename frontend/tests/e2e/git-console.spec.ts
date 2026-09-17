@@ -119,8 +119,11 @@ test.describe("git console", () => {
     // Pinned, it survives the auto-dismiss.
     await card.getByTestId("git-failure-pin").click()
     await expect(card).toHaveAttribute("data-pinned", "true")
-    // The merge dialog closes itself and the app's own banner carries the
-    // message; the card is the console's view of the same failure.
+    // v0.18.17: a failed operation stays in its dialog, in git's words; the
+    // card is the console's view of the same failure. Cancel leaves the dialog.
+    await expect(page.getByTestId("merge-dialog")).toContainText(/fast[- ]forward/i)
+    await expect(page.getByTestId("merge-confirm")).toBeEnabled() // the dialog has settled after the failure
+    await page.getByTestId("merge-dialog").getByRole("button", { name: "Cancel" }).click()
     await expect(page.getByTestId("merge-dialog")).toHaveCount(0)
     await expect(card).toBeVisible()
 
