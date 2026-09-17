@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { RevisionDto } from "../engine"
-import { mergeReload, toRevision } from "./historyMerge"
+import { applyGraphResetPatch, mergeReload, toRevision } from "./historyMerge"
+import type { GraphRow, Revision } from "../graph/types"
 
 function dto(i: number, refs: string[] = []): RevisionDto {
   return {
@@ -14,6 +15,8 @@ function dto(i: number, refs: string[] = []): RevisionDto {
 }
 
 const PAGE = 3
+const revision = (id: string): Revision => ({ id, parents: [], message: id, author: "a", date: "2026-09-17", refs: [] })
+const row = (rev: Revision, lane = 0): GraphRow => ({ rev, lane, color: lane, hasRefs: false, isHead: false, segments: [] })
 
 describe("mergeReload", () => {
   it("keeps every row object and reports unchanged when nothing moved", () => {
@@ -31,7 +34,6 @@ describe("mergeReload", () => {
     const m = mergeReload(page, old, PAGE, false)
     expect(m.unchanged).toBe(false)
     expect(m.next.map((r) => r.id)).toEqual([dto(6).id, dto(5).id, dto(4).id, dto(3).id, dto(2).id])
-    // c5 lost its refs: new object. c4, c3, c2 untouched: same objects.
     expect(m.next[1]).not.toBe(old[0])
     expect(m.next[2]).toBe(old[1])
     expect(m.next[3]).toBe(old[2])
@@ -50,5 +52,16 @@ describe("mergeReload", () => {
     const m = mergeReload([dto(1), dto(0)], [], PAGE, false)
     expect(m.complete).toBe(true)
     expect(m.unchanged).toBe(false)
+  })
+})
+
+describe("applyGraphResetPatch", () => {
+  it("keeps an unchanged row object when a new top commit shifts its index (v0.18.18)", () => {
+    const old = revision("old")
+    const prior = row(old)
+    const head = revision("head")
+    const next = applyGraphResetPatch([prior], [head, old], new Map([[0, row(head)]]))
+    expect(next).toEqual([row(head), prior])
+    expect(next[1]).toBe(prior)
   })
 })

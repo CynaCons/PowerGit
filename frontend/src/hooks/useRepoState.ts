@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report, reportTransition } from "../diagnostics"
-import { changeKindOf, describeThrown, type ChangeKind, type RefTree, type RepoStatus, type StashInfo } from "../engine"
+import { changeKindOf, changeVersionWasObserved, describeThrown, type ChangeKind, type RefTree, type RepoStatus, type StashInfo } from "../engine"
 import { syntheticRefTree, syntheticStatus } from "../graph/synthetic"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
@@ -41,6 +41,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   const inFlight = useRef(0)
   const muteUntil = useRef(0)
   const refreshSequence = useRef(0)
+  const completedRefreshVersion = useRef(0)
   const refresh = useCallback(
     async (scope?: RefreshScope) => {
       if (!client.hasRepo) return
@@ -76,6 +77,10 @@ export function useRepoState({ session, history }: RepoStateDeps) {
         inFlight.current--
         if (!statusOnly) setRefreshing(false)
         muteUntil.current = Date.now() + ECHO_MS
+        // Each response carries the watcher version at its request start.
+        // Once this sweep completes, an event at or below it cannot add data
+        // the sweep did not already observe (v0.18.18).
+        completedRefreshVersion.current = client.lastChangeVersion
         reportTransition(
           "refresh",
           `${id} end ms=${Math.round(performance.now() - started)} failed=${firstError !== null}`,
@@ -172,13 +177,15 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       const isFirst = last === null
       last = e.data
       if (isFirst) return // initial snapshot, nothing changed
+      const version = Number(e.data)
+      if (Number.isSafeInteger(version) && changeVersionWasObserved(version, completedRefreshVersion.current)) return
       // Our own action's echo lands while its refresh is in flight or just
       // after; an external change in that same window (git add, then commit
       // a second later) must not be lost, so the event is deferred past the
       // mute instead of dropped (v0.14.1). Refreshes that change nothing are
       // cheap since v0.13.20.
       const echoDelay = Math.max(muteUntil.current - Date.now() + 100, inFlight.current > 0 ? ECHO_MS + 500 : 0)
-      const kind = changeKindOf(Number(e.data))
+      const kind = changeKindOf(version)
       if (pendingKind !== "refs") pendingKind = kind
       window.clearTimeout(timer)
       timer = window.setTimeout(

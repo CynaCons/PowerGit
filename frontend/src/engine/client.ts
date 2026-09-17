@@ -130,6 +130,19 @@ export function changeKindOf(version: number): ChangeKind {
   }
 }
 
+/** The monotonically increasing portion of the packed watcher version. The
+ * low two bits are only its change classification, not ordering state. */
+export function changeSequenceOf(version: number): number {
+  return Math.floor(version / 4)
+}
+
+/** Whether a change event was already represented by a completed refresh.
+ * v0.18.18 drops only this proven watcher echo; a later external write has a
+ * higher sequence and remains eligible for the existing deferred refresh. */
+export function changeVersionWasObserved(eventVersion: number, observedVersion: number): boolean {
+  return changeSequenceOf(eventVersion) <= changeSequenceOf(observedVersion)
+}
+
 // Text-first: WebKit throws a generic DOMException ("The string did not match
 // the expected pattern") from Response.json() on any non-JSON body (empty 500,
 // proxy page, dropped connection). Read text, then parse, so the UI can show
@@ -199,6 +212,8 @@ export class EngineClient {
   readonly baseUrl: string
   readonly token: string
   readonly repoId: string | null
+  /** Highest watcher version carried by any response for this client. */
+  lastChangeVersion = 0
 
   constructor(cfg: EngineConfig) {
     this.baseUrl = cfg.baseUrl.replace(/\/+$/, "")
@@ -244,7 +259,12 @@ export class EngineClient {
       else opts.signal.addEventListener("abort", onAbort, { once: true })
     }
     try {
-      return await fetch(`${this.baseUrl}${path}`, { ...init, headers, signal: ctrl.signal })
+      const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers, signal: ctrl.signal })
+      const version = Number(response.headers.get("X-PowerGit-Change-Version"))
+      if (Number.isSafeInteger(version) && version >= 0 && version > this.lastChangeVersion) {
+        this.lastChangeVersion = version
+      }
+      return response
     } catch (e) {
       if (ctrl.signal.aborted && !opts.signal?.aborted) {
         throw new EngineError(`engine request timed out after ${Math.round(budget / 1000)} s: ${path}`, 0)

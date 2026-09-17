@@ -163,6 +163,24 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(5, (await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?max=10"))!.Length);
     }
 
+    [Fact]
+    public async Task Session_responses_carry_the_request_start_change_version()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        string sid = await client.OpenSessionAsync(repo.Dir);
+        GitHost session = _factory.Services.GetRequiredService<RepoRegistry>().Get(sid)!;
+
+        HttpResponseMessage first = await client.GetAsync($"/repos/{sid}/status");
+        first.EnsureSuccessStatusCode();
+        string? version = first.Headers.GetValues("X-PowerGit-Change-Version").SingleOrDefault();
+        Assert.Equal(session.ChangeVersion.ToString(System.Globalization.CultureInfo.InvariantCulture), version);
+
+        HttpResponseMessage second = await client.GetAsync($"/repos/{sid}/revisions?max=1");
+        second.EnsureSuccessStatusCode();
+        Assert.Equal(version, second.Headers.GetValues("X-PowerGit-Change-Version").SingleOrDefault());
+    }
+
     // v0.18.5: the graph's ref filter is repeated `ref=` query values (full
     // names); an unknown one is a 400 that names it.
     [Fact]
