@@ -102,6 +102,13 @@ export function RevisionGrid({
   }, [highlightRoot, rows.length, rootRow, onHighlightRoot])
   const exitHighlight = useCallback(() => onHighlightRoot?.(null), [onHighlightRoot])
   const graphOptions = useGraphOptions()
+  // The pixel width/height/dpr the canvas backing store was last sized to
+  // (v0.18.18): assigning canvas.width/height resets the whole bitmap even
+  // when the number does not change, so the draw effect below only touches
+  // them - and the CSS width/height that must track the same numbers - on
+  // an actual change instead of on every hover, selection or scroll step
+  // (docs/perf/reactivity-review-2026-09-17.md finding 8).
+  const lastCanvasSize = useRef({ width: -1, height: -1, dpr: 0 })
   // Author identity (v0.18.1, prototype A): a disc per row, and the selected
   // row's author marked on every loaded row by that author (class
   // author-same, set here in the render, never by a DOM pass). A pending row
@@ -155,16 +162,29 @@ export function RevisionGrid({
   useEffect(() => {
     const el = parentRef.current
     if (!el) return
-    // Native listener: React registers wheel as passive, and the body must
-    // not also scroll on Shift+wheel.
+    // Native listener: React registers wheel as passive. This one used to
+    // be { passive: false } + preventDefault, on the theory that el (the
+    // vertical list, also the virtualizer's own scroll element) might also
+    // scroll on Shift+wheel. It does not need to (v0.18.18): Chromium/
+    // WebView2 and WebKitGTK both zero deltaY and move the value to
+    // deltaX for a Shift+wheel event before it ever reaches this handler,
+    // and el's own columns are sized to fit it (gridColumns.ts, the
+    // graph's auto width and the metadata widths' floors in the
+    // <=1200px rule at app.css:45-51), so it has no horizontal overflow
+    // for that deltaX to act on and el does not move. (A user-dragged
+    // column wide enough to force one is no different from today: a
+    // plain two-finger horizontal swipe, deltaX without Shift, already
+    // bypasses this handler and scrolls el natively.) Passive removes the
+    // main-thread wait the compositor otherwise takes on every plain
+    // vertical wheel tick this handler returns early from
+    // (docs/perf/reactivity-review-2026-09-17.md finding 3).
     const onWheel = (e: WheelEvent) => {
       if (!e.shiftKey) return
       const bar = scrollbarRef.current
       if (!bar || bar.scrollWidth <= bar.clientWidth) return
-      e.preventDefault()
       bar.scrollLeft += e.deltaX || e.deltaY
     }
-    el.addEventListener("wheel", onWheel, { passive: false })
+    el.addEventListener("wheel", onWheel, { passive: true })
     return () => el.removeEventListener("wheel", onWheel)
   }, [])
 
@@ -173,12 +193,25 @@ export function RevisionGrid({
   // px under the #root zoom). Sizes are cached by SHA, not index, so a
   // refresh that shifts the rows keeps the tall one tall and no other.
   const getItemKey = useCallback((index: number) => rows[index]?.rev.id ?? index, [rows])
+  // react-virtual defaults useFlushSync to true: every 28 px range change
+  // during a scroll wraps the rerender in ReactDOM.flushSync on the
+  // SyncLane, which forces the canvas effect below to flush and repaint
+  // before the frame does instead of coalescing with it (v0.18.18,
+  // docs/perf/reactivity-review-2026-09-17.md finding 3). Nothing here
+  // needs the range updated synchronously within the same event: the
+  // jump-to-selected effect below calls scrollToIndex and returns without
+  // reading getVirtualItems() again, and useGraphNav's select() /
+  // useHistory's jumpToRef+jumpToCommit only ever call setSelectedSha and
+  // let the next render pick up the new range. A batched render is safe
+  // and lets several scroll events land in one commit per frame; overscan
+  // 12 (336 px) covers the one-frame lag.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     getItemKey,
     overscan: 12,
+    useFlushSync: false,
   })
   const measureRow = useCallback((el: HTMLDivElement | null) => virtualizer.measureElement(el), [virtualizer])
 
@@ -227,10 +260,20 @@ export function RevisionGrid({
     const parent = parentRef.current
     if (!canvas || !parent) return
     const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.ceil(width * dpr)
-    canvas.height = Math.ceil(geometry.height * dpr)
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${geometry.height}px`
+    const last = lastCanvasSize.current
+    // Resize only on a real change (v0.18.18): canvas.width/height clears
+    // the backing store even when reassigned the same value, so doing this
+    // unconditionally reallocated and discarded a ~0.25-0.5 Mpx bitmap on
+    // every hover and every 28 px scroll step for no reason. drawRows
+    // clearRects its own rect first (graph/draw.ts:76), so skipping the
+    // resize does not skip the clear.
+    if (last.width !== width || last.height !== geometry.height || last.dpr !== dpr) {
+      canvas.width = Math.ceil(width * dpr)
+      canvas.height = Math.ceil(geometry.height * dpr)
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${geometry.height}px`
+      lastCanvasSize.current = { width, height: geometry.height, dpr }
+    }
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     // Shifted left by the graph scroll; the drawn width grows by the same
