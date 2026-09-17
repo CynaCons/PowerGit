@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { edgeInScope, extendAncestry, inScope, markAncestry } from "./ancestry"
+import { ancestryFullWalks, edgeInScope, extendAncestry, inScope, markAncestry } from "./ancestry"
 import { withArtificialRows } from "./artificial"
 import { layoutGraph } from "./layout"
 import { syntheticHistory } from "./synthetic"
@@ -136,5 +136,23 @@ describe("markAncestry", () => {
     const root = rows[100].rev.id
     const changedRoot = extendAncestry(prefix, markAncestry(prefix), rows, root)
     expect([...changedRoot!.marks]).toEqual([...markAncestry(rows, root)!.marks])
+  })
+})
+
+describe("pending-row append", () => {
+  it("keeps the artificial prefix so extendAncestry avoids a full walk (v0.18.18)", () => {
+    const enginePrefix = layoutGraph([rev("head", ["middle"], ["HEAD"]), rev("middle", ["root"]), rev("root", [])])
+    const pendingPrefix = withArtificialRows(enginePrefix, { unstagedCount: 2, stagedCount: 1 })
+    const ancestry = markAncestry(pendingPrefix)
+    const engineAppend = [...enginePrefix, ...layoutGraph([rev("older", [])])]
+    const pendingAppend = withArtificialRows(engineAppend, { unstagedCount: 2, stagedCount: 1 })
+    const before = ancestryFullWalks()
+
+    extendAncestry(pendingPrefix, ancestry, pendingAppend)
+
+    expect(ancestryFullWalks()).toBe(before)
+    expect(pendingAppend[0]).toBe(pendingPrefix[0])
+    expect(pendingAppend[1]).toBe(pendingPrefix[1])
+    expect(pendingAppend[2]).toBe(pendingPrefix[2])
   })
 })

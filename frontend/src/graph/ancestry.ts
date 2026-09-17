@@ -33,7 +33,15 @@ export type Ancestry = {
 }
 export type HighlightScope = "all" | "first-parent"
 
+let fullWalks = 0
+
+/** Test seam: page-append tests verify pending rows stay incremental. */
+export function ancestryFullWalks(): number {
+  return fullWalks
+}
+
 export function markAncestry(rows: readonly GraphRow[], rootId?: string): Ancestry | null {
+  fullWalks += 1
   const root = rootId === undefined ? rows.find((r) => r.isHead) : rows.find((r) => r.rev.id === rootId)
   if (!root) return null
   const temporary = !root.isHead

@@ -17,27 +17,36 @@ type RowIndex = { bySha: Map<string, GraphRow>; children: ChildIndex; head: stri
 // keeps the array (historyMerge.ts), so the index survives it; a page append
 // is a new array and a new index. Built lazily on the first question.
 const INDEX = new WeakMap<GraphRow[], RowIndex>()
+let latest: { rows: GraphRow[]; index: RowIndex } | null = null
+
+function addRows(idx: RowIndex, rows: GraphRow[], from: number): void {
+  for (let i = from; i < rows.length; i++) {
+    const row = rows[i]
+    idx.bySha.set(row.rev.id, row)
+    if (row.isHead && idx.head === null) idx.head = row.rev.id
+    if (row.artificial) continue
+    for (const p of row.rev.parents) {
+      const list = idx.children.get(p)
+      if (list) list.push(row.rev.id)
+      else idx.children.set(p, [row.rev.id])
+    }
+  }
+}
 
 function indexOf(rows: GraphRow[]): RowIndex {
   let idx = INDEX.get(rows)
   if (idx) return idx
-  const bySha = new Map<string, GraphRow>()
-  const children: ChildIndex = new Map()
-  let head: string | null = null
-  for (const row of rows) {
-    bySha.set(row.rev.id, row)
-    if (row.isHead && head === null) head = row.rev.id
-    // A pending row (Working directory, Index) is not a commit: it is
-    // nobody's child for navigation, and it has no parents to go to.
-    if (row.artificial) continue
-    for (const p of row.rev.parents) {
-      const list = children.get(p)
-      if (list) list.push(row.rev.id)
-      else children.set(p, [row.rev.id])
-    }
-  }
-  idx = { bySha, children, head }
+  const previous = latest?.rows
+  const extendsPrevious = previous !== undefined && rows.length > previous.length &&
+    rows[0] === previous[0] && rows[previous.length - 1] === previous[previous.length - 1]
+  idx = extendsPrevious
+    ? latest!.index
+    : { bySha: new Map<string, GraphRow>(), children: new Map(), head: null }
+  // Page appends preserve useHistory's prefix row identities, so only the
+  // new engine rows extend these Maps; reloads rebuild them (v0.18.18).
+  addRows(idx, rows, extendsPrevious ? previous.length : 0)
   INDEX.set(rows, idx)
+  latest = { rows, index: idx }
   return idx
 }
 

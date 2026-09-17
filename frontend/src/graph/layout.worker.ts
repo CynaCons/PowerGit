@@ -1,5 +1,6 @@
 import { createLayouter } from "./layout"
-import type { GraphRow, Revision } from "./types"
+import { LAYOUT_REPLY_CHUNK, withoutRevision, type LayoutRequest } from "./layoutProtocol"
+import type { GraphRow } from "./types"
 
 // Runs lane layout off the main thread so a fresh commit batch never blocks
 // interaction. History arrives in pages: `reset` starts a new layout, an
@@ -19,14 +20,21 @@ function sameGraph(a: GraphRow, b: GraphRow): boolean {
   })
 }
 
-self.onmessage = (e: MessageEvent<{ seq: number; reset: boolean; revisions: Revision[] }>) => {
+self.onmessage = (e: MessageEvent<LayoutRequest>) => {
   const { seq, reset, revisions } = e.data
   if (reset) layouter = createLayouter()
   const from = layouter.rowCount()
   const rows = layouter.append(revisions)
   if (!reset) {
     previousRows = [...previousRows, ...rows]
-    ;(self as unknown as Worker).postMessage({ seq, reset: false, from, rows })
+    // Keep each structured-clone reply below one frame's work, but let the
+    // main thread publish the append only after its last chunk (v0.18.18).
+    for (let offset = 0; offset < rows.length; offset += LAYOUT_REPLY_CHUNK) {
+      const chunk = rows.slice(offset, offset + LAYOUT_REPLY_CHUNK).map(withoutRevision)
+      ;(self as unknown as Worker).postMessage({
+        seq, reset: false, from, offset, last: offset + chunk.length === rows.length, rows: chunk,
+      })
+    }
     return
   }
   // v0.18.18: a top commit shifts every index, but nearly every existing
@@ -34,7 +42,7 @@ self.onmessage = (e: MessageEvent<{ seq: number; reset: boolean; revisions: Revi
   const previousById = new Map(previousRows.map((row) => [row.rev.id, row]))
   const patches = rows.flatMap((row, index) => {
     const previous = previousById.get(row.rev.id)
-    return previous && sameGraph(row, previous) ? [] : [{ index, row }]
+    return previous && sameGraph(row, previous) ? [] : [{ index, row: withoutRevision(row) }]
   })
   previousRows = rows
   ;(self as unknown as Worker).postMessage({ seq, reset: true, length: rows.length, patches })

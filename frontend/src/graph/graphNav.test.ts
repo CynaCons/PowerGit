@@ -72,6 +72,14 @@ describe("parentsOf / firstChildOf / headSha", () => {
     expect(firstChildOf(copy, id("base"))).toBe(id("wip"))
     expect(rowOf(copy, id("base"))).toBe(rowOf(rows, id("base")))
   })
+
+  it("extends the previous index when an append preserves the prefix", () => {
+    const prefix = rows.slice(0, -1)
+    expect(firstChildOf(prefix, id("base"))).toBe(id("wip"))
+    const appended = [...prefix, rows.at(-1)!]
+    expect(rowOf(appended, id("base"))).toBe(rows.at(-1))
+    expect(firstChildOf(appended, id("base"))).toBe(id("wip"))
+  })
 })
 
 describe("pending rows", () => {

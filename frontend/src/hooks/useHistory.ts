@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report } from "../diagnostics"
 import { isAbort, type EngineClient, type RevisionDto, type RevisionFilter } from "../engine"
 import { isArtificialId } from "../graph/artificial"
 import { createLayouter, layoutGraph, type GraphLayouter } from "../graph/layout"
+import { attachRevisions, withoutRevision, type LayoutReply, type LayoutRequest, type LayoutRow } from "../graph/layoutProtocol"
 import { syntheticHistory } from "../graph/synthetic"
 import type { GraphRow, Revision } from "../graph/types"
 import { applyGraphResetPatch, mergeReload, toRevision } from "./historyMerge"
@@ -13,11 +14,6 @@ import { applyGraphResetPatch, mergeReload, toRevision } from "./historyMerge"
 const PAGE = 3000
 const EAGER_CEILING = 10_000
 const HARD_CEILING = 100_000
-
-type LayoutRequest = { seq: number; reset: boolean; revisions: Revision[] }
-type LayoutReply =
-  | { seq: number; reset: false; from: number; rows: GraphRow[] }
-  | { seq: number; reset: true; length: number; patches: { index: number; row: GraphRow }[] }
 
 export type HistoryDeps = {
   client: EngineClient
@@ -85,7 +81,8 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   const layoutSeq = useRef(0)
   const resetSeq = useRef(0)
   const lastSent = useRef<Revision[]>([])
-  const layoutRevisions = useRef<Revision[]>([])
+  const revisionsBySeq = useRef(new Map<number, Revision[]>())
+  const appendChunks = useRef(new Map<number, LayoutRow[]>())
 
   // Where layout requests go: the worker, or an in-thread layouter once the
   // worker has failed (module workers over the tauri:// custom scheme have
@@ -96,12 +93,25 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     const handle = (reply: LayoutReply) => {
       const { seq, reset } = reply
       if (seq < resetSeq.current) return
+      const revisions = revisionsBySeq.current.get(seq)
+      if (!revisions) return
       if (reset) {
-        const revisions = layoutRevisions.current.slice(0, reply.length)
-        const patches = new Map(reply.patches.map((patch) => [patch.index, patch.row]))
+        const patches = new Map(reply.patches.map((patch) => [patch.index, { ...patch.row, rev: revisions[patch.index] }]))
         setLiveGraphRows((prev) => applyGraphResetPatch(prev, revisions, patches))
+        revisionsBySeq.current.delete(seq)
       } else {
-        setLiveGraphRows((prev) => [...prev.slice(0, reply.from), ...reply.rows])
+        const chunks = appendChunks.current.get(seq) ?? []
+        chunks.push(...reply.rows)
+        if (!reply.last) {
+          appendChunks.current.set(seq, chunks)
+          return
+        }
+        appendChunks.current.delete(seq)
+        revisionsBySeq.current.delete(seq)
+        const rows = attachRevisions(chunks, revisions)
+        // The virtualizer's urgent scroll renders can interrupt the page
+        // publish; unchanged prefix rows retain their identity (v0.18.18).
+        startTransition(() => setLiveGraphRows((prev) => [...prev.slice(0, reply.from), ...rows]))
       }
     }
     const fallbackToMainThread = (why: string) => {
@@ -111,13 +121,15 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
         if (m.reset) inThread = createLayouter()
         const from = inThread.rowCount()
         const rows = inThread.append(m.revisions)
-        if (!m.reset) handle({ seq: m.seq, reset: false, from, rows })
-        else handle({ seq: m.seq, reset: true, length: rows.length, patches: rows.map((row, index) => ({ index, row })) })
+        if (!m.reset) handle({ seq: m.seq, reset: false, from, offset: 0, last: true, rows: rows.map(withoutRevision) })
+        else handle({ seq: m.seq, reset: true, length: rows.length, patches: rows.map((row, index) => ({ index, row: withoutRevision(row) })) })
       }
       // Whatever the worker swallowed is gone; replay the last full set.
       const seq = ++layoutSeq.current
       resetSeq.current = seq
-      layoutRevisions.current = lastSent.current
+      revisionsBySeq.current.clear()
+      appendChunks.current.clear()
+      revisionsBySeq.current.set(seq, lastSent.current)
       layoutPost.current({ seq, reset: true, revisions: lastSent.current })
     }
     // v0.13.11: constructing a module Worker can throw synchronously (a CSP
@@ -155,12 +167,16 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
       revisions[0] === prev[0] &&
       revisions[prev.length - 1] === prev[prev.length - 1]
     const seq = ++layoutSeq.current
-    layoutRevisions.current = revisions
     if (isAppend) {
       // Only the new tail crosses the worker boundary (no full-history clone).
-      post({ seq, reset: false, revisions: revisions.slice(prev.length) })
+      const tail = revisions.slice(prev.length)
+      revisionsBySeq.current.set(seq, tail)
+      post({ seq, reset: false, revisions: tail })
     } else {
       resetSeq.current = seq
+      revisionsBySeq.current.clear()
+      appendChunks.current.clear()
+      revisionsBySeq.current.set(seq, revisions)
       post({ seq, reset: true, revisions })
     }
     lastSent.current = revisions
