@@ -93,6 +93,9 @@ describe("merge: the dialog closes when git answers and the refresh runs behind 
     hasRepo: true,
     repoId: "r1",
     lastChangeVersion: 4,
+    // The sweep's requests report the stamp they carried; here the fake's
+    // single value stands for all of them.
+    beginChangeVersionScope: () => ({ end: () => client.lastChangeVersion }),
     eventsUrl: () => "http://engine/repos/r1/events",
     revisions: (_max: number, skip: number, signal?: AbortSignal) =>
       new Promise<RevisionDto[]>((resolve, reject) => {

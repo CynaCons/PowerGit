@@ -130,6 +130,10 @@ export function changeKindOf(version: number): ChangeKind {
   }
 }
 
+/** Handle on the requests started while a refresh sweep runs; `end()` gives
+ *  the lowest watcher version they were stamped with (0 if none carried one). */
+export type ChangeVersionScope = { end(): number }
+
 /** The monotonically increasing portion of the packed watcher version. The
  * low two bits are only its change classification, not ordering state. */
 export function changeSequenceOf(version: number): number {
@@ -214,6 +218,23 @@ export class EngineClient {
   readonly repoId: string | null
   /** Highest watcher version carried by any response for this client. */
   lastChangeVersion = 0
+  // A refresh may treat a watcher version as observed only if EVERY request
+  // of that sweep was stamped at or above it, so a scope keeps the lowest
+  // stamp of the requests started while it is open — not the highest of
+  // all responses, which a concurrent mutation could raise past what the
+  // sweep's reads actually saw (v0.18.18).
+  private readonly versionScopes = new Set<{ min: number }>()
+
+  beginChangeVersionScope(): ChangeVersionScope {
+    const scope = { min: Number.POSITIVE_INFINITY }
+    this.versionScopes.add(scope)
+    return {
+      end: () => {
+        this.versionScopes.delete(scope)
+        return Number.isFinite(scope.min) ? scope.min : 0
+      },
+    }
+  }
 
   constructor(cfg: EngineConfig) {
     this.baseUrl = cfg.baseUrl.replace(/\/+$/, "")
@@ -258,11 +279,16 @@ export class EngineClient {
       if (opts.signal.aborted) onAbort()
       else opts.signal.addEventListener("abort", onAbort, { once: true })
     }
+    // Membership is decided at request start: the engine samples the version
+    // before the handler runs, so a request started inside the scope saw at
+    // least the scope's state.
+    const scopes = [...this.versionScopes]
     try {
       const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers, signal: ctrl.signal })
       const version = Number(response.headers.get("X-PowerGit-Change-Version"))
-      if (Number.isSafeInteger(version) && version >= 0 && version > this.lastChangeVersion) {
-        this.lastChangeVersion = version
+      if (Number.isSafeInteger(version) && version >= 0) {
+        if (version > this.lastChangeVersion) this.lastChangeVersion = version
+        for (const scope of scopes) if (version < scope.min) scope.min = version
       }
       return response
     } catch (e) {

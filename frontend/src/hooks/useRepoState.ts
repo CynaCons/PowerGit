@@ -41,7 +41,11 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   const inFlight = useRef(0)
   const muteUntil = useRef(0)
   const refreshSequence = useRef(0)
-  const completedRefreshVersion = useRef(0)
+  // What the completed sweeps observed, by what they fetched: a status-only
+  // poll says nothing about refs, so a refs event above `full` still
+  // refreshes even when a later status poll carried a higher stamp
+  // (v0.18.18).
+  const observedVersion = useRef({ full: 0, status: 0 })
   const refresh = useCallback(
     async (scope?: RefreshScope) => {
       if (!client.hasRepo) return
@@ -55,6 +59,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       const id = ++refreshSequence.current
       const started = performance.now()
       reportTransition("refresh", `${id} start scope=${JSON.stringify(s)}`)
+      const stamps = client.beginChangeVersionScope()
       const jobs: Promise<unknown>[] = []
       let firstError: string | null = null
       const fail = (what: string) => (e: unknown) => {
@@ -78,9 +83,14 @@ export function useRepoState({ session, history }: RepoStateDeps) {
         if (!statusOnly) setRefreshing(false)
         muteUntil.current = Date.now() + ECHO_MS
         // Each response carries the watcher version at its request start.
-        // Once this sweep completes, an event at or below it cannot add data
-        // the sweep did not already observe (v0.18.18).
-        completedRefreshVersion.current = client.lastChangeVersion
+        // Once this sweep completes, an event at or below the lowest of them
+        // cannot add data the sweep did not already observe (v0.18.18).
+        const seen = stamps.end()
+        if (seen > 0 && firstError === null) {
+          const observed = observedVersion.current
+          if (s.revisions && s.refs) observed.full = Math.max(observed.full, seen)
+          if (s.status) observed.status = Math.max(observed.status, seen)
+        }
         reportTransition(
           "refresh",
           `${id} end ms=${Math.round(performance.now() - started)} failed=${firstError !== null}`,
@@ -178,14 +188,16 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       last = e.data
       if (isFirst) return // initial snapshot, nothing changed
       const version = Number(e.data)
-      if (Number.isSafeInteger(version) && changeVersionWasObserved(version, completedRefreshVersion.current)) return
+      const kind = changeKindOf(version)
+      const observed = observedVersion.current
+      const bound = kind === "status" ? Math.max(observed.full, observed.status) : observed.full
+      if (Number.isSafeInteger(version) && changeVersionWasObserved(version, bound)) return
       // Our own action's echo lands while its refresh is in flight or just
       // after; an external change in that same window (git add, then commit
       // a second later) must not be lost, so the event is deferred past the
       // mute instead of dropped (v0.14.1). Refreshes that change nothing are
       // cheap since v0.13.20.
       const echoDelay = Math.max(muteUntil.current - Date.now() + 100, inFlight.current > 0 ? ECHO_MS + 500 : 0)
-      const kind = changeKindOf(version)
       if (pendingKind !== "refs") pendingKind = kind
       window.clearTimeout(timer)
       timer = window.setTimeout(
