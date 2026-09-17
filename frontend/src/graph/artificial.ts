@@ -15,6 +15,17 @@ export const INDEX_ID = "INDEX"
 
 export type PendingCounts = { unstagedCount: number; stagedCount: number }
 
+type ArtificialCache = {
+  head: GraphRow
+  above: GraphRow | undefined
+  unstagedCount: number
+  stagedCount: number
+  artificial: GraphRow[]
+  headCopy: GraphRow
+}
+
+let lastArtificial: ArtificialCache | null = null
+
 export function isArtificialId(id: string): boolean {
   return id === WORKTREE_ID || id === INDEX_ID
 }
@@ -49,6 +60,11 @@ export function withArtificialRows(rows: GraphRow[], counts: PendingCounts | nul
   if (headIndex < 0) return rows
   const head = rows[headIndex]
   const above = rows[headIndex - 1]
+  const cached = lastArtificial
+  if (cached && cached.head === head && cached.above === above &&
+    cached.unstagedCount === counts.unstagedCount && cached.stagedCount === counts.stagedCount) {
+    return [...rows.slice(0, headIndex), ...cached.artificial, cached.headCopy, ...rows.slice(headIndex + 1)]
+  }
   const lane = laneBusy(above, head.lane, head.rev.id) ? maxLane([above, head]) + 1 : head.lane
 
   const specs: { id: string; artificial: "worktree" | "index"; message: string }[] = []
@@ -99,6 +115,11 @@ export function withArtificialRows(rows: GraphRow[], counts: PendingCounts | nul
   const headCopy: GraphRow = {
     ...head,
     segments: [...head.segments, artificial[artificial.length - 1].segments[0]],
+  }
+  // An append keeps the head and row above it by identity. Reusing these
+  // synthetic objects lets extendAncestry accept the old prefix (v0.18.18).
+  lastArtificial = {
+    head, above, unstagedCount: counts.unstagedCount, stagedCount: counts.stagedCount, artificial, headCopy,
   }
   return [...rows.slice(0, headIndex), ...artificial, headCopy, ...rows.slice(headIndex + 1)]
 }
