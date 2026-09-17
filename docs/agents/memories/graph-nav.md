@@ -94,3 +94,12 @@ node).
 - App.tsx is on the 400-line lint cap: the hook registers the chords on
   its own browse layer and HistoryPane mounts the pill, so App adds one
   hook call and one prop (see hotkeys.md).
+- A mouse click never takes focus (v0.18.18): NavButton's `onMouseDown`
+  calls `preventDefault`. The pill is outside `.grid-body`, whose
+  `onKeyDown` owns the plain arrows, so a focused button left them dead
+  until the grid was clicked. Tab still reaches it; MUI ButtonBase runs the
+  user handler and then the ripple whatever the event's default; the
+  parents Menu's focus trap restores focus to the grid. Proof is
+  `GraphCompass.test.ts` (jsdom does not move focus on mousedown itself, so
+  it asserts `defaultPrevented`); MUI's lazy ripple mounts in a microtask,
+  hence `await act(async …)` around the dispatch or React warns.
