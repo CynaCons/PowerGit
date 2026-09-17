@@ -34,6 +34,9 @@ declare global {
 // click → Commit tab 140 – 221 ms median, a 6 s scroll 0 – 21 long tasks with
 // frames up to 109 – 192 ms. Budgets are those × 1.5.
 const BUDGET = {
+  // The heavy fixture's measured boot allowance is deliberately looser than
+  // the vscode target (< 8 s): CI hardware varies, so this is fixture × 1.5.
+  bootToTenThousandRowsMs: 12_000,
   hoverToRedrawMedianMs: 50,
   selectToCommitTabMedianMs: 330,
   scrollLongTasks: 16, // per 3 s (vscode: 21 per 6 s)
@@ -49,12 +52,14 @@ const median = (xs: number[]) => {
 }
 
 async function booted(page: import("@playwright/test").Page) {
+  const started = Date.now()
   await page.addInitScript(PAGE_INSTRUMENTATION)
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
   await expect
     .poll(() => page.getByTestId("grid-body").evaluate((el) => el.firstElementChild!.scrollHeight), { timeout: 60_000 })
     .toBeGreaterThan(1_000 * 28)
+  expect(Date.now() - started, "boot to 10,000 rows").toBeLessThan(BUDGET.bootToTenThousandRowsMs)
   // Steady state: while the eager pages stream in, each append is a
   // 150 – 400 ms long task that would land in the numbers (a backlog item of
   // its own, measured separately by the harness's boot scenario).
