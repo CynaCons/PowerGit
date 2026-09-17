@@ -843,7 +843,7 @@ public sealed partial class GitHost
                 ReadLine("rebase-apply/original-commit")));
         }
 
-        string branch = Run(root, "rev-parse", "--abbrev-ref", "HEAD").StdOut.Trim();
+        string branch = HeadBranch(root);
         string? mergeHead = ReadLine("MERGE_HEAD");
         if (mergeHead is not null)
         {
@@ -1014,16 +1014,21 @@ public sealed partial class GitHost
         }
 
         List<SubmoduleDto> submodules = [];
-        CommandResult sm = Run(root, "submodule", "status", "--recursive");
-        if (sm.ExitCode == 0)
+        // A repository without a .gitmodules cannot have configured
+        // submodules; avoid a process on every ref refresh in that common case.
+        if (File.Exists(Path.Combine(root, ".gitmodules")))
         {
-            foreach (string line in sm.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            CommandResult sm = Run(root, "submodule", "status", "--recursive");
+            if (sm.ExitCode == 0)
             {
-                string trimmed = line.TrimStart(' ', '-', '+', 'U');
-                string[] bits = trimmed.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
-                if (bits.Length >= 2)
+                foreach (string line in sm.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    submodules.Add(new SubmoduleDto(Path.GetFileName(bits[1]), bits[1], bits[0]));
+                    string trimmed = line.TrimStart(' ', '-', '+', 'U');
+                    string[] bits = trimmed.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+                    if (bits.Length >= 2)
+                    {
+                        submodules.Add(new SubmoduleDto(Path.GetFileName(bits[1]), bits[1], bits[0]));
+                    }
                 }
             }
         }
