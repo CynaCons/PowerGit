@@ -343,7 +343,7 @@ export function FileHistoryView({
       <Paper
         data-testid="file-history-panel"
         sx={{
-          height: layout.bottomHeight,
+          height: `var(--pg-bottom-height, ${layout.bottomHeight}px)`,
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",

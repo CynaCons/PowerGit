@@ -44,9 +44,13 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   const refresh = useCallback(
     async (scope?: RefreshScope) => {
       if (!client.hasRepo) return
-      inFlight.current++
-      setRefreshing(true)
       const s = scope ?? { revisions: true, refs: true, status: true, stashes: true }
+      // The status safety-net poll keeps its previous object when unchanged;
+      // do not make that no-op render App for an invisible indicator
+      // (v0.18.18, owner: "slow, sluggish, lagging").
+      const statusOnly = s.status === true && !s.revisions && !s.refs && !s.stashes
+      inFlight.current++
+      if (!statusOnly) setRefreshing(true)
       const id = ++refreshSequence.current
       const started = performance.now()
       reportTransition("refresh", `${id} start scope=${JSON.stringify(s)}`)
@@ -70,7 +74,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
         await Promise.all(jobs)
       } finally {
         inFlight.current--
-        setRefreshing(false)
+        if (!statusOnly) setRefreshing(false)
         muteUntil.current = Date.now() + ECHO_MS
         reportTransition(
           "refresh",

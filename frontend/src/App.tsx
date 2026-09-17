@@ -145,11 +145,15 @@ export default function App({ base }: { base: EngineClient }) {
   }, [client, current])
   const chrome = useStable({
     refresh: () => refresh().catch(() => undefined),
+    // Reads `rows` at invocation time: RevisionRow keeps its click callbacks
+    // through App renders (v0.18.18, owner: "slow, sluggish, lagging").
+    selectRow: (i: number) => setSelectedSha(rows[i]?.rev.id ?? null),
     openStash: () => open({ kind: "stash" }),
     openRepo: () => void openFolder(),
     openRecents: () => open({ kind: "recents" }),
     openSettings: settings.toggle,
-    openSnapshot: () => void takeDiagnosticSnapshot(),
+    openSnapshot: () => void takeDiagnosticSnapshot(), recover: () => setRecoveryOpen(true),
+    openJobs: () => jobs.setPanelOpen(true),
     selectTarget: (sha: string) => void history.jumpToRef(sha),
     // A ref chip in the Commit tab (v0.18.3): the tree's click, by name.
     selectRef: (name: string) => {
@@ -362,13 +366,13 @@ export default function App({ base }: { base: EngineClient }) {
                         view={view}
                         headerExtra={filterChip}
                         nav={nav}
-                        onSelect={(i) => setSelectedSha(rows[i]?.rev.id ?? null)}
+                        onSelect={chrome.selectRow}
                         onNearEnd={history.onNearEnd}
                         menus={menus}
                         selectedSha={selectedSha}
-                        onRetry={() => void refresh().catch(() => undefined)}
-                        onOpenRepo={() => void openFolder()}
-                        onRecover={() => setRecoveryOpen(true)}
+                        onRetry={chrome.refresh}
+                        onOpenRepo={chrome.openRepo}
+                        onRecover={chrome.recover}
                       />
                       <PanelSplitter testid="panel-splitter" splitter={splitter} />
                       <BottomPanel
@@ -401,8 +405,8 @@ export default function App({ base }: { base: EngineClient }) {
           refreshing={refreshing && loaded}
           progressLabel={progressLabel}
           note={notes.note}
-          onOpenJobs={() => jobs.setPanelOpen(true)}
-          onOpenRecovery={() => setRecoveryOpen(true)}
+          onOpenJobs={chrome.openJobs}
+          onOpenRecovery={chrome.recover}
         />
         {/* Last row of the column: the panel shortens the graph instead of
             covering it, and neither it nor the dock line ever sits over the
