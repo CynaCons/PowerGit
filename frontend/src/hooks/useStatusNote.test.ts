@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement, useDeferredValue, useEffect, useState } from "react"
+import { act, createElement, useDeferredValue, useState } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { NOTE_MS, useStatusNote } from "./useStatusNote"
@@ -8,11 +8,11 @@ import { NOTE_MS, useStatusNote } from "./useStatusNote"
 
 // App's shape around the note (v0.18.18, docs/perf/reactivity-review-
 // 2026-09-17.md second pass, finding 9): the selection is urgent state,
-// the bottom panel reads it through useDeferredValue, and a passive effect
-// clears the note on every selection change. Counting the probe's renders
-// per selection is the measurement: 2 (urgent + deferred) when clearNote
-// dispatches nothing, 3 when a setState(null) sneaks a SyncLane update in
-// while the deferred pass is pending.
+// the bottom panel reads it through useDeferredValue, and the hook clears
+// the note on every selection change from a passive effect. Counting the
+// probe's renders per selection is the measurement: 2 (urgent + deferred)
+// when the clear dispatches nothing, 3 when a setState(null) sneaks a
+// SyncLane update in while the deferred pass is pending.
 describe("useStatusNote", () => {
   let root: Root
   let container: HTMLDivElement
@@ -23,9 +23,7 @@ describe("useStatusNote", () => {
     renders++
     const [sel, setSel] = useState(0)
     const deferred = useDeferredValue(sel)
-    const notes = useStatusNote()
-    const { clearNote } = notes
-    useEffect(() => clearNote(), [clearNote, sel])
+    const notes = useStatusNote(sel)
     latest = { ...notes, setSel, deferred }
     return null
   }

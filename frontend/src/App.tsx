@@ -112,12 +112,10 @@ export default function App({ base }: { base: EngineClient }) {
   // the bottom panel (owner report: "clicking commits feels laggy").
   // The status bar's transient line ("Saved 0001-….patch", v0.18.6): the
   // next row selection clears it, or it fades on its own. With no note up
-  // clearNote dispatches nothing (v0.18.18), so this effect costs a row
-  // click no extra App render; see useStatusNote for why a plain
-  // setState(null) could not bail out here.
-  const notes = useStatusNote()
-  const { clearNote } = notes
-  useEffect(() => clearNote(), [clearNote, selectedSha])
+  // the clear dispatches nothing (v0.18.18), so a row click pays no extra
+  // App render for it; see useStatusNote for why a plain setState(null)
+  // could not bail out here.
+  const notes = useStatusNote(selectedSha)
   const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs, notes }))
   // The compass and its chords (v0.18.12); the file history has neither.
   const nav = useGraphNav({ rows, current, history, notes, refs, repo, graphFilter, client, fileHistory, dialogs })
