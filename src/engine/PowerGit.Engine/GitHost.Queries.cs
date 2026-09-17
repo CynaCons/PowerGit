@@ -360,7 +360,20 @@ public sealed partial class GitHost
             args.Add("-w");
         }
 
-        args.AddRange(["--", path]);
+        // A renamed file: with only the new path in the pathspec git cannot
+        // pair the two sides and shows "new file", while the whole-commit
+        // patch GetChanges cuts from shows the rename. Give git both paths so
+        // the two answers stay byte-identical (QueryTests
+        // GetChanges_matches_ListFiles_plus_GetDiff met its first rename in
+        // v0.18.15).
+        args.Add("--");
+        args.Add(path);
+        string? renamedFrom = RenamedFrom(root, id, path);
+        if (renamedFrom is not null)
+        {
+            args.Add(renamedFrom);
+        }
+
         GitProcess.Result show = RunCapped(root, 30_000, ct, MaxDiffChars, [.. args]);
         if (show.ExitCode != 0)
         {
@@ -368,6 +381,28 @@ public sealed partial class GitHost
         }
 
         return BoundDiffText(path, show.StdOut, show.StdOutTruncated, "(no textual diff)");
+    }
+
+    /// <summary>The old path when <paramref name="path"/> is the new side of a rename in <paramref name="id"/>, else null.</summary>
+    private string? RenamedFrom(string root, string id, string path)
+    {
+        CommandResult names = Run(root, "-c", "core.quotepath=false",
+            "diff-tree", "--root", "-r", "--no-commit-id", "--name-status", "-M", "--diff-merges=first-parent", id);
+        if (names.ExitCode != 0)
+        {
+            return null;
+        }
+
+        foreach (string line in names.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 3 && parts[0].StartsWith('R') && parts[2] == path)
+            {
+                return parts[1];
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
