@@ -111,10 +111,11 @@ export default function App({ base }: { base: EngineClient }) {
   // stable identities so a row click re-renders only the grid and, deferred,
   // the bottom panel (owner report: "clicking commits feels laggy").
   // The status bar's transient line ("Saved 0001-….patch", v0.18.6): the
-  // next row selection clears it, or it fades on its own.
-  const notes = useStatusNote()
-  const { clearNote } = notes
-  useEffect(() => clearNote(), [clearNote, selectedSha])
+  // next row selection clears it, or it fades on its own. With no note up
+  // the clear dispatches nothing (v0.18.18), so a row click pays no extra
+  // App render for it; see useStatusNote for why a plain setState(null)
+  // could not bail out here.
+  const notes = useStatusNote(selectedSha)
   const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs, notes }))
   // The compass and its chords (v0.18.12); the file history has neither.
   const nav = useGraphNav({ engineRows, current, history, notes, refs, repo, graphFilter, client, fileHistory, dialogs })
@@ -152,7 +153,8 @@ export default function App({ base }: { base: EngineClient }) {
     openRepo: () => void openFolder(),
     openRecents: () => open({ kind: "recents" }),
     openSettings: settings.toggle,
-    openSnapshot: () => void takeDiagnosticSnapshot(), recover: () => setRecoveryOpen(true),
+    openSnapshot: () => void takeDiagnosticSnapshot(),
+    recover: () => setRecoveryOpen(true),
     openJobs: () => jobs.setPanelOpen(true),
     selectTarget: (sha: string) => void history.jumpToRef(sha),
     // A ref chip in the Commit tab (v0.18.3): the tree's click, by name.

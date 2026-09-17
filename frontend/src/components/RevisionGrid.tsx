@@ -10,6 +10,7 @@ import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
 import { chipBudget, gridGeometry, type RowBand } from "./gridGeometry"
+import { useHeldKey } from "./heldKey"
 
 type Props = {
   rows: GraphRow[]
@@ -335,14 +336,13 @@ export function RevisionGrid({
     },
     [rows, onHighlightRoot],
   )
-  const contextRow = useCallback(
-    (e: React.MouseEvent, index: number) => {
-      onSelectRef.current(index)
-      rowContextMenuRef.current?.(e, index)
-    },
-    [],
-  )
+  const contextRow = useCallback((e: React.MouseEvent, index: number) => {
+    onSelectRef.current(index)
+    rowContextMenuRef.current?.(e, index)
+  }, [])
   const hoverRow = useCallback((index: number) => setHovered(index), [])
+  // Held arrow / page keys select once per frame (heldKey.ts, v0.18.18).
+  const heldKey = useHeldKey(onSelectRef)
   const refContextRow = useCallback(
     (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => {
       refContextMenuRef.current?.(e, ref, kind, index)
@@ -397,6 +397,8 @@ export function RevisionGrid({
         data-testid="grid-body"
         tabIndex={0}
         onMouseLeave={() => setHovered(-1)}
+        onKeyUp={heldKey.release}
+        onBlur={heldKey.release}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             // Folds the expanded row, else exits the ancestry highlight;
@@ -411,7 +413,7 @@ export function RevisionGrid({
           if (e.altKey || e.ctrlKey || e.metaKey) return
           if (rows.length === 0) return
           const last = rows.length - 1
-          const cur = selected < 0 ? 0 : selected
+          const cur = heldKey.pending() ?? (selected < 0 ? 0 : selected)
           const page = Math.max(1, Math.floor((parentRef.current?.clientHeight ?? ROW_HEIGHT) / ROW_HEIGHT) - 1)
           let next: number
           switch (e.key) {
@@ -437,6 +439,12 @@ export function RevisionGrid({
               return
           }
           e.preventDefault()
+          if (e.repeat && e.key !== "Home" && e.key !== "End") {
+            heldKey.repeat(next)
+            return
+          }
+          // A press (or Home/End) supersedes whatever a hold had pending.
+          heldKey.release()
           onSelect(next)
         }}
       >
