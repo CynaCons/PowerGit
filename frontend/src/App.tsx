@@ -111,7 +111,10 @@ export default function App({ base }: { base: EngineClient }) {
   // stable identities so a row click re-renders only the grid and, deferred,
   // the bottom panel (owner report: "clicking commits feels laggy").
   // The status bar's transient line ("Saved 0001-….patch", v0.18.6): the
-  // next row selection clears it, or it fades on its own.
+  // next row selection clears it, or it fades on its own. With no note up
+  // clearNote dispatches nothing (v0.18.18), so this effect costs a row
+  // click no extra App render; see useStatusNote for why a plain
+  // setState(null) could not bail out here.
   const notes = useStatusNote()
   const { clearNote } = notes
   useEffect(() => clearNote(), [clearNote, selectedSha])
