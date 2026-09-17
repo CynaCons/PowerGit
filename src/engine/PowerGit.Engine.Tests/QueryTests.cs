@@ -247,7 +247,9 @@ public sealed class QueryTests
             Assert.Equal(5002, refs.Branches.Length);
             best = Math.Min(best, watch.ElapsedMilliseconds);
         }
-        Assert.True(best < 400, $"GetRefs best of three was {best} ms");
+        // 130 ms on the audit machine; the budget leaves room for a loaded CI box (the
+        // %(refname:short) it replaced took 2,578 ms on 5,577 refs, v0.18.10).
+        Assert.True(best < 1000, $"GetRefs best of three was {best} ms");
     }
 
     [Fact]
