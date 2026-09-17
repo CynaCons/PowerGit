@@ -6,6 +6,9 @@ public sealed partial class GitHost
 
     private readonly string _gitPath;
     private RepoInfo? _current;
+    // Resolved when a repository is opened.  Status and operation-state reads
+    // need this often; asking git again for every refresh is needless work.
+    private string? _gitDir;
 
     // v0.13.6: one GitHost per open repository ("session"). Mutations are
     // serialized per session through this gate; reads bypass it (git itself
@@ -120,6 +123,7 @@ public sealed partial class GitHost
         }
 
         string root = Run(full, "rev-parse", "--show-toplevel").StdOut.Trim().Replace('/', Path.DirectorySeparatorChar);
+        _gitDir = Run(root, "rev-parse", "--absolute-git-dir").StdOut.Trim().Replace('/', Path.DirectorySeparatorChar);
         string branch = Run(root, "rev-parse", "--abbrev-ref", "HEAD").StdOut.Trim();
         string name = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
 

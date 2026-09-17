@@ -294,7 +294,7 @@ function manyCommits(dir: string, n: number): void {
   }
   execFileSync("git", ["fast-import", "--quiet"], { cwd: dir, input: stream, stdio: ["pipe", "pipe", "pipe"] })
   // fast-import moves the branch, not the worktree: sync it so the grid has
-  // no pending row on top and index 999 is bulk-101.
+  // no pending row on top and index 2999 is bulk-101.
   git(dir, "reset", "-q", "--hard")
 }
 
@@ -306,7 +306,7 @@ test.describe("a parent below the loaded window", () => {
   test.beforeAll(async () => {
     previous = await currentRepoPath()
     dir = makeRepo("pg-graph-nav-deep-")
-    manyCommits(dir, 1100)
+    manyCommits(dir, 3100) // the parent sits on the second 3,000-row page (v0.18.15)
     await openRepoOnEngine(dir)
     repoId = await currentRepoId()
   })
@@ -320,21 +320,25 @@ test.describe("a parent below the loaded window", () => {
     page,
   }) => {
     test.setTimeout(90_000)
-    // Hold the second page (skip=1000) until the test lets it through. Every
+    // Hold the second page (skip=3000) until the test lets it through. Every
     // request for it is held: a reset during boot re-issues the page, and
     // the one the grid waits on must be the one released.
     const held: Route[] = []
-    await page.route(/\/revisions\?.*skip=1000/, (route) => {
-      held.push(route)
+    let released = false
+    await page.route(/\/revisions\?.*skip=3000/, (route) => {
+      // Once released, later requests for the page (a live-refresh reload
+      // re-issues the eager tail) go straight through instead of hanging.
+      if (released) void route.continue()
+      else held.push(route)
     })
     await page.goto(`/?repo=${repoId}`)
     await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
     await expect.poll(() => held.length, { timeout: 30_000 }).toBeGreaterThan(0)
-    // The last loaded row (index 999): its parent is on the held page.
+    // The last loaded row (index 2999): its parent is on the held page.
     const body = page.getByTestId("grid-body")
     await body.focus()
     await page.keyboard.press("End")
-    const last = page.locator('[data-testid="grid-row"][data-index="999"]')
+    const last = page.locator('[data-testid="grid-row"][data-index="2999"]')
     await expect(last).toHaveClass(/selected/)
     await expect(last).toContainText("bulk-101")
     const parent = page.getByTestId("graph-nav-parent")
@@ -346,13 +350,14 @@ test.describe("a parent below the loaded window", () => {
     await expect(page.getByTestId("graph-nav-loading")).toBeVisible()
     await expect(last).toHaveClass(/selected/)
 
+    released = true
     for (const route of held) await route.continue().catch(() => undefined)
-    // The page is in: 1100 rows tall.
+    // The page is in: 3100 rows tall.
     await expect
       .poll(() => page.getByTestId("grid-body").evaluate((el) => el.firstElementChild!.scrollHeight), {
         timeout: 30_000,
       })
-      .toBeGreaterThanOrEqual(1100 * 28)
+      .toBeGreaterThanOrEqual(3100 * 28)
     const landed = page.locator(".grid-row.selected")
     await expect(landed).toContainText("bulk-100", { timeout: 30_000 })
     await expect(landed.getByTestId("sha-cell")).toHaveText(target)

@@ -23,7 +23,7 @@ declare const process: {
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const PAGE = 1000
+const PAGE = 3000 // useHistory PAGE (v0.18.15)
 
 type Call = {
   skip: number
