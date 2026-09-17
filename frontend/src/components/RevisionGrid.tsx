@@ -160,16 +160,29 @@ export function RevisionGrid({
   useEffect(() => {
     const el = parentRef.current
     if (!el) return
-    // Native listener: React registers wheel as passive, and the body must
-    // not also scroll on Shift+wheel.
+    // Native listener: React registers wheel as passive. This one used to
+    // be { passive: false } + preventDefault, on the theory that el (the
+    // vertical list, also the virtualizer's own scroll element) might also
+    // scroll on Shift+wheel. It does not need to (v0.18.18): Chromium/
+    // WebView2 and WebKitGTK both zero deltaY and move the value to
+    // deltaX for a Shift+wheel event before it ever reaches this handler,
+    // and el's own columns are sized to fit it (gridColumns.ts, the
+    // graph's auto width and the metadata widths' floors in the
+    // <=1200px rule at app.css:45-51), so it has no horizontal overflow
+    // for that deltaX to act on and el does not move. (A user-dragged
+    // column wide enough to force one is no different from today: a
+    // plain two-finger horizontal swipe, deltaX without Shift, already
+    // bypasses this handler and scrolls el natively.) Passive removes the
+    // main-thread wait the compositor otherwise takes on every plain
+    // vertical wheel tick this handler returns early from
+    // (docs/perf/reactivity-review-2026-09-17.md finding 3).
     const onWheel = (e: WheelEvent) => {
       if (!e.shiftKey) return
       const bar = scrollbarRef.current
       if (!bar || bar.scrollWidth <= bar.clientWidth) return
-      e.preventDefault()
       bar.scrollLeft += e.deltaX || e.deltaY
     }
-    el.addEventListener("wheel", onWheel, { passive: false })
+    el.addEventListener("wheel", onWheel, { passive: true })
     return () => el.removeEventListener("wheel", onWheel)
   }, [])
 
