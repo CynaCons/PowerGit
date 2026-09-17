@@ -9,7 +9,7 @@ import Select from "@mui/material/Select"
 import ToggleButton from "@mui/material/ToggleButton"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import type { HighlightScope } from "../graph/ancestry"
 import { countAuthor } from "../graph/authorIdentity"
 import { setGraphOptions, useGraphOptions } from "../graph/graphOptions"
@@ -47,7 +47,9 @@ const AMBER_BG = "var(--pg-review-todo-bg, rgba(183, 121, 31, 0.10))"
 // home — pinned open, amber border and icon, the root's SHA and subject in
 // place of "Checked-out branch", and Exit (Esc). Scope, Ring, Dim and the
 // Author group keep working on the temporary root.
-export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHighlight }: Props) {
+// RevisionGrid passes stable rows, selectedAuthor, rootRow and exitHighlight,
+// so hover and scroll renders can bail out here (v0.18.18).
+export const GraphOptionsBar = memo(function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHighlight }: Props) {
   const temporary = highlightRoot !== null
   const bar = useFloatingBar(temporary)
   const { expanded } = bar
@@ -209,4 +211,4 @@ export function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHig
       </Box>
     </Box>
   )
-}
+})
