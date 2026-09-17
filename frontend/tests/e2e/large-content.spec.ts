@@ -16,7 +16,19 @@ async function firstRevisionWithChangedFiles(base: string, skip = 0): Promise<{ 
     ).json()) as Array<{ path: string }>
     if (files.length === 0) continue
     if (seen++ < skip) continue
-    return { id: revision.id, path: files[0].path }
+    // A submodule pointer is a changed path with no blob behind it (git:
+    // "bad object HEAD:<path>"), so a commit that only bumps one has nothing
+    // for these specs to open — skip such paths, and the commit if it has
+    // nothing else.
+    for (const file of files) {
+      const blob = (await (
+        await fetch(`${base}/commits/${revision.id}/blob?path=${encodeURIComponent(file.path)}`, {
+          headers: engineHeaders(),
+        })
+      ).json()) as { sizeBytes?: unknown }
+      if (typeof blob.sizeBytes === "number") return { id: revision.id, path: file.path }
+    }
+    seen--
   }
   throw new Error("the first 25 revisions contain no commit with changed files")
 }
