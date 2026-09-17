@@ -203,6 +203,49 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void GetRefs_shortens_names_and_disambiguates_branch_tag_collisions()
+    {
+        using TempRepo repo = new();
+        repo.Run("branch", "topic");
+        repo.Run("tag", "topic");
+        repo.Run("tag", "release");
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        RefTreeDto refs = host.GetRefs();
+        Assert.Contains(refs.Branches, r => r.Name == "heads/topic" && r.FullName == "refs/heads/topic");
+        Assert.Contains(refs.Tags, r => r.Name == "tags/topic" && r.FullName == "refs/tags/topic");
+        Assert.Contains(refs.Tags, r => r.Name == "release");
+    }
+
+    [Fact]
+    public void GetStatus_uses_four_git_calls_after_open()
+    {
+        using TempRepo repo = new();
+        GitHost host = new();
+        host.Open(repo.Dir);
+        long before = host.CommandLog().Last().Id;
+
+        RepoStatusDto status = host.GetStatus();
+        GitLogEntryDto[] calls = host.CommandLog(before).ToArray();
+
+        Assert.Equal("main", status.Branch);
+        Assert.Equal(4, calls.Length);
+        Assert.DoesNotContain(calls, c => c.Command.Contains("--absolute-git-dir", StringComparison.Ordinal));
+        Assert.DoesNotContain(calls, c => c.Command.Contains("--abbrev-ref HEAD", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void GetStatus_keeps_HEAD_for_detached_head()
+    {
+        using TempRepo repo = new();
+        repo.Run("checkout", "--detach");
+        GitHost host = new();
+        host.Open(repo.Dir);
+        Assert.Equal("HEAD", host.GetStatus().Branch);
+    }
+
+    [Fact]
     public void GetConfig_returns_identity_or_nulls()
     {
         GitHost host = Opened();

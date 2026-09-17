@@ -652,7 +652,7 @@ public sealed partial class GitHost
     public RepoStatusDto GetStatus()
     {
         string root = RequireRoot();
-        string branch = Run(root, "rev-parse", "--abbrev-ref", "HEAD").StdOut.Trim();
+        string branch = HeadBranch(root);
         CommandResult porcelain = Run(root, "-c", "core.quotepath=false", "status", "--porcelain=v1", "-uall");
         if (porcelain.ExitCode != 0)
         {
@@ -909,7 +909,30 @@ public sealed partial class GitHost
 
     /// <summary>The real git dir (`.git` may be a file in worktrees and submodules), native separators.</summary>
     internal string GitDir(string root)
-        => Run(root, "rev-parse", "--absolute-git-dir").StdOut.Trim().Replace('/', Path.DirectorySeparatorChar);
+    {
+        if (string.Equals(Current?.Root, root, StringComparison.Ordinal) && _gitDir is not null)
+        {
+            return _gitDir;
+        }
+
+        return Run(root, "rev-parse", "--absolute-git-dir").StdOut.Trim().Replace('/', Path.DirectorySeparatorChar);
+    }
+
+    // Match `rev-parse --abbrev-ref HEAD`: a symbolic HEAD is its branch
+    // name, while a detached HEAD remains the literal "HEAD".
+    private string HeadBranch(string root)
+    {
+        try
+        {
+            string head = File.ReadAllText(Path.Combine(GitDir(root), "HEAD")).Trim();
+            const string Prefix = "ref: refs/heads/";
+            return head.StartsWith(Prefix, StringComparison.Ordinal) ? head[Prefix.Length..] : "HEAD";
+        }
+        catch (IOException)
+        {
+            return "HEAD";
+        }
+    }
 
     // Branches without an upstream (or a detached HEAD) make `@{upstream}`
     // fail to resolve; git's exact wording there varies by version/locale,
@@ -939,34 +962,48 @@ public sealed partial class GitHost
         CommandResult show = Run(
             root,
             "for-each-ref",
-            "--format=%(objectname)%09%(*objectname)%09%(refname)%09%(refname:short)",
+            "--format=%(objectname)%09%(*objectname)%09%(refname)",
             "refs/heads", "refs/remotes", "refs/tags");
         if (show.ExitCode != 0)
         {
             throw new InvalidOperationException(show.StdErr.Trim());
         }
 
-        List<RefItemDto> branches = [];
-        List<RefItemDto> remotes = [];
-        List<RefItemDto> tags = [];
+        List<(string Object, string Peeled, string Full)> records = [];
         foreach (string line in show.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             string[] p = line.Split('\t');
-            if (p.Length < 4)
-            {
-                continue;
-            }
+            if (p.Length >= 3) records.Add((p[0], p[1], p[2]));
+        }
 
+        static (string Kind, string Name) ShortName(string full) => full.StartsWith("refs/heads/", StringComparison.Ordinal) ? ("heads", full[11..])
+            : full.StartsWith("refs/remotes/", StringComparison.Ordinal) ? ("remotes", full[13..])
+            : full.StartsWith("refs/tags/", StringComparison.Ordinal) ? ("tags", full[10..]) : ("", full);
+        Dictionary<string, HashSet<string>> kindsByName = new(StringComparer.Ordinal);
+        foreach ((_, _, string full) in records)
+        {
+            (string kind, string name) = ShortName(full);
+            if (!kindsByName.TryGetValue(name, out HashSet<string>? kinds)) kindsByName[name] = kinds = new(StringComparer.Ordinal);
+            kinds.Add(kind);
+        }
+
+        List<RefItemDto> branches = [];
+        List<RefItemDto> remotes = [];
+        List<RefItemDto> tags = [];
+        foreach ((string obj, string peeled, string full) in records)
+        {
             // Annotated tags peel (%(*objectname)) to the commit they tag;
             // the UI jumps to Target in the revision graph, so it must be a
             // commit id, never the tag object id.
-            string target = string.IsNullOrWhiteSpace(p[1]) ? p[0] : p[1];
-            RefItemDto item = new(p[3], p[2], target, Current: p[3] == current);
-            if (p[2].StartsWith("refs/heads/", StringComparison.Ordinal))
+            string target = string.IsNullOrWhiteSpace(peeled) ? obj : peeled;
+            (string kind, string shortName) = ShortName(full);
+            string name = kindsByName[shortName].Count > 1 ? $"{kind}/{shortName}" : shortName;
+            RefItemDto item = new(name, full, target, Current: full == $"refs/heads/{current}");
+            if (full.StartsWith("refs/heads/", StringComparison.Ordinal))
             {
                 branches.Add(item);
             }
-            else if (p[2].StartsWith("refs/remotes/", StringComparison.Ordinal))
+            else if (full.StartsWith("refs/remotes/", StringComparison.Ordinal))
             {
                 remotes.Add(item);
             }
