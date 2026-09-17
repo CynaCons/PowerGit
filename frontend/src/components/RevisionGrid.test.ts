@@ -1,4 +1,4 @@
-import { act } from "react"
+import { act, createElement } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { graphWidth } from "../graph/draw"
@@ -16,7 +16,14 @@ vi.mock("../graph/draw", async (importActual) => {
 })
 
 function revision(id: string, parents: string[]): Revision {
-  return { id: id.padEnd(40, "0"), parents: parents.map((parent) => parent.padEnd(40, "0")), message: id, author: "a", date: "", refs: [] }
+  return {
+    id: id.padEnd(40, "0"),
+    parents: parents.map((parent) => parent.padEnd(40, "0")),
+    message: id,
+    author: "a",
+    date: "",
+    refs: [],
+  }
 }
 
 describe("RevisionGrid graph width", () => {
@@ -37,7 +44,7 @@ describe("RevisionGrid graph width", () => {
     document.body.append(host)
     root = createRoot(host)
     const render = (selected: number) =>
-      root!.render(<RevisionGrid rows={rows} selected={selected} onSelect={() => undefined} />)
+      root!.render(createElement(RevisionGrid, { rows, selected, onSelect: () => undefined }))
 
     act(() => render(0))
     expect(widthSpy).toHaveBeenCalledTimes(1)
