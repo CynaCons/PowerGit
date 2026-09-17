@@ -1,3 +1,4 @@
+import { memo } from "react"
 import type { AuthorIdentity } from "../graph/authorIdentity"
 import type { GraphRow } from "../graph/types"
 import { RefChips, type RefMenuKind } from "./RefChips"
@@ -8,6 +9,8 @@ type Props = {
   /** The row's top in list pixels (the virtualizer's `start`). */
   start: number
   selected: boolean
+  /** Kept as a boolean so moving the pointer only updates the two rows. */
+  hovered: boolean
   /** By the selected row's author (v0.18.1): the disc's ring and the bold name. */
   sameAuthor: boolean
   identity: AuthorIdentity | null
@@ -36,11 +39,12 @@ type Props = {
 // translated by the virtualizer; the row element stays transparent so the
 // canvas underneath keeps its node (selected-row-graph.spec.ts), the text
 // cells carry the selection tint.
-export function RevisionRow({
+export const RevisionRow = memo(function RevisionRow({
   row,
   index,
   start,
   selected,
+  hovered,
   sameAuthor,
   identity,
   expanded,
@@ -59,7 +63,7 @@ export function RevisionRow({
   return (
     <div
       ref={measureRef}
-      className={`grid-row${selected ? " selected" : ""}${sameAuthor ? " author-same" : ""}${expanded ? " expanded" : ""}`}
+      className={`grid-row${selected ? " selected" : ""}${hovered ? " hovered" : ""}${sameAuthor ? " author-same" : ""}${expanded ? " expanded" : ""}`}
       data-testid="grid-row"
       data-index={index}
       data-artificial={row.artificial}
@@ -103,4 +107,4 @@ export function RevisionRow({
       </div>
     </div>
   )
-}
+})

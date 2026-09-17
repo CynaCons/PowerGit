@@ -1,7 +1,7 @@
 import CallSplitIcon from "@mui/icons-material/CallSplit"
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { chipWidth, foldRefs, kindOf, orderRefs, type RefKind } from "./refChipsModel"
 
 export type { RefKind } from "./refChipsModel"
@@ -39,7 +39,7 @@ type Props = {
 // orphan remotes · tags, folded by width (not count) into a "+n" chip that
 // expands the row. Every kind carries its glyph: a fork for a local branch,
 // a cloud for a remote one (v0.13.19), a tag (v0.14.0).
-export function RefChips({
+export const RefChips = memo(function RefChips({
   refs,
   tagSet,
   remoteNames,
@@ -112,7 +112,7 @@ export function RefChips({
       ) : null}
     </span>
   )
-}
+})
 
 /** The kind's glyph, also on a single chip drawn outside a row (dialogs, v0.18.11). */
 export function Glyph({ kind }: { kind: RefKind }) {

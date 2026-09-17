@@ -163,6 +163,7 @@ export function RevisionGrid({
     getItemKey,
     overscan: 12,
   })
+  const measureRow = useCallback((el: HTMLDivElement | null) => virtualizer.measureElement(el), [virtualizer])
 
   const virtualItems = virtualizer.getVirtualItems()
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
@@ -274,15 +275,19 @@ export function RevisionGrid({
     },
     [onSelect, rows, onHighlightRoot],
   )
-  const contextRow = useMemo(
-    () =>
-      onRowContextMenu
-        ? (e: React.MouseEvent, index: number) => {
-            onSelect(index)
-            onRowContextMenu(e, index)
-          }
-        : undefined,
+  const contextRow = useCallback(
+    (e: React.MouseEvent, index: number) => {
+      onSelect(index)
+      onRowContextMenu?.(e, index)
+    },
     [onSelect, onRowContextMenu],
+  )
+  const hoverRow = useCallback((index: number) => setHovered(index), [])
+  const refContextRow = useCallback(
+    (e: React.MouseEvent, ref: string, kind: "local" | "remote" | "tag", index: number) => {
+      onRefContextMenu?.(e, ref, kind, index)
+    },
+    [onRefContextMenu],
   )
   const handle = (key: ColumnKey) => (
     <div
@@ -397,6 +402,7 @@ export function RevisionGrid({
                 index={item.index}
                 start={item.start}
                 selected={item.index === selected}
+                hovered={item.index === hovered}
                 sameAuthor={markedAuthor !== null && row.rev.author === markedAuthor}
                 identity={discs && row.rev.author ? authorIdentity(row.rev.author) : null}
                 expanded={row.rev.id === expandedSha}
@@ -404,11 +410,11 @@ export function RevisionGrid({
                 tagSet={tagSet}
                 remoteNames={remoteNames}
                 currentBranch={currentBranch}
-                measureRef={virtualizer.measureElement}
+                measureRef={measureRow}
                 onClick={clickRow}
                 onContextMenu={contextRow}
-                onMouseEnter={setHovered}
-                onRefContextMenu={onRefContextMenu}
+                onMouseEnter={hoverRow}
+                onRefContextMenu={refContextRow}
                 onExpand={setExpanded}
                 onFold={foldRow}
               />
