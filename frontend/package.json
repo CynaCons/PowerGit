@@ -31,6 +31,7 @@
     "@mui/icons-material": "^9.3.1",
     "@mui/material": "^9.3.1",
     "@shikijs/engine-javascript": "4.4.3",
+    "@shikijs/langs-precompiled": "4.4.3",
     "@tanstack/react-virtual": "^3.13.12",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
