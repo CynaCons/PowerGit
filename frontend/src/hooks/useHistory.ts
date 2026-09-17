@@ -10,7 +10,7 @@ import { mergeReload, toRevision } from "./historyMerge"
 // History pages in from the engine: the first page renders fast, autofill
 // keeps loading in the background up to EAGER_CEILING, and scrolling or
 // jumping to a ref keeps loading up to HARD_CEILING.
-const PAGE = 1000
+const PAGE = 3000
 const EAGER_CEILING = 10_000
 const HARD_CEILING = 100_000
 

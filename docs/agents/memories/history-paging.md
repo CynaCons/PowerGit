@@ -1,5 +1,13 @@
 # History paging (useHistory)
 
+## 3,000-row pages reduce repeated log startup cost
+v0.18.15 changed `useHistory`'s `PAGE` from 1,000 to 3,000 while retaining
+the same eager and hard ceilings. Each page is a new `git log --date-order`
+and large repositories measured a roughly 1.3 s fixed cost per page; this
+reduces the requests required to fill the 10,000-row eager ceiling. It is not
+streaming: if this is still insufficient, the next step is one long-lived log
+stream, delivered to the layout worker in 3,000-row chunks.
+
 Captured 2026-09-11 during v0.16.0 (file history).
 
 ## A second `useHistory` is fine; give it a memoised `filter`
