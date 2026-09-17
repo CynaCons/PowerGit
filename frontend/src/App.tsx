@@ -155,7 +155,8 @@ export default function App({ base }: { base: EngineClient }) {
     openRepo: () => void openFolder(),
     openRecents: () => open({ kind: "recents" }),
     openSettings: settings.toggle,
-    openSnapshot: () => void takeDiagnosticSnapshot(), recover: () => setRecoveryOpen(true),
+    openSnapshot: () => void takeDiagnosticSnapshot(),
+    recover: () => setRecoveryOpen(true),
     openJobs: () => jobs.setPanelOpen(true),
     selectTarget: (sha: string) => void history.jumpToRef(sha),
     // A ref chip in the Commit tab (v0.18.3): the tree's click, by name.

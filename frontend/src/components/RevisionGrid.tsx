@@ -336,13 +336,10 @@ export function RevisionGrid({
     },
     [rows, onHighlightRoot],
   )
-  const contextRow = useCallback(
-    (e: React.MouseEvent, index: number) => {
-      onSelectRef.current(index)
-      rowContextMenuRef.current?.(e, index)
-    },
-    [],
-  )
+  const contextRow = useCallback((e: React.MouseEvent, index: number) => {
+    onSelectRef.current(index)
+    rowContextMenuRef.current?.(e, index)
+  }, [])
   const hoverRow = useCallback((index: number) => setHovered(index), [])
   // Held arrow / page keys select once per frame (heldKey.ts, v0.18.18).
   const heldKey = useHeldKey(onSelectRef)
