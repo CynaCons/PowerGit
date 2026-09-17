@@ -116,8 +116,14 @@ export function RevisionGrid({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const naturalWidth = graphWidth(rows)
-  const autoWidth = bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth
+  // Lane width only changes with the graph rows. Hover, selection, scroll
+  // geometry and column drags all re-render this component without changing
+  // those rows, so never make those paths rescan the complete history.
+  const naturalWidth = useMemo(() => graphWidth(rows), [rows])
+  const autoWidth = useMemo(
+    () => (bodyWidth > 0 ? Math.min(naturalWidth, Math.max(96, Math.round(bodyWidth * 0.35))) : naturalWidth),
+    [bodyWidth, naturalWidth],
+  )
   const width = widths.graph ?? autoWidth
   // Horizontal scroll of the graph column when the lanes do not fit
   // (owner: "a discreet scroll bar at the bottom of that column ... shift
