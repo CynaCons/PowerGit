@@ -43,7 +43,16 @@ export function useChromeLayout() {
     if (!dragState.current) contentRef.current?.style.setProperty("--pg-bottom-height", `${bottomHeight}px`)
   }, [bottomHeight])
 
+  // Left button only, and the pointerdown is default-prevented before the
+  // capture: without it the compat mousedown arms the engine's selection
+  // controller, which keeps extending a text selection from the real
+  // hit-test under the cursor on every move - a blue sweep across the grid
+  // rows or the diff text alongside the resize, left selected on release
+  // (v0.18.18, docs/perf/reactivity-review-2026-09-17.md second pass
+  // finding 6). Same shape as the grid's column handles.
   const onDividerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
     dragState.current = { startY: e.clientY, startH: bottomHeight, height: bottomHeight }
     e.currentTarget.setPointerCapture(e.pointerId)
   }

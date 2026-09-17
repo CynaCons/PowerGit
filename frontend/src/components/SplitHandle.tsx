@@ -1,5 +1,6 @@
 import Box from "@mui/material/Box"
 import { useRef, useState } from "react"
+import { getZoom } from "../theme/zoom"
 
 type Props = {
   testid: string
@@ -38,7 +39,13 @@ export function SplitHandle({
     return Math.min(Math.max(width, min), max)
   }
 
+  // Left button only, default-prevented before the capture so the compat
+  // mousedown never arms a text-selection drag across the diff text next
+  // to the handle (v0.18.18, docs/perf/reactivity-review-2026-09-17.md
+  // second pass finding 6); same shape as the grid's column handles.
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
     drag.current = { startX: e.clientX, startWidth: widthRef.current }
     setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -46,7 +53,13 @@ export function SplitHandle({
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag.current) return
-    const next = clamp(drag.current.startWidth + (e.clientX - drag.current.startX))
+    // clientX is visual px; the width is local px inside the zoomed subtree
+    // (#root, or a dialog paper - theme/index.ts zooms both), so the delta
+    // is divided by the zoom or the column edge outruns the pointer at
+    // 150 % (v0.18.18, docs/perf/reactivity-review-2026-09-17.md second
+    // pass finding 3). getZoom() rather than useZoom(): no hook for a value
+    // only read mid-drag.
+    const next = clamp(drag.current.startWidth + (e.clientX - drag.current.startX) / getZoom())
     widthRef.current = next
     onChange(next)
   }
@@ -82,6 +95,9 @@ export function SplitHandle({
         width: 8,
         flexShrink: 0,
         cursor: "col-resize",
+        // Belt and braces with the preventDefault above: Chromium does not
+        // start a selection from a user-select:none mousedown target.
+        userSelect: "none",
         bgcolor: dragging ? "primary.dark" : "divider",
         "&:hover": { bgcolor: dragging ? "primary.dark" : "primary.main" },
       }}
