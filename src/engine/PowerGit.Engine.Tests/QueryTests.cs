@@ -68,6 +68,28 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void GetDiff_reuses_rename_map_for_repeated_files_in_the_same_commit()
+    {
+        // v0.18.18: the Diff tab asks for one file at a time. A rename still
+        // needs both old and new paths in `git show`, but the whole-commit
+        // rename scan is per commit, not per clicked file.
+        using TempRepo repo = new();
+        repo.Run("mv", "a.txt", "renamed.txt");
+        repo.StageAndCommit("rename-a");
+        string id = repo.HeadId();
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        DiffDto first = host.GetDiff(id, "renamed.txt");
+        int misses = host.RenameMapCacheMisses;
+        DiffDto second = host.GetDiff(id, "renamed.txt");
+
+        Assert.Equal(first, second);
+        Assert.Equal(1, misses);
+        Assert.Equal(misses, host.RenameMapCacheMisses);
+    }
+
+    [Fact]
     public void Merge_commit_lists_files_and_first_parent_diff()
     {
         // Owner (v0.14.0): "merge commits are not showing a diff in the diff

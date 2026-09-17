@@ -1,7 +1,7 @@
 // Lazy, offline syntax highlighting for the File Tree blob viewer, backed by
 // Shiki's fine-grained bundle: the same TextMate grammars + VS Code themes
-// VS Code itself uses. Everything Shiki needs (core, the JS regex engine,
-// every grammar, the theme) lives in node_modules and is bundled by Vite
+// VS Code itself uses. Everything Shiki needs (core, the raw JS regex engine,
+// every precompiled grammar, the theme) lives in node_modules and is bundled by Vite
 // into the app's own dist output; each is behind an explicit, statically
 // analysable `import()` so it ships as a local chunk (never a CDN fetch,
 // never the WASM/Oniguruma engine — see docs/agents/memories/webkitgtk-css.md
@@ -19,6 +19,8 @@ const MAX_HIGHLIGHT_CHARS = 400_000 // ~400 KB
 const MAX_HIGHLIGHT_LINES = 20_000
 
 const THEME = "light-plus"
+const TOKEN_CACHE_MAX_CHARS = 8 * 1024 * 1024
+const TOKEN_CACHE_MAX_ENTRIES = 64
 
 // Extension (lowercased, no dot) -> Shiki language id. One canonical id per
 // language; the id doubles as the key into LANG_LOADERS below, so callers
@@ -76,35 +78,35 @@ const BASENAME_LANG: Readonly<Record<string, string>> = {
 // specifier, so bundlers can analyse and code-split each of these on its
 // own. Keyed by the same canonical id EXTENSION_LANG/BASENAME_LANG return.
 const LANG_LOADERS: Readonly<Record<string, () => Promise<{ default: LanguageRegistration[] }>>> = {
-  typescript: () => import("@shikijs/langs/typescript"),
-  tsx: () => import("@shikijs/langs/tsx"),
-  javascript: () => import("@shikijs/langs/javascript"),
-  jsx: () => import("@shikijs/langs/jsx"),
-  json: () => import("@shikijs/langs/json"),
-  css: () => import("@shikijs/langs/css"),
-  html: () => import("@shikijs/langs/html"),
-  markdown: () => import("@shikijs/langs/markdown"),
-  python: () => import("@shikijs/langs/python"),
-  rust: () => import("@shikijs/langs/rust"),
-  go: () => import("@shikijs/langs/go"),
-  java: () => import("@shikijs/langs/java"),
-  c: () => import("@shikijs/langs/c"),
-  cpp: () => import("@shikijs/langs/cpp"),
-  csharp: () => import("@shikijs/langs/csharp"),
-  bash: () => import("@shikijs/langs/bash"),
-  yaml: () => import("@shikijs/langs/yaml"),
-  toml: () => import("@shikijs/langs/toml"),
-  xml: () => import("@shikijs/langs/xml"),
-  sql: () => import("@shikijs/langs/sql"),
-  ruby: () => import("@shikijs/langs/ruby"),
-  php: () => import("@shikijs/langs/php"),
-  swift: () => import("@shikijs/langs/swift"),
-  kotlin: () => import("@shikijs/langs/kotlin"),
-  lua: () => import("@shikijs/langs/lua"),
-  ini: () => import("@shikijs/langs/ini"),
-  diff: () => import("@shikijs/langs/diff"),
-  dockerfile: () => import("@shikijs/langs/dockerfile"),
-  makefile: () => import("@shikijs/langs/makefile"),
+  typescript: () => import("@shikijs/langs-precompiled/typescript"),
+  tsx: () => import("@shikijs/langs-precompiled/tsx"),
+  javascript: () => import("@shikijs/langs-precompiled/javascript"),
+  jsx: () => import("@shikijs/langs-precompiled/jsx"),
+  json: () => import("@shikijs/langs-precompiled/json"),
+  css: () => import("@shikijs/langs-precompiled/css"),
+  html: () => import("@shikijs/langs-precompiled/html"),
+  markdown: () => import("@shikijs/langs-precompiled/markdown"),
+  python: () => import("@shikijs/langs-precompiled/python"),
+  rust: () => import("@shikijs/langs-precompiled/rust"),
+  go: () => import("@shikijs/langs-precompiled/go"),
+  java: () => import("@shikijs/langs-precompiled/java"),
+  c: () => import("@shikijs/langs-precompiled/c"),
+  cpp: () => import("@shikijs/langs-precompiled/cpp"),
+  csharp: () => import("@shikijs/langs-precompiled/csharp"),
+  bash: () => import("@shikijs/langs-precompiled/bash"),
+  yaml: () => import("@shikijs/langs-precompiled/yaml"),
+  toml: () => import("@shikijs/langs-precompiled/toml"),
+  xml: () => import("@shikijs/langs-precompiled/xml"),
+  sql: () => import("@shikijs/langs-precompiled/sql"),
+  ruby: () => import("@shikijs/langs-precompiled/ruby"),
+  php: () => import("@shikijs/langs-precompiled/php"),
+  swift: () => import("@shikijs/langs-precompiled/swift"),
+  kotlin: () => import("@shikijs/langs-precompiled/kotlin"),
+  lua: () => import("@shikijs/langs-precompiled/lua"),
+  ini: () => import("@shikijs/langs-precompiled/ini"),
+  diff: () => import("@shikijs/langs-precompiled/diff"),
+  dockerfile: () => import("@shikijs/langs-precompiled/dockerfile"),
+  makefile: () => import("@shikijs/langs-precompiled/makefile"),
 }
 
 /**
@@ -124,7 +126,7 @@ export function languageForPath(path: string): string | null {
 }
 
 async function createCoreHighlighter(): Promise<HighlighterCore> {
-  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, { default: lightPlus }, { default: darkPlus }] =
+  const [{ createHighlighterCore }, { createJavaScriptRawEngine }, { default: lightPlus }, { default: darkPlus }] =
     await Promise.all([
       import("shiki/core"),
       import("@shikijs/engine-javascript"),
@@ -134,10 +136,11 @@ async function createCoreHighlighter(): Promise<HighlighterCore> {
   return createHighlighterCore({
     themes: [lightPlus, darkPlus],
     langs: [],
-    // The pure-JS RegExp engine avoids loading Shiki's Oniguruma .wasm over
-    // Tauri's custom `tauri://` scheme, which is unverified on the
-    // WebKitGTK target and would fail silently there.
-    engine: createJavaScriptRegexEngine(),
+    // The pure-JS raw engine consumes precompiled grammars, so first use of
+    // a language skips the main-thread regex compilation cost (v0.18.18)
+    // while still avoiding Shiki's Oniguruma .wasm over Tauri's custom
+    // `tauri://` scheme, which is unverified on the WebKitGTK target.
+    engine: createJavaScriptRawEngine(),
   })
 }
 
@@ -194,6 +197,85 @@ export type Token = { content: string; color?: string }
 
 const DARK_THEME = "dark-plus"
 
+type TokenizingHighlighter = Pick<HighlighterCore, "codeToTokensBase">
+
+type TokenCacheEntry = {
+  tokens: Token[][]
+  chars: number
+}
+
+const tokenCache = new Map<string, TokenCacheEntry>()
+let tokenCacheChars = 0
+
+function tokenCacheKey(code: string, lang: string, mode: "light" | "dark") {
+  return `${lang}|${mode}|${code}`
+}
+
+function cachedTokens(key: string): Token[][] | null {
+  const hit = tokenCache.get(key)
+  if (!hit) return null
+  tokenCache.delete(key)
+  tokenCache.set(key, hit)
+  return hit.tokens
+}
+
+function trimTokenCache() {
+  while (tokenCache.size > TOKEN_CACHE_MAX_ENTRIES || tokenCacheChars > TOKEN_CACHE_MAX_CHARS) {
+    const first = tokenCache.entries().next().value
+    if (!first) return
+    const [key, entry] = first
+    tokenCache.delete(key)
+    tokenCacheChars -= entry.chars
+  }
+}
+
+function putTokens(key: string, tokens: Token[][], chars: number) {
+  const replaced = tokenCache.get(key)
+  if (replaced) {
+    tokenCacheChars -= replaced.chars
+    tokenCache.delete(key)
+  }
+  tokenCache.set(key, { tokens, chars })
+  tokenCacheChars += chars
+  trimTokenCache()
+}
+
+function canHighlight(code: string): boolean {
+  if (code.length > MAX_HIGHLIGHT_CHARS) return false
+  let lines = 1
+  for (let i = 0; i < code.length; i++) {
+    if (code.charCodeAt(i) === 10) lines++
+    if (lines > MAX_HIGHLIGHT_LINES) return false
+  }
+  return true
+}
+
+function tokensFromHighlighter(
+  highlighter: TokenizingHighlighter,
+  code: string,
+  lang: string,
+  mode: "light" | "dark",
+): Token[][] {
+  const themed = highlighter.codeToTokensBase(code, { lang, theme: mode === "dark" ? DARK_THEME : THEME })
+  return themed.map((line) => line.map((t) => ({ content: t.content, color: t.color })))
+}
+
+async function tokenizeLinesCached(
+  code: string,
+  lang: string | null,
+  mode: "light" | "dark",
+  load: () => Promise<TokenizingHighlighter>,
+): Promise<Token[][] | null> {
+  if (!lang) return null
+  if (!canHighlight(code)) return null
+  const key = tokenCacheKey(code, lang, mode)
+  const cached = cachedTokens(key)
+  if (cached) return cached
+  const tokens = tokensFromHighlighter(await load(), code, lang, mode)
+  putTokens(key, tokens, code.length)
+  return tokens
+}
+
 /**
  * Tokenizes `code` as `lang` for the diff view (v0.14.3, owner: "automatic
  * language recognition and syntax highlighting" in the diff and commit
@@ -206,18 +288,28 @@ export async function tokenizeLines(
   mode: "light" | "dark",
 ): Promise<Token[][] | null> {
   if (!lang) return null
-  if (code.length > MAX_HIGHLIGHT_CHARS) return null
-  let lines = 1
-  for (let i = 0; i < code.length; i++) {
-    if (code.charCodeAt(i) === 10) lines++
-    if (lines > MAX_HIGHLIGHT_LINES) return null
-  }
   try {
-    const highlighter = await getHighlighter()
-    await ensureLanguageLoaded(highlighter, lang)
-    const themed = highlighter.codeToTokensBase(code, { lang, theme: mode === "dark" ? DARK_THEME : THEME })
-    return themed.map((line) => line.map((t) => ({ content: t.content, color: t.color })))
+    return await tokenizeLinesCached(code, lang, mode, async () => {
+      const highlighter = await getHighlighter()
+      await ensureLanguageLoaded(highlighter, lang)
+      return highlighter
+    })
   } catch {
     return null
   }
+}
+
+export const highlightTestHooks = {
+  resetTokenCache() {
+    tokenCache.clear()
+    tokenCacheChars = 0
+  },
+  tokenizeLinesWithHighlighter(
+    highlighter: TokenizingHighlighter,
+    code: string,
+    lang: string | null,
+    mode: "light" | "dark",
+  ) {
+    return tokenizeLinesCached(code, lang, mode, () => Promise.resolve(highlighter))
+  },
 }

@@ -6,6 +6,13 @@ public sealed partial class GitHost
 {
     private const char Field = '\u001f';
     private const char Record = '\u001e';
+    private const int RenameMapCacheMaxEntries = 32;
+    private readonly object _renameMapCacheGate = new();
+    private readonly Dictionary<RenameMapCacheKey, IReadOnlyDictionary<string, string>> _renameMapCache = [];
+
+    internal int RenameMapCacheMisses { get; private set; }
+
+    private readonly record struct RenameMapCacheKey(string Root, string Id);
 
     /// <summary>
     /// The revision stream of the graph, or (v0.16.0, <paramref name="filter"/>)
@@ -386,23 +393,72 @@ public sealed partial class GitHost
     /// <summary>The old path when <paramref name="path"/> is the new side of a rename in <paramref name="id"/>, else null.</summary>
     private string? RenamedFrom(string root, string id, string path)
     {
+        if (!IsFullCommitId(id))
+        {
+            return LoadRenameMap(root, id).GetValueOrDefault(path);
+        }
+
+        RenameMapCacheKey key = new(root, id);
+        lock (_renameMapCacheGate)
+        {
+            if (_renameMapCache.TryGetValue(key, out IReadOnlyDictionary<string, string>? cached))
+            {
+                return cached.GetValueOrDefault(path);
+            }
+        }
+
+        IReadOnlyDictionary<string, string> loaded = LoadRenameMap(root, id);
+        lock (_renameMapCacheGate)
+        {
+            if (_renameMapCache.TryGetValue(key, out IReadOnlyDictionary<string, string>? cached))
+            {
+                return cached.GetValueOrDefault(path);
+            }
+
+            _renameMapCache[key] = loaded;
+            RenameMapCacheMisses++;
+            if (_renameMapCache.Count > RenameMapCacheMaxEntries)
+            {
+                RenameMapCacheKey oldest = _renameMapCache.Keys.First();
+                _renameMapCache.Remove(oldest);
+            }
+        }
+
+        return loaded.GetValueOrDefault(path);
+    }
+
+    private IReadOnlyDictionary<string, string> LoadRenameMap(string root, string id)
+    {
         CommandResult names = Run(root, "-c", "core.quotepath=false",
             "diff-tree", "--root", "-r", "--no-commit-id", "--name-status", "-M", "--diff-merges=first-parent", id);
         if (names.ExitCode != 0)
         {
-            return null;
+            return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
+        Dictionary<string, string> renamed = new(StringComparer.Ordinal);
         foreach (string line in names.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             string[] parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 3 && parts[0].StartsWith('R') && parts[2] == path)
+            if (parts.Length == 3 && parts[0].StartsWith('R'))
             {
-                return parts[1];
+                renamed[parts[2]] = parts[1];
             }
         }
 
-        return null;
+        return renamed;
+    }
+
+    private static bool IsFullCommitId(string id)
+    {
+        if (id.Length != 40) return false;
+        foreach (char c in id)
+        {
+            bool hex = c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
+            if (!hex) return false;
+        }
+
+        return true;
     }
 
     /// <summary>
