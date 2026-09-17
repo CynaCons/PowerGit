@@ -8,7 +8,15 @@ export type LayoutReply =
   | { seq: number; reset: false; from: number; offset: number; last: boolean; rows: LayoutRow[] }
   | { seq: number; reset: true; length: number; patches: { index: number; row: LayoutRow }[] }
 
-export function withoutRevision({ rev: _rev, ...row }: GraphRow): LayoutRow {
+export function withoutRevision(graphRow: GraphRow): LayoutRow {
+  const row: LayoutRow = {
+    lane: graphRow.lane,
+    color: graphRow.color,
+    hasRefs: graphRow.hasRefs,
+    isHead: graphRow.isHead,
+    segments: graphRow.segments,
+  }
+  if (graphRow.artificial !== undefined) row.artificial = graphRow.artificial
   return row
 }
 

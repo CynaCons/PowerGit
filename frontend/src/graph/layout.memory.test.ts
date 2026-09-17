@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createLayouter } from "./layout"
+import { withoutRevision } from "./layoutProtocol"
 import { syntheticHistory } from "./synthetic"
 import type { GraphRow, Revision } from "./types"
 
@@ -14,7 +15,11 @@ import type { GraphRow, Revision } from "./types"
  */
 // vitest runs under Node; the app tsconfig has no node types, so declare
 // the two globals this file touches.
-declare const process: { memoryUsage(): { heapUsed: number } }
+declare const process: {
+  memoryUsage(): { heapUsed: number }
+  getBuiltinModule(name: "v8"): { serialize(value: unknown): { byteLength: number } }
+}
+const serialize = process.getBuiltinModule("v8").serialize
 const nodeGc = (): (() => void) | undefined => (globalThis as unknown as { gc?: () => void }).gc
 
 function heapUsed(): number {
@@ -80,5 +85,34 @@ describe("reset patch measurement", () => {
     // far smaller than returning the 10,001-row reset result across the
     // worker boundary, so the compact patch is warranted.
     expect(changed).toBe(9)
+  }, 30_000)
+})
+
+function objectCount(value: unknown): number {
+  if (value === null || typeof value !== "object") return 0
+  if (Array.isArray(value)) return 1 + value.reduce((sum, item) => sum + objectCount(item), 0)
+  return 1 + Object.values(value).reduce((sum, item) => sum + objectCount(item), 0)
+}
+
+describe("append reply measurement", () => {
+  it("reports the 3,000-row reply before and after revisions are re-attached on the main thread (v0.18.18)", () => {
+    const revisions = syntheticHistory(13_000)
+    const layouter = createLayouter()
+    layouter.append(revisions.slice(0, 10_000))
+    const rows = layouter.append(revisions.slice(10_000))
+    const before = { seq: 1, reset: false, from: 10_000, rows }
+    const after = { seq: 1, reset: false, from: 10_000, rows: rows.map(withoutRevision) }
+    const measure = (reply: unknown) => ({
+      bytes: serialize(reply).byteLength,
+      objects: objectCount(reply),
+    })
+    const oldReply = measure(before)
+    const slimReply = measure(after)
+
+    // Keep this visible in the focused perf test: unlike timing, these
+    // deterministic payload measurements are stable across machines.
+    console.info("layout append reply", { before: oldReply, after: slimReply })
+    expect(slimReply.bytes).toBeLessThan(oldReply.bytes * 0.85)
+    expect(slimReply.objects).toBeLessThan(oldReply.objects * 0.7)
   }, 30_000)
 })

@@ -81,7 +81,6 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
   const layoutSeq = useRef(0)
   const resetSeq = useRef(0)
   const lastSent = useRef<Revision[]>([])
-  const layoutRevisions = useRef<Revision[]>([])
   const revisionsBySeq = useRef(new Map<number, Revision[]>())
   const appendChunks = useRef(new Map<number, LayoutRow[]>())
 
@@ -128,7 +127,9 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
       // Whatever the worker swallowed is gone; replay the last full set.
       const seq = ++layoutSeq.current
       resetSeq.current = seq
-      layoutRevisions.current = lastSent.current
+      revisionsBySeq.current.clear()
+      appendChunks.current.clear()
+      revisionsBySeq.current.set(seq, lastSent.current)
       layoutPost.current({ seq, reset: true, revisions: lastSent.current })
     }
     // v0.13.11: constructing a module Worker can throw synchronously (a CSP
@@ -166,7 +167,6 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
       revisions[0] === prev[0] &&
       revisions[prev.length - 1] === prev[prev.length - 1]
     const seq = ++layoutSeq.current
-    layoutRevisions.current = revisions
     if (isAppend) {
       // Only the new tail crosses the worker boundary (no full-history clone).
       const tail = revisions.slice(prev.length)
