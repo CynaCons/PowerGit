@@ -100,6 +100,13 @@ export function RevisionGrid({
   }, [highlightRoot, rows.length, rootRow, onHighlightRoot])
   const exitHighlight = useCallback(() => onHighlightRoot?.(null), [onHighlightRoot])
   const graphOptions = useGraphOptions()
+  // The pixel width/height/dpr the canvas backing store was last sized to
+  // (v0.18.18): assigning canvas.width/height resets the whole bitmap even
+  // when the number does not change, so the draw effect below only touches
+  // them - and the CSS width/height that must track the same numbers - on
+  // an actual change instead of on every hover, selection or scroll step
+  // (docs/perf/reactivity-review-2026-09-17.md finding 8).
+  const lastCanvasSize = useRef({ width: -1, height: -1, dpr: 0 })
   // Author identity (v0.18.1, prototype A): a disc per row, and the selected
   // row's author marked on every loaded row by that author (class
   // author-same, set here in the render, never by a DOM pass). A pending row
@@ -238,10 +245,20 @@ export function RevisionGrid({
     const parent = parentRef.current
     if (!canvas || !parent) return
     const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.ceil(width * dpr)
-    canvas.height = Math.ceil(geometry.height * dpr)
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${geometry.height}px`
+    const last = lastCanvasSize.current
+    // Resize only on a real change (v0.18.18): canvas.width/height clears
+    // the backing store even when reassigned the same value, so doing this
+    // unconditionally reallocated and discarded a ~0.25-0.5 Mpx bitmap on
+    // every hover and every 28 px scroll step for no reason. drawRows
+    // clearRects its own rect first (graph/draw.ts:76), so skipping the
+    // resize does not skip the clear.
+    if (last.width !== width || last.height !== geometry.height || last.dpr !== dpr) {
+      canvas.width = Math.ceil(width * dpr)
+      canvas.height = Math.ceil(geometry.height * dpr)
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${geometry.height}px`
+      lastCanvasSize.current = { width, height: geometry.height, dpr }
+    }
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     // Shifted left by the graph scroll; the drawn width grows by the same
