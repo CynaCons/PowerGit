@@ -219,6 +219,38 @@ public sealed class QueryTests
     }
 
     [Fact]
+    public void GetRefs_handles_five_thousand_packed_refs_within_budget()
+    {
+        using TempRepo repo = new();
+        string head = repo.Output("rev-parse", "HEAD");
+        System.Diagnostics.ProcessStartInfo psi = new("git", "update-ref --stdin")
+        {
+            WorkingDirectory = repo.Dir, RedirectStandardInput = true, RedirectStandardError = true,
+        };
+        using (System.Diagnostics.Process process = System.Diagnostics.Process.Start(psi)!)
+        {
+            process.StandardInput.NewLine = "\n";
+            for (int i = 0; i < 5000; i++) process.StandardInput.WriteLine($"create refs/heads/perf/{i:D5} {head}");
+            process.StandardInput.Close();
+            Assert.True(process.WaitForExit(60_000));
+            Assert.Equal(0, process.ExitCode);
+        }
+        repo.Run("pack-refs", "--all");
+        GitHost host = new();
+        host.Open(repo.Dir);
+        long best = long.MaxValue;
+        for (int i = 0; i < 3; i++)
+        {
+            System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+            RefTreeDto refs = host.GetRefs();
+            watch.Stop();
+            Assert.Equal(5002, refs.Branches.Length);
+            best = Math.Min(best, watch.ElapsedMilliseconds);
+        }
+        Assert.True(best < 400, $"GetRefs best of three was {best} ms");
+    }
+
+    [Fact]
     public void GetStatus_uses_four_git_calls_after_open()
     {
         using TempRepo repo = new();
