@@ -55,6 +55,39 @@ export function markAncestry(rows: readonly GraphRow[], rootId?: string): Ancest
   return { rootId: root.rev.id, temporary, marks }
 }
 
+/**
+ * Extends an ancestry result when history paging appends older rows. The
+ * first full walk already recorded marks for parents outside the loaded
+ * range, so an appended parent can pick up its mark immediately. Reloads,
+ * filters and a changed highlight root deliberately fall back to the full
+ * walk: only identity-preserving appends have this guarantee.
+ */
+export function extendAncestry(
+  previousRows: readonly GraphRow[] | undefined,
+  previous: Ancestry | null | undefined,
+  rows: readonly GraphRow[],
+  rootId?: string,
+): Ancestry | null {
+  if (!previousRows || !previous || rows.length <= previousRows.length) return markAncestry(rows, rootId)
+  for (let i = 0; i < previousRows.length; i++) if (rows[i] !== previousRows[i]) return markAncestry(rows, rootId)
+  const root = rootId === undefined ? rows.find((row) => row.isHead) : rows.find((row) => row.rev.id === rootId)
+  if (!root || root.rev.id !== previous.rootId) return markAncestry(rows, rootId)
+
+  const marks = new Map(previous.marks)
+  for (let rowIndex = previousRows.length; rowIndex < rows.length; rowIndex++) {
+    const row = rows[rowIndex]
+    const mark = marks.get(row.rev.id)
+    if (!mark) continue
+    for (let parentIndex = 0; parentIndex < row.rev.parents.length; parentIndex++) {
+      const parent = row.rev.parents[parentIndex]
+      const inherited: Mark = mark === 2 && parentIndex === 0 ? 2 : 1
+      const current = marks.get(parent)
+      if (!current || inherited > current) marks.set(parent, inherited)
+    }
+  }
+  return { ...previous, marks }
+}
+
 /** Whether a commit is part of the highlighted history under `scope`. */
 export function inScope(ancestry: Ancestry | null, scope: HighlightScope, id: string): boolean {
   if (!ancestry) return false

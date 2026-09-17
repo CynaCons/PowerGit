@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { markAncestry } from "../graph/ancestry"
+import { extendAncestry } from "../graph/ancestry"
 import { authorIdentity } from "../graph/authorIdentity"
 import { drawRows, graphWidth } from "../graph/draw"
 import { useGraphOptions } from "../graph/graphOptions"
@@ -71,7 +71,13 @@ export function RevisionGrid({
   // the root change (a refresh that changes nothing keeps the array, see
   // historyMerge.ts), never per click. The root is HEAD unless the user
   // picked a commit (v0.18.4, "Highlight ancestry (until refresh)").
-  const ancestry = useMemo(() => markAncestry(rows, highlightRoot ?? undefined), [rows, highlightRoot])
+  const ancestryCache = useRef<{ rows: GraphRow[]; ancestry: ReturnType<typeof extendAncestry> } | undefined>(undefined)
+  const ancestry = useMemo(() => {
+    const previous = ancestryCache.current
+    const next = extendAncestry(previous?.rows, previous?.ancestry, rows, highlightRoot ?? undefined)
+    ancestryCache.current = { rows, ancestry: next }
+    return next
+  }, [rows, highlightRoot])
   const rootRow = useMemo(
     () => (highlightRoot === null ? null : (rows.find((r) => r.rev.id === highlightRoot) ?? null)),
     [rows, highlightRoot],
