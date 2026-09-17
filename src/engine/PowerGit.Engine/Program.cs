@@ -79,7 +79,9 @@ string[] allowedOrigins =
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
 ];
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
+    p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()
+        // The refresh echo guard reads the version sampled by this request.
+        .WithExposedHeaders("X-PowerGit-Change-Version")));
 
 WebApplication app = builder.Build();
 app.UseCors();
@@ -169,6 +171,10 @@ repo.AddEndpointFilter(async (ctx, next) =>
         return Results.Json(new ErrorResponse($"unknown repository session '{id}'"), statusCode: StatusCodes.Status404NotFound);
     }
 
+    // v0.18.18: capture before the handler (and any mutation) runs. A
+    // response therefore says exactly which watcher state its read observed,
+    // allowing the client to discard that action's later watcher echo.
+    ctx.HttpContext.Response.Headers["X-PowerGit-Change-Version"] = session.ChangeVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
     session.Touch();
     string method = ctx.HttpContext.Request.Method;
     string path = ctx.HttpContext.Request.Path.Value ?? "";

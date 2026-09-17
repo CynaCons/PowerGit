@@ -92,6 +92,7 @@ describe("merge: the dialog closes when git answers and the refresh runs behind 
   const client = {
     hasRepo: true,
     repoId: "r1",
+    lastChangeVersion: 4,
     eventsUrl: () => "http://engine/repos/r1/events",
     revisions: (_max: number, skip: number, signal?: AbortSignal) =>
       new Promise<RevisionDto[]>((resolve, reject) => {
@@ -231,23 +232,20 @@ describe("merge: the dialog closes when git answers and the refresh runs behind 
     expect(latest?.busy).toBe(true)
     expect(latest?.refreshing).toBe(true)
 
-    // 2. The watcher reports what the merge wrote; the echo refresh is
-    //    deferred past the mute (ECHO_MS + 500 while one is in flight).
-    events().onmessage?.({ data: "10" }) // 0b1010: refs
-    await advance(1300)
-    // The echo's reload coalesced onto the merge's page 0: nothing aborted,
-    // no second request yet.
-    expect(calls).toHaveLength(2)
-    expect(calls[1].signal?.aborted).toBe(false)
-    expect(latest?.engineError).toBeNull()
-
-    // 3. Page 0 lands with the merge commit; the follow-up runs once more
-    //    and brings the same rows.
+    // 2. Page 0 lands with the merge commit. Its header says the refresh
+    // saw the watcher write, so the deferred echo is dropped rather than
+    // fetching the same page a third time (v0.18.18).
+    client.lastChangeVersion = 10
     calls[1].answer(MERGED)
     await flush()
     expect(latest?.rows[0]).toBe("m000000")
-    expect(calls).toHaveLength(3)
-    calls[2].answer(MERGED)
+
+    // 3. The watcher can publish after that refresh completes (its 500 ms
+    // polling cadence is independent of the request). This is the echo the
+    // old mute deferred into a duplicate third page-0 fetch.
+    events().onmessage?.({ data: "10" }) // 0b1010: refs
+    await advance(1000)
+    expect(calls).toHaveLength(2)
     await flush()
     expect(latest?.rows).toEqual(MERGED.map((r) => r.id))
     expect(latest?.engineError).toBeNull()
