@@ -274,7 +274,14 @@ type ButtonProps = {
 
 // A 28 px round button. `reason` dims it and swaps the tooltip for the
 // reason; it stays focusable and hoverable (aria-disabled, not disabled)
-// so the reason is readable where the button is.
+// so the reason is readable where the button is. A mouse click must not
+// take keyboard focus (v0.18.18): the compass sits outside .grid-body, so
+// a focused button swallowed the plain arrows until the grid was clicked
+// again; preventing the mousedown default keeps focus where it was, while
+// Tab still reaches the button and MUI's ripple still starts (ButtonBase
+// runs the handler, then the ripple, whatever the event's default). The
+// parents Menu's focus trap then hands focus back to the grid on close
+// (docs/perf/reactivity-review-2026-09-17.md second pass, finding 7).
 function NavButton({ testid, expanded, lit, reason, tip, onClick, buttonRef, children, ...handlers }: ButtonProps) {
   const off = reason !== null
   return (
@@ -287,6 +294,7 @@ function NavButton({ testid, expanded, lit, reason, tip, onClick, buttonRef, chi
         aria-disabled={off ? "true" : undefined}
         data-reason={off ? reason : undefined}
         onClick={off ? undefined : onClick}
+        onMouseDown={(e) => e.preventDefault()}
         {...(off ? {} : handlers)}
         sx={{
           width: SIZE,
