@@ -3,7 +3,13 @@ import { report } from "../diagnostics"
 import { isAbort, type EngineClient, type RevisionDto, type RevisionFilter } from "../engine"
 import { isArtificialId } from "../graph/artificial"
 import { createLayouter, layoutGraph, type GraphLayouter } from "../graph/layout"
-import { attachRevisions, withoutRevision, type LayoutReply, type LayoutRequest, type LayoutRow } from "../graph/layoutProtocol"
+import {
+  attachRevisions,
+  withoutRevision,
+  type LayoutReply,
+  type LayoutRequest,
+  type LayoutRow,
+} from "../graph/layoutProtocol"
 import { syntheticHistory } from "../graph/synthetic"
 import type { GraphRow, Revision } from "../graph/types"
 import { applyGraphResetPatch, mergeReload, toRevision } from "./historyMerge"
@@ -96,7 +102,9 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
       const revisions = revisionsBySeq.current.get(seq)
       if (!revisions) return
       if (reset) {
-        const patches = new Map(reply.patches.map((patch) => [patch.index, { ...patch.row, rev: revisions[patch.index] }]))
+        const patches = new Map(
+          reply.patches.map((patch) => [patch.index, { ...patch.row, rev: revisions[patch.index] }]),
+        )
         setLiveGraphRows((prev) => applyGraphResetPatch(prev, revisions, patches))
         revisionsBySeq.current.delete(seq)
       } else {
@@ -122,7 +130,13 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
         const from = inThread.rowCount()
         const rows = inThread.append(m.revisions)
         if (!m.reset) handle({ seq: m.seq, reset: false, from, offset: 0, last: true, rows: rows.map(withoutRevision) })
-        else handle({ seq: m.seq, reset: true, length: rows.length, patches: rows.map((row, index) => ({ index, row: withoutRevision(row) })) })
+        else
+          handle({
+            seq: m.seq,
+            reset: true,
+            length: rows.length,
+            patches: rows.map((row, index) => ({ index, row: withoutRevision(row) })),
+          })
       }
       // Whatever the worker swallowed is gone; replay the last full set.
       const seq = ++layoutSeq.current
@@ -320,13 +334,15 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
     const start = () => {
       const gen = ++histGen.current
       const entry = { gen, run: Promise.resolve() }
-      entry.run = runReload(gen).catch((e) => {
-        if (!isAbort(e) && histGen.current === gen) {
-          setEngineError(`History: ${onFailure(e, "history")}`)
-        }
-      }).finally(() => {
-        if (reloadRun.current === entry) reloadRun.current = null
-      })
+      entry.run = runReload(gen)
+        .catch((e) => {
+          if (!isAbort(e) && histGen.current === gen) {
+            setEngineError(`History: ${onFailure(e, "history")}`)
+          }
+        })
+        .finally(() => {
+          if (reloadRun.current === entry) reloadRun.current = null
+        })
       reloadRun.current = entry
       return entry.run
     }

@@ -16,7 +16,14 @@ function dto(i: number, refs: string[] = []): RevisionDto {
 
 const PAGE = 3
 const revision = (id: string): Revision => ({ id, parents: [], message: id, author: "a", date: "2026-09-17", refs: [] })
-const row = (rev: Revision, lane = 0): GraphRow => ({ rev, lane, color: lane, hasRefs: false, isHead: false, segments: [] })
+const row = (rev: Revision, lane = 0): GraphRow => ({
+  rev,
+  lane,
+  color: lane,
+  hasRefs: false,
+  isHead: false,
+  segments: [],
+})
 
 describe("mergeReload", () => {
   it("keeps every row object and reports unchanged when nothing moved", () => {

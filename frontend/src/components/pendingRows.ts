@@ -58,9 +58,9 @@ export function usePendingDiff(pending: Pending, file: string | null, options: D
         if (!ctrl.signal.aborted && !isAbort(e)) setDiff({ kind: "error", message: describeThrown(e) })
       })
     return () => ctrl.abort()
-  // `pending` is intentionally not a dependency: status polls can create an
-  // equivalent wrapper, while this request only varies by its actual inputs.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `pending` is intentionally not a dependency: status polls can create an
+    // equivalent wrapper, while this request only varies by its actual inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, pending?.staged, file, options.context, options.ws])
   return diff
 }

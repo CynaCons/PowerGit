@@ -118,7 +118,18 @@ export default function App({ base }: { base: EngineClient }) {
   const notes = useStatusNote(selectedSha)
   const actions = useStable(useGitActions({ session, history, repoState, jobs, dialogs, notes }))
   // The compass and its chords (v0.18.12); the file history has neither.
-  const nav = useGraphNav({ engineRows, current, history, notes, refs, repo, graphFilter, client, fileHistory, dialogs })
+  const nav = useGraphNav({
+    engineRows,
+    current,
+    history,
+    notes,
+    refs,
+    repo,
+    graphFilter,
+    client,
+    fileHistory,
+    dialogs,
+  })
   const layout = useChromeLayout()
   const { bottomHeight, leftOpen, setLeftOpen, bottomTab, setBottomTab, contentRef, splitter } = layout
   const [recoveryOpen, setRecoveryOpen] = useState(false)

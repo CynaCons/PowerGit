@@ -49,7 +49,12 @@ const AMBER_BG = "var(--pg-review-todo-bg, rgba(183, 121, 31, 0.10))"
 // Author group keep working on the temporary root.
 // RevisionGrid passes stable rows, selectedAuthor, rootRow and exitHighlight,
 // so hover and scroll renders can bail out here (v0.18.18).
-export const GraphOptionsBar = memo(function GraphOptionsBar({ rows, selectedAuthor, highlightRoot, onExitHighlight }: Props) {
+export const GraphOptionsBar = memo(function GraphOptionsBar({
+  rows,
+  selectedAuthor,
+  highlightRoot,
+  onExitHighlight,
+}: Props) {
   const temporary = highlightRoot !== null
   const bar = useFloatingBar(temporary)
   const { expanded } = bar

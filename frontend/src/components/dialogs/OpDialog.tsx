@@ -120,7 +120,16 @@ export function OpDialog({
             <Button size="small" onClick={onClose} disabled={busy} sx={{ height: 30, px: 1.75, fontWeight: 500 }}>
               {cancelLabel}
             </Button>
-            {secondary && <Button size="small" onClick={secondary.onClick} disabled={busy || secondary.disabled} data-testid={secondary.testid}>{secondary.label}</Button>}
+            {secondary && (
+              <Button
+                size="small"
+                onClick={secondary.onClick}
+                disabled={busy || secondary.disabled}
+                data-testid={secondary.testid}
+              >
+                {secondary.label}
+              </Button>
+            )}
             {primary && (
               <Button
                 size="small"

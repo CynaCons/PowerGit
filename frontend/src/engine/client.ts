@@ -170,7 +170,8 @@ async function json<T>(res: Response): Promise<T> {
     }
   }
   if (!res.ok) {
-    const obj = body && typeof body === "object" ? (body as { error?: unknown; running?: unknown; code?: unknown }) : null
+    const obj =
+      body && typeof body === "object" ? (body as { error?: unknown; running?: unknown; code?: unknown }) : null
     const err = obj && typeof obj.error === "string" ? obj.error : ""
     const running = obj && typeof obj.running === "string" ? obj.running : undefined
     const code = obj && typeof obj.code === "string" ? obj.code : undefined
@@ -376,10 +377,22 @@ export class EngineClient {
   /** The revision stream, or with `filter` (v0.16.0) the commits that touched one path. */
   async revisions(max = 800, skip = 0, signal?: AbortSignal, filter?: RevisionFilter): Promise<RevisionDto[]> {
     if (filter?.refs) {
-      return json<RevisionDto[]>(await this.post(`${this.repoPath()}/revisions`, {
-        refs: filter.refs, max, skip, path: filter.path, follow: filter.follow,
-        exact: filter.exact, full: filter.full, simplify: filter.simplify,
-      }, { signal, timeoutMs: 120_000 }))
+      return json<RevisionDto[]>(
+        await this.post(
+          `${this.repoPath()}/revisions`,
+          {
+            refs: filter.refs,
+            max,
+            skip,
+            path: filter.path,
+            follow: filter.follow,
+            exact: filter.exact,
+            full: filter.full,
+            simplify: filter.simplify,
+          },
+          { signal, timeoutMs: 120_000 },
+        ),
+      )
     }
     return json<RevisionDto[]>(
       await this.get(
@@ -804,11 +817,15 @@ export class EngineClient {
   }
 
   async cherryPick(id: string, autostash = false): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/cherry-pick`, { autostash }))
+    return json<RepoStatus>(
+      await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/cherry-pick`, { autostash }),
+    )
   }
 
   async revert(id: string, autostash = false): Promise<RepoStatus> {
-    return json<RepoStatus>(await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/revert`, { autostash }))
+    return json<RepoStatus>(
+      await this.post(`${this.repoPath()}/commits/${encodeURIComponent(id)}/revert`, { autostash }),
+    )
   }
 
   /** Opens `path` at `commit` in the user's configured external diff tool.

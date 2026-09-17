@@ -35,7 +35,11 @@ export function CherryPickDialog({
       testid="cherry-pick-dialog"
       subject={<QuotedRow sha={commit} />}
       busy={busy}
-      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "cherry-pick-stash-retry" } : undefined}
+      secondary={
+        dirty
+          ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "cherry-pick-stash-retry" }
+          : undefined
+      }
       primary={{ label: "Cherry-pick", onClick: () => void submit(), testid: "cherry-pick-confirm" }}
     >
       <div className="op-text">Applies the commit's changes as a new commit on the current branch.</div>

@@ -84,7 +84,11 @@ export function mergeReload(page: RevisionDto[], old: Revision[], pageSize: numb
 /** Applies a worker reset patch without replacing graph rows whose commit and
  * geometry are unchanged. A new top commit shifts indexes, so matching by
  * SHA (not position) is what preserves RevisionRow's memo identity. */
-export function applyGraphResetPatch(previous: GraphRow[], revisions: Revision[], patches: Map<number, GraphRow>): GraphRow[] {
+export function applyGraphResetPatch(
+  previous: GraphRow[],
+  revisions: Revision[],
+  patches: Map<number, GraphRow>,
+): GraphRow[] {
   const byId = new Map(previous.map((row) => [row.rev.id, row]))
   return revisions.map((revision, index) => {
     const patch = patches.get(index)

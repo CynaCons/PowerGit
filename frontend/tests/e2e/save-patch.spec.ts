@@ -80,7 +80,9 @@ test.describe("save a commit as a patch", () => {
     git(cloneDir, "reset", "-q", "--hard", baseSha)
     git(cloneDir, "am", patchPath)
     expect(git(cloneDir, "log", "-1", "--format=%s").trim()).toBe("change")
-    expect(git(cloneDir, "rev-parse", "HEAD^{tree}").trim()).toBe(git(repoDir, "rev-parse", `${changeSha}^{tree}`).trim())
+    expect(git(cloneDir, "rev-parse", "HEAD^{tree}").trim()).toBe(
+      git(repoDir, "rev-parse", `${changeSha}^{tree}`).trim(),
+    )
 
     // --- the Working directory row: the pending diff, applies on `change` ---
     write(repoDir, "a.txt", "base\nchanged\nand again\n")

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { report, reportTransition } from "../diagnostics"
-import { changeKindOf, changeVersionWasObserved, describeThrown, type ChangeKind, type RefTree, type RepoStatus, type StashInfo } from "../engine"
+import {
+  changeKindOf,
+  changeVersionWasObserved,
+  describeThrown,
+  type ChangeKind,
+  type RefTree,
+  type RepoStatus,
+  type StashInfo,
+} from "../engine"
 import { syntheticRefTree, syntheticStatus } from "../graph/synthetic"
 import type { EngineSession } from "./useEngineSession"
 import type { History } from "./useHistory"
@@ -68,7 +76,13 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       }
       if (s.revisions) jobs.push(reloadHistory().catch(fail("history")))
       if (s.refs) jobs.push(client.refs().then(setRefs).catch(fail("refs")))
-      if (s.status) jobs.push(client.status().then((next) => setStatus((previous) => statusEquals(previous, next) ? previous : next)).catch(fail("status")))
+      if (s.status)
+        jobs.push(
+          client
+            .status()
+            .then((next) => setStatus((previous) => (statusEquals(previous, next) ? previous : next)))
+            .catch(fail("status")),
+        )
       if (s.stashes)
         jobs.push(
           client

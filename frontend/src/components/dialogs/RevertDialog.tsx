@@ -32,7 +32,11 @@ export function RevertDialog({
       testid="revert-dialog"
       subject={<QuotedRow sha={commit} />}
       busy={busy}
-      secondary={dirty ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "revert-stash-retry" } : undefined}
+      secondary={
+        dirty
+          ? { label: "Stash and retry", onClick: () => void retryWithStash(), testid: "revert-stash-retry" }
+          : undefined
+      }
       primary={{ label: "Revert", onClick: () => void submit(), testid: "revert-confirm" }}
     >
       <div className="op-text">Creates a new commit that undoes the commit's changes on the current branch.</div>
