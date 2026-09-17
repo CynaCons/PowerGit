@@ -179,7 +179,7 @@ export async function select(ctx) {
       commitTabP95Ms: percentile(commitTab, 95),
       commitTabMaxMs: commitTab.length ? Math.max(...commitTab) : null,
     }
-  })
+  }, { profile: true })
 }
 
 export async function expand(ctx) {
