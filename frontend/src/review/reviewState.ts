@@ -28,6 +28,10 @@ function readStoredMode(): boolean {
 
 let mode: boolean = typeof window === "undefined" ? false : readStoredMode()
 const docs = new Map<string, ReviewDoc>()
+export type ReviewPersist = { savedAt: number | null; saving: boolean; error: string | null }
+const EMPTY_PERSIST: ReviewPersist = Object.freeze({ savedAt: null, saving: false, error: null })
+const persists = new Map<string, ReviewPersist>()
+let filePane = false
 const listeners = new Set<() => void>()
 
 function subscribe(listener: () => void): () => void {
@@ -74,6 +78,43 @@ export function updateReviewDoc(key: string, f: (d: ReviewDoc) => ReviewDoc): vo
   if (before !== undefined && after === before) return
   docs.set(key, after)
   emit()
+}
+
+export function setReviewDoc(key: string, doc: ReviewDoc | null): void {
+  if (doc === null) docs.delete(key)
+  else docs.set(key, doc)
+  emit()
+}
+
+export function getReviewPersist(key: string | null): ReviewPersist {
+  return key === null ? EMPTY_PERSIST : (persists.get(key) ?? EMPTY_PERSIST)
+}
+
+export function setReviewPersist(key: string, patch: Partial<ReviewPersist>): void {
+  persists.set(key, { ...getReviewPersist(key), ...patch })
+  emit()
+}
+
+export function useReviewPersist(key: string | null): ReviewPersist {
+  return useSyncExternalStore(
+    subscribe,
+    () => getReviewPersist(key),
+    () => EMPTY_PERSIST,
+  )
+}
+
+export function setReviewFilePane(open: boolean): void {
+  if (filePane === open) return
+  filePane = open
+  emit()
+}
+
+export function useReviewFilePane(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => filePane,
+    () => false,
+  )
 }
 
 export function useReviewDoc(key: string | null): ReviewDoc | null {

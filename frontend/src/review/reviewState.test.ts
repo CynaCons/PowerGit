@@ -89,6 +89,24 @@ describe("review documents", () => {
     expect(store.getReviewDoc("c2")).toBeNull()
   })
 
+  test("documents can be replaced and deleted", async () => {
+    const store = await load(memoryStorage())
+    const doc = withLine((await import("./reviewModel")).emptyDoc("c1"), "a.ts", "+1", "ok")
+    store.setReviewDoc("c1", doc)
+    expect(store.getReviewDoc("c1")).toBe(doc)
+    store.setReviewDoc("c1", null)
+    expect(store.getReviewDoc("c1")).toBeNull()
+  })
+
+  test("persistence records merge patches and unknown keys share a stable empty value", async () => {
+    const store = await load(memoryStorage())
+    const empty = store.getReviewPersist("missing")
+    expect(store.getReviewPersist("other")).toBe(empty)
+    store.setReviewPersist("c1", { saving: true })
+    store.setReviewPersist("c1", { saving: false, savedAt: 42 })
+    expect(store.getReviewPersist("c1")).toEqual({ savedAt: 42, saving: false, error: null })
+  })
+
   test("the updater sees the previous document, and documents keep their identity between updates", async () => {
     const store = await load(memoryStorage())
     store.updateReviewDoc("c1", (d) => withLine(d, "a.ts", "+1", "ok"))

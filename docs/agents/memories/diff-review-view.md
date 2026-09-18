@@ -44,3 +44,7 @@ todo (amber ring + stripe) and rejected (filled red). `ReviewBar.tsx` has
 no background box and no capitals: "Reviewing" / "Review complete" at
 weight 600 in the amber / blue, beside the tabs; meter and counts as
 before. `review-mode.spec.ts` asserts the sentence-case labels.
+
+## The review file (v0.19.0)
+
+A review is keyed by the full commit SHA, or `<HEAD>-worktree` / `<HEAD>-index`, and lives at `.powergit/reviews/<key>.json`. Changes save after a 400 ms debounce. `serializeDoc` supplies both the PUT body and the Review file pane, so the pane text is the file byte for byte. If a reviewer marks a line while the initial GET is in flight, the in-memory document wins and is saved; the late load never overwrites it.
