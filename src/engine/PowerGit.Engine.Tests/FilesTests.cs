@@ -230,6 +230,7 @@ public sealed class FilesTests : IClassFixture<WebApplicationFactory<Program>>
     [Theory]
     [InlineData("vim", true)]
     [InlineData("\"C:\\tools\\nvim.exe\" --clean", true)]
+    [InlineData("/usr/bin/vim", true)]
     [InlineData("emacs -nw", true)]
     [InlineData("emacs", false)]
     [InlineData("\"C:\\Program Files\\Microsoft VS Code\\Code.exe\" --wait", false)]

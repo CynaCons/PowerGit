@@ -665,4 +665,13 @@ public sealed class SequencerTests
         Assert.Equal("exec", lines[3].Action);
         Assert.Null(lines[3].Sha);
     }
+
+    [Fact]
+    public void ParseTodo_strips_the_comment_prefix_newer_git_puts_before_the_subject()
+    {
+        RebaseTodoLine[] lines = [.. GitHost.ParseTodo("pick 1a2b3c4 # first subject\nreword deadbee # second\n")];
+
+        Assert.Equal(("pick", "1a2b3c4", "first subject"), (lines[0].Action, lines[0].Sha, lines[0].Subject));
+        Assert.Equal(("reword", "deadbee", "second"), (lines[1].Action, lines[1].Sha, lines[1].Subject));
+    }
 }

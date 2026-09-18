@@ -267,7 +267,18 @@ public sealed partial class GitHost
             string action = ShortActions.TryGetValue(parts[0], out string? full) ? full : parts[0];
             if (CommitActions.Contains(action) && parts.Length >= 2 && !parts[1].StartsWith('-'))
             {
-                yield return new RebaseTodoLine(action, parts[1], parts.Length > 2 ? parts[2] : null, line);
+                // Git 2.45+ writes `pick <sha> # <subject>` when
+                // rebase.instructionFormat is set (the capture above sets it);
+                // older versions write the subject bare. The UI wants the
+                // subject either way (v0.18.19: the push CI's git is newer
+                // than the owner's).
+                string? subject = parts.Length > 2 ? parts[2] : null;
+                if (subject is not null && subject.StartsWith("# ", StringComparison.Ordinal))
+                {
+                    subject = subject[2..].Trim();
+                }
+
+                yield return new RebaseTodoLine(action, parts[1], subject, line);
             }
             else
             {

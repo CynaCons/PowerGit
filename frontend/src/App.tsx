@@ -6,7 +6,6 @@ import { AppDialogs } from "./components/dialogs/AppDialogs"
 import { ErrorBanner } from "./components/ErrorBanner"
 import { FileHistoryView } from "./components/FileHistoryView"
 import { GitConsole } from "./components/GitConsole"
-import { openConsoleTab, toggleGitConsole } from "./components/gitConsoleState"
 import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
 import { JobPanel } from "./components/JobPanel"
 import { NavRail } from "./components/NavRail"
@@ -34,7 +33,6 @@ import { useZoomHotkeys } from "./hooks/useZoomHotkeys"
 import { useStable } from "./hooks/useStable"
 import { useStatusNote } from "./hooks/useStatusNote"
 import { prefetchCommit } from "./engine/commitCache"
-import { useHotkeyLayer, type CommandId } from "./hotkeys"
 import { useBarLayout } from "./theme/barLayout"
 import { TitleStrip } from "./components/TitleStrip"
 import { CommandRail } from "./components/CommandRail"
@@ -43,11 +41,13 @@ import { SnapshotDialog } from "./components/SnapshotDialog"
 import { withArtificialRows } from "./graph/artificial"
 import { findRefTarget } from "./components/refChipsModel"
 import { useAutoFetch } from "./hooks/useAutoFetch"
+import { useBrowseHotkeys } from "./hooks/useBrowseHotkeys"
 import { useDiagnosticSnapshot } from "./hooks/useDiagnosticSnapshot"
 import { useHeartbeat } from "./hooks/useHeartbeat"
 
 // Composition only: the hooks own the state, the components own the pixels,
-// and this file wires them together plus the browse-scope hotkeys. `base`
+// and this file wires them together (the browse-scope hotkey map is
+// useBrowseHotkeys, v0.18.19). `base`
 // is the repo-less engine client resolved once at boot (main.tsx); the
 // session derives the repo-bound one every component reads via useEngine().
 export default function App({ base }: { base: EngineClient }) {
@@ -97,7 +97,7 @@ export default function App({ base }: { base: EngineClient }) {
     refresh,
     handleFailure: session.handleFailure,
   })
-  const { busy, jobLabel, runJob } = jobs
+  const { busy, jobLabel } = jobs
   // Background fetch on the interval from Settings, Behaviour (v0.15.0).
   useAutoFetch({ client, live, busy, status, defaultRemote, refresh })
   const dialogs = useDialogs()
@@ -188,67 +188,26 @@ export default function App({ base }: { base: EngineClient }) {
   const menus = useGridMenus(open, repo?.branch)
   const progressLabel = jobLabel !== null ? `${jobLabel}…` : historyNote
 
-  useHotkeyLayer(
-    "browse",
-    {
-      "browse.commit": actions.openCommit,
-      "browse.openRepo": () => void openFolder(),
-      "browse.openSettings": settings.toggle,
-      "browse.createBranch": actions.openCreateBranch,
-      "browse.createTag": actions.openCreateTag,
-      "browse.checkoutBranch": actions.openCheckoutBranch,
-      "browse.rebase": actions.openRebase,
-      "browse.mergeBranch": actions.openMergeBranch,
-      "browse.pull": () => {
-        if (live && !busy) jobs.openPreview("pull")
-      },
-      "browse.push": () => {
-        if (live && !busy) jobs.openPreview("push")
-      },
-      "browse.quickFetch": () => {
-        if (live && !busy) void runJob(`Fetching ${defaultRemote}`, () => client.startFetch(defaultRemote))
-      },
-      "browse.quickPull": () => {
-        if (live && !busy) void runJob("Pulling", () => client.startPull(false))
-      },
-      "browse.quickPush": () => {
-        if (live && !busy) void runJob("Pushing", () => client.startPush(false))
-      },
-      "browse.quickPullOrFetch": () => {
-        if (live && !busy) void runJob("Pulling", () => client.startPull(false))
-      },
-      "browse.stash": () => {
-        if (live) open({ kind: "stash" })
-      },
-      "browse.stashPop": () => {
-        if (!live || stashes.length === 0) return
-        actions.applyLatestStash(true)
-      },
-      "browse.toggleLeftPanel": () => setLeftOpen((o) => !o),
-      "browse.focusLeftPanel": () => {
-        if (!leftOpen) setLeftOpen(true)
-        requestAnimationFrame(() => {
-          ;(document.querySelector('[data-testid="tree-filter"]') as HTMLElement | null)?.focus()
-        })
-      },
-      "browse.focusRevisionGrid": focusGrid,
-      "browse.focusCommitInfo": () => setBottomTab(0),
-      "browse.focusDiff": () => setBottomTab(1),
-      "browse.focusFileTree": () => setBottomTab(2),
-      "browse.focusNextTab": () => setBottomTab((t) => (t + 1) % 3),
-      "browse.focusPrevTab": () => setBottomTab((t) => (t + 2) % 3),
-      "browse.refresh": () => {
-        if (live) void refresh().catch(() => undefined)
-      },
-      "browse.gitConsole": () => toggleGitConsole(),
-      "browse.appLog": () => openConsoleTab("app"),
-      "browse.fileHistory": () => fileHistory.openSelected(current?.rev.id),
-      // Ctrl+Shift+B (v0.18.4). The file history's grid has its own root and
-      // no menu item for it (GE's FormFileHistory has none): pass the key on.
-      "browse.highlightAncestry": () => (fileHistory.target ? false : history.toggleHighlightRoot(current?.rev.id)),
-    } satisfies Partial<Record<CommandId, () => void>>,
+  useBrowseHotkeys({
+    actions,
+    openFolder,
+    settings,
+    live,
+    busy,
+    jobs,
+    defaultRemote,
+    client,
+    open,
+    stashes,
+    leftOpen,
+    setLeftOpen,
+    setBottomTab,
+    refresh,
+    fileHistory,
+    current,
+    history,
     hotkeysEnabled,
-  )
+  })
 
   return (
     <EngineProvider base={base} repo={client}>

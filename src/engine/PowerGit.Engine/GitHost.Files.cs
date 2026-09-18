@@ -185,7 +185,11 @@ public sealed partial class GitHost
     /// </summary>
     internal static bool IsTerminalEditor(string editor)
     {
-        string name = Path.GetFileNameWithoutExtension(FirstToken(editor)).ToLowerInvariant();
+        // Both separators: Path.GetFileName on Linux keeps a `C:\tools\nvim.exe`
+        // whole, and a Windows-style core.editor is a path all the same.
+        string program = FirstToken(editor);
+        int cut = program.LastIndexOfAny(['/', '\\']);
+        string name = Path.GetFileNameWithoutExtension(cut >= 0 ? program[(cut + 1)..] : program).ToLowerInvariant();
         return name is "vi" or "vim" or "nvim" or "nano" or "pico" or "ed" or "joe" or "micro"
             || (name == "emacs" && editor.Contains("-nw", StringComparison.Ordinal));
     }
