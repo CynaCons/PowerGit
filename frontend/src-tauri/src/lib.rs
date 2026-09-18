@@ -1007,15 +1007,26 @@ pub fn run() {
             recover
         ])
         .setup(|app| {
+            // Absolute and existing is enough: git resolves the toplevel
+            // itself, and fs::canonicalize would hand Windows a verbatim
+            // `\\?\C:\…` path that git does not take as a directory.
             let requested_open_path = parse_open_path(std::env::args_os().skip(1));
             let (open_path, open_path_error) = match requested_open_path {
-                Some(path) => match fs::canonicalize(&path) {
-                    Ok(path) => (Some(path.to_string_lossy().into_owned()), None),
-                    Err(error) => (
-                        None,
-                        Some(format!("ignoring launch path {}: {error}", path.to_string_lossy())),
-                    ),
-                },
+                Some(path) => {
+                    let absolute = if path.is_absolute() {
+                        path.clone()
+                    } else {
+                        std::env::current_dir().map(|cwd| cwd.join(&path)).unwrap_or(path.clone())
+                    };
+                    if absolute.is_dir() {
+                        (Some(absolute.to_string_lossy().into_owned()), None)
+                    } else {
+                        (
+                            None,
+                            Some(format!("ignoring launch path {}: not a directory", path.to_string_lossy())),
+                        )
+                    }
+                }
                 None => (None, None),
             };
             let port = resolve_engine_port();
