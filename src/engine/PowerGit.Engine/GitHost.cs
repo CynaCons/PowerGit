@@ -130,6 +130,21 @@ public sealed partial class GitHost
         _current = new RepoInfo(name, root, branch, IdFor(root));
         _reviewsExcluded = false;
         RecentsStore.Remember(_current);
+        // A .powergit/ that exists before this engine wrote anything (a
+        // review or a session file another process or an agent wrote by
+        // hand) would list as untracked until the first save: exclude it now.
+        if (Directory.Exists(Path.Combine(root, ".powergit")))
+        {
+            try
+            {
+                EnsureExcluded("/.powergit/");
+                _reviewsExcluded = true;
+            }
+            catch (Exception)
+            {
+                // The write path handles it again on the first save.
+            }
+        }
         try
         {
             WatchRepo(root);

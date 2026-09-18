@@ -52,6 +52,24 @@ public sealed class ReviewsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public void A_powergit_directory_present_at_open_is_excluded_before_any_write()
+    {
+        // An agent's first session file (M2) or a review another process
+        // wrote lands before this engine has written anything: without the
+        // exclude at open it would list as untracked until the first save.
+        using TempRepo repo = new();
+        repo.Write(".powergit/agent-reviews/" + new string('a', 40) + ".json", "{}" + "\n");
+        Assert.Contains(".powergit", repo.Output("status", "--porcelain"));
+
+        GitHost host = new();
+        host.Open(repo.Dir);
+
+        Assert.Equal("", repo.Output("status", "--porcelain"));
+        string exclude = File.ReadAllText(Path.Combine(repo.Dir, ".git", "info", "exclude")).Replace("\r\n", "\n");
+        Assert.Contains("\n/.powergit/\n", "\n" + exclude);
+    }
+
+    [Fact]
     public void Keys_accept_only_full_lowercase_hashes_and_the_two_pending_suffixes()
     {
         (GitHost host, TempRepo repo, string sha) = Open();

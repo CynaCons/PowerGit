@@ -34,7 +34,9 @@ export function BottomTabStrip({
       <Tabs
         value={tab}
         onChange={(_, value: number) => setTab(value)}
-        sx={{ px: 0.5, minHeight: 34, minWidth: 0, "& .MuiTab-root": { minHeight: 34, py: 0.5 } }}
+        // The tabs keep their labels; the review bar beside them gives way
+        // (its meter shrinks) when the panel is narrow.
+        sx={{ px: 0.5, minHeight: 34, minWidth: 0, flexShrink: 0, "& .MuiTab-root": { minHeight: 34, py: 0.5 } }}
       >
         <Tab label="Commit" />
         <Tab label={`Diff${fileCount ? ` (${fileCount})` : ""}`} />

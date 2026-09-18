@@ -84,11 +84,12 @@ export function ReviewBar({
         display: "flex",
         alignItems: "center",
         gap: 1.5,
-        flexShrink: 0,
+        minWidth: 0,
         ml: "auto",
         mr: 1,
         py: 0.5,
         color: "text.primary",
+        whiteSpace: "nowrap",
       }}
     >
       <Button
@@ -118,7 +119,15 @@ export function ReviewBar({
         aria-valuemin={0}
         aria-valuemax={changed}
         aria-valuenow={Math.min(reviewed, changed)}
-        sx={{ position: "relative", width: 160, height: 6, borderRadius: 3, bgcolor: "divider", overflow: "hidden" }}
+        sx={{
+          position: "relative",
+          flex: "0 1 160px",
+          minWidth: 40,
+          height: 6,
+          borderRadius: 3,
+          bgcolor: "divider",
+          overflow: "hidden",
+        }}
       >
         <Box
           sx={{
