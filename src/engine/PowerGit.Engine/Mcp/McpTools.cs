@@ -57,6 +57,11 @@ public sealed class McpTools(RepoRegistry registry)
     {
         root = Required(args, "repo_path");
         if (!Path.IsPathFullyQualified(root)) throw new InvalidOperationException("repo_path must be absolute");
+        // A session already open for this root (the common case: the agent
+        // calls open, then wait, then get) is reused without the probe open
+        // (three git processes and a fresh watcher per call otherwise).
+        GitHost? open = registry.Get(GitHost.IdFor(root));
+        if (open is not null) return open;
         try
         {
             RepoInfo info = registry.Open(root);

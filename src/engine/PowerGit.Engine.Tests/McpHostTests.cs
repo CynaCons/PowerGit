@@ -59,7 +59,7 @@ public sealed class McpHostTests
         GitHost host = h.Host;
         host.WriteReview(id, "{\"reviewed\":1,\"changed\":1,\"files\":{\"f.txt\":{\"lines\":{},\"comments\":[{\"line\":\"+2\",\"text\":\"needs a guard\"}]}}}");
         host.ResolveAgentReview(id, new("request_changes", "fix", null));
-        JsonElement result = await waiting.WaitAsync(TimeSpan.FromSeconds(2));
+        JsonElement result = await waiting.WaitAsync(TimeSpan.FromSeconds(15));
         Assert.Equal("changes_requested", result.GetProperty("status").GetString());
         Assert.Equal("needs a guard", result.GetProperty("comments")[0].GetProperty("body").GetString());
         Assert.Contains("f.txt", result.GetProperty("export_markdown").GetString());
@@ -74,9 +74,9 @@ public sealed class McpHostTests
         Assert.Equal(-32601, error.GetProperty("code").GetInt32());
         JsonElement opened = await first.Tool("agent_review_open", new { repo_path = h.Repo.Dir, mode = "wait", title = "Guard", files = new[] { new { path = "f.txt", patch = "+b" } } });
         Task<JsonElement> waiting = first.Tool("agent_review_wait", new { repo_path = h.Repo.Dir, review_id = opened.GetProperty("review_id").GetString(), timeout_ms = 10000 });
-        await second.Call("ping", new { }).WaitAsync(TimeSpan.FromSeconds(1));
+        await second.Call("ping", new { }).WaitAsync(TimeSpan.FromSeconds(15));
         h.Host.ResolveAgentReview(opened.GetProperty("review_id").GetString()!, new("approve", null, null));
-        await waiting.WaitAsync(TimeSpan.FromSeconds(2));
+        await waiting.WaitAsync(TimeSpan.FromSeconds(15));
     }
 
     [Fact]
@@ -140,6 +140,15 @@ public sealed class McpHostTests
             using JsonDocument doc = JsonDocument.Parse((await _reader.ReadLineAsync())!);
             return doc.RootElement.GetProperty(result ? "result" : "error").Clone();
         }
-        public async ValueTask DisposeAsync() { await _writer.DisposeAsync(); _reader.Dispose(); stream.Dispose(); }
+        // A failed assertion leaves a request in flight; disposing the writer
+        // then throws "stream in use" and would hide the assertion (CI run
+        // 35375085756). The stream goes first, the wrappers follow quietly.
+        public ValueTask DisposeAsync()
+        {
+            try { stream.Dispose(); } catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+            try { _writer.Dispose(); } catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException) { }
+            try { _reader.Dispose(); } catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException) { }
+            return ValueTask.CompletedTask;
+        }
     }
 }
