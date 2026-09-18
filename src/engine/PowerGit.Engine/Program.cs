@@ -186,8 +186,9 @@ repo.AddEndpointFilter(async (ctx, next) =>
     // ref list outgrows a URL, but it is a read like GET /revisions — it must
     // never queue behind a mutation nor answer 409 while a fetch job runs.
     bool isReadPost = HttpMethods.IsPost(method) && path.EndsWith("/revisions", StringComparison.Ordinal);
-    // A review save writes outside git and must never 409 while a pull holds the gate.
-    bool isReview = path.Contains("/reviews/", StringComparison.Ordinal);
+    // Review and agent-session saves are files beside git and must never 409 while a pull holds the gate.
+    bool isReview = path.Contains("/reviews/", StringComparison.Ordinal)
+        || path.Contains("/agent-reviews", StringComparison.Ordinal);
     try
     {
         if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob || isReadPost || isReview)
@@ -614,6 +615,61 @@ repo.MapDelete("/reviews/{key}", (string key, GitHost git) =>
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
+});
+
+// v0.20.0 agent review sessions: the HTTP door used by the inbox. The same
+// GitHost methods are used by the private MCP transport in the next milestone.
+repo.MapPost("/agent-reviews", (AgentReviewRequest body, GitHost git) =>
+{
+    try { return Results.Json(git.CreateAgentReview(body), statusCode: StatusCodes.Status201Created); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+});
+
+repo.MapGet("/agent-reviews", (GitHost git) => Results.Ok(git.ListAgentReviews()));
+
+repo.MapGet("/agent-reviews/{sid}", (string sid, GitHost git) =>
+{
+    try
+    {
+        AgentReviewDto? session = git.GetAgentReview(sid);
+        return session is null ? Results.Json(new ErrorResponse("agent review session not found"), statusCode: 404) : Results.Ok(session);
+    }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+});
+
+repo.MapPut("/agent-reviews/{sid}", (string sid, AgentReviewRequest body, GitHost git) =>
+{
+    try { return Results.Ok(git.UpdateAgentReview(sid, body)); }
+    catch (KeyNotFoundException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 404); }
+    catch (AgentReviewStateException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 409); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+});
+
+repo.MapPost("/agent-reviews/{sid}/resolve", (string sid, AgentReviewResolveRequest body, GitHost git) =>
+{
+    try { return Results.Ok(git.ResolveAgentReview(sid, body)); }
+    catch (KeyNotFoundException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 404); }
+    catch (AgentReviewStateException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 409); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+});
+
+repo.MapGet("/agent-reviews/{sid}/wait", async (string sid, int? timeoutMs, GitHost git, HttpContext ctx) =>
+{
+    try { return Results.Ok(await git.WaitAgentReview(sid, timeoutMs ?? 120_000, ctx.RequestAborted)); }
+    catch (KeyNotFoundException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 404); }
+    catch (OperationCanceledException) { return Results.StatusCode(499); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+});
+
+repo.MapGet("/agent-reviews/{sid}/diff", (string sid, string? path, GitHost git, HttpContext ctx) =>
+{
+    try
+    {
+        if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("path is required");
+        return Results.Ok(git.GetAgentReviewDiff(sid, path, ctx.RequestAborted));
+    }
+    catch (KeyNotFoundException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 404); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
 });
 
 repo.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>

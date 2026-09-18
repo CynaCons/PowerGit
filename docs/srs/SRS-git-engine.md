@@ -90,6 +90,12 @@ Git Extensions' `FormFormatPatch` (`git format-patch --find-renames --find-copie
 |---|---|---|---|---|
 | SRS-ENG-054 | The engine shall keep one review document per key under `<repo>/.powergit/reviews/<key>.json` behind `GET/PUT/DELETE /repos/{id}/reviews/{key}`. The key shall match `^[0-9a-f]{40}([0-9a-f]{24})?(-(worktree\|index))?$` and the final path shall still pass the in-root check. After checking that the body is a JSON object, the engine shall store its text verbatim apart from exactly one final newline, using a temporary file and rename. The first write shall ensure the exact line `/.powergit/` is present in `.git/info/exclude` and bump the status stream. Review routes shall remain outside the mutation gate. | `docs/design/review-mode.md` section 2: the file lives in the repository because an agent in the repository reads it over MCP; git's own never-committed exclude keeps the repository clean. | Test | `GET/PUT/DELETE /repos/{id}/reviews/{key}`, `GitHost.ReadReview/WriteReview/DeleteReview`, `GitHost.EnsureExcluded`, `ReviewsTests` |
 
+## Agent review sessions (v0.20.0)
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-ENG-055 | The engine shall store each version-1 agent review session at `<repo>/.powergit/agent-reviews/<id>.json`, where `id` is 40 random lowercase hexadecimal characters and is also its `.powergit/reviews/<id>.json` review key. `POST/GET/PUT /repos/{id}/agent-reviews`, `GET /{sid}`, `POST /{sid}/resolve`, `GET /{sid}/wait?timeoutMs=`, and `GET /{sid}/diff?path=` shall return 201/200, 404 for a missing session, 409 for a terminal-session mutation, and 400 for invalid input as applicable. Wait shall clamp to 1--120 seconds and a timeout shall return the still-pending session with `timedOut: true`, never auto-approve. Diff selection shall use an embedded patch, then base-to-head, then worktree comparison. Session writes shall use temporary-file rename, ensure `/.powergit/` is excluded, and remain outside the mutation gate. | PLAN.md v0.20 M2 (Grok's plan, owner approved 2026-09-18): local agents can surface critical patches for explicit owner resolution. | Test | agent-review routes, `GitHost.CreateAgentReview/UpdateAgentReview/ListAgentReviews/GetAgentReview/ResolveAgentReview/WaitAgentReview/GetAgentReviewDiff`, `AgentReviewsTests` |
+
 ## Windows isolation
 
 | ID | Requirement | Rationale | Verification | Trace |
