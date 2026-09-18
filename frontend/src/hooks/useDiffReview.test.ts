@@ -229,4 +229,31 @@ describe("useDiffReview", () => {
     expect(latest?.review).toBeUndefined()
     expect(handle.focus).toHaveBeenCalledTimes(1)
   })
+
+  it("opens slash commands, reports errors, applies comments and marks, and closes on request", async () => {
+    await render(shown("k-command"))
+    await press("/")
+    expect(latest?.review?.cursor).toBe(3)
+    expect(latest?.review?.command).toEqual({ row: 3, initial: "/", error: null })
+    await act(async () => latest?.review?.onCommand(3, "/bogus"))
+    expect(latest?.review?.command?.error).toContain("Unknown command")
+    await act(async () => latest?.review?.onCommand(3, "/comment needs a guard"))
+    expect(latest?.review?.commentsOf(3)).toEqual(["needs a guard"])
+    expect(latest?.review?.command).toBeNull()
+    await act(async () => latest?.review?.onAddComment(3))
+    expect(latest?.review?.command?.initial).toBe("/comment ")
+    await act(async () => latest?.review?.onCommand(3, "/reject"))
+    expect(latest?.review?.stateOf("+2")).toBe("rejected")
+  })
+
+  it("does not open the command row when slash originates in a note textarea", async () => {
+    await render(shown("k-editing"))
+    const textarea = document.createElement("textarea")
+    surface.appendChild(textarea)
+    textarea.focus()
+    await act(async () => {
+      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true }))
+    })
+    expect(latest?.review?.command).toBeNull()
+  })
 })

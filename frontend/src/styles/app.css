@@ -324,6 +324,99 @@ html {
 .diff-row-cursor:hover {
   background: var(--pg-review-cursor-bg, var(--pg-grid-sel, #dbeafe));
 }
+.diff-row-add {
+  width: 14px;
+  flex-shrink: 0;
+  visibility: hidden;
+  color: var(--pg-review-ok, var(--pg-primary, #1553c9));
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+.diff-row:hover .diff-row-add {
+  visibility: visible;
+}
+.diff-note-row,
+.diff-cmd-row {
+  margin-left: 114px;
+  min-width: 260px;
+  box-sizing: border-box;
+  user-select: none;
+}
+.diff-note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--pg-review-ok, var(--pg-primary, #1553c9));
+  background: var(--pg-review-ok-bg, rgba(21, 83, 201, 0.06));
+}
+.diff-note-label {
+  padding-top: 3px;
+  color: var(--pg-text-meta, #475569);
+  font-size: 11px;
+}
+.diff-note-row textarea {
+  flex: 1;
+  min-width: 120px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: inherit;
+  font: 12px/18px var(--pg-font-mono, monospace);
+  user-select: text;
+}
+.diff-note-row textarea:focus,
+.diff-cmd-row input:focus {
+  border-color: var(--pg-focus-ring, #2563eb);
+  box-shadow: 0 0 0 1px var(--pg-focus-ring, #2563eb);
+}
+.diff-note-row button {
+  border: 0;
+  background: transparent;
+  color: var(--pg-text-meta, #475569);
+  cursor: pointer;
+  font-size: 15px;
+}
+.diff-cmd-row {
+  display: flex;
+  gap: 6px;
+  padding: 5px 8px 6px;
+  background: var(--pg-surface-sunken, #fafafa);
+}
+.diff-cmd-prompt {
+  color: var(--pg-review-ok, var(--pg-primary, #1553c9));
+  font-weight: 700;
+}
+.diff-cmd-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+.diff-cmd-row input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--pg-border-soft, #e5e5e5);
+  border-radius: 2px;
+  outline: none;
+  background: var(--pg-surface, #fff);
+  color: inherit;
+  font: 12px/18px var(--pg-font-mono, monospace);
+  user-select: text;
+}
+.diff-cmd-hint {
+  color: var(--pg-text-meta, #475569);
+  font-size: 11px;
+}
+.diff-cmd-error {
+  color: var(--pg-review-rejected, var(--pg-diff-removed, #d3000b));
+}
 
 .grid-tail {
   flex-shrink: 0;

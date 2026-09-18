@@ -132,6 +132,50 @@ export function withLine(doc: ReviewDoc, path: string, key: LineKey, state: Line
   return recount({ ...doc, files })
 }
 
+export function commentsOf(file: FileReview | undefined, key: LineKey): string[] {
+  return file?.comments.filter((comment) => comment.line === key).map((comment) => comment.text) ?? []
+}
+
+export function commentCount(doc: ReviewDoc | null): number {
+  if (!doc) return 0
+  return Object.values(doc.files).reduce((count, file) => count + file.comments.length, 0)
+}
+
+export function withComment(doc: ReviewDoc, path: string, key: LineKey, text: string): ReviewDoc {
+  const value = text.trim()
+  if (!value) return doc
+  const file = doc.files[path]
+  const files = {
+    ...doc.files,
+    [path]: { lines: file?.lines ?? {}, comments: [...(file?.comments ?? []), { line: key, text: value }] },
+  }
+  return recount({ ...doc, files })
+}
+
+export function withCommentText(doc: ReviewDoc, path: string, key: LineKey, index: number, text: string): ReviewDoc {
+  const file = doc.files[path]
+  if (!file || index < 0) return doc
+  let seen = 0
+  const at = file.comments.findIndex((comment) => comment.line === key && seen++ === index)
+  if (at < 0 || file.comments[at].text === text) return doc
+  const comments = file.comments.slice()
+  comments[at] = { ...comments[at], text }
+  return recount({ ...doc, files: { ...doc.files, [path]: { ...file, comments } } })
+}
+
+export function withoutComment(doc: ReviewDoc, path: string, key: LineKey, index: number): ReviewDoc {
+  const file = doc.files[path]
+  if (!file || index < 0) return doc
+  let seen = 0
+  const at = file.comments.findIndex((comment) => comment.line === key && seen++ === index)
+  if (at < 0) return doc
+  const comments = file.comments.filter((_, i) => i !== at)
+  const files = { ...doc.files }
+  if (Object.keys(file.lines).length === 0 && comments.length === 0) delete files[path]
+  else files[path] = { ...file, comments }
+  return recount({ ...doc, files })
+}
+
 /**
  * Reads a document back (the file on disk in v0.19.0, or anything else that
  * claims to be one). Tolerant: unknown keys at any level are ignored, a mark

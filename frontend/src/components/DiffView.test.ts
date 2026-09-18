@@ -46,6 +46,13 @@ function review(over: Partial<DiffReviewProps> = {}): DiffReviewProps {
     cursor: null,
     onCursor: () => {},
     onMarkClick: () => {},
+    commentsOf: () => [],
+    command: null,
+    onCommand: () => {},
+    onCommandClose: () => {},
+    onCommentEdit: () => {},
+    onCommentDelete: () => {},
+    onAddComment: () => {},
     ...over,
   }
 }
@@ -85,7 +92,7 @@ describe("DiffView with the review prop", () => {
     // The mark cell sits inside the sticky gutter, after both numbers, on every row.
     for (const r of rows) {
       expect(r).toMatch(
-        /diff-row-num-new">[^<]*<\/span><span class="diff-row-mark"><\/span><\/div><span class="diff-row-text"/,
+        /diff-row-num-new">[^<]*<\/span><span class="diff-row-mark"><\/span>(?:<span class="diff-row-add"[^>]*>\+<\/span>)?<\/div><span class="diff-row-text"/,
       )
     }
     // The plain list is the focusable review surface.
@@ -95,6 +102,26 @@ describe("DiffView with the review prop", () => {
   it("names the virtual list as the review surface too", () => {
     const html = renderToStaticMarkup(createElement(DiffView, { diff: LONG, review: review() }))
     expect(html).toMatch(/data-testid="diff-lines" data-hotkey-surface="review" tabindex="0"/)
+  })
+
+  it("puts note and command items directly after their line without making them diff rows", () => {
+    const html = renderToStaticMarkup(
+      createElement(DiffView, {
+        diff: SHORT,
+        review: review({
+          commentsOf: (i) => (i === 4 ? ["first", "second"] : []),
+          command: { row: 4, initial: "/", error: null },
+        }),
+      }),
+    )
+    const afterLine = html.slice(html.indexOf('data-index="4"'))
+    expect(afterLine.indexOf('data-testid="diff-note-row"')).toBeLessThan(
+      afterLine.indexOf('data-testid="diff-cmd-row"'),
+    )
+    expect(afterLine.match(/data-testid="diff-note-row"/g)).toHaveLength(2)
+    expect(html).toContain('data-note-index="0"')
+    expect(html).toContain('data-cmd-row="4"')
+    expect(html).not.toMatch(/diff-note-row[^>]* diff-row/)
   })
 })
 
@@ -128,6 +155,16 @@ describe("DiffView review clicks and ref", () => {
     calls.length = 0
     act(() => rowOf(5).querySelector<HTMLElement>(".diff-row-text")!.click())
     expect(calls).toEqual(["line 5", "cursor 5"])
+  })
+
+  it("opens the add-comment row only from a keyed line", () => {
+    const calls: number[] = []
+    act(() =>
+      root.render(createElement(DiffView, { diff: SHORT, review: review({ onAddComment: (i) => calls.push(i) }) })),
+    )
+    expect(host.querySelector('[data-index="2"] .diff-row-add')).toBeNull()
+    act(() => host.querySelector<HTMLElement>('[data-index="4"] .diff-row-add')!.click())
+    expect(calls).toEqual([4])
   })
 
   it("moves the cursor on a text click even when the host has no line selection", () => {

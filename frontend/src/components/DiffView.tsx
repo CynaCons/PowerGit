@@ -6,8 +6,10 @@ import { languageForPath, tokenizeLines, type Token } from "../highlight"
 import { codeSx } from "../theme"
 import { useCodeWrap } from "./codeWrap"
 import { ContentNotice } from "./ContentNotice"
+import { CommandRow, NoteRow } from "./ReviewRows"
 import { parseGutterLines, type GutterLine } from "./diffLines"
-import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines"
+import { CODE_LINE_HEIGHT, VirtualLines, type VirtualLinesHandle } from "./VirtualLines"
+import { COMMAND_HINT } from "../review/reviewCommands"
 
 /**
  * Syntax colours for the hunk lines (v0.14.3, owner: "the diff view and
@@ -147,7 +149,17 @@ export type DiffReviewProps = {
   onCursor: (i: number) => void
   /** A click on the mark cell in the gutter: the host cycles the line and sets the cursor. */
   onMarkClick: (i: number) => void
+  commentsOf: (i: number) => string[]
+  command: { row: number; initial: string; error: string | null } | null
+  onCommand: (line: number, input: string) => void
+  onCommandClose: () => void
+  onCommentEdit: (line: number, n: number, text: string) => void
+  onCommentDelete: (line: number, n: number) => void
+  onAddComment: (line: number) => void
 }
+
+export type DiffItem =
+  { kind: "line"; line: number } | { kind: "note"; line: number; n: number } | { kind: "cmd"; line: number }
 
 /** Imperative surface for the review layer's keys: scroll the cursor row into view, take the focus. */
 export type DiffViewHandle = {
@@ -203,6 +215,23 @@ export const DiffView = forwardRef<
   }
 >(function DiffView({ diff, onOpenDifftool, onRetry, selection, onLineClick, onLineContextMenu, review }, ref) {
   const lines = useMemo(() => parseGutterLines(diff.text), [diff.text])
+  const items = useMemo<DiffItem[]>(() => {
+    if (!review) return lines.map((_, line) => ({ kind: "line", line }))
+    const result: DiffItem[] = []
+    lines.forEach((_, line) => {
+      result.push({ kind: "line", line })
+      review.commentsOf(line).forEach((_, n) => result.push({ kind: "note", line, n }))
+      if (review.command?.row === line) result.push({ kind: "cmd", line })
+    })
+    return result
+  }, [lines, review])
+  const lineToItem = useMemo(() => {
+    const map = new Map<number, number>()
+    items.forEach((item, index) => {
+      if (item.kind === "line") map.set(item.line, index)
+    })
+    return map
+  }, [items])
   const mode = useTheme().palette.mode
   const tokens = useDiffTokens(diff.text, lines, diff.path, mode)
   // Wrap lines (v0.18.8): the scroll container carries data-wrap and
@@ -218,15 +247,16 @@ export const DiffView = forwardRef<
     ref,
     () => ({
       scrollToRow: (i) => {
-        virtualRef.current?.scrollToIndex(i, { align: "auto" })
+        const itemIndex = lineToItem.get(i) ?? i
+        virtualRef.current?.scrollToIndex(itemIndex, { align: "auto" })
         // Mounted (always in the plain list; in the virtual one when it
         // already sat in the window): settle whichever ancestor scrolls.
-        const row = rootRef.current?.querySelector(`[data-index="${i}"]`)
+        const row = rootRef.current?.querySelector(`[data-index="${itemIndex}"]`)
         if (row) scrollRowIntoView(row)
       },
       focus: () => (virtualRef.current ?? plainRef.current)?.focus(),
     }),
-    [],
+    [lineToItem],
   )
   // Plain elements with classes (app.css .diff-row*), not MUI Box: a row is
   // rendered hundreds of times per diff and per-element emotion styling was
@@ -282,6 +312,18 @@ export const DiffView = forwardRef<
               }}
             />
           )}
+          {review && key !== null && (
+            <span
+              className="diff-row-add"
+              title="Add comment"
+              onClick={(e) => {
+                e.stopPropagation()
+                review.onAddComment(i)
+              }}
+            >
+              +
+            </span>
+          )}
         </div>
         <span className="diff-row-text">
           {sign !== null && (
@@ -302,6 +344,30 @@ export const DiffView = forwardRef<
               ))}
         </span>
       </div>
+    )
+  }
+  const renderItem = (itemIndex: number) => {
+    const item = items[itemIndex]
+    if (item.kind === "line") return renderLine(item.line)
+    if (item.kind === "note") {
+      const text = review!.commentsOf(item.line)[item.n]
+      return (
+        <NoteRow
+          label={review!.keyOf(item.line) ?? ""}
+          text={text}
+          onChange={(value) => review!.onCommentEdit(item.line, item.n, value)}
+          onDelete={() => review!.onCommentDelete(item.line, item.n)}
+        />
+      )
+    }
+    return (
+      <CommandRow
+        initial={review!.command!.initial}
+        hint={COMMAND_HINT}
+        error={review!.command!.error}
+        onRun={(value) => review!.onCommand(item.line, value)}
+        onClose={review!.onCommandClose}
+      />
     )
   }
   return (
@@ -338,22 +404,35 @@ export const DiffView = forwardRef<
           tabIndex={review ? 0 : undefined}
           sx={review ? REVIEW_LINES_SX : PLAIN_LINES_SX}
         >
-          {lines.map((_, i) => (
-            <div key={i} data-index={i}>
-              {renderLine(i)}
-            </div>
-          ))}
+          {review
+            ? items.map((item, i) => (
+                <div
+                  key={`${item.kind}-${item.line}-${item.kind === "note" ? item.n : 0}`}
+                  data-index={item.kind === "line" ? i : undefined}
+                  data-note-index={item.kind === "note" ? item.n : undefined}
+                  data-cmd-row={item.kind === "cmd" ? item.line : undefined}
+                >
+                  {renderItem(i)}
+                </div>
+              ))
+            : lines.map((_, i) => (
+                <div key={i} data-index={i}>
+                  {renderLine(i)}
+                </div>
+              ))}
         </Box>
       ) : (
         <VirtualLines
           ref={virtualRef}
-          count={lines.length}
+          count={items.length}
           ariaLabel={`Diff of ${diff.path}`}
           testid="diff-lines"
-          renderLine={renderLine}
+          renderLine={renderItem}
           hotkeySurface={review ? "review" : undefined}
           passKeys={review !== undefined}
           wrap={wrap}
+          estimateSize={(i) => (items[i].kind === "note" ? 64 : items[i].kind === "cmd" ? 44 : CODE_LINE_HEIGHT)}
+          measure={(i) => items[i].kind !== "line"}
         />
       )}
     </Box>

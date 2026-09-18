@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest"
 import {
+  commentCount,
+  commentsOf,
   cycle,
   emptyDoc,
   fileProgress,
@@ -9,6 +11,9 @@ import {
   recount,
   toggleReject,
   withLine,
+  withComment,
+  withCommentText,
+  withoutComment,
   type FileReview,
   type ReviewDoc,
 } from "./reviewModel"
@@ -38,6 +43,46 @@ function deepFreeze<T>(value: T): T {
   }
   return value
 }
+
+describe("comments", () => {
+  test("appends trimmed comments and reads only the requested line", () => {
+    const one = withComment(emptyDoc("c"), "a.ts", "+1", " first ")
+    const two = withComment(one, "a.ts", "+2", "second")
+    const three = withComment(two, "a.ts", "+1", "third")
+    expect(commentsOf(three.files["a.ts"], "+1")).toEqual(["first", "third"])
+    expect(commentCount(three)).toBe(3)
+    expect(commentCount(null)).toBe(0)
+    expect(withComment(three, "a.ts", "+1", "  ")).toBe(three)
+  })
+
+  test("edits the index within one line without disturbing other comments or files", () => {
+    const doc = withComment(withComment(withComment(emptyDoc("c"), "a", "+1", "a"), "a", "+2", "b"), "a", "+1", "c")
+    const other = withComment(doc, "b", "+1", "other")
+    const edited = withCommentText(other, "a", "+1", 1, "changed")
+    expect(edited.files.a.comments).toEqual([
+      { line: "+1", text: "a" },
+      { line: "+2", text: "b" },
+      { line: "+1", text: "changed" },
+    ])
+    expect(edited.files.b).toBe(other.files.b)
+    expect(withCommentText(edited, "a", "+1", 1, "changed")).toBe(edited)
+    expect(withCommentText(edited, "a", "+1", 9, "nope")).toBe(edited)
+  })
+
+  test("deletes by line-local index and drops an otherwise empty file", () => {
+    const doc = withComment(withComment(emptyDoc("c"), "a", "+1", "one"), "a", "+1", "two")
+    const one = withoutComment(doc, "a", "+1", 0)
+    expect(commentsOf(one.files.a, "+1")).toEqual(["two"])
+    const none = withoutComment(one, "a", "+1", 0)
+    expect(none.files).toEqual({})
+    expect(withoutComment(none, "a", "+1", 0)).toBe(none)
+  })
+
+  test("keeps a file when its last comment is removed but a mark remains", () => {
+    const doc = withComment(withLine(emptyDoc("c"), "a", "+1", "ok"), "a", "+1", "note")
+    expect(withoutComment(doc, "a", "+1", 0).files.a).toEqual({ lines: { "+1": "ok" }, comments: [] })
+  })
+})
 
 describe("lineKeyOf", () => {
   test("an added line is keyed by its new number, a removed one by its old number", () => {
