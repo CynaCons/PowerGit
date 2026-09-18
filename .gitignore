@@ -29,3 +29,6 @@ Thumbs.db
 # Temporary probe configs written by e2e runs against a hand-started stack.
 frontend/playwright.*.probe.config.ts
 frontend/playwright.probe.config.ts
+
+# Local agent-to-agent scratch (Grok Bot <-> Claude). Never commit.
+/AGENTS_IPC.md
