@@ -1,8 +1,6 @@
 import Box from "@mui/material/Box"
 import LinearProgress from "@mui/material/LinearProgress"
 import Paper from "@mui/material/Paper"
-import Tab from "@mui/material/Tab"
-import Tabs from "@mui/material/Tabs"
 import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { CommitFileTree } from "./CommitFileTree"
 import { SplitHandle } from "./SplitHandle"
@@ -10,7 +8,7 @@ import { BlobPane } from "./BlobPane"
 import { ErrorState } from "./AsyncState"
 import { CommitInfo } from "./CommitDetailView"
 import { DiffTab, type DiffTabActions } from "./DiffTab"
-import { ReviewBar } from "./ReviewBar"
+import { BottomTabStrip, DEFAULT_FILES_WIDTH, MAX_FILES_WIDTH_RATIO, MIN_FILES_WIDTH } from "./BottomTabStrip"
 import type { BrowseRow } from "./browseReset"
 import type { Loadable } from "./loadable"
 import {
@@ -25,6 +23,9 @@ import {
 } from "../engine"
 import type { GraphRow } from "../graph/types"
 import { rowKeysOf, type RowKeys } from "../hooks/useDiffReview"
+import { useReview } from "../hooks/useReview"
+import { reviewKeyOf } from "../review/reviewKey"
+import { getReviewDoc } from "../review/reviewState"
 import type { GridMenus } from "../hooks/useGridMenus"
 
 type Props = {
@@ -57,29 +58,6 @@ import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commit
 import { PendingSummary } from "./PendingSummary"
 import { usePendingOf, usePendingDiff } from "./pendingRows"
 
-const FILES_WIDTH_STORAGE_KEY = "pg.bottomFilesWidth"
-const DEFAULT_FILES_WIDTH = 340
-const MIN_FILES_WIDTH = 180
-const MAX_FILES_WIDTH_RATIO = 0.7
-
-function readStoredFilesWidth(): number {
-  try {
-    const raw = window.localStorage.getItem(FILES_WIDTH_STORAGE_KEY)
-    const parsed = raw ? Number(raw) : NaN
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FILES_WIDTH
-  } catch {
-    return DEFAULT_FILES_WIDTH
-  }
-}
-
-function writeStoredFilesWidth(width: number): void {
-  try {
-    window.localStorage.setItem(FILES_WIDTH_STORAGE_KEY, String(Math.round(width)))
-  } catch {
-    // Ignore storage failures (private mode, quota exceeded, disabled).
-  }
-}
-
 /** True once `pending` has been continuously true for `delayMs`; a short
  *  load never shows an indicator, a long one shows it without flicker. */
 function useDelayed(pending: boolean, delayMs: number): boolean {
@@ -89,8 +67,8 @@ function useDelayed(pending: boolean, delayMs: number): boolean {
       setShown(false)
       return
     }
-    const t = setTimeout(() => setShown(true), delayMs)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setShown(true), delayMs)
+    return () => clearTimeout(timer)
   }, [pending, delayMs])
   return shown && pending
 }
@@ -157,7 +135,14 @@ export function BottomPanel({
   diffOptsRef.current = diffOpts
   // Shared by the Files (Diff) tab and File Tree tab so both file columns
   // resize together and remember one width across sessions.
-  const [filesWidth, setFilesWidth] = useState<number>(() => readStoredFilesWidth())
+  const [filesWidth, setFilesWidth] = useState<number>(() => {
+    try {
+      const parsed = Number(window.localStorage.getItem("pg.bottomFilesWidth"))
+      return parsed > 0 ? parsed : DEFAULT_FILES_WIDTH
+    } catch {
+      return DEFAULT_FILES_WIDTH
+    }
+  })
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   const commitId = current && current.rev.id.length >= 16 ? current.rev.id : null
@@ -175,9 +160,31 @@ export function BottomPanel({
   // row (docs/design/review-mode.md §1); null until HEAD is known. The row
   // keys of the diff on screen feed the Diff tab's marks and the bar once,
   // parsed from the text (memoised on it: a status poll refetches the same).
-  const reviewKey = commitId ?? (pendingRow && headId ? `${headId}-${pendingRow.kind}` : null)
+  const reviewKey = reviewKeyOf({ commitId, pending: pendingRow?.kind ?? null, headId })
+  const { startOver } = useReview({ engine, key: reviewKey })
   const shownText = shownDiff.kind === "ready" ? shownDiff.value.text : null
   const rowKeys = useMemo<RowKeys>(() => (shownText === null ? [] : rowKeysOf(shownText)), [shownText])
+  const exportDiffs = useCallback(async () => {
+    const result = new Map<string, string>()
+    const doc = getReviewDoc(reviewKey)
+    if (!doc) return result
+    if (shownDiff.kind === "ready") result.set(shownDiff.value.path, shownDiff.value.text)
+    await Promise.all(
+      Object.keys(doc.files)
+        .filter((path) => !result.has(path))
+        .map(async (path) => {
+          try {
+            const value = commitId
+              ? await engine.diff(commitId, path, diffOpts)
+              : await engine.workTreeDiff(path, pendingRow?.kind === "index", diffOpts)
+            result.set(path, value.text)
+          } catch {
+            /* A digest can still identify a mark whose diff failed. */
+          }
+        }),
+    )
+    return result
+  }, [commitId, diffOpts, engine, pendingRow?.kind, reviewKey, shownDiff])
   useEffect(() => {
     if (!pendingRow) return
     setFiles(pendingRow.files)
@@ -349,7 +356,11 @@ export function BottomPanel({
     onChange: (width: number) => panelRef.current?.style.setProperty("--pg-files-width", `${width}px`),
     onCommit: (width: number) => {
       setFilesWidth(width)
-      writeStoredFilesWidth(width)
+      try {
+        window.localStorage.setItem("pg.bottomFilesWidth", String(Math.round(width)))
+      } catch {
+        /* apply locally */
+      }
     },
   }
 
@@ -382,24 +393,16 @@ export function BottomPanel({
         overflow: "hidden",
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, v: number) => setTab(v)}
-          sx={{ px: 0.5, minHeight: 34, minWidth: 0, "& .MuiTab-root": { minHeight: 34, py: 0.5 } }}
-        >
-          <Tab label="Commit" />
-          <Tab label={`Diff${files.length ? ` (${files.length})` : ""}`} />
-          <Tab label="File tree" />
-        </Tabs>
-        {tab === 1 && (
-          <ReviewBar
-            reviewKey={reviewKey}
-            path={shownDiff.kind === "ready" ? shownDiff.value.path : null}
-            rowKeys={rowKeys}
-          />
-        )}
-      </Box>
+      <BottomTabStrip
+        tab={tab}
+        setTab={setTab}
+        fileCount={files.length}
+        reviewKey={reviewKey}
+        path={shownDiff.kind === "ready" ? shownDiff.value.path : null}
+        rowKeys={rowKeys}
+        startOver={startOver}
+        exportDiffs={exportDiffs}
+      />
       <Box sx={{ height: 2, flexShrink: 0 }}>
         {busy && <LinearProgress data-testid="panel-busy" sx={{ height: 2 }} />}
       </Box>

@@ -18,6 +18,8 @@ import type { Loadable } from "./loadable"
 import { useEngine, type DiffDto, type DiffOptions, type FileChange, type RepoStatus } from "../engine"
 import { useBrowseReset, type BrowseResetNote } from "../hooks/useBrowseReset"
 import { useDiffReview, type RowKeys } from "../hooks/useDiffReview"
+import { useReviewFilePane } from "../review/reviewState"
+import { ReviewFilePane } from "./ReviewFilePane"
 
 // The bottom panel's Diff tab: the file list, the split handle and the diff,
 // plus (v0.15.5) the two right-click menus over them. Split out of
@@ -104,6 +106,7 @@ export function DiffTab({
     onSelect,
     diffRef,
   })
+  const reviewFilePane = useReviewFilePane()
 
   return (
     <>
@@ -236,6 +239,7 @@ export function DiffTab({
         review={review}
         diffRef={diffRef}
       />
+      {reviewing && reviewFilePane && reviewKey && <ReviewFilePane reviewKey={reviewKey} />}
       {enabled && row && (
         <>
           <DiffFileContextMenu
