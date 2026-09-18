@@ -1,6 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("mcp") {
+        std::process::exit(powergit_lib::mcp_shim::run());
+    }
+
     // Linux display stack (owner freezes on the AppImage, 2026-09-08):
     // - v0.14.2: WebKitGTK's DMA-BUF renderer off, the documented switch for
     //   black, non-redrawing views on some driver/compositor combinations.

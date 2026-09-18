@@ -6,6 +6,7 @@ mod crash_hooks;
 mod snapshot;
 mod tinyhttp;
 mod logwriter;
+pub mod mcp_shim;
 mod watchdog;
 mod probe;
 mod recovery;
