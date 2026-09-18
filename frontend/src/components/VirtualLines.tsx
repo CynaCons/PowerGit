@@ -38,8 +38,13 @@ export const VirtualLines = forwardRef<
      *  every row is CODE_LINE_HEIGHT tall and the track is as wide as the
      *  longest line (horizontal scroll). */
     wrap?: boolean
+    estimateSize?: (index: number) => number
+    measure?: (index: number) => boolean
   }
->(function VirtualLines({ count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys, wrap }, ref) {
+>(function VirtualLines(
+  { count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys, wrap, estimateSize, measure },
+  ref,
+) {
   const parentRef = useRef<HTMLDivElement>(null)
   // Sizes are cached by index (the rows of one diff never move); the
   // estimate stays the line height and measureElement corrects the wrapped
@@ -49,7 +54,7 @@ export const VirtualLines = forwardRef<
   const virtualizer = useVirtualizer({
     count,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => CODE_LINE_HEIGHT,
+    estimateSize: estimateSize ?? (() => CODE_LINE_HEIGHT),
     getItemKey: (index) => index,
     overscan: 20,
   })
@@ -120,26 +125,29 @@ export const VirtualLines = forwardRef<
           minWidth: "100%",
         }}
       >
-        {virtualizer.getVirtualItems().map((item) => (
-          <div
-            key={item.key}
-            ref={wrap ? virtualizer.measureElement : undefined}
-            data-index={item.index}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              minWidth: "100%",
-              width: wrap ? "100%" : undefined,
-              height: wrap ? "auto" : CODE_LINE_HEIGHT,
-              transform: `translateY(${item.start}px)`,
-              whiteSpace: wrap ? "pre-wrap" : "pre",
-              overflowWrap: wrap ? "anywhere" : undefined,
-            }}
-          >
-            {renderLine(item.index)}
-          </div>
-        ))}
+        {virtualizer.getVirtualItems().map((item) => {
+          const measured = Boolean(wrap || measure?.(item.index))
+          return (
+            <div
+              key={item.key}
+              ref={measured ? virtualizer.measureElement : undefined}
+              data-index={item.index}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                minWidth: "100%",
+                width: wrap ? "100%" : undefined,
+                height: measured ? "auto" : (estimateSize?.(item.index) ?? CODE_LINE_HEIGHT),
+                transform: `translateY(${item.start}px)`,
+                whiteSpace: wrap ? "pre-wrap" : "pre",
+                overflowWrap: wrap ? "anywhere" : undefined,
+              }}
+            >
+              {renderLine(item.index)}
+            </div>
+          )
+        })}
       </div>
     </Box>
   )

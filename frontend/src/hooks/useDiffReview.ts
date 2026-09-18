@@ -4,6 +4,7 @@ import { parseGutterLines } from "../components/diffLines"
 import type { FileChange } from "../engine"
 import { useHotkeyLayer } from "../hotkeys"
 import {
+  commentsOf,
   cycle,
   fileProgress,
   lineKeyOf,
@@ -11,11 +12,14 @@ import {
   recount,
   toggleReject,
   withLine,
+  withCommentText,
+  withoutComment,
   type FileReview,
   type LineKey,
   type LineState,
   type ReviewDoc,
 } from "../review/reviewModel"
+import { applyCommand, parseCommand } from "../review/reviewCommands"
 import { setReviewMode, updateReviewDoc, useReviewDoc, useReviewMode } from "../review/reviewState"
 
 // Review mode over one diff (v0.17.0, docs/design/review-mode.md §3): the
@@ -84,8 +88,18 @@ export function useDiffReview({
   const at = `${mode}|${reviewKey}|${path}`
   const [cur, setCur] = useState<{ at: string; row: number | null }>({ at, row: null })
   if (cur.at !== at) setCur({ at, row: null })
+  const [cmd, setCmd] = useState<{
+    at: string
+    value: { row: number; initial: string; error: string | null } | null
+  }>({ at, value: null })
+  if (cmd.at !== at) setCmd({ at, value: null })
+  const command = cmd.at === at ? cmd.value : null
   const cursor = cur.at === at ? cur.row : null
   const setCursor = useCallback((row: number | null) => setCur({ at, row }), [at])
+  const setCommand = useCallback(
+    (value: { row: number; initial: string; error: string | null } | null) => setCmd({ at, value }),
+    [at],
+  )
   // The changed rows of this diff and their keys, in row order.
   const changed = useMemo(() => {
     const rows: number[] = []
@@ -208,6 +222,26 @@ export function useDiffReview({
     return true
   }
 
+  const openCommand = useCallback(
+    (initial: string, line = cursor): boolean => {
+      let row = line
+      if (row === null) {
+        const idx = nextUnreviewed(changed.keys, file, -1)
+        row = idx === null ? (changed.rows[0] ?? null) : changed.rows[idx]
+      }
+      if (row === null) return true
+      setCursor(row)
+      setCommand({ row, initial, error: null })
+      return true
+    },
+    [cursor, changed, file, setCursor, setCommand],
+  )
+
+  const closeCommand = useCallback(() => {
+    setCommand(null)
+    diffRef.current?.focus()
+  }, [setCommand, diffRef])
+
   useHotkeyLayer(
     "review",
     {
@@ -233,8 +267,7 @@ export function useDiffReview({
       "review.nextUnreviewed": jumpNext,
       "review.nextFile": () => gotoFile(1),
       "review.prevFile": () => gotoFile(-1),
-      // The command line arrives in v0.19.3; the chord is reserved.
-      "review.command": () => false,
+      "review.command": () => openCommand("/"),
     },
     reviewing,
   )
@@ -264,9 +297,62 @@ export function useDiffReview({
               mark(i, cycle)
               setCursor(i)
             },
+            commentsOf: (i) => {
+              const key = rowKeys[i]
+              return key ? commentsOf(file, key) : []
+            },
+            command,
+            onCommand: (line, input) => {
+              const parsed = parseCommand(input)
+              if ("error" in parsed) {
+                setCommand({ row: line, initial: input, error: parsed.hint })
+                return
+              }
+              const key = rowKeys[line]
+              if (!key || reviewKey === null || path === null) {
+                setCommand({ row: line, initial: input, error: "Only a changed line can be marked" })
+                return
+              }
+              updateReviewDoc(reviewKey, (d) =>
+                recount({ ...applyCommand(d, path, key, parsed), changed: changed.keys.length }),
+              )
+              setCursor(line)
+              closeCommand()
+            },
+            onCommandClose: closeCommand,
+            onCommentEdit: (line, n, text) => {
+              const key = rowKeys[line]
+              if (key && reviewKey !== null && path !== null) {
+                updateReviewDoc(reviewKey, (d) => withCommentText(d, path, key, n, text))
+              }
+            },
+            onCommentDelete: (line, n) => {
+              const key = rowKeys[line]
+              if (key && reviewKey !== null && path !== null) {
+                updateReviewDoc(reviewKey, (d) => withoutComment(d, path, key, n))
+              }
+            },
+            onAddComment: (line) => {
+              setCursor(line)
+              openCommand("/comment ", line)
+            },
           }
         : undefined,
-    [reviewing, rowKeys, file, cursor, setCursor, mark],
+    [
+      reviewing,
+      rowKeys,
+      file,
+      cursor,
+      setCursor,
+      mark,
+      command,
+      reviewKey,
+      path,
+      changed,
+      setCommand,
+      closeCommand,
+      openCommand,
+    ],
   )
 
   return { reviewing, review, toggle }
