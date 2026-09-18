@@ -19,6 +19,19 @@ export function BehaviourSection({ visible }: { visible: Set<SettingId> | null }
   return (
     <SettingsSection id="behaviour" visible={visible}>
       <SettingRow
+        id="behaviour.openLast"
+        hidden={!isShown(visible, "behaviour.openLast")}
+        changed={value.openLastOnStart !== DEFAULT_BEHAVIOUR.openLastOnStart}
+        onReset={() => setBehaviour({ openLastOnStart: DEFAULT_BEHAVIOUR.openLastOnStart })}
+      >
+        <SettingCheck
+          label="Open the last repository on start"
+          testid="settings-open-last"
+          checked={value.openLastOnStart}
+          onChange={(next) => setBehaviour({ openLastOnStart: next })}
+        />
+      </SettingRow>
+      <SettingRow
         id="behaviour.confirmations"
         hidden={!isShown(visible, "behaviour.confirmations")}
         changed={behaviourChanged(value, CONFIRM_KEYS)}

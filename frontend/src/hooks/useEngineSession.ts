@@ -9,6 +9,8 @@ import {
   type RepoInfo,
 } from "../engine"
 import { initialSession, sessionReducer, sessionView, type SessionEvent, type SessionPhase } from "../session/state"
+import { getBehaviour } from "../theme/behaviour"
+import { resolveStartRepo } from "./resolveStartRepo"
 
 export type EngineSession = ReturnType<typeof useEngineSession>
 
@@ -38,18 +40,25 @@ export function useEngineSession(base: EngineClient) {
   const attempt = "attempt" in state ? state.attempt : 0
   const demo = useMemo(() => isDemoMode(), [])
 
-  // Resolves the repository once the engine answered: pinned id first
-  // (this window's), the engine-global current one only as a fallback.
+  // Startup resolution is deliberately not reused on reconnect: an engine
+  // restart must not silently switch this window to a different repository.
   const resolveRepo = useCallback(
     async (pinned: string | null): Promise<RepoInfo | null> => {
-      if (pinned) {
-        const info = await base.repoInfo(pinned)
-        if (info) return info
-        report("warn", "session", `pinned repository ${pinned} is no longer open on the engine`)
-        rememberPinnedRepo(null)
-        return null
-      }
-      return base.currentRepo()
+      return resolveStartRepo({
+        pinned,
+        openPath: null,
+        openLast: getBehaviour().openLastOnStart,
+        repoInfo: (id) => base.repoInfo(id),
+        currentRepo: () => base.currentRepo(),
+        recents: () => base.recents(),
+        openRepo: async (path) => (await base.openRepo(path)).info,
+        onPinnedMissing: (id) => {
+          report("warn", "session", `pinned repository ${id} is no longer open on the engine`)
+          rememberPinnedRepo(null)
+        },
+        onOpenFailure: (path, error) =>
+          report("warn", "session", `could not open startup repository ${path}: ${describeThrown(error)}`),
+      })
     },
     [base],
   )

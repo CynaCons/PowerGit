@@ -13,6 +13,7 @@ import { useSyncExternalStore } from "react"
 export type MergeFf = "only" | "allow" | "no"
 
 export type Behaviour = {
+  openLastOnStart: boolean
   confirmForcePush: boolean
   confirmDeleteBranch: boolean
   confirmResetHard: boolean
@@ -29,6 +30,7 @@ export type Behaviour = {
 export const BEHAVIOUR_KEY = "pg.behaviour"
 
 export const DEFAULT_BEHAVIOUR: Behaviour = {
+  openLastOnStart: true,
   confirmForcePush: true,
   confirmDeleteBranch: true,
   confirmResetHard: true,
@@ -54,6 +56,7 @@ export function parseBehaviour(raw: string | null): Behaviour {
     }
     const minutes = o.autoFetchMinutes
     return {
+      openLastOnStart: bool("openLastOnStart"),
       confirmForcePush: bool("confirmForcePush"),
       confirmDeleteBranch: bool("confirmDeleteBranch"),
       confirmResetHard: bool("confirmResetHard"),

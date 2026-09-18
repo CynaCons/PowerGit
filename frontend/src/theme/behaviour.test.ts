@@ -3,6 +3,7 @@ import { AUTO_FETCH_CHOICES, DEFAULT_BEHAVIOUR, getBehaviour, parseBehaviour, se
 
 describe("behaviour preferences (v0.15.0)", () => {
   it("defaults to asking before every destructive action, with auto-fetch off", () => {
+    expect(DEFAULT_BEHAVIOUR.openLastOnStart).toBe(true)
     expect(DEFAULT_BEHAVIOUR.confirmForcePush).toBe(true)
     expect(DEFAULT_BEHAVIOUR.confirmDeleteBranch).toBe(true)
     expect(DEFAULT_BEHAVIOUR.confirmResetHard).toBe(true)
@@ -23,8 +24,14 @@ describe("behaviour preferences (v0.15.0)", () => {
 
   it("keeps the values it understands", () => {
     const stored = parseBehaviour(
-      JSON.stringify({ confirmDeleteBranch: false, autoFetchMinutes: 15, defaultMergeFf: "no" }),
+      JSON.stringify({
+        openLastOnStart: false,
+        confirmDeleteBranch: false,
+        autoFetchMinutes: 15,
+        defaultMergeFf: "no",
+      }),
     )
+    expect(stored.openLastOnStart).toBe(false)
     expect(stored.confirmDeleteBranch).toBe(false)
     expect(stored.autoFetchMinutes).toBe(15)
     expect(stored.defaultMergeFf).toBe("no")
