@@ -169,6 +169,13 @@ Each iteration ends with a symptom e2e in the owner's words and an owner
 tick. The MCP hand-off (`Finish review` sending the file to an agent) is
 the next major, once the file format has been used for real.
 
+Order of delivery (2026-09-18): v0.19.0 and v0.19.3 shipped together as
+M1 of the MCP Agent Review Bridge (PLAN.md v0.20), because the bridge needs
+the file and the line comments before anything else; v0.19.1 (the commit
+window) and v0.19.2 (whole-review progress) follow the bridge. Finish
+review today writes the pending save and shows the summary dialog
+(`ReviewSummaryDialog.tsx`); the hand-off is Export → Copy as Markdown.
+
 ## 7. Owner calls (decided 2026-09-11)
 
 1. **Click on the text of a line** moves the cursor only; the mark cell

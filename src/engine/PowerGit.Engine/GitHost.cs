@@ -128,6 +128,7 @@ public sealed partial class GitHost
         string name = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
 
         _current = new RepoInfo(name, root, branch, IdFor(root));
+        _reviewsExcluded = false;
         RecentsStore.Remember(_current);
         try
         {

@@ -8,7 +8,14 @@ import { BlobPane } from "./BlobPane"
 import { ErrorState } from "./AsyncState"
 import { CommitInfo } from "./CommitDetailView"
 import { DiffTab, type DiffTabActions } from "./DiffTab"
-import { BottomTabStrip, DEFAULT_FILES_WIDTH, MAX_FILES_WIDTH_RATIO, MIN_FILES_WIDTH } from "./BottomTabStrip"
+import { BottomTabStrip } from "./BottomTabStrip"
+import {
+  DEFAULT_FILES_WIDTH,
+  MAX_FILES_WIDTH_RATIO,
+  MIN_FILES_WIDTH,
+  readStoredFilesWidth,
+  writeStoredFilesWidth,
+} from "./filesWidth"
 import type { BrowseRow } from "./browseReset"
 import type { Loadable } from "./loadable"
 import {
@@ -67,8 +74,8 @@ function useDelayed(pending: boolean, delayMs: number): boolean {
       setShown(false)
       return
     }
-    const timer = setTimeout(() => setShown(true), delayMs)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => setShown(true), delayMs)
+    return () => clearTimeout(t)
   }, [pending, delayMs])
   return shown && pending
 }
@@ -135,14 +142,7 @@ export function BottomPanel({
   diffOptsRef.current = diffOpts
   // Shared by the Files (Diff) tab and File Tree tab so both file columns
   // resize together and remember one width across sessions.
-  const [filesWidth, setFilesWidth] = useState<number>(() => {
-    try {
-      const parsed = Number(window.localStorage.getItem("pg.bottomFilesWidth"))
-      return parsed > 0 ? parsed : DEFAULT_FILES_WIDTH
-    } catch {
-      return DEFAULT_FILES_WIDTH
-    }
-  })
+  const [filesWidth, setFilesWidth] = useState<number>(() => readStoredFilesWidth())
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   const commitId = current && current.rev.id.length >= 16 ? current.rev.id : null
@@ -161,7 +161,7 @@ export function BottomPanel({
   // keys of the diff on screen feed the Diff tab's marks and the bar once,
   // parsed from the text (memoised on it: a status poll refetches the same).
   const reviewKey = reviewKeyOf({ commitId, pending: pendingRow?.kind ?? null, headId })
-  const { startOver } = useReview({ engine, key: reviewKey })
+  const { startOver, finish } = useReview({ engine, key: reviewKey })
   const shownText = shownDiff.kind === "ready" ? shownDiff.value.text : null
   const rowKeys = useMemo<RowKeys>(() => (shownText === null ? [] : rowKeysOf(shownText)), [shownText])
   const exportDiffs = useCallback(async () => {
@@ -356,11 +356,7 @@ export function BottomPanel({
     onChange: (width: number) => panelRef.current?.style.setProperty("--pg-files-width", `${width}px`),
     onCommit: (width: number) => {
       setFilesWidth(width)
-      try {
-        window.localStorage.setItem("pg.bottomFilesWidth", String(Math.round(width)))
-      } catch {
-        /* apply locally */
-      }
+      writeStoredFilesWidth(width)
     },
   }
 
@@ -401,6 +397,7 @@ export function BottomPanel({
         path={shownDiff.kind === "ready" ? shownDiff.value.path : null}
         rowKeys={rowKeys}
         startOver={startOver}
+        finish={finish}
         exportDiffs={exportDiffs}
       />
       <Box sx={{ height: 2, flexShrink: 0 }}>

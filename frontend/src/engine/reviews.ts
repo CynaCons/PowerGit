@@ -1,5 +1,10 @@
 import { describeThrown, EngineClient, EngineError } from "./client"
 
+// The review file routes (v0.19.0, docs/design/review-mode.md §2):
+// GET / PUT / DELETE /repos/{id}/reviews/{key}. Standalone functions over
+// the window's EngineClient, the files.ts pattern; the body is text, not
+// JSON-parsed, because the pane shows the file exactly as written.
+
 async function textResponse(res: Response): Promise<string> {
   let text: string
   try {
@@ -28,10 +33,15 @@ export async function getReview(engine: EngineClient, key: string, signal?: Abor
   return textResponse(res)
 }
 
-export async function putReview(engine: EngineClient, key: string, text: string): Promise<void> {
+/**
+ * Writes the document text as-is; the engine stores it verbatim. `keepalive`
+ * lets the last debounced save of a page that is unloading complete
+ * (useReview flushes on pagehide).
+ */
+export async function putReview(engine: EngineClient, key: string, text: string, keepalive = false): Promise<void> {
   const res = await engine.request(
     route(engine, key),
-    { method: "PUT", headers: { "Content-Type": "application/json" }, body: text },
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: text, keepalive },
     { timeoutMs: 0 },
   )
   await textResponse(res)

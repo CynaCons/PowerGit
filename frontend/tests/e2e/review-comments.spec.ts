@@ -3,6 +3,13 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { commit, currentRepoPath, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
+// v0.19.3, docs/design/review-mode.md §3: "/ on a line and a command line
+// opens under it: /comment <text> attaches a review comment to that line
+// (shown as a note row), /ok /reject /clear set its state, Enter runs, Esc
+// cancels, an unknown command gets a hint; a '+' on hover in the gutter
+// does the same as /comment." The proof is the note row under its line,
+// the count in the bar and the comment in the review file.
+
 async function openInApp(page: Page, dir: string): Promise<void> {
   const res = await fetch(`${ENGINE_URL}/repos/open`, {
     method: "POST",
@@ -71,7 +78,17 @@ test.describe("review comments in the Diff tab", () => {
       )
       await expect(rows.nth(secondIndex + 1)).toHaveAttribute("data-testid", "diff-note-row")
       await expect(second).toHaveAttribute("data-review", "todo")
-      // TODO(coordinator): the bar says 1 comment; the pane JSON contains {"line":"+2","text":"needs a guard"}
+      // The bar counts it and the review file carries it with its line
+      // (v0.19.0's pane shows the file as written).
+      await expect(page.getByTestId("diff-review-count")).toHaveText("0 / 2 lines · 1 comment")
+      await page.getByTestId("review-file-toggle").click()
+      const json = JSON.parse((await page.getByTestId("review-file-json").textContent()) ?? "{}") as {
+        files?: Record<string, { comments?: { line: string; text: string }[] }>
+      }
+      expect(json.files?.["f.txt"]?.comments).toEqual([{ line: "+5", text: "needs a guard" }])
+      await page.getByTestId("review-file-toggle").click()
+      // The toggle took the focus; the keys below belong to the diff surface.
+      await page.getByTestId("diff-lines").focus()
 
       await page.keyboard.press("/")
       await input.type("reject")
@@ -91,6 +108,12 @@ test.describe("review comments in the Diff tab", () => {
       await first.locator(".diff-row-add").click()
       await expect(input).toHaveValue("/comment ")
       await input.press("Escape")
+
+      // Finish review: the summary of what is in the file (no agent call yet).
+      await page.getByTestId("review-finish").click()
+      await expect(page.getByTestId("review-summary-lines")).toHaveText("1 / 2 lines reviewed · 1 rejected · 1 comment")
+      await page.getByTestId("review-summary-close").click()
+      await expect(page.getByTestId("review-summary")).toHaveCount(0)
     } finally {
       await removeRepo(dir)
     }

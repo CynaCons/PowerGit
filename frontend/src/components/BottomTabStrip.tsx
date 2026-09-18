@@ -4,9 +4,10 @@ import Tabs from "@mui/material/Tabs"
 import type { RowKeys } from "../hooks/useDiffReview"
 import { ReviewBar } from "./ReviewBar"
 
-export const DEFAULT_FILES_WIDTH = 340
-export const MIN_FILES_WIDTH = 180
-export const MAX_FILES_WIDTH_RATIO = 0.7
+// The bottom panel's tab strip (v0.19.0): the three tabs and, on the Diff
+// tab, the review bar beside them. Split out of BottomPanel.tsx, which
+// reached the 400-line lint cap when the review file's load/save hook and
+// the export's diff loader moved in.
 export function BottomTabStrip({
   tab,
   setTab,
@@ -15,6 +16,7 @@ export function BottomTabStrip({
   path,
   rowKeys,
   startOver,
+  finish,
   exportDiffs,
 }: {
   tab: number
@@ -24,6 +26,7 @@ export function BottomTabStrip({
   path: string | null
   rowKeys: RowKeys
   startOver: () => Promise<void>
+  finish: () => void
   exportDiffs: () => Promise<Map<string, string>>
 }) {
   return (
@@ -43,6 +46,7 @@ export function BottomTabStrip({
           path={path}
           rowKeys={rowKeys}
           startOver={startOver}
+          finish={finish}
           exportDiffs={exportDiffs}
         />
       )}

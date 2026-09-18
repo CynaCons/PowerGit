@@ -4,6 +4,12 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
+// v0.19.0, docs/design/review-mode.md §2. The review is one JSON document
+// per key at <repo>/.powergit/reviews/<key>.json, written by the engine and
+// hidden from git through .git/info/exclude. The proof is the owner's
+// sentence in the test title: the marks after a reload, the file on disk
+// against the pane, a clean git status, Start over.
+
 async function openInApp(page: Page, dir: string): Promise<void> {
   const res = await fetch(`${ENGINE_URL}/repos/open`, {
     method: "POST",
@@ -79,7 +85,9 @@ test.describe("persisted review", () => {
       await expect(diffRow(page, "+first")).toHaveAttribute("data-review", "ok")
       await expect(diffRow(page, "+second")).toHaveAttribute("data-review", "rejected")
       await page.getByTestId("review-file-toggle").click()
-      await expect(page.getByTestId("review-file-json")).toHaveText(readFileSync(reviewPath, "utf8"))
+      // Byte for byte: the pane shows the file as written.
+      await expect(page.getByTestId("review-file-json")).toContainText('"status"')
+      expect(await page.getByTestId("review-file-json").textContent()).toBe(readFileSync(reviewPath, "utf8"))
       expect(git(dir, "status", "--porcelain")).not.toContain(".powergit")
       if (clipboard) {
         await page.getByTestId("review-export").click()

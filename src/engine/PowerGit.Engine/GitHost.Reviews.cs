@@ -4,13 +4,26 @@ using System.Text.RegularExpressions;
 namespace PowerGit.Engine;
 
 /// <summary>
-/// Repository-local review documents (v0.19.0). They preserve the UI's line
-/// marks and comments for a later agent while git's local exclude keeps the
-/// working tree clean; see docs/design/review-mode.md section 2.
+///  Review files (v0.19.0, docs/design/review-mode.md §2): the UI's line
+///  marks and comments, one JSON document per review key, kept in the
+///  repository so an agent working there can read them (over MCP, v0.20).
+///  The engine stores the text as written and only checks it is a JSON
+///  object; git's local exclude keeps the working tree clean.
 /// </summary>
 public sealed partial class GitHost
 {
+    /// <summary>
+    ///  Where the reviews live, relative to the root. The one place the
+    ///  location is spelled: an app-data fallback (owner call 3) is this line.
+    /// </summary>
     public const string ReviewsDirectory = ".powergit/reviews";
+
+    /// <summary>
+    ///  Set once <c>/.powergit/</c> is known to be in <c>.git/info/exclude</c>
+    ///  for this session, so the debounced saves (one every few hundred ms
+    ///  while marking) do not each spawn a <c>git rev-parse</c>.
+    /// </summary>
+    private bool _reviewsExcluded;
 
     internal static readonly Regex ReviewKeyPattern = new(
         "^[0-9a-f]{40}([0-9a-f]{24})?(-(worktree|index))?$",
@@ -63,7 +76,11 @@ public sealed partial class GitHost
             throw;
         }
 
-        EnsureExcluded("/.powergit/");
+        if (!_reviewsExcluded)
+        {
+            EnsureExcluded("/.powergit/");
+            _reviewsExcluded = true;
+        }
     }
 
     public bool DeleteReview(string key)

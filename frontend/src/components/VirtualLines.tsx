@@ -38,11 +38,20 @@ export const VirtualLines = forwardRef<
      *  every row is CODE_LINE_HEIGHT tall and the track is as wide as the
      *  longest line (horizontal scroll). */
     wrap?: boolean
+    /** Rows of different heights (v0.19.3, review note and command rows):
+     *  the estimate per index, and which rows are measured after render
+     *  (`measureElement`, height auto) the way every row is under `wrap`.
+     *  Unset, every row is CODE_LINE_HEIGHT. */
     estimateSize?: (index: number) => number
     measure?: (index: number) => boolean
+    /** A stable identity per row when rows can be inserted (a note row
+     *  under a line): the virtualizer caches measured sizes by key, so a
+     *  key that follows the row keeps the sizes right after an insert. The
+     *  default is the index. */
+    itemKey?: (index: number) => string | number
   }
 >(function VirtualLines(
-  { count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys, wrap, estimateSize, measure },
+  { count, renderLine, testid, sx, ariaLabel, header, hotkeySurface, passKeys, wrap, estimateSize, measure, itemKey },
   ref,
 ) {
   const parentRef = useRef<HTMLDivElement>(null)
@@ -55,7 +64,7 @@ export const VirtualLines = forwardRef<
     count,
     getScrollElement: () => parentRef.current,
     estimateSize: estimateSize ?? (() => CODE_LINE_HEIGHT),
-    getItemKey: (index) => index,
+    getItemKey: itemKey ?? ((index) => index),
     overscan: 20,
   })
   // Toggling wrap changes every row's height: drop the cached sizes so the

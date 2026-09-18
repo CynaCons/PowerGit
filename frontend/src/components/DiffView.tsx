@@ -158,8 +158,17 @@ export type DiffReviewProps = {
   onAddComment: (line: number) => void
 }
 
+/**
+ * What the list renders in review mode (v0.19.3): each parsed line, then
+ * its comment rows and, under the cursor line, the command row. Line
+ * indexes and item indexes differ once a note exists; `lineToItem` maps
+ * them for the scroll and the DOM lookup.
+ */
 export type DiffItem =
   { kind: "line"; line: number } | { kind: "note"; line: number; n: number } | { kind: "cmd"; line: number }
+
+const itemKeyOf = (item: DiffItem): string | number =>
+  item.kind === "line" ? item.line : `${item.kind}-${item.line}-${item.kind === "note" ? item.n : 0}`
 
 /** Imperative surface for the review layer's keys: scroll the cursor row into view, take the focus. */
 export type DiffViewHandle = {
@@ -407,7 +416,7 @@ export const DiffView = forwardRef<
           {review
             ? items.map((item, i) => (
                 <div
-                  key={`${item.kind}-${item.line}-${item.kind === "note" ? item.n : 0}`}
+                  key={itemKeyOf(item)}
                   data-index={item.kind === "line" ? i : undefined}
                   data-note-index={item.kind === "note" ? item.n : undefined}
                   data-cmd-row={item.kind === "cmd" ? item.line : undefined}
@@ -433,6 +442,7 @@ export const DiffView = forwardRef<
           wrap={wrap}
           estimateSize={(i) => (items[i].kind === "note" ? 64 : items[i].kind === "cmd" ? 44 : CODE_LINE_HEIGHT)}
           measure={(i) => items[i].kind !== "line"}
+          itemKey={(i) => itemKeyOf(items[i])}
         />
       )}
     </Box>

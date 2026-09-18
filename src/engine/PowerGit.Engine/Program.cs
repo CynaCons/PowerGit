@@ -557,8 +557,10 @@ repo.MapGet("/files/hidden", (GitHost git) =>
     }
 });
 
-// v0.19.0 review files: repository-local persistence described by
-// docs/design/review-mode.md section 2.
+// v0.19.0 review files (docs/design/review-mode.md §2): one JSON document
+// per review key under <repo>/.powergit/reviews/, stored as the UI wrote it.
+// Outside the mutation gate (see the group filter): a save is a file write
+// beside git, and it must not 409 while a pull runs.
 repo.MapGet("/reviews/{key}", (string key, GitHost git) =>
 {
     try
@@ -585,21 +587,8 @@ repo.MapPut("/reviews/{key}", async (string key, GitHost git, HttpContext ctx) =
         }
 
         using StreamReader reader = new(ctx.Request.Body, System.Text.Encoding.UTF8);
-        char[] buffer = new char[maxReviewBytes + 1];
-        int length = 0;
-        while (length < buffer.Length)
-        {
-            int read = await reader.ReadAsync(buffer.AsMemory(length, buffer.Length - length));
-            if (read == 0)
-            {
-                break;
-            }
-
-            length += read;
-        }
-
-        string body = new(buffer, 0, length);
-        if (length > maxReviewBytes || System.Text.Encoding.UTF8.GetByteCount(body) > maxReviewBytes)
+        string body = await reader.ReadToEndAsync(ctx.RequestAborted);
+        if (body.Length > maxReviewBytes)
         {
             return Results.Json(new ErrorResponse("review body exceeds 8 MB"), statusCode: StatusCodes.Status400BadRequest);
         }

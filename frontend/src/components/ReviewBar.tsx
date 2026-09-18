@@ -4,12 +4,29 @@ import Typography from "@mui/material/Typography"
 import { useState } from "react"
 import { progressOf, type RowKeys } from "../hooks/useDiffReview"
 import { reviewMarkdown, serializeDoc } from "../review/reviewFile"
+import { commentCount } from "../review/reviewModel"
 import { setReviewFilePane, useReviewDoc, useReviewFilePane, useReviewMode } from "../review/reviewState"
 import { isTauriShell } from "../shell"
 import { ConfirmDialog } from "./dialogs/ConfirmDialog"
 import { copyToClipboard } from "./clipboard"
 import { ReviewExportMenu } from "./ReviewExportMenu"
+import { ReviewSummaryDialog } from "./ReviewSummaryDialog"
 
+// The review bar (v0.17.0, docs/design/review-mode.md §4, the prototype's
+// `.review-bar`): "Reviewing" / "Review complete", a 160 px meter and the
+// counts for the file on screen. v0.18.2 dropped the pill background and
+// the capitals: the label sits beside the tabs in its own colour, no box.
+// v0.19.0 adds Export at the left (owner: "left of the REVIEWING banner we
+// need something to export the review"), the Review file pane toggle and
+// Start over; v0.19.3 the comment count. Whole-review counts and the file
+// pills come with v0.19.2. Renders nothing while review mode is off or the
+// row's key is not known yet.
+
+/**
+ * Save as… (the pattern of hooks/useOperationActions.ts `saveTextFile`):
+ * the shell's save dialog and its `write_text_file` command; in a browser
+ * a download, so the e2e harness and the demo have a path too.
+ */
 async function saveText(name: string, text: string, extension: "md" | "json") {
   if (isTauriShell()) {
     const { save } = await import("@tauri-apps/plugin-dialog")
@@ -35,12 +52,15 @@ export function ReviewBar({
   path,
   rowKeys,
   startOver,
+  finish,
   exportDiffs,
 }: {
   reviewKey: string | null
   path: string | null
   rowKeys: RowKeys
   startOver: () => Promise<void>
+  /** Finish review: the pending save is written before the summary opens. */
+  finish: () => void
   exportDiffs: () => Promise<Map<string, string>>
 }) {
   const mode = useReviewMode()
@@ -48,11 +68,13 @@ export function ReviewBar({
   const pane = useReviewFilePane()
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const [confirm, setConfirm] = useState(false)
+  const [summary, setSummary] = useState(false)
   if (!mode || reviewKey === null) return null
   const { reviewed, changed, rejected } = progressOf(doc, path, rowKeys)
   const complete = changed > 0 && reviewed >= changed
   const percent = changed > 0 ? (100 * Math.min(reviewed, changed)) / changed : 0
-  const marked = Boolean(doc && (doc.reviewed > 0 || Object.values(doc.files).some((f) => f.comments.length > 0)))
+  const comments = commentCount(doc)
+  const marked = Boolean(doc && (doc.reviewed > 0 || comments > 0))
   const json = () => (doc ? serializeDoc(doc) : "")
   const markdown = async () => (doc ? reviewMarkdown(doc, await exportDiffs()) : "")
   return (
@@ -119,6 +141,12 @@ export function ReviewBar({
             </Box>
           </>
         )}
+        {comments > 0 && (
+          <>
+            {" · "}
+            {comments} {comments === 1 ? "comment" : "comments"}
+          </>
+        )}
       </Typography>
       <Button
         data-testid="review-file-toggle"
@@ -137,6 +165,21 @@ export function ReviewBar({
       >
         Start over
       </Button>
+      <Button
+        data-testid="review-finish"
+        size="small"
+        variant="contained"
+        disableElevation
+        disabled={!marked}
+        onClick={() => {
+          finish()
+          setSummary(true)
+        }}
+        sx={{ textTransform: "none", fontSize: 12, fontWeight: 600 }}
+      >
+        Finish review
+      </Button>
+      <ReviewSummaryDialog open={summary} reviewKey={reviewKey} doc={doc} onClose={() => setSummary(false)} />
       <ReviewExportMenu
         anchor={anchor}
         onClose={() => setAnchor(null)}
