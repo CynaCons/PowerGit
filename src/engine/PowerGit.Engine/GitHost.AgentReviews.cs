@@ -121,6 +121,15 @@ public sealed partial class GitHost
         return updated;
     }
 
+    /// <summary>Wake MCP waiters when the engine that owns their endpoint is going away.</summary>
+    public void ExpireAgentReviews(string reason)
+    {
+        foreach (AgentReviewSummaryDto session in ListAgentReviews().Sessions.Where(s => s.Mode == "wait" && s.Status == "pending"))
+        {
+            ResolveAgentReview(session.Id, new("expire", null, reason));
+        }
+    }
+
     public async Task<AgentReviewWaitDto> WaitAgentReview(string id, int timeoutMs, CancellationToken ct)
     {
         timeoutMs = Math.Clamp(timeoutMs, 1_000, 120_000);

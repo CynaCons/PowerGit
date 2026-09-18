@@ -96,6 +96,12 @@ Git Extensions' `FormFormatPatch` (`git format-patch --find-renames --find-copie
 |---|---|---|---|---|
 | SRS-ENG-055 | The engine shall store each version-1 agent review session at `<repo>/.powergit/agent-reviews/<id>.json`, where `id` is 40 random lowercase hexadecimal characters and is also its `.powergit/reviews/<id>.json` review key. `POST/GET/PUT /repos/{id}/agent-reviews`, `GET /{sid}`, `POST /{sid}/resolve`, `GET /{sid}/wait?timeoutMs=`, and `GET /{sid}/diff?path=` shall return 201/200, 404 for a missing session, 409 for a terminal-session mutation, and 400 for invalid input as applicable. Wait shall clamp to 1--120 seconds and a timeout shall return the still-pending session with `timedOut: true`, never auto-approve. Diff selection shall use an embedded patch, then base-to-head, then worktree comparison. Session writes shall use temporary-file rename, ensure `/.powergit/` is excluded, and remain outside the mutation gate. | PLAN.md v0.20 M2 (Grok's plan, owner approved 2026-09-18): local agents can surface critical patches for explicit owner resolution. | Test | agent-review routes, `GitHost.CreateAgentReview/UpdateAgentReview/ListAgentReviews/GetAgentReview/ResolveAgentReview/WaitAgentReview/GetAgentReviewDiff`, `AgentReviewsTests` |
 
+## MCP host (v0.20.1)
+
+| ID | Requirement | Rationale | Verification | Trace |
+|---|---|---|---|---|
+| SRS-ENG-056 | While enabled, the engine shall host newline-delimited JSON-RPC 2.0 on a private per-user endpoint: `POWERGIT_MCP_ENDPOINT` when set, otherwise an owner-only `\\.\pipe\PowerGit.mcp.<sanitized-user>` named pipe on Windows or a `0600` `mcp.sock` in the `0700` PowerGit data directory on Unix. It shall implement initialize, ping, tools/list and tools/call, empty prompts/list and resources/list, and the five tools agent_review_open/wait/get/list/cancel with review status, summary, comments, file paths and Markdown digest payloads. Wait shall clamp to 1--120 seconds, return pending plus timed_out on its deadline, and never auto-approve. Shutdown shall expire pending Wait sessions with reason `host_gone`; `POWERGIT_MCP=0` shall disable hosting. | PLAN.md v0.20 hosting lock approved by the owner on 2026-09-18: PowerGit owns the server and OS endpoint privacy replaces a token file. | Test | `McpHost`, `McpTools`, `McpEndpoint`, `McpHostTests` |
+
 ## Windows isolation
 
 | ID | Requirement | Rationale | Verification | Trace |
