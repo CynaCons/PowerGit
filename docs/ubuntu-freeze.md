@@ -1,12 +1,10 @@
 # The Ubuntu freeze
 
-**Status: open; leading hypothesis H1; discriminating test shipped in
-v0.15.6.** Six releases have gone into it (v0.14.1 → v0.15.6). Until
-v0.15.6 everything shipped was instrumentation aimed at the wrong place, a
-mitigation borrowed from known WebKitGTK bugs, or a real defect found on the
-way. v0.15.6 ships the first change that targets the leading hypothesis
-(native Wayland by default) and the first probe that can actually see the
-freeze. The owner has not yet confirmed any of it made the freeze stop.
+**Status: closed on the owner's tick on 2026-09-11 after native Wayland became
+the default.** No freeze has recurred to probe, so root-cause hypothesis H1
+remains unconfirmed. X11 sessions are unmitigated by default;
+`POWERGIT_NO_FRAME_SYNC=1` is the fallback. Reopen on the first freeze report
+and capture it with `scripts/freeze-dump.sh`.
 
 This document is the whole case file: what was reported, what the evidence
 proves, what it was wrongly read as, the ranked hypotheses, what v0.15.6
@@ -460,36 +458,36 @@ described both.
 
 ---
 
-## 7. Where the investigation stands
+## 7. Where the investigation closed
 
 **Proven (two captures):**
 - Linux AppImage / WebKitGTK / Ubuntu only, always under XWayland so far.
 - The page, the engine, **and the UI process's main loop** are alive during
   the freeze. What is dead is presentation of the main window.
 
-**Leading hypothesis:** H1, the GTK3 X11 frame-sync stall (§3). v0.15.6
-removes that code path by default and ships a probe that would show the
-stall directly if it happens again on X11.
+**Closed by the owner:** on 2026-09-11, after v0.15.6 made native Wayland the
+default when `WAYLAND_DISPLAY` is set, the owner reported on v0.15.7: "Seems
+to work very well. No issues at all." There has been no freeze since the
+switch, including through the Ubuntu features ticked on 2026-09-16.
 
-**Unknown:**
-- Whether native Wayland stops it (the owner's week-long run answers this).
-- H1 vs H2 on a real freeze (`probe.txt`'s after-paint counter decides).
-- Whether the frameless title bar behaves under Wayland on the owner's
-  machine.
+**Root cause remains unconfirmed:** H1, the GTK3 X11 frame-sync stall (§3),
+is still the leading hypothesis, but no freeze recurred for the shipped probe
+to discriminate H1 from H2. Native Wayland avoids the suspected XWayland code
+path; that successful mitigation does not by itself prove H1.
+
+**X11 caveat:** sessions without `WAYLAND_DISPLAY` are unmitigated by default.
+Set `POWERGIT_NO_FRAME_SYNC=1` as the documented fallback. `POWERGIT_X11=1`
+also restores XWayland explicitly and therefore restores the suspected path.
 
 **Never reproduced on our side**, and the harnesses we have cannot: neither
 the container matrix nor WSLg runs mutter. A faithful reproduction needs a
 GNOME Wayland VM with an XWayland client left occluded/minimised across
 workspace switches.
 
-**Next, in order:**
-
-1. The owner's day-by-day report from §5.
-2. On the next freeze, the v0.15.6 `freeze-dump.sh` tarball plus which
-   recovery steps worked.
-3. Only if Wayland also freezes with `probe.txt` saying `gdk painting`:
-   H2/H4 become the working hypotheses and `draw_thread_is_main` and the
-   journal are read next.
+**Reopen condition:** the first new freeze report. Capture it while frozen with
+`scripts/freeze-dump.sh` and record which recovery steps worked. If native
+Wayland freezes with `probe.txt` saying `gdk painting`, H2/H4 become the
+working hypotheses and `draw_thread_is_main` and the journal are read next.
 
 ---
 
