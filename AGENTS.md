@@ -220,3 +220,10 @@ what is still open, which memory files you added or updated.
 - AppImage/Linux: supported Ubuntu 22.04/24.04/26.04, guarded by
   `docker/appimage-check/run-matrix.sh` in release.yml; see
   docs/agents/memories/appimage-compat-matrix.md.
+- Review files and the agent bridge (v0.19.0 → v0.20.1): the owner's line
+  marks and comments live at `<repo>/.powergit/reviews/<key>.json`, an
+  agent's review session at `.powergit/agent-reviews/<id>.json` (the id is
+  the session's review key), both excluded through `.git/info/exclude`;
+  the engine hosts an MCP server on a private per-user pipe and
+  `powergit mcp` is the stdio shim agents launch. docs/agents/mcp-agent-review.md,
+  docs/agents/memories/agent-review-sessions.md, mcp-host.md, mcp-shim.md.
