@@ -129,6 +129,12 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
     scope: "app",
     rows: [
       {
+        id: "behaviour.openLast",
+        title: "Open the last repository on start",
+        description: "Reopens the repository you had open when the app starts; off shows the empty Browse.",
+        keywords: ["startup", "launch", "recent", "repository", "empty", "browse"],
+      },
+      {
         id: "behaviour.confirmations",
         title: "Ask before",
         description: "A confirmation dialog before these; turn one off knowingly.",

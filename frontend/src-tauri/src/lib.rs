@@ -10,6 +10,7 @@ mod watchdog;
 mod probe;
 mod recovery;
 
+use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -39,6 +40,9 @@ struct EngineState {
     base_url: String,
     port: u16,
     token: String,
+    /// Canonical repository path supplied to the packaged executable
+    /// (v0.18.19); consumed only during the frontend's starting phase.
+    open_path: Option<String>,
     child: Mutex<Option<CommandChild>>,
     /// Timestamped sidecar stderr + exit status, kept on disk for the
     /// recovery panel (v0.13.11). None when the log dir is unavailable.
@@ -90,6 +94,7 @@ struct Incident {
 struct EngineConfig {
     base_url: String,
     token: String,
+    open_path: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -111,7 +116,45 @@ fn engine_config(state: tauri::State<EngineState>) -> EngineConfig {
     EngineConfig {
         base_url: state.base_url.clone(),
         token: state.token.clone(),
+        open_path: state.open_path.clone(),
     }
+}
+
+/// First non-flag launch argument, with desktop-entry file URLs converted to
+/// a local path (v0.18.19). Existence is checked separately in setup.
+fn parse_open_path(args: impl IntoIterator<Item = OsString>) -> Option<PathBuf> {
+    let arg = args
+        .into_iter()
+        .find(|arg| !arg.to_string_lossy().starts_with('-'))?;
+    let Some(encoded) = arg.to_str().and_then(|text| text.strip_prefix("file://")) else {
+        return Some(PathBuf::from(arg));
+    };
+    let decoded = percent_decode(encoded)?;
+    #[cfg(target_os = "windows")]
+    let decoded = decoded
+        .strip_prefix('/')
+        .filter(|path| path.as_bytes().get(1) == Some(&b':'))
+        .unwrap_or(&decoded)
+        .to_owned();
+    Some(PathBuf::from(decoded))
+}
+
+fn percent_decode(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = bytes.get(i + 1..i + 3)?;
+            let digits = std::str::from_utf8(hex).ok()?;
+            decoded.push(u8::from_str_radix(digits, 16).ok()?);
+            i += 3;
+        } else {
+            decoded.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(decoded).ok()
 }
 
 /// Tauri command: where the sidecar log lives (shown by the recovery panel).
@@ -964,6 +1007,17 @@ pub fn run() {
             recover
         ])
         .setup(|app| {
+            let requested_open_path = parse_open_path(std::env::args_os().skip(1));
+            let (open_path, open_path_error) = match requested_open_path {
+                Some(path) => match fs::canonicalize(&path) {
+                    Ok(path) => (Some(path.to_string_lossy().into_owned()), None),
+                    Err(error) => (
+                        None,
+                        Some(format!("ignoring launch path {}: {error}", path.to_string_lossy())),
+                    ),
+                },
+                None => (None, None),
+            };
             let port = resolve_engine_port();
             let token = generate_token();
             let (log_path, log) = open_engine_log(app.handle());
@@ -972,6 +1026,7 @@ pub fn run() {
                 base_url: format!("http://{ENGINE_HOST}:{port}"),
                 port,
                 token,
+                open_path,
                 child: Mutex::new(None),
                 log_path,
                 logger: logwriter::Logger::start(log, frontend_log),
@@ -990,6 +1045,9 @@ pub fn run() {
 
             let state = app.state::<EngineState>();
             log_line(&state, &format!("PowerGit {} starting", env!("POWERGIT_VERSION")));
+            if let Some(error) = open_path_error {
+                log_line(&state, &error);
+            }
             if port != ENGINE_DEFAULT_PORT {
                 log_line(
                     &state,
@@ -1112,6 +1170,7 @@ mod tests {
             base_url: String::new(),
             port: 0,
             token: String::new(),
+            open_path: None,
             child: Mutex::new(None),
             log_path: None,
             logger: logwriter::Logger::disabled(),
@@ -1125,6 +1184,31 @@ mod tests {
             started: Instant::now(),
             probe: Arc::new(probe::Probe::new(false)),
         }
+    }
+
+    #[test]
+    fn launch_path_uses_the_first_non_flag_argument() {
+        assert_eq!(parse_open_path(Vec::new()), None);
+        assert_eq!(
+            parse_open_path([OsString::from("--verbose"), OsString::from("repo")]),
+            Some(PathBuf::from("repo"))
+        );
+        assert_eq!(
+            parse_open_path([OsString::from("plain/path")]),
+            Some(PathBuf::from("plain/path"))
+        );
+    }
+
+    #[test]
+    fn launch_path_decodes_file_urls_and_keeps_windows_paths_with_spaces() {
+        assert_eq!(
+            parse_open_path([OsString::from("file:///home/me/my%20repo")]),
+            Some(PathBuf::from("/home/me/my repo"))
+        );
+        assert_eq!(
+            parse_open_path([OsString::from(r"C:\Users\Me\Power Git")]),
+            Some(PathBuf::from(r"C:\Users\Me\Power Git"))
+        );
     }
 
     #[test]

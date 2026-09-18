@@ -13,6 +13,6 @@ export {
   isAbort,
 } from "./client"
 export type { EngineConfig, RequestOptions } from "./client"
-export { bootstrapEngine, pinnedRepoId, rememberPinnedRepo } from "./bootstrap"
+export { bootOpenPath, bootstrapEngine, pinnedRepoId, rememberPinnedRepo } from "./bootstrap"
 export { EngineProvider } from "./context"
 export { useEngine, useEngineBase } from "./useEngine"

@@ -7,6 +7,8 @@ test("saved recent repositories appear after reopening with no active repository
     route.fulfill({ json: { status: "ok", engine: "0.15.2", gitPath: "git", gitVersion: "git version 2.43.0" } }),
   )
   await page.route("**/repos/current", (route) => route.fulfill({ status: 404 }))
+  // The saved root is gone: automatic reopen must fall through to empty Browse.
+  await page.route("**/repos/open", (route) => route.fulfill({ status: 404 }))
   await page.route("**/repos/recents", (route) =>
     route.fulfill({ json: [{ id: "saved", name: "My Ubuntu project", root: "/home/me/project", branch: "main" }] }),
   )
