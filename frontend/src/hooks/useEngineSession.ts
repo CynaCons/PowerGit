@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { getEngineLogPath, report, setEngineLogPath } from "../diagnostics"
 import {
   EngineError,
+  bootOpenPath,
   describeThrown,
   pinnedRepoId,
   rememberPinnedRepo,
@@ -46,7 +47,7 @@ export function useEngineSession(base: EngineClient) {
     async (pinned: string | null): Promise<RepoInfo | null> => {
       return resolveStartRepo({
         pinned,
-        openPath: null,
+        openPath: bootOpenPath(),
         openLast: getBehaviour().openLastOnStart,
         repoInfo: (id) => base.repoInfo(id),
         currentRepo: () => base.currentRepo(),

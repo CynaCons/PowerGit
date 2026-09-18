@@ -199,6 +199,8 @@ same binaries under `/usr`. Both need the distro's WebKitGTK stack
 (`libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`,
 `librsvg2-2`) and `git` on `PATH`.
 
+`powergit <path>` opens that repository; without it the last one reopens — Settings → Behaviour.
+
 Supported Ubuntu versions: **22.04, 24.04 and 26.04**. Every release
 AppImage is launched in stock containers of all three before it is
 published (`docker/appimage-check/run-matrix.sh`), so a version-skew crash

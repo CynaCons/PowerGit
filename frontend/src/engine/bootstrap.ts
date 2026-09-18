@@ -4,6 +4,12 @@ import { EngineClient } from "./client"
 /** Engine base URL. Override with VITE_ENGINE_URL (e.g. remote engine or
  *  demo setups); the packaged app otherwise asks the Tauri shell. */
 const DEFAULT_URL = "http://127.0.0.1:7733"
+let openPath: string | null = null
+
+/** Canonical launch path supplied by the native shell (v0.18.19). */
+export function bootOpenPath(): string | null {
+  return openPath
+}
 
 /**
  * Resolves the engine location once. Under Tauri, `lib.rs` spawned the
@@ -17,9 +23,10 @@ export async function bootstrapEngine(): Promise<EngineClient> {
   let token: string = import.meta.env.VITE_ENGINE_TOKEN ?? ""
   if (!import.meta.env.VITE_ENGINE_URL && typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
     try {
-      const cfg = await invoke<{ baseUrl: string; token: string }>("engine_config")
+      const cfg = await invoke<{ baseUrl: string; token: string; openPath?: string | null }>("engine_config")
       baseUrl = cfg.baseUrl
       token = cfg.token
+      openPath = cfg.openPath ?? null
     } catch {
       // Older host build without the command, or an IPC failure — keep the defaults.
     }
