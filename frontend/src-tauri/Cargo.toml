@@ -21,7 +21,9 @@ serde_json = "1"
 getrandom = "0.2"
 hex = "0.4"
 # Sidecar restart backoff (tauri already runs on tokio).
-tokio = { version = "1", features = ["time"] }
+# The `powergit mcp` shim (v0.20.1, mcp_shim.rs) bridges stdio to the
+# engine's named pipe with overlapped I/O: net, io-util, io-std.
+tokio = { version = "1", features = ["time", "net", "io-util", "io-std", "rt-multi-thread"] }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 zip = "4"

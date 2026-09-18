@@ -118,34 +118,7 @@ impl Drop for ShutdownWriter {
 pub fn run() -> i32 {
     #[cfg(windows)]
     {
-        use std::fs::OpenOptions;
-        use std::time::{Duration, Instant};
-
-        let name = endpoint();
-        let deadline = Instant::now() + Duration::from_secs(1);
-        let connection = loop {
-            match OpenOptions::new().read(true).write(true).open(&name) {
-                Ok(connection) => break connection,
-                Err(error)
-                    if matches!(error.raw_os_error(), Some(2) | Some(231))
-                        && Instant::now() < deadline =>
-                {
-                    thread::sleep(Duration::from_millis(40));
-                }
-                Err(_) => {
-                    eprintln!("{NOT_RUNNING}");
-                    return 2;
-                }
-            }
-        };
-        let reader = match connection.try_clone() {
-            Ok(reader) => reader,
-            Err(_) => {
-                eprintln!("{NOT_RUNNING}");
-                return 2;
-            }
-        };
-        pump(io::stdin(), io::stdout(), reader, connection)
+        run_windows(&endpoint())
     }
 
     #[cfg(unix)]
@@ -179,6 +152,66 @@ pub fn run() -> i32 {
         eprintln!("{NOT_RUNNING}");
         2
     }
+}
+
+/// Windows: the pipe is opened with overlapped I/O through tokio. A
+/// synchronous handle (std's `File` on `\\.\pipe\…`) serialises ReadFile
+/// and WriteFile: the thread parked in the pipe→stdout read holds the
+/// handle and every stdin→pipe write waits behind it, so the very first
+/// `initialize` never reached the engine (found with the mcp-probe on
+/// 2026-09-18). Overlapped reads and writes proceed independently.
+#[cfg(windows)]
+fn run_windows(name: &str) -> i32 {
+    use std::time::{Duration, Instant};
+    use tokio::io::{copy, split, stdin, stdout, AsyncWriteExt};
+    use tokio::net::windows::named_pipe::ClientOptions;
+
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(_) => {
+            eprintln!("{NOT_RUNNING}");
+            return 2;
+        }
+    };
+    runtime.block_on(async {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let client = loop {
+            match ClientOptions::new().open(name) {
+                Ok(client) => break client,
+                // 2 = not found (no engine yet), 231 = every instance busy
+                // (the engine is between accept and the next instance).
+                Err(error)
+                    if matches!(error.raw_os_error(), Some(2) | Some(231))
+                        && Instant::now() < deadline =>
+                {
+                    tokio::time::sleep(Duration::from_millis(40)).await;
+                }
+                Err(_) => {
+                    eprintln!("{NOT_RUNNING}");
+                    return 2;
+                }
+            }
+        };
+        let (mut from_pipe, mut to_pipe) = split(client);
+        let mut tasks = tokio::task::JoinSet::new();
+        tasks.spawn(async move {
+            let mut input = stdin();
+            let _ = copy(&mut input, &mut to_pipe).await;
+            let _ = to_pipe.shutdown().await;
+        });
+        tasks.spawn(async move {
+            let mut output = stdout();
+            let _ = copy(&mut from_pipe, &mut output).await;
+            let _ = output.flush().await;
+        });
+        // Either side closing ends the bridge, as on Unix.
+        let _ = tasks.join_next().await;
+        0
+    })
 }
 
 #[cfg(test)]
