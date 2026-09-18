@@ -155,31 +155,36 @@ export async function select(ctx) {
   for (const b of await visibleRows(page, REAL_ROW)) if (b.subject) rows.push({ b, subject: b.subject })
   const picks = []
   for (let i = 0; i < 20 && rows.length > 0; i++) picks.push(rows[(i * 3) % rows.length])
-  return measure(ctx, "select", async () => {
-    const commitTab = []
-    const highlight = []
-    for (const { b, subject } of picks) {
-      // The SHA cell, never a ref chip (a chip click selects that ref's tip).
-      const c = b.sha ?? b
-      await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2)
-      const clickAt = await page.evaluate(() => window.__pgPerf.lastInput("click"))
-      const [hl, ct] = await Promise.all([
-        page.evaluate((s) => window.__pgPerf.waitText(".grid-row.selected .msg-text", s, 10000), subject),
-        page.evaluate((s) => window.__pgPerf.waitText('[data-testid="commit-info"]', s, 10000), subject),
-      ])
-      if (hl !== null && clickAt !== null) highlight.push(Math.round(hl - clickAt))
-      if (ct !== null && clickAt !== null) commitTab.push(Math.round(ct - clickAt))
-      await sleep(150)
-    }
-    return {
-      selections: picks.length,
-      highlightMedianMs: median(highlight),
-      highlightP95Ms: percentile(highlight, 95),
-      commitTabMedianMs: median(commitTab),
-      commitTabP95Ms: percentile(commitTab, 95),
-      commitTabMaxMs: commitTab.length ? Math.max(...commitTab) : null,
-    }
-  }, { profile: true })
+  return measure(
+    ctx,
+    "select",
+    async () => {
+      const commitTab = []
+      const highlight = []
+      for (const { b, subject } of picks) {
+        // The SHA cell, never a ref chip (a chip click selects that ref's tip).
+        const c = b.sha ?? b
+        await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2)
+        const clickAt = await page.evaluate(() => window.__pgPerf.lastInput("click"))
+        const [hl, ct] = await Promise.all([
+          page.evaluate((s) => window.__pgPerf.waitText(".grid-row.selected .msg-text", s, 10000), subject),
+          page.evaluate((s) => window.__pgPerf.waitText('[data-testid="commit-info"]', s, 10000), subject),
+        ])
+        if (hl !== null && clickAt !== null) highlight.push(Math.round(hl - clickAt))
+        if (ct !== null && clickAt !== null) commitTab.push(Math.round(ct - clickAt))
+        await sleep(150)
+      }
+      return {
+        selections: picks.length,
+        highlightMedianMs: median(highlight),
+        highlightP95Ms: percentile(highlight, 95),
+        commitTabMedianMs: median(commitTab),
+        commitTabP95Ms: percentile(commitTab, 95),
+        commitTabMaxMs: commitTab.length ? Math.max(...commitTab) : null,
+      }
+    },
+    { profile: true },
+  )
 }
 
 export async function expand(ctx) {
