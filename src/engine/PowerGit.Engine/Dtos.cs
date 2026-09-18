@@ -80,6 +80,25 @@ public sealed record DiffDto(
     bool Truncated = false,
     string? TruncatedReason = null);
 
+public sealed record AgentReviewFileDto(string Path, string Status, string? Patch);
+public sealed record AgentReviewCommentDto(string Path, string Line, string Side, string Body);
+public sealed record AgentReviewResolutionDto(string? Summary, IReadOnlyList<AgentReviewCommentDto> Comments);
+public sealed record AgentReviewDto(
+    int Version, string Id, string Mode, string Title, string Why, string? Agent,
+    string? Branch, string? Base, string? Head, bool Worktree,
+    IReadOnlyList<AgentReviewFileDto> Files, string Status, bool Unread,
+    string CreatedAt, string UpdatedAt, string? ResolvedAt,
+    AgentReviewResolutionDto? Resolution, string? Reason);
+public sealed record AgentReviewSummaryDto(
+    string Id, string Mode, string Title, string? Agent, string? Branch,
+    int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt);
+public sealed record AgentReviewRequest(
+    string Mode, string Title, string? Why, string? Agent, string? Branch,
+    string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files);
+public sealed record AgentReviewResolveRequest(string Action, string? Summary, string? Reason);
+public sealed record AgentReviewWaitDto(AgentReviewDto Session, bool TimedOut);
+public sealed record AgentReviewListDto(IReadOnlyList<AgentReviewSummaryDto> Sessions, int Badge);
+
 /// <summary>
 /// v0.13.14: the changed files of a commit and the diff of the first one in a
 /// single response, so the Diff tab needs one round trip per selection.
