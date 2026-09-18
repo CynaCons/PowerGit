@@ -1,5 +1,11 @@
 # UI/UX release audit — 2026-09-05
 
+> **Status 2026-09-18: superseded.** v0.13.17 (`778641d1c`) kept the commit
+> footer reachable at 150%/200%, displayed failed-commit errors, enabled
+> message-only amend, and retained dismissed drafts per repository and mode
+> until success or explicit discard (not across app restarts). The original
+> findings remain below as historical audit evidence.
+
 Audited the v0.13.16 working tree, including eight pre-existing uncommitted UI files. No product changes made. Windows headless Chromium, current C# engine on isolated port 7734, disposable real Git repository. Commit rejection was intercepted in Playwright; no product-repository mutations or real commit submissions. This is a focused audit, not packaged Tauri/Linux release certification.
 
 ## P1 — Commit controls fall outside the window at 150% zoom
