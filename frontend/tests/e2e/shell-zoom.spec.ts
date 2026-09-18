@@ -46,7 +46,8 @@ test("the Operations panel stays inside the window at 150 % zoom", async ({ page
     expect(close.y).toBeGreaterThanOrEqual(0)
     expect(close.y + close.height).toBeLessThanOrEqual(800)
     await page.getByTestId("job-panel-close").click()
-    await expect(page.getByTestId("job-panel")).toHaveCount(0)
+    // A persistent Drawer stays mounted; closed, its paper is hidden.
+    await expect(page.getByTestId("job-panel-close")).toBeHidden()
   } finally {
     await openRepoOnEngine(previous ?? process.cwd())
     await removeRepo(root)
