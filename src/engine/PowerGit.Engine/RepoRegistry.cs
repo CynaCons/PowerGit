@@ -44,6 +44,9 @@ public sealed class RepoRegistry(string? gitPath = null)
 
     public IReadOnlyList<RepoInfo> List() => [.. _sessions.Values.Select(h => h.Current!).OrderBy(r => r.Name)];
 
+    /// <summary>Snapshot of open hosts for process-lifecycle services such as the MCP host.</summary>
+    public IReadOnlyList<GitHost> OpenHosts => [.. _sessions.Values];
+
     /// <summary>Sessions with their lifecycle facts (GET /repos, diagnostics).</summary>
     public IReadOnlyList<SessionDto> Describe() =>
         [.. _sessions.Values

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using PowerGit.Engine;
+using PowerGit.Engine.Mcp;
 
 // Version comes from frontend/package.json via the csproj (v0.13.5); nothing to keep in sync here.
 string engineVersion = typeof(Program).Assembly
@@ -55,6 +56,11 @@ builder.Services.AddSingleton<RepoRegistry>(_ =>
 
     return repos;
 });
+if (Environment.GetEnvironmentVariable("POWERGIT_MCP") != "0")
+{
+    builder.Services.AddHostedService(sp => new McpHost(
+        sp.GetRequiredService<RepoRegistry>(), McpEndpoint.Resolve(), engineVersion));
+}
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<GitHost>(sp =>
 {
