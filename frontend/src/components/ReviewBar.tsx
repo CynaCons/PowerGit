@@ -83,7 +83,13 @@ export function ReviewBar({
       sx={{
         display: "flex",
         alignItems: "center",
+        // Wraps onto a second row when the strip is narrow (the agent session
+        // view at 1400 px, the Diff tab at 1024 px cut "Finish review" off the
+        // right edge; coordinator's look on 2026-09-18).
+        flexWrap: "wrap",
+        justifyContent: "flex-end",
         gap: 1.5,
+        rowGap: 0.5,
         minWidth: 0,
         ml: "auto",
         mr: 1,

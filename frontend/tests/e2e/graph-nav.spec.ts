@@ -89,9 +89,9 @@ test.describe("the compass: go to parent, child and HEAD", () => {
       expect(b.y).toBeGreaterThanOrEqual(lastBottom)
       lastBottom = b.y + b.height
     }
-    // At rest: 45 % like the options pill; hovered: full, expanded.
+    // At rest: 70 % with a hairline frame (2026-09-18, the owner could not find it at 45 %); hovered: full, expanded.
     await expect(nav).toHaveAttribute("data-expanded", "false")
-    await expect(nav).toHaveCSS("opacity", "0.45")
+    await expect(nav).toHaveCSS("opacity", "0.7")
     await nav.hover()
     await expect(nav).toHaveAttribute("data-expanded", "true")
     await expect(nav).toHaveCSS("opacity", "1")

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
 // Owner (2026-09-08): "The columns that we have in the main graph view,
 // should be resizeable" and "the git graph may sometimes be larger than the
@@ -39,8 +40,34 @@ test("dragging a header handle resizes the column and the width survives a reloa
 })
 
 test("a graph wider than its column gets a scrollbar that Shift+wheel drives", async ({ page }) => {
-  await page.goto("/")
-  await page.getByTestId("grid-row").first().waitFor()
+  // A made repository with three lanes: the checkout's own graph grows lanes
+  // while its pages load, and on the Ubuntu runner the auto-fit at the end
+  // met the 35 % Graph cap and rightly kept the scrollbar (CI 2026-09-18).
+  const previous = await currentRepoPath()
+  const repoDir = makeRepo("pg-grid-columns-")
+  git(repoDir, "checkout", "-q", "-b", "left")
+  write(repoDir, "l.txt", "l\n")
+  commit(repoDir, "left")
+  git(repoDir, "checkout", "-q", "main")
+  git(repoDir, "checkout", "-q", "-b", "right")
+  write(repoDir, "r.txt", "r\n")
+  commit(repoDir, "right")
+  git(repoDir, "checkout", "-q", "main")
+  git(repoDir, "merge", "-q", "--no-ff", "-m", "merge left", "left")
+  git(repoDir, "merge", "-q", "--no-ff", "-m", "merge right", "right")
+  await openRepoOnEngine(repoDir)
+  try {
+    await page.goto("/")
+    await page.getByTestId("grid-row").first().waitFor()
+    await expect(page.locator('[data-testid="tree-row"][data-label="right"]')).toBeVisible()
+    await runScrollbarCase(page)
+  } finally {
+    await openRepoOnEngine(previous ?? process.cwd())
+    await removeRepo(repoDir)
+  }
+})
+
+async function runScrollbarCase(page: import("@playwright/test").Page) {
   const graph = await cellWidth(page, "graph-cell")
   // Narrow the graph column to a fraction of its natural width.
   await drag(page, "col-resize-graph", -(graph - 30))
@@ -62,4 +89,4 @@ test("a graph wider than its column gets a scrollbar that Shift+wheel drives", a
 
   await page.getByTestId("col-resize-graph").dblclick()
   await expect(bar).toBeHidden()
-})
+}

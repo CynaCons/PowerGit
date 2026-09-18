@@ -81,10 +81,13 @@ export function GraphCompass({ rows, nav }: Props) {
         p: 0.5,
         borderRadius: 2,
         border: 1,
-        borderColor: expanded ? "divider" : "transparent",
-        bgcolor: expanded ? "background.paper" : "transparent",
+        // A hairline frame and the paper behind it at rest, at 70 %: the
+        // 45 % transparent version blended into the SHA column's text and the
+        // owner never found it (2026-09-18, "make it a bit more visible").
+        borderColor: "divider",
+        bgcolor: "background.paper",
         boxShadow: expanded ? 3 : 0,
-        opacity: expanded ? 1 : 0.45,
+        opacity: expanded ? 1 : 0.7,
         transition: "all 120ms ease",
         "&:hover": { opacity: 1 },
       }}
