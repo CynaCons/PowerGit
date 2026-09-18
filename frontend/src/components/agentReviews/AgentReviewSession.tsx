@@ -53,7 +53,11 @@ export function AgentReviewSession({
     return () => ctrl.abort()
   }, [engine, selectedPath, session.id])
   useEffect(load, [load])
+  // The review file must be on disk before the engine reads its comments
+  // into the resolution: a /comment typed within the save debounce would
+  // otherwise miss "Request changes".
   const resolve = async (action: "approve" | "request_changes" | "cancel" | "ack", summary?: string) => {
+    await finish()
     await resolveAgentReview(engine, session.id, action, summary)
     onResolved()
   }

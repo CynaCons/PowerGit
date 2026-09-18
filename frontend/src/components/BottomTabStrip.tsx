@@ -26,7 +26,7 @@ export function BottomTabStrip({
   path: string | null
   rowKeys: RowKeys
   startOver: () => Promise<void>
-  finish: () => void
+  finish: () => Promise<void>
   exportDiffs: () => Promise<Map<string, string>>
 }) {
   return (

@@ -5,9 +5,21 @@ using System.Text.RegularExpressions;
 
 namespace PowerGit.Engine;
 
-/// <summary>Repository-local sessions that bridge a coding agent to review mode.</summary>
+/// <summary>
+///  Agent review sessions (v0.20.0, M2 of the MCP Agent Review Bridge): a
+///  coding agent opens one for a patch it wants the owner's eyes on; the
+///  inbox lists it, the owner reviews it with the v0.19 review mode and
+///  resolves it; in Wait mode the agent's tool long-polls until then. One
+///  JSON per session under <see cref="AgentReviewsDirectory"/>; the id is
+///  also the review key of the owner's marks and comments
+///  (<c>.powergit/reviews/&lt;id&gt;.json</c>), so "Request changes" copies
+///  that file's comments into the resolution. The M3 MCP host calls these
+///  methods in-process; the HTTP routes are the inbox's door. The engine
+///  never auto-approves: a timed-out wait answers pending + timedOut.
+/// </summary>
 public sealed partial class GitHost
 {
+    /// <summary>Where the sessions live, relative to the root; one constant like <see cref="ReviewsDirectory"/>.</summary>
     public const string AgentReviewsDirectory = ".powergit/agent-reviews";
     private static readonly Regex AgentReviewIdPattern = new("^[0-9a-f]{40}$", RegexOptions.Compiled);
     private static readonly JsonSerializerOptions AgentReviewJson = new(JsonSerializerDefaults.Web)
@@ -115,10 +127,13 @@ public sealed partial class GitHost
         DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (true)
         {
-            AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
-            if (session.Status != "pending") return new(session, false);
+            // The signal is taken before the read: a resolve that lands
+            // between the two completes this signal, not a later one, so
+            // the wait can never sleep through it.
             Task signal;
             lock (_agentReviewsLock) signal = _agentReviewsChanged.Task;
+            AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
+            if (session.Status != "pending") return new(session, false);
             TimeSpan remaining = deadline - DateTime.UtcNow;
             if (remaining <= TimeSpan.Zero) return new(session, true);
             Task delay = Task.Delay(remaining, ct);

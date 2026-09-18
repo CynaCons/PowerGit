@@ -60,7 +60,7 @@ export function ReviewBar({
   rowKeys: RowKeys
   startOver: () => Promise<void>
   /** Finish review: the pending save is written before the summary opens. */
-  finish: () => void
+  finish: () => Promise<void>
   exportDiffs: () => Promise<Map<string, string>>
 }) {
   const mode = useReviewMode()
@@ -172,7 +172,7 @@ export function ReviewBar({
         disableElevation
         disabled={!marked}
         onClick={() => {
-          finish()
+          void finish()
           setSummary(true)
         }}
         sx={{ textTransform: "none", fontSize: 12, fontWeight: 600 }}

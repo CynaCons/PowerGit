@@ -82,7 +82,9 @@ test.describe("agent reviews", () => {
     const changeId = make("wait", "Guard the parser")
     try {
       await openInApp(page, dir)
-      await expect(page.getByTestId("agent-reviews-badge")).toHaveText("1", { timeout: 10_000 })
+      // The count sits on the rail entry: NavRail's Badge or the command
+      // rail's pill (the default layout), each with its own testid.
+      await expect(page.getByTestId(/^agent-reviews-(badge|button-count)$/)).toHaveText("1", { timeout: 10_000 })
       await page.getByTestId("agent-reviews-button").click()
       await page.getByTestId("agent-review-row").filter({ hasText: "Guard the parser" }).click()
       await expect(page.getByTestId("agent-review-why")).toContainText("critical")

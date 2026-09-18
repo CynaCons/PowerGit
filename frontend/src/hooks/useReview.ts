@@ -27,21 +27,25 @@ export function useReview({ engine, key }: { engine: EngineClient; key: string |
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pending = useRef<{ engine: EngineClient; key: string; doc: ReviewDoc } | null>(null)
 
-  const save = useCallback((saveEngine: EngineClient, saveKey: string, value: ReviewDoc, keepalive = false) => {
-    baseline.current = value
-    setReviewPersist(saveKey, { saving: true, error: null })
-    void putReview(saveEngine, saveKey, serializeDoc(withHead(value, saveKey)), keepalive)
-      .then(() => setReviewPersist(saveKey, { saving: false, savedAt: Date.now(), error: null }))
-      .catch((e: unknown) => setReviewPersist(saveKey, { saving: false, error: describeThrown(e) }))
-  }, [])
+  const save = useCallback(
+    (saveEngine: EngineClient, saveKey: string, value: ReviewDoc, keepalive = false): Promise<void> => {
+      baseline.current = value
+      setReviewPersist(saveKey, { saving: true, error: null })
+      return putReview(saveEngine, saveKey, serializeDoc(withHead(value, saveKey)), keepalive)
+        .then(() => setReviewPersist(saveKey, { saving: false, savedAt: Date.now(), error: null }))
+        .catch((e: unknown) => setReviewPersist(saveKey, { saving: false, error: describeThrown(e) }))
+    },
+    [],
+  )
 
+  /** Writes what is pending now; resolves once it is on disk (or failed into persist.error). */
   const flush = useCallback(
-    (keepalive = false) => {
+    (keepalive = false): Promise<void> => {
       if (timer.current) clearTimeout(timer.current)
       timer.current = null
       const value = pending.current
       pending.current = null
-      if (value) save(value.engine, value.key, value.doc, keepalive)
+      return value ? save(value.engine, value.key, value.doc, keepalive) : Promise.resolve()
     },
     [save],
   )
@@ -49,13 +53,13 @@ export function useReview({ engine, key }: { engine: EngineClient; key: string |
   // last marks (review-persist.spec caught it): write them on the way out.
   // `keepalive` lets the request outlive the page.
   useEffect(() => {
-    const onHide = () => flush(true)
+    const onHide = () => void flush(true)
     window.addEventListener("pagehide", onHide)
     return () => window.removeEventListener("pagehide", onHide)
   }, [flush])
 
   useEffect(() => {
-    flush()
+    void flush()
     baseline.current = key ? getReviewDoc(key) : null
     if (!key) return
     const ctrl = new AbortController()
@@ -78,7 +82,7 @@ export function useReview({ engine, key }: { engine: EngineClient; key: string |
       })
     return () => {
       ctrl.abort()
-      flush()
+      void flush()
     }
   }, [engine, flush, key])
 
@@ -95,7 +99,7 @@ export function useReview({ engine, key }: { engine: EngineClient; key: string |
     // everything is on disk, not only the previous write.
     setReviewPersist(key, { saving: true })
     timer.current = setTimeout(() => {
-      flush()
+      void flush()
     }, SAVE_DELAY)
   }, [doc, engine, flush, key])
 
@@ -110,8 +114,9 @@ export function useReview({ engine, key }: { engine: EngineClient; key: string |
     setReviewPersist(key, { savedAt: null, saving: false, error: null })
   }, [engine, key])
 
-  /** Finish review (v0.19.3): write what is pending now, before the summary shows. */
-  const finish = useCallback(() => flush(), [flush])
+  /** Finish review (v0.19.3) and the agent-review resolves (v0.20.0): write
+   *  what is pending now; await it before anything reads the file. */
+  const finish = useCallback((): Promise<void> => flush(), [flush])
 
   return { startOver, finish }
 }
