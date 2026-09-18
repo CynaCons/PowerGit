@@ -186,9 +186,11 @@ repo.AddEndpointFilter(async (ctx, next) =>
     // ref list outgrows a URL, but it is a read like GET /revisions — it must
     // never queue behind a mutation nor answer 409 while a fetch job runs.
     bool isReadPost = HttpMethods.IsPost(method) && path.EndsWith("/revisions", StringComparison.Ordinal);
+    // A review save writes outside git and must never 409 while a pull holds the gate.
+    bool isReview = path.Contains("/reviews/", StringComparison.Ordinal);
     try
     {
-        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob || isReadPost)
+        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob || isReadPost || isReview)
         {
             return await next(ctx);
         }
@@ -550,6 +552,75 @@ repo.MapGet("/files/hidden", (GitHost git) =>
         return Results.Ok(git.ListHiddenFiles());
     }
     catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+// v0.19.0 review files: repository-local persistence described by
+// docs/design/review-mode.md section 2.
+repo.MapGet("/reviews/{key}", (string key, GitHost git) =>
+{
+    try
+    {
+        string? text = git.ReadReview(key);
+        return text is null
+            ? Results.Json(new ErrorResponse($"no review for {key}"), statusCode: StatusCodes.Status404NotFound)
+            : Results.Content(text, "application/json");
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapPut("/reviews/{key}", async (string key, GitHost git, HttpContext ctx) =>
+{
+    try
+    {
+        const int maxReviewBytes = 8 * 1024 * 1024;
+        if (ctx.Request.ContentLength > maxReviewBytes)
+        {
+            return Results.Json(new ErrorResponse("review body exceeds 8 MB"), statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        using StreamReader reader = new(ctx.Request.Body, System.Text.Encoding.UTF8);
+        char[] buffer = new char[maxReviewBytes + 1];
+        int length = 0;
+        while (length < buffer.Length)
+        {
+            int read = await reader.ReadAsync(buffer.AsMemory(length, buffer.Length - length));
+            if (read == 0)
+            {
+                break;
+            }
+
+            length += read;
+        }
+
+        string body = new(buffer, 0, length);
+        if (length > maxReviewBytes || System.Text.Encoding.UTF8.GetByteCount(body) > maxReviewBytes)
+        {
+            return Results.Json(new ErrorResponse("review body exceeds 8 MB"), statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        git.WriteReview(key, body);
+        return Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
+repo.MapDelete("/reviews/{key}", (string key, GitHost git) =>
+{
+    try
+    {
+        git.DeleteReview(key);
+        return Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
     {
         return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }

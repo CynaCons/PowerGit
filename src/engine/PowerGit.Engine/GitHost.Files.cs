@@ -340,22 +340,48 @@ public sealed partial class GitHost
             throw new InvalidOperationException("pattern is required");
         }
 
-        string gitDir = Run(root, "rev-parse", "--git-path", "info/exclude").StdOut.Trim();
-        string exclude = Path.IsPathRooted(gitDir) ? gitDir : Path.Combine(root, gitDir.Replace('/', Path.DirectorySeparatorChar));
+        string exclude = ExcludePath(root);
         Directory.CreateDirectory(Path.GetDirectoryName(exclude)!);
-        // A file that does not end in a newline would glue our first line to
-        // its last one.
-        if (File.Exists(exclude))
-        {
-            string existing = File.ReadAllText(exclude);
-            if (existing.Length > 0 && !existing.EndsWith('\n'))
-            {
-                File.AppendAllText(exclude, "\n");
-            }
-        }
-
+        EnsureFreshLine(exclude);
         File.AppendAllLines(exclude, lines);
         NotifyStatusChanged();
+    }
+
+    /// <summary>Ensures one exact repository-local exclude rule, without duplicating it.</summary>
+    internal void EnsureExcluded(string line)
+    {
+        string root = RequireRoot();
+        string exclude = ExcludePath(root);
+        if (File.Exists(exclude)
+            && File.ReadLines(exclude).Any(existing => string.Equals(existing.Trim(), line, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(exclude)!);
+        EnsureFreshLine(exclude);
+        File.AppendAllLines(exclude, [line]);
+        NotifyStatusChanged();
+    }
+
+    private string ExcludePath(string root)
+    {
+        string gitDir = Run(root, "rev-parse", "--git-path", "info/exclude").StdOut.Trim();
+        return Path.IsPathRooted(gitDir) ? gitDir : Path.Combine(root, gitDir.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    private static void EnsureFreshLine(string path)
+    {
+        // A file that does not end in a newline would glue our first line to
+        // its last one.
+        if (File.Exists(path))
+        {
+            string existing = File.ReadAllText(path);
+            if (existing.Length > 0 && !existing.EndsWith('\n'))
+            {
+                File.AppendAllText(path, "\n");
+            }
+        }
     }
 
     /// <summary>GE "Stop tracking this file": <c>git rm --cached</c>, the file stays on disk.</summary>
