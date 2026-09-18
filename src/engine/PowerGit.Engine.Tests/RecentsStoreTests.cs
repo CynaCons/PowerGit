@@ -18,6 +18,11 @@ internal static class TestDataDir
     {
         Directory.CreateDirectory(Path);
         Environment.SetEnvironmentVariable(RecentsStore.DataDirEnvVar, Path);
+        // v0.20.1: every WebApplicationFactory in this suite would otherwise
+        // host the MCP endpoint on the user's real pipe / socket and race the
+        // others (and a running PowerGit) for it; McpHostTests build their
+        // own host on a unique endpoint.
+        Environment.SetEnvironmentVariable("POWERGIT_MCP", "0");
     }
 }
 

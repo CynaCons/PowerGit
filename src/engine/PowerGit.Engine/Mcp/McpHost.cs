@@ -66,11 +66,29 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
         }
     }
 
+    // Shutdown runs twice (the host's StopAsync, then the container's
+    // DisposeAsync) and must never throw: a test factory's teardown or the
+    // sidecar's exit is not the place for a disposed pipe to surface. Every
+    // step is guarded on its own, and the stopping token source is never
+    // disposed (a straggling read that asks it for a token would throw).
+    private bool _stopped;
+
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        foreach (GitHost host in registry.OpenHosts) host.ExpireAgentReviews("host_gone");
-        _stopping.Cancel(); _firstPipe?.Dispose(); _socket?.Dispose();
-        foreach (Stream connection in _connections.Keys) connection.Dispose();
+        if (_stopped) return;
+        _stopped = true;
+        foreach (GitHost host in registry.OpenHosts)
+        {
+            try { host.ExpireAgentReviews("host_gone"); }
+            catch (Exception ex) { Console.Error.WriteLine($"[engine] mcp: could not expire the sessions of {host.Current?.Root}: {ex.Message}"); }
+        }
+        try { _stopping.Cancel(); } catch (ObjectDisposedException) { }
+        try { _firstPipe?.Dispose(); } catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+        try { _socket?.Dispose(); } catch (Exception ex) when (ex is IOException or ObjectDisposedException or SocketException) { }
+        foreach (Stream connection in _connections.Keys)
+        {
+            try { connection.Dispose(); } catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+        }
         if (_acceptLoop is not null) try { await _acceptLoop.WaitAsync(cancellationToken); } catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException or SocketException) { }
         if (_hosting && !OperatingSystem.IsWindows()) try { File.Delete(endpoint); } catch (IOException) { }
         _hosting = false;
@@ -151,10 +169,13 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
         catch (JsonException) { response = JsonSerializer.Serialize(Error(null, -32700, "parse error"), Json); }
         catch (OperationCanceledException) { return; }
         if (response is null or "null") return;
-        await writeGate.WaitAsync(_stopping.Token);
-        try { await writer.WriteLineAsync(response.AsMemory(), _stopping.Token); }
+        try
+        {
+            await writeGate.WaitAsync(_stopping.Token);
+            try { await writer.WriteLineAsync(response.AsMemory(), _stopping.Token); }
+            finally { writeGate.Release(); }
+        }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException) { }
-        finally { writeGate.Release(); }
     }
 
     private async Task<object?> Dispatch(JsonElement request)
@@ -223,5 +244,5 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
     private static object S() => new { type = "string" }; private static object B() => new { type = "boolean" }; private static object I() => new { type = "integer" };
     private static object Error(JsonElement? id, int code, string message) => new { jsonrpc = "2.0", id, error = new { code, message } };
 
-    public async ValueTask DisposeAsync() { await StopAsync(CancellationToken.None); _stopping.Dispose(); }
+    public async ValueTask DisposeAsync() => await StopAsync(CancellationToken.None);
 }
