@@ -904,6 +904,10 @@ Root cause analysis: linuxdeploy bundles GIO modules (gvfs, dconf) and libcurl-g
 - [x] H — Zoom-correct drags and a crisp canvas (Copilot Fable 5.1): column-resize and SplitHandle deltas are divided by getZoom(); the graph canvas backing store scales by devicePixelRatio × zoom with `ctx.setTransform` and the size guard comparing the scale; the bottom-panel splitter and SplitHandle ignore non-primary buttons, prevent default on pointerdown and set user-select none. The @grid visual baseline is retaken at the next release (it photographs the repository's own rows).
 - [x] I — The viewport keeps its row (Codex Sol): useViewportAnchor remembers the first visible item's key and start and, in a layout effect after rows change, compensates scrollTop by that key's start delta — unless scrollTop is 0 or a selection scroll is pending (RevisionGrid.test.ts: five rows prepended keep the same row at the same offset; the top stays at the top).
 
+### Release v0.18.18 — 2026-09-18
+
+Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the owner tick stays open, as for v0.18.17). Shortest path at the owner's request: no local packaging, no suite re-run, no showcase re-capture — the tag workflow (run 35333805110) builds and signs the Windows zip + installer, the Linux AppImage and `latest.json`. Verified on the merged head before the bump: tsc, eslint, prettier, vitest 451/451, engine 196/196, e2e 180/180, smoke with zero console errors, perf A/B on the 50k fixture neutral-to-better. Not done: the `@grid` visual baseline (photographs the repository's rows; retake before the next tag), the Pages showcase screenshots (v0.18.17's stay).
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
