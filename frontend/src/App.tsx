@@ -44,6 +44,9 @@ import { useAutoFetch } from "./hooks/useAutoFetch"
 import { useBrowseHotkeys } from "./hooks/useBrowseHotkeys"
 import { useDiagnosticSnapshot } from "./hooks/useDiagnosticSnapshot"
 import { useHeartbeat } from "./hooks/useHeartbeat"
+import { AgentReviewsView } from "./components/agentReviews/AgentReviewsView"
+import { useAgentReviews } from "./hooks/useAgentReviews"
+import { useAgentReviewsPage } from "./hooks/useAgentReviewsPage"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together (the browse-scope hotkey map is
@@ -105,6 +108,8 @@ export default function App({ base }: { base: EngineClient }) {
   // Git Extensions' FormFileHistory, shown in place of the graph and panel
   // (v0.16.0); the main history's state stays here while it is open.
   const fileHistory = useFileHistory()
+  const agentReviewsPage = useAgentReviewsPage()
+  const agentReviews = useAgentReviews({ engine: client })
   // Settings is a page over the same area (v0.18.0); the gear toggles it.
   const settings = useSettingsPage()
   // useGitActions rebuilds its closures every render; hand memoised children
@@ -181,6 +186,15 @@ export default function App({ base }: { base: EngineClient }) {
     rebaseOnto: (name: string) => open({ kind: "rebase", onto: name }),
     closeFileHistory: () => {
       fileHistory.close()
+      focusGrid()
+    },
+    openAgentReviews: () => {
+      fileHistory.close()
+      settings.close()
+      agentReviewsPage.openList()
+    },
+    closeAgentReviews: () => {
+      agentReviewsPage.close()
       focusGrid()
     },
   })
@@ -273,6 +287,9 @@ export default function App({ base }: { base: EngineClient }) {
               actions={actions}
               refresh={chrome.refresh}
               openStash={chrome.openStash}
+              onAgentReviews={chrome.openAgentReviews}
+              agentReviewsOpen={agentReviewsPage.open}
+              agentReviewsBadge={agentReviews.badge}
             />
           ) : (
             <NavRail
@@ -282,6 +299,9 @@ export default function App({ base }: { base: EngineClient }) {
               onSettings={chrome.openSettings}
               settingsOpen={settings.open}
               onSnapshot={chrome.openSnapshot}
+              onAgentReviews={chrome.openAgentReviews}
+              agentReviewsOpen={agentReviewsPage.open}
+              agentReviewsBadge={agentReviews.badge}
             />
           )}
 
@@ -309,7 +329,17 @@ export default function App({ base }: { base: EngineClient }) {
               )}
               {!settings.open && (
                 <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-                  {fileHistory.target ? (
+                  {agentReviewsPage.open ? (
+                    <AgentReviewsView
+                      engine={client}
+                      sessions={agentReviews.sessions}
+                      sessionId={agentReviewsPage.sessionId}
+                      refresh={agentReviews.refresh}
+                      onOpen={agentReviewsPage.openSession}
+                      onList={agentReviewsPage.openList}
+                      onClose={chrome.closeAgentReviews}
+                    />
+                  ) : fileHistory.target ? (
                     <FileHistoryView
                       target={fileHistory.target}
                       session={session}

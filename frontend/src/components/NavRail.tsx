@@ -3,6 +3,8 @@ import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutl
 import HistoryIcon from "@mui/icons-material/History"
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined"
+import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
 import IconButton from "@mui/material/IconButton"
 import Tooltip from "@mui/material/Tooltip"
@@ -16,9 +18,22 @@ export type NavRailProps = {
   /** The settings page is open: the gear shows it (v0.18.2). */
   settingsOpen: boolean
   onSnapshot: () => void
+  onAgentReviews: () => void
+  agentReviewsOpen: boolean
+  agentReviewsBadge: number
 }
 
-export function NavRail({ repoName, onOpenRepo, onRecents, onSettings, settingsOpen, onSnapshot }: NavRailProps) {
+export function NavRail({
+  repoName,
+  onOpenRepo,
+  onRecents,
+  onSettings,
+  settingsOpen,
+  onSnapshot,
+  onAgentReviews,
+  agentReviewsOpen,
+  agentReviewsBadge,
+}: NavRailProps) {
   return (
     <Box
       component="nav"
@@ -66,6 +81,24 @@ export function NavRail({ repoName, onOpenRepo, onRecents, onSettings, settingsO
         <IconButton onClick={onRecents} sx={{ borderRadius: 2 }} aria-label="Recent repositories">
           <HistoryIcon fontSize="small" />
         </IconButton>
+      </Tooltip>
+      <Tooltip title="Agent reviews" placement="right">
+        <Badge
+          badgeContent={agentReviewsBadge}
+          color="error"
+          invisible={agentReviewsBadge === 0}
+          slotProps={{ badge: { "data-testid": "agent-reviews-badge" } as object }}
+        >
+          <IconButton
+            data-testid="agent-reviews-button"
+            aria-label="Agent reviews"
+            aria-pressed={agentReviewsOpen}
+            onClick={onAgentReviews}
+            sx={{ borderRadius: 2, ...(agentReviewsOpen && { bgcolor: "action.selected", color: "primary.main" }) }}
+          >
+            <RateReviewOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Badge>
       </Tooltip>
       <Box sx={{ flex: 1 }} />
       <Tooltip title="Diagnostic snapshot" placement="right">
