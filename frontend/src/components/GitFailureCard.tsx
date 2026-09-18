@@ -7,6 +7,7 @@ import PushPinIcon from "@mui/icons-material/PushPin"
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined"
 import { useEffect, useState } from "react"
 import type { GitLogEntry } from "../engine"
+import { useZoom } from "../theme/zoom"
 import { entryOutput, firstLines, formatExit } from "./gitLogModel"
 
 /** How long an unpinned card stays before it takes itself away. */
@@ -30,6 +31,7 @@ export function GitFailureCard({
   onDismiss: () => void
   onOpenConsole: () => void
 }) {
+  const zoom = useZoom()
   const [pinned, setPinned] = useState(false)
   const entryId = entry?.id ?? null
 
@@ -58,7 +60,8 @@ export function GitFailureCard({
         bottom: 52,
         zIndex: (t) => t.zIndex.snackbar,
         width: 380,
-        maxWidth: "calc(100vw - 24px)",
+        // Viewport units scale with #root; preserve the visual inset (v0.18.19).
+        maxWidth: `calc((100vw - 24px) / ${zoom})`,
         p: 1,
         display: "flex",
         flexDirection: "column",
