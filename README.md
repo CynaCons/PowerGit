@@ -201,6 +201,12 @@ same binaries under `/usr`. Both need the distro's WebKitGTK stack
 
 `powergit <path>` opens that repository; without it the last one reopens — Settings → Behaviour.
 
+## Agent review (MCP)
+
+With PowerGit running, connect Claude Code in one line:
+`claude mcp add powergit -- "C:\Users\<you>\AppData\Local\PowerGit\powergit.exe" mcp`.
+Codex, Linux/AppImage, tool schemas, and the Silent / Notify / Wait workflow are documented in [Agent review over MCP](docs/agents/mcp-agent-review.md).
+
 Supported Ubuntu versions: **22.04, 24.04 and 26.04**. Every release
 AppImage is launched in stock containers of all three before it is
 published (`docker/appimage-check/run-matrix.sh`), so a version-skew crash
