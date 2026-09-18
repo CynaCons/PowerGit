@@ -4,7 +4,7 @@
 `frontend/src-tauri/src/main.rs` handles `powergit mcp` before setting GTK/WebKit environment variables and before Tauri starts.
 
 ## Windows: a synchronous pipe handle cannot read and write at once
-The first shim opened `\.\pipe\…` as a `std::fs::File` and cloned the
+The first shim opened the pipe path (`\\.\pipe\...`) as a `std::fs::File` and cloned the
 handle for the two copy threads. A synchronous named-pipe handle serialises
 `ReadFile` and `WriteFile`: the thread parked in the pipe→stdout read held
 the handle and the stdin→pipe write of `initialize` waited behind it
