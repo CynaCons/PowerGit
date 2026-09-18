@@ -98,6 +98,35 @@ export type DiffDto = {
   truncated: boolean
   truncatedReason: "size" | "lines" | null
 }
+
+export type AgentReviewStatus = "pending" | "approved" | "changes_requested" | "cancelled" | "expired"
+export type AgentReviewSummary = {
+  id: string
+  mode: "notify" | "wait"
+  title: string
+  agent: string | null
+  branch: string | null
+  fileCount: number
+  status: AgentReviewStatus
+  unread: boolean
+  createdAt: string
+  updatedAt: string
+}
+export type AgentReview = Omit<AgentReviewSummary, "fileCount"> & {
+  version: 1
+  why: string
+  base: string | null
+  head: string | null
+  worktree: boolean
+  files: { path: string; status: string; patch: string | null }[]
+  resolvedAt: string | null
+  resolution: {
+    summary: string | null
+    comments: { path: string; line: string; side: "new" | "old"; body: string }[]
+  } | null
+  reason: string | null
+}
+export type AgentReviewList = { sessions: AgentReviewSummary[]; badge: number }
 /** v0.16.0: the two index bits Git Extensions shows as check marks. A file git
  *  hides from `status` because of them arrives through `RepoStatus.hidden` (or
  *  `GET /files/hidden`) with git's own `ls-files -v` letter as `status`: "S"

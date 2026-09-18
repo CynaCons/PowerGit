@@ -5,6 +5,7 @@ import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutl
 import HistoryIcon from "@mui/icons-material/History"
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined"
 import Box from "@mui/material/Box"
 import Divider from "@mui/material/Divider"
 import { useState } from "react"
@@ -29,6 +30,9 @@ export type CommandRailProps = CommandDeps & {
   onSettings: () => void
   /** The settings page is open: the gear shows it (v0.18.2). */
   settingsOpen: boolean
+  onAgentReviews: () => void
+  agentReviewsOpen: boolean
+  agentReviewsBadge: number
 }
 
 export function CommandRail({
@@ -38,6 +42,9 @@ export function CommandRail({
   onSettings,
   settingsOpen,
   onSnapshot,
+  onAgentReviews,
+  agentReviewsOpen,
+  agentReviewsBadge,
   ...deps
 }: CommandRailProps) {
   const commands = useCommandItems(deps)
@@ -74,6 +81,15 @@ export function CommandRail({
       icon: <HistoryIcon />,
       testid: "recents-button",
       onClick: onRecents,
+    },
+    {
+      id: "agent-reviews",
+      label: "Agent reviews",
+      icon: <RateReviewOutlinedIcon />,
+      testid: "agent-reviews-button",
+      badge: agentReviewsBadge,
+      pressed: agentReviewsOpen,
+      onClick: onAgentReviews,
     },
   ]
 
