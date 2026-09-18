@@ -29,7 +29,8 @@ test("file context menu: GE item set and every item works against the engine", a
     id: string
     root: string
   }
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pg-menu-"))
+  // realpath: the Windows CI runner's TEMP is an 8.3 name and the engine reports the long one (v0.18.19).
+  const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "pg-menu-")))
   const git = (...args: string[]) =>
     execFileSync("git", ["-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", ...args], { stdio: "pipe" })
   const gitOut = (...args: string[]) =>

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -38,7 +38,10 @@ export function commit(dir: string, message: string): void {
 
 /** A repository with one commit on `main`. */
 export function makeRepo(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix))
+  // The long name: the Windows CI runner's TEMP is an 8.3 path
+  // (C:/Users/RUNNER~1/...) and the engine reports the real one, so a spec
+  // that compares roots never matched there (v0.18.19).
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)))
   git(dir, "init", "-q", "-b", "main")
   write(dir, "a.txt", "base\n")
   commit(dir, "base")

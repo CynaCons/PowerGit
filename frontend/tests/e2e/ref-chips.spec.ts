@@ -118,11 +118,15 @@ test.describe("every ref on its row, and in the Commit tab", () => {
     const remote = head.locator('[data-ref="origin/main"]')
     await expect(remote).toHaveAttribute("data-ref-kind", "remote")
     await expect(remote.locator("svg")).toHaveCount(1)
-    await expect(head.locator('[data-ref="v0.2"]')).toHaveAttribute("data-ref-kind", "tag")
-    // Nothing folded on this row at the default 1280 px viewport, and the
-    // group names every ref for the hover.
-    await expect(head.getByTestId("ref-more")).toHaveCount(0)
+    // The fold is measured in the chip font, so whether the tag still fits
+    // at 1280 px depends on the machine's fonts: none folded on Windows, the
+    // Ubuntu runner's wider fallback folds the last chip into "+1". Either
+    // way the group names every ref, and the tag is there once expanded
+    // (v0.18.19: the spec had assumed Windows metrics).
     await expect(head.locator(".msg-refs")).toHaveAttribute("title", "HEAD, main, origin/main, v0.2")
+    const more = head.getByTestId("ref-more")
+    if ((await more.count()) > 0) await more.click()
+    await expect(head.locator('[data-ref="v0.2"]')).toHaveAttribute("data-ref-kind", "tag")
   })
 
   test("if there are too many, expand vertically the column: +n grows the row, every chip shows, the lanes keep drawing, − folds it", async ({
