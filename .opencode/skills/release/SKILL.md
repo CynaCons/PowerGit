@@ -143,6 +143,19 @@ Use `gh release view vX.Y.Z --web` / `gh release edit` to add notes:
 highlights from PLAN.md iterations closed since the previous tag, known
 issues, artifact list. GPL-3.0 license notice must stay intact.
 
+## 4b. GitHub storefront
+
+- Run
+  `gh repo view CynaCons/PowerGit --json description,homepageUrl,repositoryTopics,hasIssuesEnabled`.
+- Confirm the description identifies PowerGit, the homepage is
+  `https://cynacons.github.io/PowerGit/`, Issues are enabled, and the topics
+  include `git`, `git-client`, `git-gui`, `git-extensions`, `tauri`, `react`,
+  `dotnet`, `windows`, and `linux`.
+- The settings command, already run on 2026-09-18, is:
+  `gh repo edit CynaCons/PowerGit --description "A new frontend for Git Extensions — modern, portable, cross-platform. React + Tauri shell over a self-contained C# git engine; Windows and Linux." --homepage "https://cynacons.github.io/PowerGit/" --enable-issues=true --add-topic "git,git-client,git-gui,git-extensions,tauri,react,dotnet,windows,linux"`.
+- These are repository settings, not tree content: check them during release;
+  do not make a commit merely to record their current values.
+
 ## 5. Pages showcase refresh
 
 1. Engine running locally, then `node frontend/scripts/capture-showcase.mjs`

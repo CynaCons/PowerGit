@@ -23,7 +23,7 @@ running in a lightweight Tauri shell, talking to a self-contained C# git engine.
 |            | Git Extensions (WinForms) | PowerGit                                                                     |
 | ---------- | ------------------------- | ---------------------------------------------------------------------------- |
 | UI toolkit | Windows Forms             | React + Material, Tauri shell                                                |
-| Platform   | Windows only              | Windows today, Linux target                                                  |
+| Platform   | Windows only              | Windows and Linux (Ubuntu 22.04 / 24.04 / 26.04)                             |
 | Install    | Heavy installer           | Portable zip — one exe + one sidecar                                         |
 | Graph      | The gold standard         | Reimplemented lane layout, GE colours, golden-tested against GE, virtualized |
 
@@ -101,6 +101,9 @@ and `scripts/freeze-dump.sh` collects a report from a terminal — see
 `docs/ubuntu-freeze.md`. Settings → Tools → Open logs folder shows the
 files.
 
+Report a bug: https://github.com/CynaCons/PowerGit/issues (attach the
+diagnostic snapshot from Settings → Diagnostics).
+
 ## Updating
 
 Settings → Updates → "Check for updates" asks GitHub for the latest release,
@@ -122,22 +125,19 @@ console at the bottom shows every command PowerGit runs. It builds on
 v0.14.3's grid work and v0.14.1's diagnostic snapshot and watchdog.
 Parked: worktrees and hotkey remapping UI.
 
-v0.15.2 adds diagnostics for the Ubuntu focus-loss freeze: Settings → Tools →
-Open developer tools opens the inspector in release builds. To open it at launch,
-run `POWERGIT_DEVTOOLS=1 ./YourDownloaded.AppImage`. Choose right-side docking
-if available in the inspector, open Console and preserve logs. Native focus
-events, page visibility changes and refresh timings are also saved beside the
-existing snapshots (Settings → Tools → Open logs folder). This release adds
-evidence gathering; the freeze is still under investigation.
+On Linux, PowerGit runs natively on Wayland when `WAYLAND_DISPLAY` is set,
+disables WebKitGTK's DMA-BUF renderer and accelerated compositing, probes paint
+and liveness, and uses a snapshot → reload → restart watchdog; X11 sessions
+use `POWERGIT_NO_FRAME_SYNC=1` as the fallback.
 
 Recent repositories now load even when no repository is open after restart.
 Settings → Updates → Open app location reveals the running AppImage. Updates
 replace it in place, so its filename may still contain the original version.
 
-**If the window freezes on Linux, run this from a terminal while it is still
-frozen** — the app keeps running underneath (its main loop, page and engine
-were all alive in every captured freeze); what stops is the window being
-painted, so the picture has to be examined from outside:
+**If the window stops repainting on an X11 session, set
+`POWERGIT_NO_FRAME_SYNC=1`; to capture it for a report, run this from a
+terminal while it is still frozen** — the app kept running underneath in every
+captured freeze, so the picture has to be examined from outside:
 
 ```
 bash freeze-dump.sh

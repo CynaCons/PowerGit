@@ -1,5 +1,13 @@
 # Frontend UX audit after v0.13.17 — 2026-09-05
 
+> **Status 2026-09-18: superseded.** v0.13.18 (`46a33ea11`) fixed the shell at
+> 150% zoom, kept rail Settings reachable, and first made Settings draft until
+> Save; v0.18.0 (`673345178`) replaced that model with apply-on-change and no
+> Save. v0.15.0 (`ea710713f`, `db79ed889`) replaced the disabled Merge entry
+> with merge/rebase flows and a conflict workspace: banner → Resolve →
+> ours/theirs/base/mergetool → Continue/Skip/Abort. The command-palette
+> recommendation is still open and deferred. The original audit remains below.
+
 Scope: source review and focused Windows Chromium walkthrough, real disposable
 repository, light/dark, 1280x800, 100/150% zoom, plus commit captures at 200%
 and 800x600. No additional e2e suite runs, per owner instruction. Native and

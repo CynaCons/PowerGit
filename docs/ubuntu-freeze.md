@@ -1,12 +1,10 @@
 # The Ubuntu freeze
 
-**Status: open; leading hypothesis H1; discriminating test shipped in
-v0.15.6.** Six releases have gone into it (v0.14.1 → v0.15.6). Until
-v0.15.6 everything shipped was instrumentation aimed at the wrong place, a
-mitigation borrowed from known WebKitGTK bugs, or a real defect found on the
-way. v0.15.6 ships the first change that targets the leading hypothesis
-(native Wayland by default) and the first probe that can actually see the
-freeze. The owner has not yet confirmed any of it made the freeze stop.
+**Status: closed on the owner's tick on 2026-09-11 after native Wayland became
+the default.** No freeze has recurred to probe, so root-cause hypothesis H1
+remains unconfirmed. X11 sessions are unmitigated by default;
+`POWERGIT_NO_FRAME_SYNC=1` is the fallback. Reopen on the first freeze report
+and capture it with `scripts/freeze-dump.sh`.
 
 This document is the whole case file: what was reported, what the evidence
 proves, what it was wrongly read as, the ranked hypotheses, what v0.15.6
@@ -23,15 +21,15 @@ vendored crate and GTK/WebKit sources line by line.
 Every one is from the owner, on the **Linux AppImage, Ubuntu, WebKitGTK**.
 Nothing equivalent has been reported on Windows.
 
-| Date | What the owner said | Release in hand |
-|---|---|---|
-| 2026-09-07 | "sometimes after a while the app freezes. Can't click on anything. When that's the case, I don't have a way to bring back the logs." | v0.14.0 |
-| 2026-09-08 | "the app froze while I wasn't using it. None of the buttons work, the only responsive thing is Open repository (system picker). The window moves and resizes, the content is frozen, some areas are black and not redrawn. Can't use the Diagnostic snapshot button." | v0.14.1 |
-| 2026-09-08 | Second freeze, same shape, after DMA-BUF was already disabled | v0.14.3 |
-| 2026-09-09 | "whenever the windows loses focus on my ubuntu, it usually end up in a freeze." | v0.15.1 |
-| 2026-09-09 | "when the crash happens, even the developper panels does not refresh!!!" | v0.15.3 |
-| 2026-09-10 | Same shape on v0.15.5 (no capture) | v0.15.5 |
-| 2026-09-11 | Snapshot handed over "from an earlier crash": the watchdog capture of 2026-09-10 22:10 (v0.15.4), see §2 | v0.15.4 |
+| Date       | What the owner said                                                                                                                                                                                                                                                   | Release in hand |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 2026-09-07 | "sometimes after a while the app freezes. Can't click on anything. When that's the case, I don't have a way to bring back the logs."                                                                                                                                  | v0.14.0         |
+| 2026-09-08 | "the app froze while I wasn't using it. None of the buttons work, the only responsive thing is Open repository (system picker). The window moves and resizes, the content is frozen, some areas are black and not redrawn. Can't use the Diagnostic snapshot button." | v0.14.1         |
+| 2026-09-08 | Second freeze, same shape, after DMA-BUF was already disabled                                                                                                                                                                                                         | v0.14.3         |
+| 2026-09-09 | "whenever the windows loses focus on my ubuntu, it usually end up in a freeze."                                                                                                                                                                                       | v0.15.1         |
+| 2026-09-09 | "when the crash happens, even the developper panels does not refresh!!!"                                                                                                                                                                                              | v0.15.3         |
+| 2026-09-10 | Same shape on v0.15.5 (no capture)                                                                                                                                                                                                                                    | v0.15.5         |
+| 2026-09-11 | Snapshot handed over "from an earlier crash": the watchdog capture of 2026-09-10 22:10 (v0.15.4), see §2                                                                                                                                                              | v0.15.4         |
 
 The shape is consistent across all of them:
 
@@ -66,7 +64,7 @@ link in code:
   mean it did so repeatedly, and each time ran `write_snapshot` on the main
   thread: log sync, up to 3 s of blocking HTTP per engine JSON, zip, write.
   The "engine idle at 6 req/min" fact was fetched by the main thread
-  *during* the freeze.
+  _during_ the freeze.
 - "Only Open repository works" is the strongest evidence of all: the dialog
   plugin runs rfd inside `run_on_main_thread`, drained only by tao's loop.
   The picker appearing means tao's loop cycled **and** a fresh GTK toplevel
@@ -77,8 +75,8 @@ Two refutation passes tried to break this chain and could not.
 **What the evidence does not prove:** anything about GDK's frame clock, GTK
 `draw` on the main toplevel, X11 frame sync, or WebKit's UI-side backing
 store. Nothing the shell measured before v0.15.6 touched the paint path. The
-correct statement is: *the default GLib context and tao's main thread were
-cycling; what is dead is presentation of the main window's WebKitWebView.*
+correct statement is: _the default GLib context and tao's main thread were
+cycling; what is dead is presentation of the main window's WebKitWebView._
 
 Scope caveat, kept honest: "loop alive" is **proven** for the two captures
 (v0.14.1, v0.14.3) and **inferred** for v0.15.1–v0.15.5 (same shape, no
@@ -109,7 +107,7 @@ thread missed its 5 s tick (it reported "22s" at 22:10:35.93 instead of
 or visibility event, and the refresh then completed normally. Wall clock
 and monotonic clock agree on 22 s, so it was not a suspend. **This is not a
 frame-clock stall**: a frozen GdkFrameClock does not stop JavaScript timers
-or a tokio thread. It is the whole UI process *and* the web process being
+or a tokio thread. It is the whole UI process _and_ the web process being
 stopped or starved for 22 s — memory or I/O pressure on the machine (the
 AppImage pages its code in through FUSE, so a thrashing machine stalls every
 thread that touches a cold page) or a stop signal. The owner never saw this
@@ -320,7 +318,7 @@ capture).
 - **`POWERGIT_NO_FRAME_SYNC=1`** (X11 only): after the main window is
   realized the shell calls `gdk_x11_window_set_frame_sync_enabled(false)`
   on its GdkWindow and logs `frame sync disabled (X11)` or `frame sync: not
-  an X11 window`. The fallback experiment for owners who must stay on X11.
+an X11 window`. The fallback experiment for owners who must stay on X11.
 - **Paint and liveness probes** (`probe.rs`, opt-out `POWERGIT_PROBE_PAINT=0`):
   the shell counts `GdkFrameClock::after-paint`, toplevel `draw` and
   WebKitWebView `draw`, tracks `mapped`, and sends a 1 px `queue_draw_area`
@@ -351,23 +349,24 @@ capture).
   (writes `<log dir>/recover.request`, polled every 2 s by the liveness
   thread).
 
-  | step | key | action |
-  |---|---|---|
-  | 1 | `queue_draw` | `gtk_window.queue_draw()` |
-  | 2 | `thaw` | `thaw_updates()` / `thaw_toplevel_updates()` on the toplevel GdkWindow |
-  | 3 | `hide_show` | `window.hide()` then `window.show()` |
-  | 4 | `resize` | inner width +1 px then back |
-  | 5 | `present` | `gtk_window.present()` |
-  | 6 | `frame_sync_off_hide_show` | `set_frame_sync_enabled(false)` if X11, then hide+show |
-  | 7 | `reload` | `WebviewWindow::reload()` |
-  | 8 | `new_window` | a second webview window `recovery-<n>` at the same URL and size |
-  | 9 | `webview_snapshot` | `webkit_web_view_get_snapshot` of the visible region, 5 s timeout |
+    | step | key                        | action                                                                 |
+    | ---- | -------------------------- | ---------------------------------------------------------------------- |
+    | 1    | `queue_draw`               | `gtk_window.queue_draw()`                                              |
+    | 2    | `thaw`                     | `thaw_updates()` / `thaw_toplevel_updates()` on the toplevel GdkWindow |
+    | 3    | `hide_show`                | `window.hide()` then `window.show()`                                   |
+    | 4    | `resize`                   | inner width +1 px then back                                            |
+    | 5    | `present`                  | `gtk_window.present()`                                                 |
+    | 6    | `frame_sync_off_hide_show` | `set_frame_sync_enabled(false)` if X11, then hide+show                 |
+    | 7    | `reload`                   | `WebviewWindow::reload()`                                              |
+    | 8    | `new_window`               | a second webview window `recovery-<n>` at the same URL and size        |
+    | 9    | `webview_snapshot`         | `webkit_web_view_get_snapshot` of the visible region, 5 s timeout      |
 
-  Each logs `recover #<n> <key>: requested`, `done in <ms>ms` (or `failed:
-  <why>`), and 3 s later a `probe` readout. Expected under H1: only 3, 6 and
-  8 restore the picture (hide/show unmaps, which thaws the clock; a new
-  toplevel gets a new clock); `queue_draw`, `resize` and `reload` cannot
-  thaw a frozen clock. Which steps work is itself evidence.
+    Each logs `recover #<n> <key>: requested`, `done in <ms>ms` (or `failed:
+<why>`), and 3 s later a `probe` readout. Expected under H1: only 3, 6 and
+    8 restore the picture (hide/show unmaps, which thaws the clock; a new
+    toplevel gets a new clock); `queue_draw`, `resize` and `reload` cannot
+    thaw a frozen clock. Which steps work is itself evidence.
+
 - `diagnostic_snapshot` is now `#[tauri::command(async)]`, so a press no
   longer blocks the main thread on log sync, HTTP and zip.
 - `freeze-dump.sh` collects the presentation side (§5).
@@ -430,7 +429,7 @@ Run for a week with the usual background-then-return usage and report
    resize, say so — that is the known Wayland risk, and the opt-out is
    `POWERGIT_X11=1`.
 2. If it still freezes on Wayland: `POWERGIT_X11=1 POWERGIT_NO_FRAME_SYNC=1
-   ./PowerGit_*.AppImage` — back on X11 with the frame-sync path disabled.
+./PowerGit_*.AppImage` — back on X11 with the frame-sync path disabled.
 3. If it still freezes: `POWERGIT_KEEP_DMABUF=1 POWERGIT_KEEP_COMPOSITING=1`
    (H3 test; a shape change is informative).
 
@@ -460,36 +459,37 @@ described both.
 
 ---
 
-## 7. Where the investigation stands
+## 7. Where the investigation closed
 
 **Proven (two captures):**
+
 - Linux AppImage / WebKitGTK / Ubuntu only, always under XWayland so far.
 - The page, the engine, **and the UI process's main loop** are alive during
   the freeze. What is dead is presentation of the main window.
 
-**Leading hypothesis:** H1, the GTK3 X11 frame-sync stall (§3). v0.15.6
-removes that code path by default and ships a probe that would show the
-stall directly if it happens again on X11.
+**Closed by the owner:** on 2026-09-11, after v0.15.6 made native Wayland the
+default when `WAYLAND_DISPLAY` is set, the owner reported on v0.15.7: "Seems
+to work very well. No issues at all." There has been no freeze since the
+switch, including through the Ubuntu features ticked on 2026-09-16.
 
-**Unknown:**
-- Whether native Wayland stops it (the owner's week-long run answers this).
-- H1 vs H2 on a real freeze (`probe.txt`'s after-paint counter decides).
-- Whether the frameless title bar behaves under Wayland on the owner's
-  machine.
+**Root cause remains unconfirmed:** H1, the GTK3 X11 frame-sync stall (§3),
+is still the leading hypothesis, but no freeze recurred for the shipped probe
+to discriminate H1 from H2. Native Wayland avoids the suspected XWayland code
+path; that successful mitigation does not by itself prove H1.
+
+**X11 caveat:** sessions without `WAYLAND_DISPLAY` are unmitigated by default.
+Set `POWERGIT_NO_FRAME_SYNC=1` as the documented fallback. `POWERGIT_X11=1`
+also restores XWayland explicitly and therefore restores the suspected path.
 
 **Never reproduced on our side**, and the harnesses we have cannot: neither
 the container matrix nor WSLg runs mutter. A faithful reproduction needs a
 GNOME Wayland VM with an XWayland client left occluded/minimised across
 workspace switches.
 
-**Next, in order:**
-
-1. The owner's day-by-day report from §5.
-2. On the next freeze, the v0.15.6 `freeze-dump.sh` tarball plus which
-   recovery steps worked.
-3. Only if Wayland also freezes with `probe.txt` saying `gdk painting`:
-   H2/H4 become the working hypotheses and `draw_thread_is_main` and the
-   journal are read next.
+**Reopen condition:** the first new freeze report. Capture it while frozen with
+`scripts/freeze-dump.sh` and record which recovery steps worked. If native
+Wayland freezes with `probe.txt` saying `gdk painting`, H2/H4 become the
+working hypotheses and `draw_thread_is_main` and the journal are read next.
 
 ---
 
