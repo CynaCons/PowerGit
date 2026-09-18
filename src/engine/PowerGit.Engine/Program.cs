@@ -565,10 +565,11 @@ repo.MapGet("/reviews/{key}", (string key, GitHost git) =>
 {
     try
     {
+        // No review yet is the ordinary case for every row the user selects:
+        // 204 rather than 404, so the browser console (and the app log that
+        // mirrors it) does not record an error per selection.
         string? text = git.ReadReview(key);
-        return text is null
-            ? Results.Json(new ErrorResponse($"no review for {key}"), statusCode: StatusCodes.Status404NotFound)
-            : Results.Content(text, "application/json");
+        return text is null ? Results.NoContent() : Results.Content(text, "application/json");
     }
     catch (InvalidOperationException ex)
     {

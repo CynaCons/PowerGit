@@ -29,7 +29,8 @@ const route = (engine: EngineClient, key: string) => `${engine.repoPath()}/revie
 
 export async function getReview(engine: EngineClient, key: string, signal?: AbortSignal): Promise<string | null> {
   const res = await engine.request(route(engine, key), {}, { signal, timeoutMs: 0 })
-  if (res.status === 404) return null
+  // 204: no review for this key yet (the ordinary case; not a console error).
+  if (res.status === 204 || res.status === 404) return null
   return textResponse(res)
 }
 

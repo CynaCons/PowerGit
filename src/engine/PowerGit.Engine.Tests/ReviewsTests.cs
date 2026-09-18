@@ -123,7 +123,7 @@ public sealed class ReviewsTests : IClassFixture<WebApplicationFactory<Program>>
             Assert.Equal(json + "\n", await get.Content.ReadAsStringAsync());
 
             string unknown = new('0', 40);
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/repos/{id}/reviews/{unknown}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync($"/repos/{id}/reviews/{unknown}")).StatusCode);
 
             HttpResponseMessage bad = await client.PutAsync(
                 $"/repos/{id}/reviews/%2E%2E%2Fx",
@@ -133,7 +133,7 @@ public sealed class ReviewsTests : IClassFixture<WebApplicationFactory<Program>>
             Assert.False(string.IsNullOrWhiteSpace(error?.Error));
 
             Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/repos/{id}/reviews/{sha}")).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/repos/{id}/reviews/{sha}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync($"/repos/{id}/reviews/{sha}")).StatusCode);
         }
         finally
         {

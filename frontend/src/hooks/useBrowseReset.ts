@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   describeThrown,
   type DiffDto,
@@ -64,8 +64,16 @@ export function useBrowseReset({
     onApplied: () => undefined,
   })
 
-  // Selecting another row or file clears a half-open interaction.
+  // Selecting another row or file clears a half-open interaction. The diff
+  // arriving for the file already selected (undefined → its path) is not a
+  // change of file: a menu opened from the list while it loaded stays open
+  // (browse-reset.spec's untracked case raced on it once the v0.19.0 review
+  // load shared the selection's round trips).
+  const shownPath = useRef(diff?.path)
   useEffect(() => {
+    const was = shownPath.current
+    shownPath.current = diff?.path
+    if (was === undefined && diff?.path !== undefined) return
     setFileMenu(null)
     setPending(null)
   }, [row?.kind, commitId, diff?.path])
