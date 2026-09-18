@@ -56,6 +56,7 @@ export function DiffTab({
   onFileHistory,
   reviewKey,
   rowKeys,
+  filesRow,
 }: {
   files: FileChange[]
   selectedPath: string | null
@@ -81,6 +82,8 @@ export function DiffTab({
   /** Review mode (v0.17.0): the document key for the selected row (null while unknown) and the shown diff's row keys. */
   reviewKey: string | null
   rowKeys: RowKeys
+  /** Which row `files` belongs to (BottomPanel keeps the previous list on screen while the next loads). */
+  filesRow?: string | null
 }) {
   const engine = useEngine()
   const [note, setNote] = useState<BrowseResetNote | null>(null)
@@ -111,6 +114,8 @@ export function DiffTab({
   return (
     <>
       <Box
+        data-testid="diff-files-wrap"
+        data-row={filesRow ?? undefined}
         sx={{
           width: `var(--pg-files-width, ${filesWidth}px)`,
           flexShrink: 0,

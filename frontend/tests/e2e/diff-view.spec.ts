@@ -49,12 +49,16 @@ test("double-click a file in the Files tab requests the external diff tool", asy
   await page.goto("/")
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
   const row = page.locator('[data-testid="grid-row"]:not([data-artificial])').first()
-  await row.click()
-  // The file list follows the selection asynchronously; on a dirty tree the
-  // artificial row's files are showing until the click lands, and reading the
-  // first path before that races the double-click below.
-  await expect(row).toHaveClass(/selected/)
   await page.getByRole("tab", { name: /Diff/ }).click()
+  // The file list follows the selection asynchronously and the previous
+  // row's list stays on screen until the new one arrives (on a dirty tree
+  // that is the Working directory's): reading the first path before the
+  // swap raced the double-click below. data-row says whose list it is.
+  const wrap = page.getByTestId("diff-files-wrap")
+  const before = (await row.getAttribute("class"))?.includes("selected") ? null : await wrap.getAttribute("data-row")
+  await row.click()
+  await expect(row).toHaveClass(/selected/)
+  if (before) await expect(wrap).not.toHaveAttribute("data-row", before)
 
   const rows = page.getByTestId("file-list-row")
   if ((await rows.count()) === 0) return

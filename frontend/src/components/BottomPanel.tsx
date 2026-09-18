@@ -133,7 +133,10 @@ export function BottomPanel({
   // (commit, path, options) the current diff was loaded for. Both keep the
   // diff effect from firing for a stale file when the commit changes, and
   // from re-requesting a diff that arrived with the file list.
-  const filesFor = useRef<string | null>(null)
+  // Which row the file list belongs to (a sha, or the pending row's kind):
+  // the previous list stays on screen until the next arrives (below), so a
+  // spec that reads the list right after a click waits on this (data-row).
+  const [filesRow, setFilesRow] = useState<string | null>(null)
   const diffFor = useRef<string | null>(null)
   const lastCommitChange = useRef(0)
   // Read at request time, not a dependency: changing the diff options must
@@ -188,6 +191,7 @@ export function BottomPanel({
   useEffect(() => {
     if (!pendingRow) return
     setFiles(pendingRow.files)
+    setFilesRow(pendingRow.kind)
     setFile((f) => (f && pendingRow.files.some((x) => x.path === f) ? f : (pendingRow.files[0]?.path ?? null)))
     setDetail({ kind: "idle" })
   }, [pendingRow])
@@ -251,7 +255,7 @@ export function BottomPanel({
       data.changes
         .then((changes) => {
           if (ctrl.signal.aborted) return
-          filesFor.current = commitId
+          setFilesRow(commitId)
           setFiles(changes.files)
           const first = changes.files[0]?.path ?? null
           setFile(first)
@@ -279,7 +283,7 @@ export function BottomPanel({
     // The file list still belongs to the previous commit: the changes()
     // request above will deliver the new list and first diff; asking for
     // the old path against the new commit is a wasted round trip.
-    if (filesFor.current !== commitId) return
+    if (filesRow !== commitId) return
     const key = `${commitId}|${file}|${JSON.stringify(diffOpts)}`
     if (diffFor.current === key) return
     const ctrl = new AbortController()
@@ -296,7 +300,7 @@ export function BottomPanel({
           setDiff({ kind: "error", message: `diff failed: ${describeThrown(e)}` })
       })
     return () => ctrl.abort()
-  }, [engine, commitId, file, diffOpts, tab, reloadTick])
+  }, [engine, commitId, file, diffOpts, tab, reloadTick, filesRow])
 
   // The File Tree's blob: the commit's, or for a pending-change row (whose
   // tree is HEAD's, see CommitFileTree below) the file on disk (Working
@@ -445,6 +449,7 @@ export function BottomPanel({
             onFileHistory={fileHistory}
             reviewKey={reviewKey}
             rowKeys={rowKeys}
+            filesRow={filesRow}
           />
         )}
         {tab === 2 && (
