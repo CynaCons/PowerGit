@@ -2,6 +2,7 @@ import Button from "@mui/material/Button"
 import Dialog from "@mui/material/Dialog"
 import type { PaperProps } from "@mui/material/Paper"
 import type { KeyboardEvent, ReactNode } from "react"
+import { useZoom } from "../../theme/zoom"
 import { Kbd } from "../Kbd"
 
 /** The dialog's one action: the label says what it does, `danger` says it discards something. */
@@ -68,6 +69,7 @@ export function OpDialog({
   /** Marks the dialog surface, so a spec can assert what it says (v0.15.0). */
   testid?: string
 }) {
+  const zoom = useZoom()
   const toned = isToned(note) ? note : null
   const noteText: ReactNode = toned ? toned.text : (note as ReactNode)
   const noteTone = toned ? toned.tone : ""
@@ -94,7 +96,8 @@ export function OpDialog({
           "data-testid": testid,
           className: "op-dialog",
           onKeyDown,
-          sx: { width, maxWidth: "calc(100vw - 32px)", overflow: "visible" },
+          // Keep the visual margin stable when #root zooms viewport units (v0.18.19).
+          sx: { width, maxWidth: `calc((100vw - 32px) / ${zoom})`, overflow: "visible" },
         } as PaperProps,
       }}
     >

@@ -7,6 +7,7 @@ import CloseIcon from "@mui/icons-material/Close"
 import { useEffect, useState } from "react"
 import { explainGitFailure } from "../gitErrors"
 import type { JobRecord, Jobs } from "../hooks/useJobs"
+import { useZoom } from "../theme/zoom"
 import { copyToClipboard } from "./clipboard"
 
 function elapsed(startedAt: string, finishedAt: string | null, now: number): string {
@@ -22,6 +23,7 @@ function elapsed(startedAt: string, finishedAt: string | null, now: number): str
  */
 export function JobPanel({ jobs, onClose }: { jobs: Jobs; onClose: () => void }) {
   const { panelOpen, jobs: records, cancelActive, retryJob, clearJobs, busy } = jobs
+  const zoom = useZoom()
   const [now, setNow] = useState(() => Date.now())
   const running = records.some((j) => j.status === "running")
   useEffect(() => {
@@ -40,7 +42,16 @@ export function JobPanel({ jobs, onClose }: { jobs: Jobs; onClose: () => void })
       data-testid="job-panel"
       slotProps={{
         paper: {
-          sx: { width: 420, maxWidth: "90vw", top: "auto", bottom: 24, height: "min(70vh, 560px)", boxShadow: 6 },
+          // Viewport units are local px inside #root and get zoomed again;
+          // divide them so the drawer stays in the visual window (v0.18.19).
+          sx: {
+            width: 420,
+            maxWidth: `calc(90vw / ${zoom})`,
+            top: "auto",
+            bottom: 24,
+            height: `min(calc(70vh / ${zoom}), 560px)`,
+            boxShadow: 6,
+          },
         },
       }}
     >
