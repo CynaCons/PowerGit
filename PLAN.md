@@ -939,11 +939,11 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 
 ### v0.20.3 — The start pane (current) (ACTIVE)
 **Goal:** Prototype B of docs/prototypes/recents-v2.html, picked by the owner on 2026-09-22: opening the recent repositories stops covering the app. The picker becomes the main pane — the same one a cold start shows instead of "Open a repository to see its history." — with the list on the left and the chosen repository on the right: its path, working tree, what is to push and to pull, its recent history, and Open / Terminal here / Copy path / Remove. The three you live in can be pinned to the top. The modal dialog goes; Escape puts the grid back. The engine learns when each repository was last opened and can peek at one it has not opened, without starting a session. Gate: the e2e suite green on the rewritten specs, and a look at the pane in both themes and at 150 % zoom before it goes to the owner.
-- [ ] Engine: recents.json gains lastOpened (written by Remember) and pinned (toggled by PUT /repos/recents/pin); both survive the prune. RecentsStoreTests cover them.
-- [ ] Engine: GET /repos/peek — one or many roots, read-only, cached: branch, ahead/behind, changed count, and the last 8 commits for a single root. Never opens a session.
-- [ ] Frontend StartPane: the list on the left (filter, Pinned / Today / This week / Earlier, keys, Delete with Undo) and the chosen repository on the right (path, state, recent history, Open / Terminal here / Copy path / Remove).
-- [ ] Frontend wiring: the rail button and the cold start both show the pane, Escape puts the grid back, RecentsDialog and RecentTile go; recents.spec.ts rewritten for the pane.
-- [ ] Gate: tsc, eslint, prettier, vitest, the engine suite and the e2e suite green, plus a look at the pane in light and dark and at 150 % zoom.
+- [x] Engine: recents.json gains lastOpened (written by Remember) and pinned (toggled by PUT /repos/recents/pin); both survive the prune. RecentsStoreTests cover them.
+- [x] Engine: GET /repos/peek — one or many roots, read-only, cached: branch, ahead/behind, changed count, and the last 8 commits for a single root. Never opens a session.
+- [x] Frontend StartPane: the list on the left (filter, Pinned / Today / This week / Earlier, keys, Delete with Undo) and the chosen repository on the right (path, state, recent history, Open / Terminal here / Copy path / Remove).
+- [x] Frontend wiring: the rail button and the cold start both show the pane, Escape puts the grid back, RecentsDialog and RecentTile go; recents.spec.ts rewritten for the pane.
+- [x] Gate: tsc, eslint, prettier, vitest, the engine suite and the e2e suite green, plus a look at the pane in light and dark and at 150 % zoom.
 - [ ] Owner tick: open the app cold, land on the pane, pin two repositories, open one from it.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
