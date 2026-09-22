@@ -962,6 +962,8 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Polish from the coordinator's look after the review/agent/MCP work (2026-09-18, not M4): the graph compass at rest is 70 % with a hairline frame and the paper behind it — at 45 % on a transparent box it sat over the SHA column's text and the owner never found it (Grok relay: "make it a bit more visible at rest"); the review bar wraps onto a second row when the strip is narrow — the agent session view at 1400 px and the Diff tab at 1024 px cut "Finish review" off the right edge; the graph-options pill keeps its 45 % until the owner says.
 - [x] CI hygiene from the same look: grid-columns.spec's scrollbar case runs on a made three-lane repository instead of the checkout's own graph, whose lanes grow while pages load — on the Ubuntu runner the auto-fit at the end met the 35 % Graph cap and rightly kept the scrollbar (red on 3 of the day's 5 runs). Known and left: graph-nav's "a parent below the loaded window" case fails once in ~4 runs under load (the second page's 30 s poll), and the @grid visual baselines are the checkout's own rows and drift with every commit — they want a made fixture too.
 
+Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the owner's explicit call ("Can we release 0.20? If possible quickly" — and, asked about the two open ticks, "tag now, tick after"). The v0.20.1 owner tick is open too. Anything either of them turns up goes into v0.20.4.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
