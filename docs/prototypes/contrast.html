@@ -1,0 +1,606 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Contrast and separators</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee;
+    --chrome-tint: #e7ecf3; --chrome-band: #eff2f7;
+    --shadow-win: 0 14px 40px rgba(16, 24, 39, 0.22);
+    --shadow-card: 0 1px 2px rgba(16, 24, 39, 0.07);
+    --zebra: rgba(16, 24, 39, 0.032);
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb;
+    --ref-remote-bg: #ecfdf5; --ref-remote-fg: #059669;
+    --ref-head-bg: #fef2f2; --ref-head-fg: #dc2626;
+    --lane1: #78b4e6; --lane2: #24c221;
+    --console-bg: #12171e; --console-line: #1b222b; --console-text: #e6e9ef; --console-meta: #9aa6b4; --console-ok: #5ee38a;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+      --page: #0a0e13;
+      --chrome-tint: #10161e; --chrome-band: #141b23;
+      --shadow-win: 0 18px 48px rgba(0, 0, 0, 0.55);
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+      --zebra: rgba(255, 255, 255, 0.026);
+      --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe;
+      --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+      --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+      --lane1: #82bdf0; --lane2: #3ad636;
+      --console-bg: #0d1116; --console-line: #141b23;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+    --page: #0a0e13;
+    --chrome-tint: #10161e; --chrome-band: #141b23;
+    --shadow-win: 0 18px 48px rgba(0, 0, 0, 0.55);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --zebra: rgba(255, 255, 255, 0.026);
+    --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe;
+    --ref-remote-bg: #0b3d2e; --ref-remote-fg: #86efac;
+    --ref-head-bg: #4a1d1d; --ref-head-fg: #fecaca;
+    --lane1: #82bdf0; --lane2: #3ad636;
+    --console-bg: #0d1116; --console-line: #141b23;
+  }
+
+  /* How deep the chrome tint goes (variant C). 1 is the --surface-alt the app
+     already has, 2 is what the prototype proposes, 3 is as far as it can go
+     before the window stops looking like paper. */
+  :root[data-tint="1"] { --chrome-tint: #eef1f5; --chrome-band: #f6f8fb; }
+  :root[data-tint="3"] { --chrome-tint: #dde4ed; --chrome-band: #e9edf4; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"])[data-tint="1"] { --chrome-tint: #141b23; --chrome-band: #171f28; }
+    :root:not([data-theme="light"])[data-tint="3"] { --chrome-tint: #090d12; --chrome-band: #10161e; }
+  }
+  :root[data-theme="dark"][data-tint="1"] { --chrome-tint: #141b23; --chrome-band: #171f28; }
+  :root[data-theme="dark"][data-tint="3"] { --chrome-tint: #090d12; --chrome-band: #10161e; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Ubuntu", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  svg { display: block; }
+  kbd { font-family: var(--mono); font-size: 10.5px; padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--meta); line-height: 15px; }
+
+  /* ---------- page chrome ---------- */
+  .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 9px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .right { display: flex; gap: 10px; margin-left: auto; align-items: center; flex-wrap: wrap; }
+  .switch { display: flex; gap: 4px; flex-wrap: wrap; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch button b { font-weight: 700; margin-right: 6px; }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme[hidden] { display: none; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 4px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 18px 20px 56px; }
+  .lead { max-width: 82ch; margin: 0 auto 14px; color: var(--text-2); }
+  .lead h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .quote { max-width: 82ch; margin: 0 auto 14px; border-left: 2px solid var(--border); padding-left: 10px; color: var(--meta); font-style: italic; }
+  .notes { max-width: 1340px; margin: 18px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .notes h3 { font-size: 12px; font-weight: 600; color: var(--meta); margin: 0 0 6px; }
+  .notes ul { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+  .notes li { display: flex; gap: 9px; margin: 0 0 7px; }
+  .notes li .mark { flex: none; margin-top: 1px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+  .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; line-height: 1; font-style: normal; }
+  .mark.cost { background: var(--surface-alt); color: var(--meta); box-shadow: inset 0 0 0 1px var(--border); }
+  .foothint { max-width: 1340px; margin: 16px auto 0; color: var(--meta); font-size: 12px; }
+  @media (max-width: 900px) { .notes { grid-template-columns: 1fr; } main { padding: 16px 16px 48px; } .top { padding: 9px 16px; } }
+
+  /* =======================================================================
+     The window. One markup, four skins: the body class is the variant, and
+     everything below is the app as it would look under that treatment.
+     Five knobs do all the work — they are the values a real change would
+     put into src/theme/tokens.ts.
+     ======================================================================= */
+  .win-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .win {
+    --pane: var(--surface);          /* what a panel is painted with */
+    --chrome: var(--surface);        /* rail, tree, tab strip, status bar */
+    --band: var(--surface);          /* column header / caption bands */
+    --rule: var(--border-soft);      /* pane-to-pane divider */
+    --inner-rule: var(--border-soft);/* rules inside a pane */
+    --desk: var(--surface);          /* what shows between panes */
+    --gap: 0px;                      /* the gutter between panes */
+    --radius: 0px;
+    --card-shadow: none;
+    --stripe: transparent;
+    width: 1340px; max-width: 100%; height: 812px; margin: 0 auto;
+    background: var(--desk); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    box-shadow: var(--shadow-win);
+    display: grid; grid-template-rows: 34px minmax(0, 1fr) 24px 22px;
+    user-select: none; font-size: 12.5px;
+  }
+
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--chrome); border-bottom: 1px solid var(--rule); font-size: 12.5px; color: var(--meta); }
+  .titlebar .logo { width: 17px; height: 17px; flex: none; }
+  .titlebar .word { font-weight: 700; color: var(--text); font-size: 13px; }
+  .titlebar .hair { width: 1px; height: 15px; background: var(--border); }
+  .titlebar .sp { flex: 1; }
+  .titlebar .wc { display: flex; gap: 14px; color: var(--meta); font-size: 11px; }
+
+  .shell { display: grid; grid-template-columns: 186px 226px minmax(0, 1fr); min-height: 0; gap: var(--gap); padding: var(--gap); background: var(--desk); }
+
+  .pane { background: var(--pane); border-radius: var(--radius); box-shadow: var(--card-shadow); min-width: 0; min-height: 0; overflow: hidden; }
+  .bordered { border: 0; }
+
+  /* ---- the command rail ---- */
+  .rail { display: flex; flex-direction: column; padding: 6px 0; border-right: 1px solid var(--rule); }
+  .rail .item { display: flex; align-items: center; gap: 9px; height: 25px; padding: 0 10px; color: var(--text-2); white-space: nowrap; }
+  .rail .item i { width: 15px; height: 15px; flex: none; border-radius: 3px; background: var(--meta); opacity: 0.55; }
+  .rail .item.on { color: var(--text); font-weight: 600; }
+  .rail .item.on i { background: var(--primary); opacity: 1; }
+  .rail .item .chev { margin-left: auto; color: var(--disabled); font-size: 10px; }
+  .rail .sp { flex: 1; }
+  .rail .sep { height: 1px; background: var(--inner-rule); margin: 6px 10px; }
+
+  /* ---- the repository tree ---- */
+  .tree { display: grid; grid-template-rows: 26px 28px minmax(0, 1fr); border-right: 1px solid var(--rule); }
+  .caption { display: none; align-items: center; gap: 8px; padding: 0 10px; background: var(--band); border-bottom: 1px solid var(--inner-rule); font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--meta); }
+  .tree .head { display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--band); border-bottom: 1px solid var(--inner-rule); font-weight: 600; color: var(--text); }
+  .tree .head .sp { flex: 1; }
+  .tree .head .ic { width: 13px; height: 13px; border-radius: 2px; background: var(--meta); opacity: 0.5; }
+  .tree .filter { display: flex; align-items: center; padding: 0 10px; color: var(--disabled); border-bottom: 1px solid var(--inner-rule); }
+  .tree .body { overflow: hidden; padding: 4px 0; }
+  .tree .n { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; color: var(--text-2); white-space: nowrap; }
+  .tree .n.d1 { padding-left: 22px; } .tree .n.d2 { padding-left: 34px; } .tree .n.d3 { padding-left: 46px; }
+  .tree .n .tw { color: var(--disabled); font-size: 9px; width: 8px; }
+  .tree .n .gi { width: 12px; height: 12px; flex: none; border-radius: 2px; background: var(--meta); opacity: 0.45; }
+  .tree .n.cur { background: var(--sel-bg); color: var(--text); font-weight: 600; }
+  .tree .n.grp { font-weight: 600; color: var(--text); }
+
+  /* ---- the centre: history over the commit pane ---- */
+  .centre { display: grid; grid-template-rows: minmax(0, 1fr) 5px 250px; min-width: 0; min-height: 0; gap: var(--gap); }
+  .history { display: grid; grid-template-rows: 26px minmax(0, 1fr); min-height: 0; }
+  .ghead { display: grid; grid-template-columns: var(--cols); align-items: center; background: var(--band); border-bottom: 1px solid var(--rule); color: var(--meta); font-size: 11px; }
+  .ghead > div { padding: 0 10px; height: 100%; display: flex; align-items: center; }
+  .ghead > div + div { border-left: 1px solid transparent; }
+  .rows { position: relative; overflow: hidden; }
+  .lanes { position: absolute; left: 0; top: 0; }
+  .rowlist { position: relative; }
+  .row { display: grid; grid-template-columns: var(--cols); align-items: stretch; height: 28px; border-left: 2px solid transparent; }
+  .row > div { display: flex; align-items: center; gap: 7px; padding: 0 10px; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .row .c-msg .txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .row .c-auth { color: var(--text-2); }
+  .row .c-date, .row .c-sha { color: var(--meta); font-size: 11.5px; }
+  .row .c-sha { font-family: var(--mono); font-size: 11px; }
+  /* Nothing paints the graph cell. The lanes are a canvas under the rows, so
+     a row background there hides the node of the row you just selected —
+     exactly the defect that shipped from v0.12.1 to v0.13.13. */
+  .row:nth-child(even) > div:not(.c-graph) { background: var(--stripe); }
+  .row:hover > div:not(.c-graph) { background: var(--hover); }
+  .row.sel { border-left-color: var(--sel-border); }
+  .row.sel > div:not(.c-graph) { background: var(--sel-bg); }
+  .disc { width: 17px; height: 17px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 8.5px; font-weight: 700; color: var(--ref-local-fg); background: var(--ref-local-bg); box-shadow: inset 0 0 0 1px currentColor; }
+  .ref { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; height: 17px; border-radius: 999px; font-size: 10.5px; font-weight: 600; background: var(--ref-local-bg); color: var(--ref-local-fg); white-space: nowrap; flex: none; }
+  .ref.remote { background: var(--ref-remote-bg); color: var(--ref-remote-fg); }
+  .ref.head { background: var(--ref-head-bg); color: var(--ref-head-fg); }
+
+  .splitter { background: transparent; }
+  .splitter::after { content: ""; display: block; height: 1px; margin-top: 2px; background: var(--rule); }
+
+  .bottom { display: grid; grid-template-rows: 30px minmax(0, 1fr); min-height: 0; }
+  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 10px; background: var(--chrome); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .tabs .t { padding: 0 12px; height: 29px; display: flex; align-items: center; color: var(--meta); border-bottom: 2px solid transparent; }
+  .tabs .t.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .detail { background: var(--pane); padding: 14px 18px; overflow: hidden; }
+  .detail h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+  .detail .who { color: var(--meta); font-size: 11.5px; margin-bottom: 10px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .detail p { margin: 0 0 6px; color: var(--text-2); font-size: 12.5px; max-width: 92ch; white-space: normal; }
+
+  .status { display: flex; align-items: center; gap: 14px; padding: 0 12px; background: var(--chrome); border-top: 1px solid var(--rule); color: var(--meta); font-size: 11.5px; }
+  .status .b { color: var(--primary); font-weight: 600; }
+  .status .sp { flex: 1; }
+  .console { display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--console-line); color: var(--console-meta); font-family: var(--mono); font-size: 11px; }
+  .console .cmd { color: var(--console-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .console .ok { color: var(--console-ok); }
+  .console .sp { flex: 1; }
+
+  /* =======================================================================
+     N — today. Nothing below this line is a change: it is the released
+     0.20.4 look, so the four proposals are measured against it.
+     ======================================================================= */
+
+  /* ---- A: the lines do it. Every boundary is a real rule. ---- */
+  body.A .win { --rule: var(--border); }
+  body.A .ghead > div + div { border-left-color: var(--inner-rule); }
+  body.A .row > div + div { box-shadow: inset 1px 0 0 var(--border-soft); }
+
+  /* ---- B: A, plus a band over every pane and a stripe on every other row ---- */
+  body.B .win { --rule: var(--border); --band: var(--surface-alt); --stripe: var(--zebra); }
+  body.B .caption { display: flex; }
+  body.B .tree { grid-template-rows: 22px 26px 28px minmax(0, 1fr); }
+  body.B .bottom { grid-template-rows: 22px 30px minmax(0, 1fr); }
+  body.B .history { grid-template-rows: 22px 26px minmax(0, 1fr); }
+  body.B .ghead > div + div { border-left-color: var(--border-soft); }
+  body.B .tabs { background: var(--pane); }
+
+  /* ---- C: the chrome is tinted; only the grid and the commit stay paper ---- */
+  body.C .win { --chrome: var(--chrome-tint); --band: var(--chrome-band); --rule: var(--border); }
+  body.C .rail .sep { background: var(--border); }
+  body.C .tree { background: var(--chrome); }
+  body.C .tree .head, body.C .tree .filter { background: transparent; border-bottom-color: var(--border); }
+  body.C .tree .body { background: transparent; }
+  body.C .rail { background: var(--chrome); }
+  body.C .tabs { background: var(--chrome); }
+  body.C .titlebar { background: var(--chrome); }
+  body.C .status { background: var(--chrome); }
+
+  /* ---- D: panes become cards on a desk ---- */
+  body.D .win { --desk: var(--page); --gap: 6px; --radius: 6px; --card-shadow: var(--shadow-card); --rule: var(--border); --band: var(--sunken); }
+  body.D .rail, body.D .tree { border-right: 0; }
+  body.D .pane { border: 1px solid var(--border); }
+  body.D .splitter::after { display: none; }
+  body.D .status { background: var(--desk); border-top: 1px solid var(--border); }
+  body.D .titlebar { border-bottom: 1px solid var(--border); }
+  body.D .tabs { border-top: 0; }
+  body.D .history, body.D .bottom { background: var(--pane); }
+
+  @media (max-width: 1400px) { .win { height: 760px; } }
+</style>
+
+<div class="top">
+  <h1>Contrast and separators</h1>
+  <span class="sub">PowerGit 0.20.4 · four ways to tell the panes apart</span>
+  <div class="right">
+    <div class="switch" id="variants"></div>
+    <div class="theme" id="tint" hidden>
+      <button data-tint="1">Subtle</button>
+      <button data-tint="2" class="on">Medium</button>
+      <button data-tint="3">Strong</button>
+    </div>
+    <div class="theme" id="theme">
+      <button data-t="light" class="on">Light</button>
+      <button data-t="dark">Dark</button>
+      <button data-t="auto">Auto</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="quote">
+    “I think we're missing a bit of contrast and separators in the app. Right now its all just white and its
+    hard to distinguish the different parts.” — Constantin, 2026-09-22
+  </div>
+  <div class="lead" id="lead"></div>
+  <div class="win-wrap"><div class="win" id="win"></div></div>
+  <div class="notes" id="notes"></div>
+  <p class="foothint">
+    <kbd>1</kbd>–<kbd>5</kbd> switch, <kbd>↑</kbd><kbd>↓</kbd> move the selected commit, <kbd>T</kbd> switches
+    the theme. Every variant is the same window with different values — nothing moves except what the note says.
+  </p>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id)
+  const state = { v: "C", sel: 1, tint: "2" }
+
+  const VARIANTS = {
+    N: "Today (0.20.4)",
+    A: "Rules",
+    B: "Bands",
+    C: "Tinted chrome",
+    D: "Cards",
+  }
+
+  const LEAD = {
+    N: `<h2>What ships today</h2><p>Rail, tree, history and the commit pane are all <b>#ffffff</b>, and the only
+      thing between them is a <b>#e6eaf0</b> hairline — about a 4 % step off white. The column header, the tab
+      strip and the status bar are white too. This is the screen you were looking at; the other four are
+      measured against it.</p>`,
+    A: `<h2>A — Rules</h2><p>Nothing moves and nothing is repainted. Every boundary that separates <i>panes</i>
+      is promoted from the soft hairline to the real border (<b>#d6dce5</b>, ~16 % off white), and the grid gets
+      its column rules back. In-pane lines stay soft, so the hierarchy reads: <b>hard line = a different part of
+      the app, soft line = a row inside one</b>.</p>`,
+    B: `<h2>B — Bands</h2><p>A's rules, plus a caption band over each pane — <span style="letter-spacing:.06em">REPOSITORY</span>,
+      <span style="letter-spacing:.06em">HISTORY</span>, <span style="letter-spacing:.06em">COMMIT</span> — on the
+      sunken grey, and a stripe on every other commit row. Each part now names itself, and the eye tracks a long
+      row across to the SHA.</p>`,
+    C: `<h2>C — Tinted chrome</h2><p>The chrome takes a tint and the content keeps the paper: rail, tree, tab
+      strip, title strip and status bar go to <b>#eef1f5</b>, while the revision grid and the commit text stay
+      white. The separation stops depending on a hairline you have to hunt for — it is a change of surface, the
+      way VS Code, Fork and GitKraken do it. Dark mode already works this way; this makes light agree with it.</p>`,
+    D: `<h2>D — Cards</h2><p>Every pane becomes a card: 1 px border, 6 px radius, a hair of shadow, floating on a
+      desk the colour of the window background, with a 6 px gutter where the splitters are. The most separation
+      of the four, and the only one that costs you pixels.</p>`,
+  }
+
+  const NOTES = {
+    N: [
+      ["what", [
+        ["Four panes, one colour", "rail #ffffff, tree #ffffff, grid #ffffff, commit #ffffff."],
+        ["One hairline, 4 % off white", "--border-soft #e6eaf0 does every boundary; --border #d6dce5 is barely used outside dialogs."],
+        ["No band anywhere", "the column header, the tab strip and the status bar sit on the same white as the content they head."],
+      ]],
+      ["cost", [
+        ["What it buys", "maximum brightness and the most rows per screen — nothing is spent on chrome."],
+        ["What it costs", "at a glance the window is one sheet; you find the tree/grid boundary by the text, not the surface."],
+      ]],
+    ],
+    A: [
+      ["what", [
+        ["One token rule", "pane boundaries use --border, in-pane lines keep --border-soft. Both values already exist."],
+        ["The grid gets columns back", "a soft rule between Graph / Message / Author / Date / SHA, so a long message stops bleeding into the author."],
+        ["Half a day", "about ten borderColor values across the shell components; no layout, no new token, no test churn."],
+      ]],
+      ["cost", [
+        ["The smallest of the four", "if 'all just white' is about surfaces rather than lines, A will not be enough on its own."],
+        ["Composes with everything", "A is the floor for B, C and D — they all assume the harder rule."],
+      ]],
+    ],
+    B: [
+      ["what", [
+        ["A caption over each pane", "22 px, sunken, uppercase 10.5 px. Names the part and draws the line at the same time."],
+        ["A sunken column header", "the grid header stops being the same white as its rows."],
+        ["The stripe stops at the graph column", "the rows are painted over the graph canvas, so a stripe across it would dash the lanes. Same reason the selected row does not paint there since v0.13.13."],
+        ["Zebra rows", "a 2 % stripe on every other row carries the eye out to the date and the SHA."],
+      ]],
+      ["cost", [
+        ["22 px a pane, vertically", "three captions ≈ one commit row lost in the history and a line of the diff."],
+        ["The stripe is over the canvas", "the graph is painted under the rows, so a stripe has to be translucent and will tint the lanes it crosses very slightly — or the stripe gets painted into the canvas too, which is the honest version and half a day more."],
+        ["Captions can be noise", "you already know which pane is the tree."],
+      ]],
+    ],
+    C: [
+      ["what", [
+        ["Chrome tints, content stays paper", "rail, tree, tab strip, title strip and status bar take a tint; the revision grid and the commit text keep the paper white."],
+        ["It needs a new token, and that is the finding", "--surface-alt (#eef1f5) is 6 % off white and disappears on a bright panel — I could not see it in a screenshot of this very page. The tint here is #e7ecf3, ~9 %, which is where it starts to read. Dark reuses #10161e, which already works."],
+        ["The hairline stops carrying the load", "a 6 % surface step separates better than a 4 % line, at any zoom and on a dim laptop panel."],
+        ["Light finally matches dark", "in dark, surface-alt is already a step down from the panels — light is the theme that never got the treatment."],
+        ["Density unchanged", "not one pixel of layout moves; the same number of rows fit."],
+      ]],
+      ["cost", [
+        ["Ref chips sit on a tint now", "the pale badge backgrounds (#eff6ff, #ecfdf5) lose a little pop on the tinted tree; they may want one step more saturation."],
+        ["Hover and selection want a check", "the rail/tree hover is an alpha blue over white today; over the tint it reads slightly darker. contrast.test.ts covers the text ratios, not this."],
+        ["A day, plus the visual baselines", "@grid, @themes and the settings screens all move by a few pixels of colour."],
+      ]],
+    ],
+    D: [
+      ["what", [
+        ["Panes become cards", "1 px --border, 6 px radius, 0 1px 2px shadow, on a desk of --page."],
+        ["The gutter is the splitter", "6 px of desk between panes; the drag handle lives in it, which is where you already aim."],
+        ["No ambiguity at all", "you could describe this window over the phone."],
+      ]],
+      ["cost", [
+        ["12–18 px of content gone", "two vertical gutters and one horizontal, plus the card borders. At 28 px a row that is a row and a half."],
+        ["The graph canvas meets a rounded corner", "the canvas is a sibling of the rows; clipping it to a radius needs care at the top-left, and the first lane sits 6 px further in."],
+        ["Splitter hit areas change", "PanelSplitter's grab zone is currently a 1 px line with padding; it becomes the gutter. The e2e drag specs move with it."],
+        ["Two days", "and it is the one that stops looking like Git Extensions."],
+      ]],
+    ],
+  }
+
+  const COMMITS = [
+    { refs: [["head", "HEAD"], ["local", "powergit"]], msg: "plan(v0.20.3): the release ships with the owner ticks open", d: "2026-09-22 16:23", s: "c4c8b1f", lane: 1, node: "sq" },
+    { refs: [["remote", "origin/powergit"]], msg: "test: two specs that read this repository's own history, made to survive a merge", d: "2026-09-22 16:23", s: "27287be", lane: 1, node: "sq" },
+    { refs: [], msg: "chore(release): v0.20.3", d: "2026-09-22 15:59", s: "a1647a1", lane: 1 },
+    { refs: [], msg: "plan(v0.20.3): the start pane is built and gated; the owner's tick is what is left", d: "2026-09-22 15:33", s: "9e9c123", lane: 1 },
+    { refs: [], msg: "test: the two specs that still looked for the old empty state and the dialog", d: "2026-09-22 15:32", s: "7be7987", lane: 1 },
+    { refs: [], msg: "ui: the start pane replaces the recent-repositories dialog, and a sweep no longer resets a navigation", d: "2026-09-22 15:12", s: "b78341e", lane: 1 },
+    { refs: [], msg: "ui: the start pane — the list on the left, the repository you are about to open on the right", d: "2026-09-22 14:52", s: "a707469", lane: 1, node: "merge" },
+    { refs: [], msg: "engine: the start pane's facts — lastOpened and pinned in recents.json", d: "2026-09-22 14:51", s: "2c19334", lane: 1 },
+    { refs: [["local", "wt/start-pane-ui"]], msg: "feat: build recent repositories start pane", d: "2026-09-22 14:51", s: "58027f5", lane: 2, node: "sq" },
+    { refs: [], msg: "plan: the start pane ships in the 0.20 line (v0.20.3), the rest of the agent bridge moves to v0.21", d: "2026-09-22 14:48", s: "4bdd351", lane: 1 },
+    { refs: [["local", "wt/start-pane-engine"]], msg: "Add start pane repository metadata APIs", d: "2026-09-22 14:38", s: "5d7fcf6", lane: 2, node: "sq" },
+    { refs: [], msg: "plan: the start pane is registered (v0.21.0) from prototype B, and a task is one or two lines", d: "2026-09-22 14:35", s: "eff5f67", lane: 1 },
+    { refs: [], msg: "prototypes(recents): a second pass on the recent-repositories picker", d: "2026-09-22 14:22", s: "5edee5d", lane: 1 },
+    { refs: [], msg: "ui: the compass is findable at rest (70 %, a hairline frame, paper behind it)", d: "2026-09-18 22:14", s: "340be53", lane: 1 },
+    { refs: [], msg: "agent-reviews: the inbox poll sets state only when the list changed", d: "2026-09-18 21:03", s: "61539b8", lane: 1 },
+    { refs: [], msg: "mcp: a tool call reuses the open session; the host tests wait longer on CI", d: "2026-09-18 19:46", s: "9ecf90a", lane: 1 },
+    { refs: [], msg: "mcp: shutdown never throws, and the test suite does not host the endpoint", d: "2026-09-18 19:33", s: "a530166", lane: 1 },
+    { refs: [], msg: "plan(v0.20.1): the engine-hosted MCP server is ticked", d: "2026-09-18 19:13", s: "43bfa21", lane: 1 },
+  ]
+
+  const RAIL = [
+    ["Collapse", 0], ["PowerGit", 0], ["Open repository…", 0], ["Recent repositories", 0], ["Agent reviews", 0],
+    ["sep", 0], ["Refresh", 0], ["Commit", 1, ">"], ["Stash", 0, ">"], ["Pull", 0, ">"], ["Push", 0, ">"],
+    ["Fetch", 0, ">"], ["Branch", 0, ">"], ["Checkout", 0], ["Merge", 0], ["Rebase", 0], ["Tag", 0],
+  ]
+
+  const TREE = [
+    ["Branches", "grp", 0, "v"],
+    ["wt", "", 1, "v"], ["console", "", 2], ["engine", "", 2], ["start-pane-engine", "", 2],
+    ["start-pane-ui", "", 2], ["v18-recents", "", 2], ["v18-wrap", "", 2],
+    ["master", "", 1], ["powergit", "cur", 1],
+    ["Remotes", "grp", 0, "v"],
+    ["origin", "", 1, "v"], ["experimental", "", 2, ">"], ["feature", "", 2, ">"], ["release", "", 2, ">"],
+    ["master", "", 2], ["powergit", "", 2],
+    ["upstream", "", 1, ">"],
+  ]
+
+  const ROW_H = 28
+
+  function laneSvg(n) {
+    const h = n * ROW_H
+    const x1 = 20, x2 = 42
+    const y = (i) => i * ROW_H + ROW_H / 2
+    let d = ""
+    // the branch that leaves at row 8 and comes back at row 6 (reading down the page)
+    const out = `M ${x1} ${y(6)} C ${x1} ${y(6) + 12}, ${x2} ${y(7) - 12}, ${x2} ${y(7)} L ${x2} ${y(8)}`
+    const out2 = `M ${x1} ${y(9)} C ${x1} ${y(9) + 12}, ${x2} ${y(10) - 12}, ${x2} ${y(10)} L ${x2} ${y(11)}`
+    d += `<path d="${out}" fill="none" stroke="var(--lane2)" stroke-width="2"/>`
+    d += `<path d="${out2}" fill="none" stroke="var(--lane2)" stroke-width="2"/>`
+    d += `<line x1="${x1}" y1="0" x2="${x1}" y2="${h}" stroke="var(--lane1)" stroke-width="2"/>`
+    COMMITS.slice(0, n).forEach((c, i) => {
+      const x = c.lane === 2 ? x2 : x1
+      const fill = c.lane === 2 ? "var(--lane2)" : "var(--lane1)"
+      if (c.node === "sq") {
+        d += `<rect x="${x - 5}" y="${y(i) - 5}" width="10" height="10" rx="1.5" fill="${fill}" stroke="var(--pane)" stroke-width="1.5"/>`
+      } else {
+        d += `<circle cx="${x}" cy="${y(i)}" r="5" fill="${fill}" stroke="var(--pane)" stroke-width="1.5"/>`
+      }
+    })
+    return `<svg class="lanes" width="300" height="${h}" viewBox="0 0 300 ${h}">${d}</svg>`
+  }
+
+  function windowHtml() {
+    const rows = COMMITS.map(
+      (c, i) => `<div class="row ${i === state.sel ? "sel" : ""}" data-i="${i}">
+        <div class="c-graph"></div>
+        <div class="c-msg">${c.refs
+          .map(([k, t]) => `<span class="ref ${k}">${t}</span>`)
+          .join("")}<span class="txt">${c.msg}</span></div>
+        <div class="c-auth"><i class="disc">CC</i>Constantin Chabirand</div>
+        <div class="c-date">${c.d}</div>
+        <div class="c-sha">${c.s}</div>
+      </div>`,
+    ).join("")
+
+    const rail = RAIL.map(([label, on, chev]) =>
+      label === "sep"
+        ? `<div class="sep"></div>`
+        : `<div class="item ${on ? "on" : ""}"><i></i>${label}${chev ? `<span class="chev">›</span>` : ""}</div>`,
+    ).join("")
+
+    const tree = TREE.map(([label, cls, depth, tw]) =>
+      `<div class="n ${cls} d${depth}"><span class="tw">${tw || ""}</span><i class="gi"></i>${label}</div>`,
+    ).join("")
+
+    return `
+      <div class="titlebar">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round">
+          <path d="M5 4 L19 20 M19 4 L5 20"/>
+        </svg>
+        <span class="word">PowerGit</span>
+        <span class="hair"></span>
+        <span>powergit</span>
+        <span class="sp"></span>
+        <span class="wc">— ▢ ✕</span>
+      </div>
+
+      <div class="shell">
+        <div class="pane rail">${rail}</div>
+
+        <div class="pane tree">
+          <div class="caption">Repository</div>
+          <div class="head">Repository<span class="sp"></span><i class="ic"></i><i class="ic"></i></div>
+          <div class="filter">Filter refs…</div>
+          <div class="body">${tree}</div>
+        </div>
+
+        <div class="centre">
+          <div class="pane history" style="--cols: 300px minmax(0, 1fr) 168px 124px 78px">
+            <div class="caption">History</div>
+            <div class="ghead"><div>Graph</div><div>Message</div><div>Author</div><div>Date</div><div>SHA</div></div>
+            <div class="rows">${laneSvg(COMMITS.length)}<div class="rowlist">${rows}</div></div>
+          </div>
+
+          <div class="splitter"></div>
+
+          <div class="pane bottom">
+            <div class="caption">Commit</div>
+            <div class="tabs"><div class="t on">Commit</div><div class="t">Diff (2)</div><div class="t">File tree</div></div>
+            <div class="detail">
+              <h4>${COMMITS[state.sel].msg}</h4>
+              <div class="who"><span>Constantin Chabirand</span><span>${COMMITS[state.sel].d}</span><span style="font-family: var(--mono)">${COMMITS[state.sel].s}</span></div>
+              <p>Both failed on CI against the start-pane merges and pass here: diff-latency measures rows 3, 5, 7…
+                of the checkout's own graph, and a --no-ff merge can list exactly the files of the commit it merged,
+                so neither the list nor the diff text ever changes and the row cannot be measured.</p>
+              <p>Such a row is skipped now — five measurable rows out of the first twenty — and the report says
+                which were skipped.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="status">
+        <span class="b">powergit</span><span>↑1 ↓0</span><span>(0 changes)</span>
+        <span class="sp"></span>
+        <span>git 2.38.1.windows.1</span><span>engine 0.20.4</span>
+      </div>
+
+      <div class="console">
+        <span class="ok">▸</span>
+        <span class="cmd">git -c core.quotepath=false show -s --format=%H%P%an%ae%cn%ce%ad%cd%s%b 61539b8e9bf92c9190571c15f8f348c47aa7693f</span>
+        <span class="sp"></span><span>160 ms</span><span>50</span>
+      </div>`
+  }
+
+  function render() {
+    document.body.className = state.v
+    $("variants").innerHTML = Object.entries(VARIANTS)
+      .map(([k, t]) => `<button data-variant="${k}" class="${k === state.v ? "on" : ""}"><b>${k === "N" ? "•" : k}</b>${t}</button>`)
+      .join("")
+    $("lead").innerHTML = LEAD[state.v]
+    $("tint").hidden = state.v !== "C"
+    document.documentElement.dataset.tint = state.tint
+    $("win").innerHTML = windowHtml()
+    $("notes").innerHTML = NOTES[state.v]
+      .map(([kind, rows]) => `<div><h3>${kind === "what" ? "What changes" : "What it costs"}</h3><ul>${rows
+        .map(([b, t], i) => `<li><i class="mark ${kind === "cost" ? "cost" : ""}">${kind === "cost" ? "·" : i + 1}</i><span><b>${b}</b> — ${t}</span></li>`)
+        .join("")}</ul></div>`)
+      .join("")
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-variant],[data-t],[data-tint],[data-i]")
+    if (!t) return
+    if (t.dataset.variant) {
+      state.v = t.dataset.variant
+      return render()
+    }
+    if (t.dataset.t) {
+      if (t.dataset.t === "auto") delete document.documentElement.dataset.theme
+      else document.documentElement.dataset.theme = t.dataset.t
+      for (const b of $("theme").children) b.classList.toggle("on", b === t)
+      return
+    }
+    if (t.dataset.tint) {
+      state.tint = t.dataset.tint
+      for (const b of $("tint").children) b.classList.toggle("on", b === t)
+      return render()
+    }
+    if (t.dataset.i !== undefined) {
+      state.sel = Number(t.dataset.i)
+      return render()
+    }
+  })
+
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return
+    const keys = Object.keys(VARIANTS)
+    if (/^[1-5]$/.test(e.key)) {
+      e.preventDefault()
+      state.v = keys[Number(e.key) - 1]
+      return render()
+    }
+    if (e.key === "t" || e.key === "T") {
+      e.preventDefault()
+      const now = document.documentElement.dataset.theme
+      const next = now === "dark" ? "light" : "dark"
+      document.documentElement.dataset.theme = next
+      for (const b of $("theme").children) b.classList.toggle("on", b.dataset.t === next)
+      return
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault()
+      state.sel = Math.max(0, Math.min(COMMITS.length - 1, state.sel + (e.key === "ArrowDown" ? 1 : -1)))
+      return render()
+    }
+  })
+
+  document.documentElement.dataset.theme = "light"
+  render()
+</script>
