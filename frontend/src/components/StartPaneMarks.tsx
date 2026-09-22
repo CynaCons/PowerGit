@@ -21,8 +21,10 @@ export function Branch({ text, range }: { text?: string; range: MatchRange | nul
         // The chip grows instead of cutting the name off (owner, 2026-09-22:
         // "I would like to have the branch names longer if possible, so
         // separate row for the rest would be good"): the name wraps onto a
-        // second line, two lines at most so one long branch cannot push the
-        // rest of the list down a screen.
+        // second line, three at most so one long branch cannot push the rest
+        // of the list down a screen. Three, not two: CI's font metrics put
+        // a 54-character branch on a third line where this machine's fit it
+        // on two, and a clipped name is the thing the owner reported.
         height: "auto",
         minHeight: 18,
         alignItems: "flex-start",
@@ -41,7 +43,7 @@ export function Branch({ text, range }: { text?: string; range: MatchRange | nul
           // A branch name has no spaces to break at, so it breaks anywhere.
           wordBreak: "break-all",
           display: "-webkit-box",
-          WebkitLineClamp: 2,
+          WebkitLineClamp: 3,
           WebkitBoxOrient: "vertical",
           overflow: "hidden",
         }}
