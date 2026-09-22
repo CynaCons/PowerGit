@@ -113,6 +113,10 @@ dotnet build ../gitextensions-ref/GitExtensions.slnx
 - **powerplan** is the only sanctioned writer of `PLAN.md`. Direct edits are a
   process violation except when powerplan is not yet runnable (bootstrap).
 - Every mutation tool takes optional `plan_path`; default is the nearest PLAN.md.
+- **A task is one or two lines** (owner, 2026-09-22): what it is, then `Done
+  <sha>` with the number that proves it. Design detail belongs in the
+  iteration goal, in `docs/`, or in the commit message — never in the task.
+  Backlog entries too: powerplan cannot edit or remove one afterwards.
 - Optional `agent` tag on mutations: `[agent: <id>]`.
 - **PowerSpawn** is how the coordinator launches workers (`spawn_claude`,
   `spawn_codex`, `spawn_copilot`, `spawn_grok`, …).
