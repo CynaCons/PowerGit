@@ -28,6 +28,8 @@ import type {
   RefTree,
   RemoteInfo,
   RepoInfo,
+  RecentInfo,
+  RepoPeek,
   RepoStatus,
   ResetScope,
   RevisionDto,
@@ -362,8 +364,21 @@ export class EngineClient {
     if (!res.ok && res.status !== 404) await json(res)
   }
 
-  async recents(): Promise<RepoInfo[]> {
-    return json<RepoInfo[]>(await this.get(`/repos/recents`))
+  async recents(): Promise<RecentInfo[]> {
+    return json<RecentInfo[]>(await this.get(`/repos/recents`))
+  }
+
+  async peekRepos(roots: string[], signal?: AbortSignal): Promise<RepoPeek[]> {
+    const query = roots.map((root) => `root=${encodeURIComponent(root)}`).join("&")
+    return json<RepoPeek[]>(await this.get(`/repos/peek?${query}`, { signal }))
+  }
+
+  async peekRepo(root: string, history: number, signal?: AbortSignal): Promise<RepoPeek> {
+    return json<RepoPeek>(await this.get(`/repos/peek?root=${encodeURIComponent(root)}&history=${history}`, { signal }))
+  }
+
+  async pinRecent(root: string, pinned: boolean): Promise<void> {
+    await json<{ ok: boolean }>(await this.put(`/repos/recents/pin`, { root, pinned }))
   }
 
   /** Removes one root from the recents list for good (v0.14.2). */

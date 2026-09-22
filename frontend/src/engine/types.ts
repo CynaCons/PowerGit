@@ -15,6 +15,19 @@ export type RepoInfo = {
   id: string
 }
 
+export type RecentInfo = RepoInfo & { lastOpened?: string; pinned?: boolean }
+
+export type RepoPeek = {
+  root: string
+  exists: boolean
+  branch?: string
+  ahead?: number
+  behind?: number
+  changed?: number
+  last?: { sha: string; subject: string; date: string }
+  commits?: { sha: string; subject: string; author: string; date: string }[]
+}
+
 /** GET /repos/sessions: lifecycle facts per open session (v0.13.11). */
 export type SessionInfo = RepoInfo & { lastUsed: string; busy: boolean; watchers: number }
 
