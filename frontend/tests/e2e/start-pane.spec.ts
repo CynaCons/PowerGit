@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 import { basename } from "node:path"
 import { ENGINE_URL, engineHeaders } from "../engine"
-import { currentRepoPath, makeRepo, openRepoOnEngine, removeRepo } from "../repoFixture"
+import { currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo } from "../repoFixture"
 
 // The recent repositories, second pass. Owner (2026-09-22): "I don't like
 // the current UI for the 'select a recent project' - can we try new visuals?
@@ -40,6 +40,11 @@ test.describe("the start pane", () => {
   let a = ""
   let b = ""
   let bId = ""
+  // Owner (2026-09-22, on the v0.20.3 release): "The 'xx min ago' is on the
+  // same line as the branch name. They overlap." A branch name that fills
+  // the row is what shows it.
+  let long = ""
+  const LONG_BRANCH = "feature/the-branch-name-that-fills-the-row"
   // By name, not by data-root: a Windows path in a CSS attribute selector
   // would have its backslashes read as escapes.
   const rowOf = (page: Page, dir: string) => page.getByTestId("start-row").filter({ hasText: basename(dir) })
@@ -50,12 +55,15 @@ test.describe("the start pane", () => {
     b = makeRepo("pg-start-b-")
     // Newest first on the engine: B then A, so A heads the list and B is the
     // one that is open in the first test.
+    long = makeRepo("pg-longbranch-")
+    git(long, "checkout", "-q", "-b", LONG_BRANCH)
+    await openOnEngine(long)
     bId = (await openOnEngine(b)).id
     await openOnEngine(a)
   })
 
   test.afterAll(async () => {
-    for (const root of [a, b]) {
+    for (const root of [a, b, long]) {
       await fetch(`${ENGINE_URL}/repos/recents?root=${encodeURIComponent(root)}`, {
         method: "DELETE",
         headers: engineHeaders(),
@@ -64,6 +72,7 @@ test.describe("the start pane", () => {
     await openRepoOnEngine(previousRepo ?? process.cwd())
     await removeRepo(a)
     await removeRepo(b)
+    await removeRepo(long)
   })
 
   test("the rail swaps the grid for the pane, the filter has the focus, the open repository says so, and 1 opens the first", async ({
@@ -182,5 +191,31 @@ test.describe("the start pane", () => {
     await expect(rowA).toHaveCount(0)
     await page.clock.fastForward(5_000)
     await expect.poll(async () => (await recents()).map((r) => r.root)).not.toContain(a.toLowerCase())
+  })
+
+  test("a long branch name and 'xx min ago' never share a line, whatever the list's width", async ({ page }) => {
+    await page.goto("/")
+    await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
+    await page.getByTestId("recents-button").click()
+    await page.getByTestId("start-filter").fill("pg-longbranch")
+    const row = page.getByTestId("start-row").first()
+    await expect(row.getByTestId("start-branch")).toContainText("feature/the-branch")
+
+    // 900 px is the narrowest the content area gets here; 1600 the widest.
+    for (const width of [900, 1280, 1600]) {
+      await page.setViewportSize({ width, height: 900 })
+      const branch = (await row.getByTestId("start-branch").boundingBox())!
+      const when = (await row.getByTestId("start-when").boundingBox())!
+      const overlap =
+        branch.x < when.x + when.width &&
+        when.x < branch.x + branch.width &&
+        branch.y < when.y + when.height &&
+        when.y < branch.y + branch.height
+      expect(overlap, `branch and time overlap at ${width} px`).toBe(false)
+      // Split, as the owner asked: the time is not on the branch's line.
+      expect(Math.abs(branch.y - when.y), `branch and time share a line at ${width} px`).toBeGreaterThan(4)
+      // And the row still says both things.
+      await expect(row.getByTestId("start-when")).not.toHaveText("")
+    }
   })
 })

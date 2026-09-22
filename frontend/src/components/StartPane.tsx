@@ -280,10 +280,17 @@ function StartRow({
       onClick={onChoose}
       onDoubleClick={onOpen}
       sx={{
+        // Four cells and a star: the name and when it was last opened on the
+        // first line, the branch and the repository's state on the second.
+        // Owner on v0.20.3: "The 'xx min ago' is on the same line as the
+        // branch name. They overlap. Better split" — a long branch used to
+        // run under the time, because a `.ref` chip does not clip its text.
         display: "grid",
-        gridTemplateColumns: "1fr auto",
+        gridTemplateColumns: "minmax(0, 1fr) auto 22px",
+        gridTemplateRows: "auto auto",
         alignItems: "center",
         columnGap: 1,
+        rowGap: "2px",
         py: 0.875,
         pr: 1.25,
         pl: 1.5,
@@ -295,55 +302,68 @@ function StartRow({
         "&:hover": { bgcolor: cursor ? "background.paper" : "var(--pg-grid-hover, rgba(37, 99, 235, 0.08))" },
       }}
     >
-      <Box sx={{ minWidth: 0 }}>
-        <Box
-          sx={{ fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        >
-          <Marked text={repo.name} range={match.name} />
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.875, mt: "2px", minWidth: 0 }}>
-          <Branch text={peek?.branch ?? repo.branch} range={match.branch} />
-          <Box
-            sx={{
-              fontSize: 11.5,
-              color: "text.secondary",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {relativeTime(repo.lastOpened)}
-          </Box>
-        </Box>
+      <Box
+        sx={{
+          gridArea: "1 / 1",
+          fontSize: 13.5,
+          fontWeight: 600,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <Marked text={repo.name} range={match.name} />
       </Box>
-      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
-        <IconButton
-          data-testid="start-pin"
-          aria-label={repo.pinned ? `Unpin ${repo.name}` : `Pin ${repo.name}`}
-          size="small"
-          onClick={(event) => {
-            event.stopPropagation()
-            onPin()
-          }}
-          sx={{ width: 22, height: 22, color: repo.pinned ? "primary.main" : "text.secondary" }}
-        >
-          {repo.pinned ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
-        </IconButton>
-        <Box sx={{ fontSize: 11, color: "text.secondary", whiteSpace: "nowrap" }}>
-          {current ? "open now" : stateText(peek)}
-        </Box>
+      <Box
+        data-testid="start-when"
+        sx={{ gridArea: "1 / 2", fontSize: 11.5, color: "text.secondary", whiteSpace: "nowrap", justifySelf: "end" }}
+      >
+        {relativeTime(repo.lastOpened)}
       </Box>
+      <Box sx={{ gridArea: "2 / 1", display: "flex", minWidth: 0 }}>
+        <Branch text={peek?.branch ?? repo.branch} range={match.branch} />
+      </Box>
+      <Box sx={{ gridArea: "2 / 2", fontSize: 11, color: "text.secondary", whiteSpace: "nowrap", justifySelf: "end" }}>
+        {current ? "open now" : stateText(peek)}
+      </Box>
+      <IconButton
+        data-testid="start-pin"
+        aria-label={repo.pinned ? `Unpin ${repo.name}` : `Pin ${repo.name}`}
+        size="small"
+        onClick={(event) => {
+          event.stopPropagation()
+          onPin()
+        }}
+        sx={{
+          gridArea: "1 / 3 / span 2",
+          alignSelf: "center",
+          width: 22,
+          height: 22,
+          color: repo.pinned ? "primary.main" : "text.secondary",
+        }}
+      >
+        {repo.pinned ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
+      </IconButton>
     </Box>
   )
 }
 
 function Branch({ text, range }: { text?: string; range: MatchRange | null }) {
   return text ? (
-    <Box component="span" className="ref" sx={{ minWidth: 0, maxWidth: "15ch", height: 18, fontSize: 11 }}>
+    <Box
+      component="span"
+      className="ref"
+      data-testid="start-branch"
+      title={text}
+      sx={{ minWidth: 0, maxWidth: "22ch", height: 18, fontSize: 11, overflow: "hidden" }}
+    >
       <CallSplitIcon />
-      <span>
+      {/* The chip clips, so the branch that does not fit ends in an ellipsis
+          rather than mid-letter; the whole name is the title. */}
+      <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
         <Marked text={text} range={range} />
-      </span>
+      </Box>
     </Box>
   ) : null
 }
