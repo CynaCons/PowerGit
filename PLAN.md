@@ -953,8 +953,9 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Tokens: the window background becomes the desk (a step darker in both themes) and gains a card shadow, a 6 px gutter and a 6 px radius; theme/panels.ts exports the one pane style. Done ec9bf2084.
 - [x] Shell: rail, tree, history, commit panel, settings, agent reviews and the start pane each take the card; the gutters go in, the pane borders come out, and the bottom splitter becomes the gutter. Done ec9bf2084.
 - [x] Test: desk.spec.ts samples the pixels between two panes and finds the desk there, in light and dark, at 100 % and 150 %. Done ec9bf2084.
-- [ ] Gate: tsc, eslint, prettier, vitest, the e2e suite and the visual subset (@grid, @themes, @bottom) green, plus a look at the window in both themes and at 150 % zoom.
+- [x] Gate: tsc, eslint, prettier, vitest 487, the e2e suite, the engine suite 222 and the visual baselines green, plus a look at the window in both themes and at 150 %. Done 71acf2f7d.
 - [ ] Release v0.20.5: version bump, Windows artifacts, the zip smoke-tested from a clean extract, tag, CI green, assets and latest.json verified.
+- [ ] Owner tick: open the released build and say the panes read apart, in light and in dark.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
