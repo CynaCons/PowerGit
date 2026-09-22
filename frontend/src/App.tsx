@@ -271,7 +271,7 @@ export default function App({ base }: { base: EngineClient }) {
           onAbort={actions.abortOperation}
         />
 
-        <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+        <Box className="pg-desk" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
           {railBar ? (
             <CommandRail
               repoName={repo?.name}
@@ -310,7 +310,7 @@ export default function App({ base }: { base: EngineClient }) {
           )}
 
           <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <Box ref={contentRef} sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+            <Box ref={contentRef} className="pg-desk-row" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
               {settings.open ? (
                 <SettingsView onClose={settings.close} />
               ) : leftOpen ? (

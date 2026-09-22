@@ -8,6 +8,7 @@ import { RefContextMenu, type RefMenuKind } from "./dialogs/RefContextMenu"
 import { checkState, toggleNames } from "./repoTreeChecks"
 import { RepoTreeHeader } from "./RepoTreeHeader"
 import { ROW_HEIGHT, SECTION_HEIGHT, SectionHeader, TreeRow, type Item } from "./RepoTreeRows"
+import { paneSx } from "../theme/panels"
 
 type Props = {
   tree: RefTree | null
@@ -357,13 +358,11 @@ function RepoTreeImpl({
     <Paper
       data-testid="left-panel"
       sx={{
+        ...paneSx,
         width: 240,
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
-        overflow: "hidden",
-        borderRight: 1,
-        borderColor: "divider",
       }}
     >
       <RepoTreeHeader

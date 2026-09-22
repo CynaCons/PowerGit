@@ -11,6 +11,7 @@ import type { SessionView } from "../session/state"
 import { EmptyState, ErrorState, LoadingState } from "./AsyncState"
 import { GraphCompass } from "./GraphCompass"
 import { RevisionGrid } from "./RevisionGrid"
+import { paneSx } from "../theme/panels"
 
 export type HistoryPaneProps = {
   rows: GraphRow[]
@@ -75,12 +76,11 @@ export function HistoryPane({
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }} component="div">
       <Box
         sx={{
+          ...paneSx,
           flex: 1,
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          bgcolor: "background.paper",
-          overflow: "hidden",
         }}
       >
         {empty && (
@@ -151,15 +151,13 @@ export function CollapsedLeftPanel({ onExpand }: { onExpand: () => void }) {
     <Box
       data-testid="left-panel-collapsed"
       sx={{
+        ...paneSx,
         width: 36,
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         py: 1,
-        bgcolor: "background.paper",
-        borderRight: 1,
-        borderColor: "divider",
       }}
     >
       <IconButton size="small" data-testid="left-panel-expand" onClick={onExpand} aria-label="Expand panel">

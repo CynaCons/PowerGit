@@ -6,6 +6,7 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined"
 import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
+import { paneSx } from "../theme/panels"
 import IconButton from "@mui/material/IconButton"
 import Tooltip from "@mui/material/Tooltip"
 import { shortcutLabel } from "../hotkeys"
@@ -40,6 +41,7 @@ export function NavRail({
       data-testid="navrail"
       aria-label="Repositories"
       sx={{
+        ...paneSx,
         width: 48,
         flexShrink: 0,
         display: "flex",
@@ -47,9 +49,6 @@ export function NavRail({
         alignItems: "center",
         py: 1.5,
         gap: 0.5,
-        bgcolor: "background.paper",
-        borderRight: 1,
-        borderColor: "divider",
       }}
     >
       <Tooltip title={repoName ?? "PowerGit"} placement="right">

@@ -1,5 +1,6 @@
 import Box from "@mui/material/Box"
 import type { ChromeLayout } from "../hooks/useChromeLayout"
+import { deskGap } from "../theme/panels"
 
 // The drag line between a revision grid and the bottom panel, shared by
 // the Browse view and the file history (v0.18.0 factored it out of both).
@@ -18,17 +19,26 @@ export function PanelSplitter({ testid, splitter }: { testid: string; splitter: 
       aria-orientation="horizontal"
       aria-label="Resize bottom panel"
       sx={{
-        height: 5,
+        // The gutter between the two cards is the handle (v0.20.5): it shows
+        // the desk at rest and draws a line under the pointer, so the grab
+        // area is the space you already aim at.
+        height: deskGap,
         flexShrink: 0,
         cursor: "row-resize",
         // Belt and braces with onDividerDown's preventDefault (v0.18.18):
         // Chromium does not start a selection from a user-select:none target.
         userSelect: "none",
-        bgcolor: "background.default",
-        borderTop: 1,
-        borderColor: "divider",
-        transition: "background-color 120ms",
-        "&:hover": { bgcolor: "primary.main" },
+        display: "flex",
+        alignItems: "center",
+        "&::after": {
+          content: '""',
+          flex: 1,
+          height: "2px",
+          borderRadius: "1px",
+          bgcolor: "transparent",
+          transition: "background-color 120ms",
+        },
+        "&:hover::after": { bgcolor: "primary.main" },
       }}
     />
   )

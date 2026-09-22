@@ -20,7 +20,9 @@ export type RefBadge = { bg: string; fg: string }
 export type Tokens = {
   /** Panels, paper, the revision grid. */
   surface: string
-  /** The window background behind panels (MUI background.default). */
+  /** The desk the panes sit on: the window background that shows through
+   *  the gutters between cards (MUI background.default). A step darker than
+   *  a pane since v0.20.5, or the cards do not read. */
   surfaceAlt: string
   /** Footers and strips that sit a step below the surface. */
   surfaceSunken: string
@@ -48,6 +50,8 @@ export type Tokens = {
   selectionBorder: string
   hover: string
   focusRing: string
+  /** The hair of shadow under a pane (v0.20.5, prototype D). */
+  cardShadow: string
   ref: Record<"local" | "remote" | "head" | "stash" | "tag" | "extra", RefBadge>
   diff: {
     added: string
@@ -105,7 +109,7 @@ export type Tokens = {
 // lifted from app.css, tokens.css, theme.ts or a component sx.
 export const light: Tokens = {
   surface: "#ffffff",
-  surfaceAlt: "#eef1f5",
+  surfaceAlt: "#e3e7ee",
   surfaceSunken: "#f6f8fb",
   codeBg: "#f8fafc",
   noticeBg: "#fffbeb",
@@ -124,6 +128,7 @@ export const light: Tokens = {
   selectionBorder: "#2563eb",
   hover: "rgba(37, 99, 235, 0.08)",
   focusRing: "#2563eb",
+  cardShadow: "0 1px 2px rgba(16, 24, 39, 0.07)",
   ref: {
     local: { bg: "#eff6ff", fg: "#2563eb" },
     remote: { bg: "#ecfdf5", fg: "#059669" },
@@ -188,7 +193,7 @@ export const light: Tokens = {
 // test tells you if it fell under.
 export const dark: Tokens = {
   surface: "#182029",
-  surfaceAlt: "#10161e",
+  surfaceAlt: "#0a0e13",
   surfaceSunken: "#141b23",
   codeBg: "#14171b",
   noticeBg: "#3a2e0b",
@@ -207,6 +212,7 @@ export const dark: Tokens = {
   selectionBorder: "#60a5fa",
   hover: "rgba(96, 165, 250, 0.12)",
   focusRing: "#93c5fd",
+  cardShadow: "0 1px 2px rgba(0, 0, 0, 0.35)",
   ref: {
     local: { bg: "#1f3a5f", fg: "#bfdbfe" },
     remote: { bg: "#0b3d2e", fg: "#86efac" },
@@ -289,6 +295,10 @@ export const metrics = {
   focusRingWidth: 1,
   /** Minimum pointer target for icon-only actions (WCAG 2.5.8 is 24px). */
   minHitTarget: 24,
+  /** The gutter of desk between two panes, and the bottom splitter's height. */
+  deskGap: 6,
+  /** A pane's corner. */
+  cardRadius: 6,
 } as const
 
 /** The `--pg-*` custom properties app.css and the canvas fallbacks read. */
@@ -314,6 +324,7 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-grid-sel-border": t.selectionBorder,
     "--pg-grid-hover": t.hover,
     "--pg-focus-ring": t.focusRing,
+    "--pg-card-shadow": t.cardShadow,
     "--pg-diff-added": t.diff.added,
     "--pg-diff-removed": t.diff.removed,
     "--pg-diff-hunk": t.diff.hunk,
@@ -356,6 +367,8 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-caption-size": `${metrics.captionSize}px`,
     "--pg-badge-size": `${metrics.badgeSize}px`,
     "--pg-focus-ring-w": `${metrics.focusRingWidth}px`,
+    "--pg-desk-gap": `${metrics.deskGap}px`,
+    "--pg-card-radius": `${metrics.cardRadius}px`,
   }
   for (const [name, badge] of Object.entries(t.ref)) {
     vars[`--pg-ref-${name}-bg`] = badge.bg

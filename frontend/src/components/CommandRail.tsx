@@ -7,6 +7,7 @@ import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined"
 import Box from "@mui/material/Box"
+import { paneSx } from "../theme/panels"
 import Divider from "@mui/material/Divider"
 import { useState } from "react"
 import { shortcutLabel } from "../hotkeys"
@@ -100,6 +101,7 @@ export function CommandRail({
       data-expanded={expanded ? "true" : "false"}
       aria-label="Commands"
       sx={{
+        ...paneSx,
         width: expanded ? 188 : 48,
         transition: "width 120ms",
         flexShrink: 0,
@@ -108,10 +110,6 @@ export function CommandRail({
         px: "5px",
         py: 1,
         gap: 0.25,
-        bgcolor: "background.paper",
-        borderRight: 1,
-        borderColor: "divider",
-        overflow: "hidden",
       }}
     >
       {/* Owner: the collapse control belongs at the top, where the eye starts. */}

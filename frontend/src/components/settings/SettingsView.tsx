@@ -15,6 +15,7 @@ import { ToolsSection } from "./ToolsSection"
 import { UpdatesSection } from "./UpdatesSection"
 import { matchSettings } from "./settingsCatalog"
 import type { GitScope } from "./useGitConfig"
+import { paneSx } from "../../theme/panels"
 
 // Settings as a page (v0.18.0, owner: "It's ugly, poor layout… We could do
 // something like VS Code" — layout A of docs/prototypes/settings-layouts.html).
@@ -50,12 +51,12 @@ export function SettingsView({ onClose }: Props) {
         onClose()
       }}
       sx={{
+        ...paneSx,
         flex: 1,
         minWidth: 0,
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
-        bgcolor: "background.paper",
         outline: "none",
       }}
     >

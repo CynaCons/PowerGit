@@ -13,6 +13,7 @@ import { matchRecent, type RecentMatch } from "./recentsModel"
 import { groupRecents, relativeTime } from "./startPaneModel"
 import { Branch, Marked } from "./StartPaneMarks"
 import { useDelayedForget } from "./useDelayedForget"
+import { paneSx } from "../theme/panels"
 
 export type StartPaneProps = {
   recents: RecentInfo[]
@@ -93,13 +94,13 @@ export function StartPane(props: StartPaneProps) {
       data-testid="start-pane"
       onKeyDown={onKeyDown}
       sx={{
+        ...paneSx,
         display: "grid",
         // The list gives way before the preview does when the content
         // area is narrow — a 150 % zoom leaves about 960 px for both.
         gridTemplateColumns: "minmax(232px, min(330px, 34%)) minmax(0, 1fr)",
         minHeight: 0,
         height: "100%",
-        bgcolor: "background.paper",
         color: "text.primary",
       }}
     >

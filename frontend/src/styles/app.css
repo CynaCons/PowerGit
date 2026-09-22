@@ -807,3 +807,17 @@ code {
 .graph-scrollbar > div {
   height: 1px;
 }
+
+/* The desk (v0.20.5, prototype D of docs/prototypes/contrast.html): every
+   pane is a card and the gutters between them are these gaps. Owner, on the
+   0.20.4 window: "we're missing a bit of contrast and separators in the app.
+   Right now its all just white". The gap is a token, so the application zoom
+   scales it with the rest; src/theme/panels.ts paints the cards themselves. */
+.pg-desk {
+  gap: var(--pg-desk-gap, 6px);
+  padding: var(--pg-desk-gap, 6px);
+}
+
+.pg-desk-row {
+  gap: var(--pg-desk-gap, 6px);
+}

@@ -43,6 +43,7 @@ import { HistoryPane } from "./HistoryPane"
 import type { Loadable } from "./loadable"
 import { PanelSplitter } from "./PanelSplitter"
 import { findRefTarget } from "./refChipsModel"
+import { deskGap, paneSx } from "../theme/panels"
 
 // Git Extensions' FormFileHistory (v0.16.0). Owner: "In main view, in the
 // file tree, right click a file and show the file history. Here again, we
@@ -241,20 +242,19 @@ export function FileHistoryView({
         e.stopPropagation()
         onClose()
       }}
-      sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}
+      sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: deskGap }}
     >
       <Box
         data-testid="file-history-header"
         sx={{
+          ...paneSx,
           display: "flex",
           alignItems: "center",
           flexWrap: "wrap",
           gap: 0.5,
           px: 1,
           minHeight: 34,
-          borderBottom: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          flexShrink: 0,
         }}
       >
         <HistoryIcon fontSize="small" sx={{ color: "text.secondary" }} />
@@ -343,11 +343,11 @@ export function FileHistoryView({
       <Paper
         data-testid="file-history-panel"
         sx={{
+          ...paneSx,
           height: `var(--pg-bottom-height, ${layout.bottomHeight}px)`,
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
         }}
       >
         <Tabs

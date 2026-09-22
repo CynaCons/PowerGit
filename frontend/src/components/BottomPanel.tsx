@@ -64,6 +64,7 @@ type Props = {
 import { DEFAULT_DIFF_OPTIONS, commitData, forgetCommit } from "../engine/commitCache"
 import { PendingSummary } from "./PendingSummary"
 import { usePendingOf, usePendingDiff } from "./pendingRows"
+import { paneSx } from "../theme/panels"
 
 /** True once `pending` has been continuously true for `delayMs`; a short
  *  load never shows an indicator, a long one shows it without flicker. */
@@ -386,11 +387,11 @@ export function BottomPanel({
     <Paper
       data-testid="bottom-panel"
       sx={{
+        ...paneSx,
         height: `var(--pg-bottom-height, ${height}px)`,
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
-        overflow: "hidden",
       }}
     >
       <BottomTabStrip

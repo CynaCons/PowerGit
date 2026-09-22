@@ -9,6 +9,7 @@ import type { AgentReview, AgentReviewSummary, EngineClient } from "../../engine
 import { getAgentReview } from "../../engine/agentReviews"
 import { AgentReviewList } from "./AgentReviewList"
 import { AgentReviewSession } from "./AgentReviewSession"
+import { paneSx } from "../../theme/panels"
 
 export function AgentReviewsView({
   engine,
@@ -41,9 +42,8 @@ export function AgentReviewsView({
   }
   return (
     <Paper
-      square
       data-testid="agent-reviews-view"
-      sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+      sx={{ ...paneSx, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
     >
       <Box sx={{ height: 44, px: 1.5, display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider" }}>
         <Typography sx={{ fontWeight: 600, flex: 1 }}>
