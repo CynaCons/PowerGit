@@ -946,6 +946,7 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Gate: tsc, eslint, prettier, vitest, the engine suite and the e2e suite green, plus a look at the pane in light and dark and at 150 % zoom.
 - [ ] Owner tick: open the app cold, land on the pane, pin two repositories, open one from it.
 - [ ] Owner on the released build: "The 'xx min ago' is on the same line as the branch name. They overlap. Better split." Fixed in dee69ecf5 — the row's first line is the name and the time, the second the branch and the state; his sentence is a test at three widths. His to tick.
+- [ ] Owner on v0.20.4: "I would like to have the branch names longer if possible, so separate row for the rest would be good." Done 339578512 — the chip takes the row's width and wraps onto a second line, two at most. His to tick.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
