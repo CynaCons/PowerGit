@@ -110,19 +110,18 @@ test.describe("@dialogs", () => {
     await expect(page).toHaveScreenshot("settings-page.png")
   })
 
-  // v0.18.7, prototype C: the tile picker with the focus in the search box.
-  // The list is whatever this machine's engine remembers; the baseline is
-  // seeded on the main tree (docs/agents/memories/private-e2e-harness.md).
+  // v0.20.3, prototype B: the picker is a pane, not a dialog — the list on
+  // the left with the focus in its filter, the chosen repository on the
+  // right. (This case still drove the v0.18.7 tile dialog until v0.20.5; the
+  // visual suite does not run on CI, so nothing caught it.) The list is
+  // whatever this machine's engine remembers; the baseline is seeded on the
+  // main tree (docs/agents/memories/private-e2e-harness.md).
   test("recent repositories picker", async ({ page }) => {
     await appearance(page, "light")
     await ready(page)
     await page.getByTestId("recents-button").click()
-    await expect(page.getByTestId("recents-filter")).toBeFocused()
-    await expect(page.getByTestId("recent-card").first()).toBeVisible()
-    // MUI fades the backdrop in through an inline transition that
-    // animations: "disabled" does not fast-forward; without this wait the
-    // baseline sometimes has the dim and sometimes not.
-    await expect(page.locator(".MuiBackdrop-root").first()).toHaveCSS("opacity", "1")
+    await expect(page.getByTestId("start-filter")).toBeFocused()
+    await expect(page.getByTestId("start-row").first()).toBeVisible()
     await page.mouse.move(5, 5)
     await expect(page).toHaveScreenshot("recents-picker.png")
   })

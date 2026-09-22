@@ -26,10 +26,14 @@ test("the gear opens Settings as a page with a search box, in place of the graph
   await expect(page.getByTestId("grid-row")).toHaveCount(0)
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0)
 
-  // The page fills the content area edge to edge, like the graph did.
+  // The page fills the content area, like the graph did — up to the desk's
+  // own gutter, which every pane is inset by since v0.20.5.
   const content = (await page.getByTestId("browse-shell").boundingBox())!
   const box = (await settings.boundingBox())!
-  expect(box.x + box.width).toBeGreaterThan(content.x + content.width - 2)
+  const gutter = await page.evaluate(() =>
+    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--pg-desk-gap")),
+  )
+  expect(box.x + box.width).toBeGreaterThan(content.x + content.width - gutter - 2)
 
   // Escape brings the graph back, with the keyboard on it.
   await page.keyboard.press("Escape")
