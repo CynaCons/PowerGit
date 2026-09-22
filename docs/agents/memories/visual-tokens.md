@@ -9,3 +9,26 @@ CSS `zoom` on `#root` (and on dialog papers) scales the subtree but changes neit
 ## Splitter pointerdown: cancel it
 
 A resize handle's `pointerdown` needs `if (e.button !== 0) return; e.preventDefault()` before `setPointerCapture`. Capture retargets events but does not cancel the compat `mousedown`, so Chromium arms text selection and sweeps a highlight across the grid/diff on every move. Cancelling `pointerdown` does not suppress `click`/`dblclick`, so a double-click reset on the same handle keeps working (proved by `grid-columns.spec`).
+
+## The desk: panes are cards (v0.20.5)
+
+Owner report on v0.20.4 — "we're missing a bit of contrast and separators in
+the app. Right now its all just white" — answered with prototype D of
+`docs/prototypes/contrast.html`. `surfaceAlt` stopped being a near-white
+window background (#eef1f5) and became the **desk** a card reads against
+(#e3e7ee light, #0a0e13 dark); `cardShadow`, `metrics.deskGap` and
+`metrics.cardRadius` came with it, as `--pg-card-shadow`, `--pg-desk-gap`
+and `--pg-card-radius`.
+
+Every pane spreads one style, `paneSx` from `frontend/src/theme/panels.ts`,
+and **no pane carries its own `borderRight`/`borderBottom` any more** — the
+gutter separates them. The gutters are `.pg-desk` / `.pg-desk-row` in
+app.css (App.tsx is at the 400-line cap, so they could not be an sx import),
+and `PanelSplitter` *is* the horizontal gutter: transparent at rest, a 2 px
+primary line under the pointer.
+
+Two traps this cost: a spec that asserted a pane reaches the window edge now
+has to allow the gutter (read `--pg-desk-gap`, do not hard-code 6), and the
+`test:visual` case for the recents picker had been driving the dialog the
+start pane replaced in v0.20.3 — that suite is on-demand, so nothing caught
+it for two releases. Run `npm run test:visual` after any token change.
