@@ -1,0 +1,736 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Recent repositories</title>
+<style>
+  :root {
+    --surface: #ffffff; --surface-alt: #eef1f5; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --disabled: #64748b;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --primary-soft: rgba(21, 83, 201, 0.10);
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08); --focus: #2563eb;
+    --page: #e3e7ee; --scrim: rgba(16, 24, 39, 0.28); --shadow: 0 18px 48px rgba(16, 24, 39, 0.26);
+    --ref-local-bg: #eff6ff; --ref-local-fg: #2563eb;
+    --ok: #059669; --warn: #a16207; --danger: #dc2626;
+    /* the six badge pairs, reused as the repository colour (v0.18.1 device) */
+    --d1-bg: #eff6ff; --d1-fg: #2563eb; --d2-bg: #ecfdf5; --d2-fg: #059669; --d3-bg: #f5f3ff; --d3-fg: #6d28d9;
+    --d4-bg: #fef9c3; --d4-fg: #a16207; --d5-bg: #fef2f2; --d5-fg: #dc2626; --d6-bg: #f3f4f6; --d6-fg: #6b7280;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+      --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+      --border: #2a3340; --border-soft: #222a35;
+      --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+      --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+      --page: #0c1117; --scrim: rgba(0, 0, 0, 0.5); --shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+      --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe;
+      --ok: #34d399; --warn: #fbbf24; --danger: #f87171;
+      --d1-bg: #1f3a5f; --d1-fg: #bfdbfe; --d2-bg: #0b3d2e; --d2-fg: #86efac; --d3-bg: #2e1f5e; --d3-fg: #ddd6fe;
+      --d4-bg: #3f2a06; --d4-fg: #fde68a; --d5-bg: #4a1d1d; --d5-fg: #fecaca; --d6-bg: #2c3239; --d6-fg: #c5cbd3;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #182029; --surface-alt: #10161e; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --disabled: #8b939f;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --primary-soft: rgba(59, 123, 255, 0.16);
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12); --focus: #93c5fd;
+    --page: #0c1117; --scrim: rgba(0, 0, 0, 0.5); --shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    --ref-local-bg: #1f3a5f; --ref-local-fg: #bfdbfe;
+    --ok: #34d399; --warn: #fbbf24; --danger: #f87171;
+    --d1-bg: #1f3a5f; --d1-fg: #bfdbfe; --d2-bg: #0b3d2e; --d2-fg: #86efac; --d3-bg: #2e1f5e; --d3-fg: #ddd6fe;
+    --d4-bg: #3f2a06; --d4-fg: #fde68a; --d5-bg: #4a1d1d; --d5-fg: #fecaca; --d6-bg: #2c3239; --d6-fg: #c5cbd3;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Ubuntu", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  svg { display: block; }
+  kbd { font-family: var(--mono); font-size: 10.5px; padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--meta); line-height: 15px; }
+
+  /* ---------- page chrome ---------- */
+  .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 9px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .top .sub { color: var(--meta); font-size: 12px; }
+  .right { display: flex; gap: 10px; margin-left: auto; align-items: center; }
+  .switch { display: flex; gap: 4px; }
+  .switch button, .theme button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch button b { font-weight: 700; margin-right: 6px; }
+  .theme { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .theme button { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 4px 9px; color: var(--meta); }
+  .theme button:first-child { border-left: 0; }
+  .theme button.on { color: var(--text); background: var(--surface-alt); }
+  main { padding: 20px 20px 56px; }
+  .lead { max-width: 80ch; margin: 0 auto 14px; color: var(--text-2); }
+  .lead h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-wrap: balance; }
+  .lead p { margin: 0 0 6px; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .lead .quote { border-left: 2px solid var(--border); padding-left: 10px; color: var(--meta); font-style: italic; margin: 8px 0; }
+  .notes { max-width: 1280px; margin: 18px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .notes h3 { font-size: 12px; font-weight: 600; color: var(--meta); margin: 0 0 6px; }
+  .notes ul { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+  .notes li { display: flex; gap: 9px; margin: 0 0 7px; }
+  .notes li .mark { flex: none; margin-top: 1px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+  .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10.5px; font-weight: 700; line-height: 1; font-style: normal; }
+  .mark.cost { background: var(--surface-alt); color: var(--meta); box-shadow: inset 0 0 0 1px var(--border); }
+  @media (max-width: 900px) { .notes { grid-template-columns: 1fr; } }
+
+  /* ---------- the window behind the surface ---------- */
+  .win-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .win { width: 1280px; max-width: 100%; height: 760px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 14px 40px rgba(16, 24, 39, 0.22); display: grid; grid-template-rows: 30px 1fr; position: relative; user-select: none; }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--meta); }
+  .titlebar .word { font-weight: 600; color: var(--text); }
+  .titlebar .hair { width: 1px; height: 14px; background: var(--border); }
+  .shell { display: grid; grid-template-columns: 48px 240px 1fr; min-height: 0; }
+  .rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 10px; }
+  .rail i { width: 22px; height: 22px; border-radius: 5px; background: var(--surface-alt); display: block; }
+  .rail i.on { background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+  .tree { border-right: 1px solid var(--border); padding: 10px 12px; }
+  .bar { height: 10px; border-radius: 3px; background: var(--surface-alt); margin: 8px 0; }
+  .grid { padding: 8px 12px; }
+  .grid .bar { margin: 12px 0; }
+  .scrim { position: absolute; left: 0; top: 30px; right: 0; bottom: 0; background: var(--scrim); }
+
+  /* ---------- shared bits ---------- */
+  .panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; z-index: 4; }
+  .search { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; }
+  .search svg { width: 17px; height: 17px; fill: var(--meta); flex: none; }
+  .search input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 15px; min-width: 0; }
+  .search input::placeholder { color: var(--disabled); }
+  .scroller { overflow: auto; flex: 1; min-height: 0; }
+  .foot { display: flex; align-items: center; gap: 16px; height: 38px; padding: 0 16px; border-top: 1px solid var(--border); background: var(--sunken); font-size: 12.5px; color: var(--meta); flex: none; white-space: nowrap; }
+  .foot .sp { flex: 1; }
+  .foot .hint { display: inline-flex; gap: 5px; align-items: center; }
+  .foot a, .link { color: var(--primary); cursor: pointer; text-decoration: none; font-weight: 500; background: none; border: 0; padding: 0; }
+  .foot a:hover, .link:hover { text-decoration: underline; }
+  .empty { padding: 30px 18px; color: var(--meta); }
+  .empty b { display: block; color: var(--text); font-weight: 600; margin-bottom: 4px; font-size: 13.5px; }
+  .ref { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; height: 18px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--ref-local-bg); color: var(--ref-local-fg); white-space: nowrap; max-width: 15ch; }
+  .ref svg { width: 12px; height: 12px; fill: currentColor; flex: none; }
+  .ref span { overflow: hidden; text-overflow: ellipsis; }
+  .hl { background: rgba(21, 83, 201, 0.16); border-radius: 2px; }
+  :root[data-theme="dark"] .hl { background: rgba(59, 123, 255, 0.28); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hl { background: rgba(59, 123, 255, 0.28); } }
+  .path { font-family: var(--mono); font-size: 12px; color: var(--meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; min-width: 0; }
+  .path bdi { unicode-bidi: plaintext; }
+  .path .shared { color: var(--disabled); }
+  .path .tail { color: var(--text-2); }
+  .when { font-size: 12px; color: var(--meta); white-space: nowrap; }
+  .now-chip { font-size: 11px; font-weight: 600; color: var(--ok); border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; height: 17px; display: inline-flex; align-items: center; opacity: .85; }
+  .state { display: inline-flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--meta); white-space: nowrap; font-family: var(--mono); }
+  .state .dirty { color: var(--warn); }
+  .state .ahead { color: var(--ok); }
+  .state .behind { color: var(--meta); }
+  .state .clean { color: var(--disabled); }
+  .star { width: 22px; height: 22px; border: 0; background: transparent; border-radius: 4px; display: grid; place-items: center; cursor: pointer; color: var(--disabled); flex: none; }
+  .star svg { width: 15px; height: 15px; fill: currentColor; }
+  .star.on { color: var(--warn); }
+  .x { width: 22px; height: 22px; border: 0; background: transparent; border-radius: 4px; color: var(--meta); display: grid; place-items: center; cursor: pointer; visibility: hidden; flex: none; }
+  .x:hover { background: var(--hover); color: var(--text); }
+  .x svg { width: 14px; height: 14px; fill: currentColor; }
+  .key { font-family: var(--mono); font-size: 11.5px; color: var(--disabled); text-align: center; }
+  .grouphead { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 16px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--meta); background: var(--sunken); border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 1; }
+  .grouphead .n { margin-left: auto; font-family: var(--mono); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--disabled); }
+
+  /* ---------- A · the list ---------- */
+  .A .panel { width: 900px; max-height: 620px; }
+  .A .row { display: grid; grid-template-columns: 26px 168px 116px minmax(60px, 1fr) 74px 88px; align-items: center; column-gap: 12px; height: 38px; padding: 0 12px 0 10px; border-left: 2px solid transparent; cursor: default; }
+  .A .row + .row { box-shadow: inset 0 1px 0 var(--border-soft); }
+  .A .row:hover { background: var(--hover); }
+  .A .row.cur { background: var(--sel-bg); border-left-color: var(--sel-border); }
+  .A .row.cur .key { color: var(--primary); }
+  .A .row > .ref { justify-self: start; }
+  .A .row .name { font-size: 14.5px; min-width: 0; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .A .row:hover .x, .A .row.cur .x { visibility: visible; }
+  .A .row:hover .key, .A .row.cur .key { visibility: hidden; }
+  .A .keycell { position: relative; }
+  .A .keycell .x { position: absolute; inset: 0; margin: auto; }
+
+  /* ---------- B · the desk ---------- */
+  .B .deskpane { grid-column: 3; display: grid; grid-template-columns: 330px 1fr; min-height: 0; background: var(--surface); }
+  .B .side { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--sunken); }
+  .B .side .search { height: 44px; padding: 0 12px; background: var(--surface); }
+  .B .side .search input { font-size: 13.5px; }
+  .B .side .grouphead { background: transparent; border-bottom: 0; padding: 0 12px; height: 26px; margin-top: 6px; }
+  .B .srow { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 8px; padding: 7px 10px 7px 12px; border-left: 2px solid transparent; cursor: default; }
+  .B .srow:hover { background: var(--hover); }
+  .B .srow.cur { background: var(--surface); border-left-color: var(--sel-border); }
+  .B .srow .nm { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .B .srow .sub { display: flex; align-items: center; gap: 7px; margin-top: 2px; }
+  .B .srow .sub .b { font-size: 11.5px; color: var(--meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .B .srow .rt { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .B .detail { min-height: 0; overflow: auto; padding: 26px 30px 0; display: flex; flex-direction: column; }
+  .B .detail h2 { margin: 0; font-size: 23px; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .B .detail .pathline { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; }
+  .B .detail .pathline .path { font-size: 12.5px; direction: ltr; }
+  .B .facts { display: flex; gap: 22px; margin: 18px 0 0; padding: 12px 0; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+  .B .fact { display: flex; flex-direction: column; gap: 3px; }
+  .B .fact .k { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--meta); }
+  .B .fact .v { font-size: 15px; font-weight: 600; font-family: var(--mono); }
+  .B .log { margin: 16px 0 0; }
+  .B .log h3 { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--meta); margin: 0 0 8px; font-weight: 600; }
+  .B .commit { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; column-gap: 12px; height: 26px; }
+  .B .commit .lane { position: relative; height: 26px; width: 16px; }
+  .B .commit .lane::before { content: ""; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: var(--d1-fg); opacity: .35; }
+  .B .commit:first-child .lane::before { top: 13px; }
+  .B .commit:last-child .lane::before { bottom: 13px; }
+  .B .commit .lane::after { content: ""; position: absolute; left: 4px; top: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--d1-fg); }
+  .B .commit .subj { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .B .commit .ago { font-size: 11.5px; color: var(--disabled); font-family: var(--mono); }
+  .B .actions { margin-top: auto; padding: 16px 0 20px; border-top: 1px solid var(--border-soft); display: flex; align-items: center; gap: 10px; }
+  .B .btn { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; height: 34px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+  .B .btn svg { width: 15px; height: 15px; fill: currentColor; }
+  .B .btn:hover { background: var(--hover); }
+  .B .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+  .B .btn.primary:hover { filter: brightness(1.08); }
+  .B .btn.ghost { border-color: transparent; color: var(--meta); }
+  .B .empty-detail { margin: auto; text-align: center; color: var(--meta); }
+
+  /* ---------- C · the board ---------- */
+  .C .panel { width: 1120px; max-height: 720px; }
+  .C .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border-soft); }
+  .C .grouphead { grid-column: 1 / -1; }
+  .C .card { background: var(--surface); position: relative; display: grid; grid-template-columns: 4px 1fr auto; column-gap: 14px; align-items: start; padding: 13px 14px 13px 0; min-height: 104px; cursor: default; }
+  .C .card:hover { background: var(--hover); }
+  .C .card.cur { background: var(--sel-bg); }
+  .C .card .spine { grid-row: 1 / span 3; grid-column: 1; width: 4px; height: 100%; border-radius: 0 2px 2px 0; opacity: .85; }
+  .C .card .line1 { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .C .card .nm { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .C .card .rt { grid-row: 1 / span 3; grid-column: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+  .C .card .toprow { display: flex; align-items: center; gap: 4px; }
+  .C .card .last { grid-column: 2; grid-row: 2; display: flex; align-items: baseline; gap: 8px; margin-top: 8px; min-width: 0; }
+  .C .card .last .subj { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .C .card .last .ago { font-size: 11.5px; color: var(--disabled); white-space: nowrap; font-family: var(--mono); }
+  .C .card .path { grid-column: 2; grid-row: 3; margin-top: 6px; }
+  .C .spark { display: flex; align-items: flex-end; gap: 2px; height: 20px; }
+  .C .spark i { width: 4px; opacity: .5; border-radius: 1px; display: block; }
+    .C .card:hover .x, .C .card.cur .x { visibility: visible; }
+  
+  /* ---------- N · today, for comparison ---------- */
+  .N .panel { width: 1120px; max-height: 720px; }
+  .N .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border-soft); align-content: start; }
+  .N .tile { background: var(--surface); display: grid; grid-template-columns: 36px 1fr auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 3px; min-height: 96px; padding: 14px 16px; border-left: 2px solid transparent; position: relative; cursor: default; }
+  .N .tile:hover { background: var(--hover); }
+  .N .tile.cur { background: var(--sel-bg); border-left-color: var(--sel-border); }
+  .N .tile .disc { grid-row: 1 / span 2; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; margin-top: 2px; }
+  .N .tile .nm { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 500; }
+  .N .tile .nm span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .N .tile .key { grid-column: 3; }
+  .N .tile .path { grid-column: 2 / span 2; }
+  .N .tile .x { position: absolute; top: 8px; right: 8px; }
+  .N .tile:hover .x, .N .tile.cur .x { visibility: visible; }
+  .N .tile:hover .key, .N .tile.cur .key { visibility: hidden; }
+  .p1 { background: var(--d1-bg); color: var(--d1-fg); } .p2 { background: var(--d2-bg); color: var(--d2-fg); } .p3 { background: var(--d3-bg); color: var(--d3-fg); }
+  .p4 { background: var(--d4-bg); color: var(--d4-fg); } .p5 { background: var(--d5-bg); color: var(--d5-fg); } .p6 { background: var(--d6-bg); color: var(--d6-fg); }
+  .s1 { background: var(--d1-fg); } .s2 { background: var(--d2-fg); } .s3 { background: var(--d3-fg); }
+  .s4 { background: var(--d4-fg); } .s5 { background: var(--d5-fg); } .s6 { background: var(--d6-fg); }
+
+  /* ---------- narrow screens (the link opened on a phone) ---------- */
+  @media (max-width: 900px) {
+    .top { gap: 8px 10px; padding: 8px 12px; }
+    .right { margin-left: 0; flex-wrap: wrap; }
+    .switch { flex-wrap: wrap; }
+    main { padding: 14px 12px 40px; }
+    .win { height: auto; min-height: 620px; }
+    .shell { grid-template-columns: 1fr; }
+    .rail, .tree, .grid { display: none; }
+    .scrim { display: none; }
+    .panel { position: static; transform: none; width: auto !important; max-width: none; max-height: none; border: 0; border-radius: 0; box-shadow: none; height: 100%; }
+    .A .row { display: flex; align-items: center; gap: 8px; padding: 0 10px; }
+    .A .row .name { flex: 1; }
+    .A .row .path { display: none; }
+    .A .keycell { width: 20px; }
+    .C .cards, .N .tiles { grid-template-columns: 1fr; }
+    .C .card .path, .N .tile .path { font-size: 11px; }
+    .B .deskpane { grid-template-columns: 1fr; }
+    .B .detail { display: none; }
+    .B .side { border-right: 0; }
+    .foot { gap: 10px; overflow-x: auto; }
+    .foot .hint { display: none; }
+  }
+
+  /* the toast that answers Enter */
+  .toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--text); color: var(--surface); padding: 7px 14px; border-radius: 6px; font-size: 12.5px; z-index: 6; opacity: 0; transition: opacity 120ms ease; pointer-events: none; }
+  .toast.on { opacity: 1; }
+</style>
+
+<div class="top">
+  <h1>Recent repositories</h1>
+  <span class="sub">second pass · prototypes · 2026-09-22</span>
+  <div class="right">
+    <div class="switch" id="variants"></div>
+    <div class="theme" id="theme">
+      <button data-t="light">Light</button><button data-t="auto" class="on">Auto</button><button data-t="dark">Dark</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="lead" id="lead"></div>
+  <div class="win-wrap">
+    <div class="win" id="win"></div>
+  </div>
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+const ICON = {
+  search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19z',
+  branch: 'M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z',
+  close: 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+  star: 'M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+  starOff: 'm22 9.24-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28z',
+  folder: 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2m0 12H4V8h16z',
+  terminal: 'M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 14H4V8h16zM18 17h-6v-2h6zM7.5 17l-1.41-1.41L8.67 13l-2.59-2.59L7.5 9l4 4z',
+  copy: 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z',
+}
+const svg = (d, cls) => `<svg viewBox="0 0 24 24" ${cls ? `class="${cls}"` : ''} aria-hidden="true"><path d="${d}"/></svg>`
+
+// Ten entries, the shape of a working list: the tree open now, two tools,
+// a worktree, the upstream fork, the site, a plugin folder, two scratches.
+// `dirty`/`ahead`/`behind`/`last`/`spark`/`opened` are the facts today's
+// recents.json does NOT carry — every variant that uses them says so in
+// the notes.
+const SEED = [
+  { name: 'PowerGit', root: 'C:\\dev\\public-repo\\powergit', branch: 'powergit', pal: 1, when: 'now', bucket: 'Today', openNow: true, pinned: true, dirty: 3, ahead: 2, behind: 0, last: 'ui: the compass is findable at rest', ago: '12 min', spark: [3, 6, 2, 8, 5, 9, 7] },
+  { name: 'powerflow', root: 'C:\\dev\\tools\\powerflow', branch: 'main', pal: 2, when: '2 h ago', bucket: 'Today', pinned: true, dirty: 0, ahead: 0, behind: 0, last: 'skill: the miniplan closes a turn', ago: '2 h', spark: [1, 0, 4, 2, 3, 1, 5] },
+  { name: 'powerspawn', root: 'C:\\dev\\tools\\powerspawn', branch: 'main', pal: 3, when: '5 h ago', bucket: 'Today', dirty: 1, ahead: 0, behind: 0, last: 'models: gpt-5.6-sol is the Codex default', ago: '1 d', spark: [0, 2, 1, 0, 4, 2, 1] },
+  { name: 'pg-wt-mcp-engine', root: 'C:\\dev\\pg-wt-mcp-engine', branch: 'wt/mcp-engine', pal: 4, when: 'yesterday', bucket: 'This week', dirty: 0, ahead: 4, behind: 0, last: 'mcp: the host binds the per-user pipe', ago: '1 d', spark: [0, 0, 6, 7, 3, 0, 0] },
+  { name: 'gitextensions', root: 'C:\\dev\\public-repo\\gitextensions', branch: 'master', pal: 5, when: '2 d ago', bucket: 'This week', dirty: 0, ahead: 0, behind: 37, last: 'Merge pull request #12043 from…', ago: '3 d', spark: [4, 3, 5, 2, 6, 4, 3] },
+  { name: 'powergit-site', root: 'C:\\dev\\public-repo\\powergit-site', branch: 'gh-pages', pal: 6, when: '3 d ago', bucket: 'This week', dirty: 0, ahead: 0, behind: 0, last: 'docs: the download links point at v0.18', ago: '3 d', spark: [0, 1, 0, 2, 0, 0, 1] },
+  { name: 'claude-plugins', root: 'C:\\dev\\tools\\claude-plugins', branch: 'main', pal: 1, when: '4 d ago', bucket: 'This week', dirty: 2, ahead: 1, behind: 0, last: 'powerplan: show_miniplan', ago: '4 d', spark: [2, 0, 3, 1, 0, 0, 2] },
+  { name: 'engine-bench', root: 'C:\\dev\\scratch\\engine-bench', branch: 'main', pal: 2, when: '2 weeks ago', bucket: 'Earlier', dirty: 0, ahead: 0, behind: 0, last: 'bench: 3 000 rows in 210 ms', ago: '2 w', spark: [0, 0, 0, 0, 0, 0, 0] },
+  { name: 'dotfiles', root: 'C:\\Users\\cynak\\dotfiles', branch: 'main', pal: 3, when: '3 weeks ago', bucket: 'Earlier', dirty: 0, ahead: 0, behind: 0, last: 'pwsh: the prompt shows the worktree', ago: '3 w', spark: [0, 0, 1, 0, 0, 0, 0] },
+  { name: 'kata', root: 'C:\\dev\\scratch\\kata', branch: 'main', pal: 4, when: 'a month ago', bucket: 'Earlier', dirty: 0, ahead: 0, behind: 0, last: 'day 14', ago: '1 mo', spark: [0, 0, 0, 0, 0, 0, 0] },
+]
+
+const VARIANTS = { A: 'The list', B: 'The desk', C: 'The board', N: 'Today (shipped)' }
+const state = { v: 'A', q: '', cur: 0, items: SEED.map((r) => ({ ...r })), toast: '', gone: null }
+
+const $ = (id) => document.getElementById(id)
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+/** The prefix every listed root shares, cut at a separator (recentsModel.sharedRoot). */
+function sharedRoot(roots) {
+  if (roots.length < 2) return ''
+  let p = roots[0]
+  for (const r of roots.slice(1)) {
+    let i = 0
+    while (i < p.length && i < r.length && p[i].toLowerCase() === r[i].toLowerCase()) i++
+    p = p.slice(0, i)
+  }
+  const cut = p.lastIndexOf('\\')
+  return cut > 0 ? p.slice(0, cut + 1) : ''
+}
+
+function mark(text, q) {
+  if (!q) return esc(text)
+  const i = text.toLowerCase().indexOf(q.toLowerCase())
+  if (i < 0) return esc(text)
+  return esc(text.slice(0, i)) + '<mark class="hl">' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length))
+}
+
+function pathHtml(root, shared, q) {
+  const rest = root.slice(shared.length)
+  const cut = rest.lastIndexOf('\\')
+  const mid = cut > 0 ? rest.slice(0, cut + 1) : ''
+  const tail = cut > 0 ? rest.slice(cut + 1) : rest
+  return `<bdi><span class="shared">${mark(shared, q)}</span>${mark(mid, q)}<span class="tail">${mark(tail, q)}</span></bdi>`
+}
+
+function branchChip(b, q) {
+  return `<span class="ref">${svg(ICON.branch)}<span>${mark(b, q)}</span></span>`
+}
+
+function stateHtml(r) {
+  if (r.dirty === 0 && r.ahead === 0 && r.behind === 0) return `<span class="state"><span class="clean">clean</span></span>`
+  const bits = []
+  if (r.dirty) bits.push(`<span class="dirty" title="${r.dirty} changed files">●&nbsp;${r.dirty}</span>`)
+  if (r.ahead) bits.push(`<span class="ahead" title="${r.ahead} to push">↑${r.ahead}</span>`)
+  if (r.behind) bits.push(`<span class="behind" title="${r.behind} to pull">↓${r.behind}</span>`)
+  return `<span class="state">${bits.join('')}</span>`
+}
+
+function visible() {
+  const q = state.q.trim().toLowerCase()
+  const items = state.items.filter((r) => r.root !== state.gone)
+  if (!q) return items
+  return items.filter((r) => (r.name + ' ' + r.root + ' ' + r.branch).toLowerCase().includes(q))
+}
+
+function grouped(list) {
+  const pinned = list.filter((r) => r.pinned)
+  const rest = list.filter((r) => !r.pinned)
+  const out = []
+  if (pinned.length && !state.q.trim()) out.push(['Pinned', pinned])
+  for (const b of ['Today', 'This week', 'Earlier']) {
+    const g = rest.filter((r) => r.bucket === b)
+    if (g.length) out.push([b, g])
+  }
+  if (state.q.trim()) return [['', list]]
+  return out
+}
+
+/* ---------------- the window ---------------- */
+function windowHtml(inner, scrim) {
+  return `
+  <div class="titlebar"><span class="word">PowerGit</span><span class="hair"></span><span>powergit</span><span class="hair"></span><span>C:\\dev\\public-repo\\powergit</span></div>
+  <div class="shell">
+    <div class="rail"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+    <div class="tree">${'<div class="bar" style="width:78%"></div><div class="bar" style="width:56%"></div><div class="bar" style="width:66%"></div><div class="bar" style="width:44%"></div>'.repeat(3)}</div>
+    ${state.v === 'B' ? inner : `<div class="grid">${'<div class="bar" style="width:92%"></div><div class="bar" style="width:74%"></div><div class="bar" style="width:86%"></div>'.repeat(6)}</div>`}
+  </div>
+  ${scrim ? '<div class="scrim"></div>' : ''}
+  ${state.v === 'B' ? '' : inner}
+  <div class="toast ${state.toast ? 'on' : ''}">${esc(state.toast)}</div>`
+}
+
+/* ---------------- A · the list ---------------- */
+function viewA(list, shared) {
+  const q = state.q.trim()
+  let n = 0
+  const rows = grouped(list)
+    .map(([label, g]) => {
+      const head = label ? `<div class="grouphead">${label}<span class="n">${g.length}</span></div>` : ''
+      return head + g.map((r) => {
+          const i = n++
+          const key = i < 9 ? String(i + 1) : ''
+          return `<div class="row ${i === state.cur ? 'cur' : ''}" data-i="${i}">
+            <span class="keycell key">${key}${r.pinned ? '' : ''}<button class="x" data-forget="${esc(r.root)}" title="Remove from recent repositories">${svg(ICON.close)}</button></span>
+            <span class="name">${mark(r.name, q)}</span>
+            ${branchChip(r.branch, q)}
+            <span class="path">${pathHtml(r.root, shared, q)}</span>
+            <span style="text-align:right">${r.openNow ? '<span class="now-chip">open now</span>' : stateHtml(r)}</span>
+            <span class="when" style="text-align:right">${esc(r.when)}</span>
+          </div>`
+        }).join('')
+    })
+    .join('')
+  return `<div class="panel">
+    <div class="search">${svg(ICON.search)}<input placeholder="Type to filter by name, path or branch" value="${esc(state.q)}" /><kbd>Esc</kbd></div>
+    <div class="scroller">${list.length ? rows : emptyHtml()}</div>
+    ${footHtml(list)}
+  </div>`
+}
+
+/* ---------------- B · the desk ---------------- */
+function viewB(list, shared) {
+  const q = state.q.trim()
+  let n = 0
+  const side = grouped(list)
+    .map(([label, g]) => {
+      const head = label ? `<div class="grouphead">${label}</div>` : ''
+      return head + g.map((r) => {
+          const i = n++
+          return `<div class="srow ${i === state.cur ? 'cur' : ''}" data-i="${i}">
+            <span style="min-width:0">
+              <span class="nm">${mark(r.name, q)}</span>
+              <span class="sub">${branchChip(r.branch, q)}<span class="b">${esc(r.when)}</span></span>
+            </span>
+            <span class="rt">
+              <button class="star ${r.pinned ? 'on' : ''}" data-pin="${esc(r.root)}" title="${r.pinned ? 'Unpin' : 'Pin to the top'}">${svg(r.pinned ? ICON.star : ICON.starOff)}</button>
+              ${r.openNow ? '<span class="now-chip">open now</span>' : stateHtml(r)}
+            </span>
+          </div>`
+        }).join('')
+    })
+    .join('')
+  const r = list[state.cur]
+  const detail = !r
+    ? `<div class="detail"><div class="empty-detail">Nothing matches “${esc(q)}”.<br />Try part of the path or the branch name.</div></div>`
+    : `<div class="detail">
+        <h2>${mark(r.name, q)} ${branchChip(r.branch, q)} ${r.openNow ? '<span class="now-chip">open now</span>' : ''}</h2>
+        <div class="pathline"><span class="path" style="direction:ltr">${esc(r.root)}</span><button class="star x" style="visibility:visible" title="Copy path">${svg(ICON.copy)}</button></div>
+        <div class="facts">
+          <div class="fact"><span class="k">Working tree</span><span class="v" style="color:${r.dirty ? 'var(--warn)' : 'var(--disabled)'}">${r.dirty ? r.dirty + ' changed' : 'clean'}</span></div>
+          <div class="fact"><span class="k">To push</span><span class="v" style="color:${r.ahead ? 'var(--ok)' : 'var(--disabled)'}">${r.ahead || '—'}</span></div>
+          <div class="fact"><span class="k">To pull</span><span class="v" style="color:${r.behind ? 'var(--warn)' : 'var(--disabled)'}">${r.behind || '—'}</span></div>
+          <div class="fact"><span class="k">Last opened</span><span class="v" style="font-size:13px;font-weight:500">${esc(r.when)}</span></div>
+        </div>
+        <div class="log">
+          <h3>Recent history</h3>
+          ${[r.last, 'plan: the iteration is closed', 'engine: the sequencer strips the comment prefix', 'ui: the review bar wraps when the strip is narrow', 'test: a made three-lane repository', 'mcp: a tool call reuses the open session', 'agent-reviews: the inbox poll sets state only when the list changed', 'docs: the one-line config for Claude Code and Codex']
+            .map((s, i) => `<div class="commit"><span class="lane"></span><span class="subj">${esc(s)}</span><span class="ago">${i === 0 ? r.ago : ['1 d', '2 d', '2 d', '3 d', '3 d', '4 d', '4 d'][i - 1]}</span></div>`)
+            .join('')}
+        </div>
+        <div class="actions">
+          <button class="btn primary">${svg(ICON.folder)} Open</button>
+          <button class="btn">${svg(ICON.terminal)} Terminal here</button>
+          <button class="btn ghost" data-forget="${esc(r.root)}">Remove from recents</button>
+          <span style="flex:1"></span>
+          <span class="when"><kbd>↑</kbd> <kbd>↓</kbd> move · <kbd>Enter</kbd> open</span>
+        </div>
+      </div>`
+  return `<div class="deskpane">
+    <div class="side">
+      <div class="search">${svg(ICON.search)}<input placeholder="Filter" value="${esc(state.q)}" /></div>
+      <div class="scroller">${list.length ? side : emptyHtml()}</div>
+      <div class="foot" style="height:34px;padding:0 12px"><a data-act="folder">Open folder…</a><span class="sp"></span><span>${list.length}</span></div>
+    </div>
+    ${detail}
+  </div>`
+}
+
+/* ---------------- C · the board ---------------- */
+function viewC(list, shared) {
+  const q = state.q.trim()
+  let n = 0
+  const cards = grouped(list)
+    .map(([label, g]) => {
+      const head = label ? `<div class="grouphead">${label}<span class="n">${g.length}</span></div>` : ''
+      return head + g.map((r) => {
+          const i = n++
+          const max = Math.max(1, ...r.spark)
+          return `<div class="card ${i === state.cur ? 'cur' : ''}" data-i="${i}">
+            <span class="spine s${r.pal}"></span>
+            <span class="line1"><span class="nm">${mark(r.name, q)}</span>${branchChip(r.branch, q)}${r.openNow ? '<span class="now-chip">open now</span>' : ''}</span>
+            <span class="rt">
+              <span class="toprow">
+                <span class="when">${esc(r.when)}</span>
+                <button class="star ${r.pinned ? 'on' : ''}" data-pin="${esc(r.root)}" title="${r.pinned ? 'Unpin' : 'Pin to the top'}">${svg(r.pinned ? ICON.star : ICON.starOff)}</button>
+                <button class="x" data-forget="${esc(r.root)}" title="Remove from recent repositories">${svg(ICON.close)}</button>
+              </span>
+              <span class="spark" title="commits over the last two weeks">${r.spark.map((v) => `<i class="s${r.pal}" style="height:${Math.max(2, Math.round((v / max) * 20))}px"></i>`).join('')}</span>
+              ${stateHtml(r)}
+            </span>
+            <span class="last"><span class="subj">${esc(r.last)}</span><span class="ago">${esc(r.ago)} ago</span></span>
+            <span class="path">${pathHtml(r.root, shared, q)}</span>
+          </div>`
+        }).join('')
+    })
+    .join('')
+  return `<div class="panel">
+    <div class="search">${svg(ICON.search)}<input placeholder="Type to filter by name, path or branch" value="${esc(state.q)}" /><kbd>Esc</kbd></div>
+    <div class="scroller">${list.length ? `<div class="cards">${cards}</div>` : emptyHtml()}</div>
+    ${footHtml(list)}
+  </div>`
+}
+
+/* ---------------- N · today ---------------- */
+function viewN(list, shared) {
+  const q = state.q.trim()
+  const initials = (n) => n.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+  const tiles = list
+    .map((r, i) => `<div class="tile ${i === state.cur ? 'cur' : ''}" data-i="${i}">
+      <span class="disc p${r.pal}">${initials(r.name)}</span>
+      <span class="nm"><span class="t">${mark(r.name, q)}</span>${branchChip(r.branch, q)}</span>
+      <span class="key">${i < 9 ? i + 1 : ''}</span>
+      <span class="path" style="display:flex;gap:8px;direction:ltr"><span class="path" style="flex:1">${pathHtml(r.root, shared, q)}</span>${r.openNow ? '<span style="flex:none">open now</span>' : ''}</span>
+      <button class="x" data-forget="${esc(r.root)}">${svg(ICON.close)}</button>
+    </div>`)
+    .join('')
+  return `<div class="panel">
+    <div class="search">${svg(ICON.search)}<input placeholder="Type to filter by name, path or branch" value="${esc(state.q)}" /><kbd>Esc</kbd></div>
+    <div class="scroller">${list.length ? `<div class="tiles">${tiles}</div>` : emptyHtml()}</div>
+    ${footHtml(list)}
+  </div>`
+}
+
+function emptyHtml() {
+  return `<div class="empty"><b>${state.q.trim() ? `Nothing matches “${esc(state.q.trim())}”` : 'No repositories yet'}</b>${state.q.trim() ? 'Try part of the path or the branch name.' : 'Open a folder and it will be listed here next time.'}</div>`
+}
+
+function footHtml(list) {
+  const total = state.items.filter((r) => r.root !== state.gone).length
+  const count = list.length === total ? `${total} repositories` : `${list.length} of ${total}`
+  return `<div class="foot">
+    ${state.gone ? `<span>Removed ${esc(state.items.find((r) => r.root === state.gone)?.name || '')} <span style="color:var(--disabled)">·</span> <button class="link" data-act="undo">Undo</button></span>` : `<span>${count}</span>`}
+    <span class="sp"></span>
+    <span class="hint"><kbd>↑</kbd><kbd>↓</kbd> move</span>
+    <span class="hint"><kbd>Enter</kbd> open</span>
+    <span class="hint"><kbd>1</kbd>–<kbd>9</kbd> jump</span>
+    <a data-act="folder">Open folder…</a>
+  </div>`
+}
+
+/* ---------------- leads and notes ---------------- */
+const LEAD = {
+  A: `<h2>A · The list — one line per repository, columns that line up</h2>
+      <p>The cards go. A repository is a <b>row</b>: name, branch, path, state, when you last had it open — each in its own column, so the eye runs down one edge instead of hopping across three tiles. Twelve fit without scrolling where four tiles do now, and the panel is only as tall as the list. Type to filter, arrows to move, digits to jump; <b>Today / This week / Earlier</b> headers give the list a rhythm and answer “which one did I touch this morning”.</p>`,
+  B: `<h2>B · The desk — no dialog at all; the list on the left, the repository on the right</h2>
+      <p>Opening the picker stops covering the app: it <b>becomes</b> the main pane, the same one the cold start shows when nothing is open. The left column is the list, the right shows what you are about to open — the path, the working tree, what is to push and to pull, and the last five commits. You recognise a repository by its work, not by its initials. Pin the three you live in and they sit at the top for good.</p>`,
+  C: `<h2>C · The board — the cards stay, but each one earns its size</h2>
+      <p>Closest to today, and the smallest change: two columns instead of three, and every card carries something worth reading — the last commit and when, what is uncommitted, what is unpushed, a two-week activity bar. The coloured disc of initials gives way to a thin spine in the same colour: the same recognition, none of the noise. Grouped and pinnable like B.</p>`,
+  N: `<h2>Now · what ships today (v0.18.9)</h2>
+      <p>Here for comparison, at its real size: a 1120 × 720 window over the app, three tiles to a row, 96 px each. Every tile says the same four things — a coloured disc of initials, the name, the branch, the path — so nothing tells two of them apart but the path, which is set right-to-left and hard to read at a glance. Four of the ten fill the first screen; the rest is empty white.</p>`,
+}
+
+const NOTES = {
+  A: [
+    ['what', [
+      ['Rows, not cards', 'a 38 px line with aligned columns; the whole list is readable in one fixation instead of three.'],
+      ['A time column', 'now / 2 h ago / yesterday — what the list is sorted by is finally visible.'],
+      ['State at the end of the line', '● uncommitted, ↑ to push, ↓ to pull — the thing you actually want to know before you open it.'],
+      ['Group headers', 'Today · This week · Earlier, sticky while you scroll.'],
+      ['Keys unchanged', 'type to filter, ↑↓, Enter, 1–9, Delete with Undo — every spec in recents.spec.ts still describes it.'],
+    ]],
+    ['cost', [
+      ['recents.json gains lastOpened', 'one field written in RecentsStore.Remember; the list is already MRU, so the ordering does not change — only the label appears.'],
+      ['State needs a peek per repository', 'a batch route (git status --porcelain=v2 --branch, ~10 ms each, cached) called after the list paints; the row shows nothing until it answers, and never blocks the picker.'],
+      ['Rework', 'RecentTile is replaced by a row; RecentsDialog keeps its shell. Half a day.'],
+    ]],
+  ],
+  B: [
+    ['what', [
+      ['No scrim, no dialog', 'the rail button swaps the main pane. Nothing is hidden behind an overlay, and Escape puts the grid back.'],
+      ['The same surface answers the cold start', 'today an empty app says “Open a repository to see its history.” with one button; this is a front door instead.'],
+      ['A preview earns the click', 'path, working tree, to push / to pull, the last five commits — you know it is the right repository before you open it.'],
+      ['Pinning', 'the three you live in stay at the top; the rest stays MRU.'],
+      ['Room for the verbs', 'Open, Terminal here, Copy path, Remove — where you already are, not behind a context menu.'],
+    ]],
+    ['cost', [
+      ['The biggest of the three', 'a new pane, a route for it, the empty state rewired, and the rail button changes meaning. Two or three days.'],
+      ['Needs a read-only peek at an unopened repository', 'git log -5 and a status per selection — cheap, but it is the first time we touch a repository the engine has not opened. A session per hover would be wrong; one lazy read on selection is right.'],
+      ['Decide', 'does the picker still exist as a dialog for “switch while I work”, or is the pane the only way in? Two entry points is the honest answer, and it costs a little more.'],
+    ]],
+  ],
+  C: [
+    ['what', [
+      ['Two columns, not three', 'a card gets ~540 px and can carry a sentence of prose (the last commit) without truncating it to nothing.'],
+      ['The disc becomes a spine', 'the same hashed colour, 4 px down the left edge; recognition without the noise of ten coloured circles.'],
+      ['Activity bars', 'two weeks of commits, seven bars — a repository you left in the middle looks different from one you finished.'],
+      ['Groups and pins', 'as in A and B.'],
+    ]],
+    ['cost', [
+      ['Smallest change of the three', 'RecentTile grows a line and loses the disc; the grid goes to two columns. A day.'],
+      ['Same engine work as A', 'lastOpened, plus a cached status/last-commit peek. The bars need git log --since=14.days --format=%cd per repository — the most expensive of the extras; drop them if the peek turns out slow.'],
+      ['Risk', 'it is still a wall of cards. If the wall is what you dislike, C will not fix it — A or B will.'],
+    ]],
+  ],
+  N: [
+    ['what', [
+      ['1120 × 720, centred, over a scrim', 'sized to your ask in v0.18.9 — “larger so that we can actually read the stuff on the cards”.'],
+      ['Three tiles to a row, 96 px each', 'disc, name, branch chip, path; the cross on hover, 1–9 in the corner.'],
+      ['Filter, arrows, Enter, Delete + Undo', 'all of which the three proposals keep.'],
+    ]],
+    ['cost', [
+      ['What I think is wrong with it', 'the tiles are interchangeable — the only thing that differs is the path, set right-to-left; the discs are decorative; there is no time, no state, no sense of what you were doing there; and at ten entries the window is mostly empty.'],
+      ['What is worth keeping', 'the size and the centring, the filter-first behaviour, the digits, and Delete with Undo.'],
+    ]],
+  ],
+}
+
+/* ---------------- render ---------------- */
+function render() {
+  document.body.className = state.v
+  $('variants').innerHTML = Object.entries(VARIANTS)
+    .map(([k, t]) => `<button data-variant="${k}" class="${k === state.v ? 'on' : ''}"><b>${k === 'N' ? '•' : k}</b>${t}</button>`)
+    .join('')
+  $('lead').innerHTML = LEAD[state.v]
+  const list = visible()
+  if (state.cur >= list.length) state.cur = Math.max(0, list.length - 1)
+  const shared = sharedRoot(list.map((r) => r.root))
+  const view = { A: viewA, B: viewB, C: viewC, N: viewN }[state.v]
+  $('win').innerHTML = windowHtml(view(list, shared), state.v !== 'B')
+  $('notes').innerHTML = NOTES[state.v]
+    .map(([kind, rows]) => `<div><h3>${kind === 'what' ? 'What changes' : 'What it costs'}</h3><ul>${rows
+      .map(([b, t], i) => `<li><i class="mark ${kind === 'cost' ? 'cost' : ''}">${kind === 'cost' ? '·' : i + 1}</i><span><b>${b}</b> — ${t}</span></li>`)
+      .join('')}</ul></div>`)
+    .join('')
+  const input = $('win').querySelector('input')
+  if (input) {
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }
+  const cur = $('win').querySelector('.cur')
+  if (cur) cur.scrollIntoView({ block: 'nearest' })
+}
+
+function toast(msg) {
+  state.toast = msg
+  render()
+  clearTimeout(toast.t)
+  toast.t = setTimeout(() => {
+    state.toast = ''
+    render()
+  }, 1400)
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-variant],[data-t],[data-forget],[data-pin],[data-act],[data-i]')
+  if (!t) return
+  if (t.dataset.variant) {
+    state.v = t.dataset.variant
+    state.q = ''
+    state.cur = 0
+    return render()
+  }
+  if (t.dataset.t) {
+    document.documentElement.dataset.theme = t.dataset.t === 'auto' ? '' : t.dataset.t
+    if (t.dataset.t === 'auto') delete document.documentElement.dataset.theme
+    for (const b of $('theme').children) b.classList.toggle('on', b === t)
+    return
+  }
+  if (t.dataset.act === 'undo') {
+    state.gone = null
+    return render()
+  }
+  if (t.dataset.act === 'folder') return toast('Open folder…')
+  if (t.dataset.pin) {
+    const r = state.items.find((x) => x.root === t.dataset.pin)
+    r.pinned = !r.pinned
+    return render()
+  }
+  if (t.dataset.forget) {
+    state.gone = t.dataset.forget
+    return render()
+  }
+  if (t.dataset.i !== undefined) {
+    state.cur = Number(t.dataset.i)
+    return render()
+  }
+})
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return
+  const list = visible()
+  const cols = state.v === 'C' ? 2 : state.v === 'N' ? 3 : 1
+  const move = (to) => {
+    e.preventDefault()
+    state.cur = Math.max(0, Math.min(list.length - 1, to))
+    render()
+  }
+  switch (e.key) {
+    case 'ArrowDown': return move(state.cur + cols)
+    case 'ArrowUp': return move(state.cur - cols)
+    case 'ArrowRight': return cols > 1 ? move(state.cur + 1) : undefined
+    case 'ArrowLeft': return cols > 1 ? move(state.cur - 1) : undefined
+    case 'Enter':
+      e.preventDefault()
+      return list[state.cur] ? toast(`Opened ${list[state.cur].name}`) : undefined
+    case 'Escape':
+      e.preventDefault()
+      if (state.q) {
+        state.q = ''
+        state.cur = 0
+        return render()
+      }
+      return toast('Closed')
+    case 'Delete':
+      if (!state.q && list[state.cur]) {
+        state.gone = list[state.cur].root
+        return render()
+      }
+      return
+    default:
+      if (/^[1-9]$/.test(e.key) && !state.q) {
+        e.preventDefault()
+        return list[Number(e.key) - 1] ? toast(`Opened ${list[Number(e.key) - 1].name}`) : undefined
+      }
+  }
+})
+
+document.addEventListener('input', (e) => {
+  if (e.target.tagName !== 'INPUT') return
+  state.q = e.target.value
+  state.cur = 0
+  render()
+})
+
+render()
+</script>
