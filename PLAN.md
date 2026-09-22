@@ -954,7 +954,7 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Shell: rail, tree, history, commit panel, settings, agent reviews and the start pane each take the card; the gutters go in, the pane borders come out, and the bottom splitter becomes the gutter. Done ec9bf2084.
 - [x] Test: desk.spec.ts samples the pixels between two panes and finds the desk there, in light and dark, at 100 % and 150 %. Done ec9bf2084.
 - [x] Gate: tsc, eslint, prettier, vitest 487, the e2e suite, the engine suite 222 and the visual baselines green, plus a look at the window in both themes and at 150 %. Done 71acf2f7d.
-- [ ] Release v0.20.5: version bump, Windows artifacts, the zip smoke-tested from a clean extract, tag, CI green, assets and latest.json verified.
+- [x] Release v0.20.5: tagged 80d53f593, the three release jobs green, zip smoke-tested from a clean extract (engine 0.20.5), assets and the signed latest.json verified, showcase and Pages refreshed.
 - [ ] Owner tick: open the released build and say the panes read apart, in light and in dark.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
