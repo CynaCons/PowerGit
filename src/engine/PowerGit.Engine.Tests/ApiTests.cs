@@ -66,6 +66,67 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task Peek_reads_repository_without_opening_a_session()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Write("changed.txt", "changed\n");
+        RepoRegistry registry = _factory.Services.GetRequiredService<RepoRegistry>();
+        int sessionsBefore = registry.List().Count;
+
+        PeekInfo[] answer = await client.GetFromJsonAsync<PeekInfo[]>(
+            $"/repos/peek?root={Uri.EscapeDataString(repo.Dir)}&history=8") ?? [];
+
+        PeekInfo peek = Assert.Single(answer);
+        Assert.True(peek.Exists);
+        Assert.Equal("main", peek.Branch);
+        Assert.Equal(1, peek.Changed);
+        Assert.NotNull(peek.Last);
+        Assert.NotEmpty(peek.Commits ?? []);
+        Assert.Equal(sessionsBefore, registry.List().Count);
+    }
+
+    [Fact]
+    public async Task Peek_reports_a_non_repository_as_not_existing()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        string path = Directory.CreateTempSubdirectory("powergit-peek-not-repo-").FullName;
+        try
+        {
+            PeekInfo[] answer = await client.GetFromJsonAsync<PeekInfo[]>(
+                $"/repos/peek?root={Uri.EscapeDataString(path)}") ?? [];
+            Assert.False(Assert.Single(answer).Exists);
+        }
+        finally
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Pin_recent_answers_no_content_then_not_found()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        string root = Directory.CreateTempSubdirectory("powergit-pin-recent-").FullName;
+        try
+        {
+            RecentsStore.Remember(new RepoInfo("pin", root, "main", "pin"));
+            HttpResponseMessage pinned = await client.PutAsJsonAsync("/repos/recents/pin", new PinRecentRequest(root, true));
+            Assert.Equal(HttpStatusCode.NoContent, pinned.StatusCode);
+            Assert.True(Assert.Single(RecentsStore.List(), r => r.Root == root).Pinned);
+
+            HttpResponseMessage missing = await client.PutAsJsonAsync(
+                "/repos/recents/pin", new PinRecentRequest(root + "-missing", true));
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+        finally
+        {
+            RecentsStore.Forget(root);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Commit_tree_lists_root_entries()
     {
         HttpClient client = _factory.CreateAuthedClient();

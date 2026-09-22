@@ -327,5 +327,6 @@ public sealed record HealthResponse(
     string GitVersion);
 
 public sealed record OpenRepoRequest(string Path);
+public sealed record PinRecentRequest(string Root, bool Pinned);
 
 public sealed record ErrorResponse(string Error);

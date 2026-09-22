@@ -38,7 +38,7 @@ public static class RecentsStore
 
     public static string FilePath => Path.Combine(DataDir, "recents.json");
 
-    public static IReadOnlyList<RepoInfo> List()
+    public static IReadOnlyList<RecentInfo> List()
     {
         lock (Gate)
         {
@@ -50,8 +50,10 @@ public static class RecentsStore
     {
         lock (Gate)
         {
-            List<RepoInfo> list = [.. Prune(ReadUnlocked()).Where(r => !string.Equals(r.Root, repo.Root, StringComparison.OrdinalIgnoreCase))];
-            list.Insert(0, repo);
+            List<RecentInfo> existing = Prune(ReadUnlocked());
+            bool pinned = existing.FirstOrDefault(r => string.Equals(r.Root, repo.Root, StringComparison.OrdinalIgnoreCase))?.Pinned ?? false;
+            List<RecentInfo> list = [.. existing.Where(r => !string.Equals(r.Root, repo.Root, StringComparison.OrdinalIgnoreCase))];
+            list.Insert(0, new RecentInfo(repo.Name, repo.Root, repo.Branch, repo.Id, DateTimeOffset.UtcNow, pinned));
             if (list.Count > 20)
             {
                 list.RemoveRange(20, list.Count - 20);
@@ -61,23 +63,40 @@ public static class RecentsStore
         }
     }
 
+    public static bool SetPinned(string root, bool pinned)
+    {
+        lock (Gate)
+        {
+            List<RecentInfo> list = Prune(ReadUnlocked());
+            int index = list.FindIndex(r => string.Equals(r.Root, root, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+            {
+                return false;
+            }
+
+            list[index] = list[index] with { Pinned = pinned };
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(list, Json));
+            return true;
+        }
+    }
+
     /// <summary>Removes one entry for good (the cross on a Recents card, v0.14.2).</summary>
     public static void Forget(string root)
     {
         lock (Gate)
         {
-            List<RepoInfo> list = [.. Prune(ReadUnlocked()).Where(r => !string.Equals(r.Root, root, StringComparison.OrdinalIgnoreCase))];
+            List<RecentInfo> list = [.. Prune(ReadUnlocked()).Where(r => !string.Equals(r.Root, root, StringComparison.OrdinalIgnoreCase))];
             File.WriteAllText(FilePath, JsonSerializer.Serialize(list, Json));
         }
     }
 
     /// <summary>Drops entries whose root directory is gone (deleted fixtures, unplugged drives).</summary>
-    private static List<RepoInfo> Prune(List<RepoInfo> list)
+    private static List<RecentInfo> Prune(List<RecentInfo> list)
     {
         return [.. list.Where(r => !string.IsNullOrEmpty(r.Root) && Directory.Exists(r.Root))];
     }
 
-    private static List<RepoInfo> ReadUnlocked()
+    private static List<RecentInfo> ReadUnlocked()
     {
         if (!File.Exists(FilePath))
         {
@@ -86,7 +105,7 @@ public static class RecentsStore
 
         try
         {
-            return JsonSerializer.Deserialize<List<RepoInfo>>(File.ReadAllText(FilePath), Json) ?? [];
+            return JsonSerializer.Deserialize<List<RecentInfo>>(File.ReadAllText(FilePath), Json) ?? [];
         }
         catch
         {
@@ -94,3 +113,11 @@ public static class RecentsStore
         }
     }
 }
+
+public sealed record RecentInfo(
+    string Name,
+    string Root,
+    string Branch,
+    string Id,
+    DateTimeOffset? LastOpened = null,
+    bool Pinned = false);

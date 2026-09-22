@@ -48,7 +48,7 @@ public sealed class RecentsStoreTests
 
         Directory.Delete(gone, recursive: true);
 
-        IReadOnlyList<RepoInfo> list = RecentsStore.List();
+        IReadOnlyList<RecentInfo> list = RecentsStore.List();
         Assert.DoesNotContain(list, r => r.Root == gone);
         Assert.Contains(list, r => r.Root == alive);
         Directory.Delete(alive, recursive: true);
@@ -69,7 +69,7 @@ public sealed class RecentsStoreTests
             RecentsStore.Forget(drop);
             RecentsStore.Forget(drop); // idempotent
 
-            IReadOnlyList<RepoInfo> list = RecentsStore.List();
+            IReadOnlyList<RecentInfo> list = RecentsStore.List();
             Assert.DoesNotContain(list, r => r.Root == drop);
             Assert.Contains(list, r => r.Root == keep);
         }
@@ -77,6 +77,55 @@ public sealed class RecentsStoreTests
         {
             Directory.Delete(keep, recursive: true);
             Directory.Delete(drop, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Remember_writes_last_opened_and_preserves_pinned()
+    {
+        string root = Directory.CreateTempSubdirectory("powergit-recent-").FullName;
+        try
+        {
+            RecentsStore.Remember(new RepoInfo("repo", root, "main", "one"));
+            Assert.True(RecentsStore.SetPinned(root, true));
+
+            DateTimeOffset before = DateTimeOffset.UtcNow;
+            RecentsStore.Remember(new RepoInfo("repo", root, "topic", "two"));
+            RecentInfo recent = Assert.Single(RecentsStore.List(), r => r.Root == root);
+
+            Assert.True(recent.Pinned);
+            Assert.Equal("topic", recent.Branch);
+            Assert.NotNull(recent.LastOpened);
+            Assert.True(recent.LastOpened >= before);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SetPinned_returns_false_for_a_missing_root()
+    {
+        Assert.False(RecentsStore.SetPinned(System.IO.Path.Combine(TestDataDir.Path, Guid.NewGuid().ToString("N")), true));
+    }
+
+    [Fact]
+    public void Old_format_loads_with_defaults()
+    {
+        string root = Directory.CreateTempSubdirectory("powergit-old-recent-").FullName;
+        try
+        {
+            File.WriteAllText(RecentsStore.FilePath,
+                $$"""[{"Name":"repo","Root":"{{root.Replace("\\", "\\\\")}}","Branch":"main","Id":"old"}]""");
+
+            RecentInfo recent = Assert.Single(RecentsStore.List());
+            Assert.Null(recent.LastOpened);
+            Assert.False(recent.Pinned);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 }
