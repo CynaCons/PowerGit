@@ -56,6 +56,10 @@ builder.Services.AddSingleton<RepoRegistry>(_ =>
 
     return repos;
 });
+builder.Services.AddSingleton(_ => new RepositoryPeek(
+    string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GIT_EXECUTABLE"))
+        ? null
+        : Environment.GetEnvironmentVariable("GIT_EXECUTABLE")));
 if (Environment.GetEnvironmentVariable("POWERGIT_MCP") != "0")
 {
     builder.Services.AddHostedService(sp => new McpHost(
@@ -139,6 +143,30 @@ app.MapGet("/repos/current", (RepoRegistry repos) =>
         : Results.Ok(repos.Current));
 
 app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
+
+app.MapPut("/repos/recents/pin", (PinRecentRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Root))
+    {
+        return Results.Json(new ErrorResponse("root is required"), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    return RecentsStore.SetPinned(body.Root, body.Pinned)
+        ? Results.NoContent()
+        : Results.NotFound(new ErrorResponse("recent repository not found"));
+});
+
+app.MapGet("/repos/peek", async (HttpRequest request, int? history, RepositoryPeek peek, HttpContext ctx) =>
+{
+    if (!request.Query.ContainsKey("root"))
+    {
+        return Results.Json(new ErrorResponse("root is required"), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    string[] roots = [.. request.Query["root"].Select(root => root ?? "")];
+    int? count = history.HasValue ? Math.Clamp(history.Value, 1, 50) : null;
+    return Results.Ok(await peek.ReadAsync(roots, count, ctx.RequestAborted));
+});
 
 // The cross on a Recents card (v0.14.2): forget one root. Idempotent.
 app.MapDelete("/repos/recents", (string root) =>
