@@ -966,6 +966,14 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 
 Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the owner's explicit call ("Can we release 0.20? If possible quickly" — and, asked about the two open ticks, "tag now, tick after"). The v0.20.1 owner tick is open too. Anything either of them turns up goes into v0.20.4.
 
+### v0.20.5 — The desk — the panes become cards
+**Goal:** Prototype D of docs/prototypes/contrast.html, picked by the owner on 2026-09-22 ("I like the cards best. Let's ship that asap") after his report that "we're missing a bit of contrast and separators in the app. Right now its all just white and its hard to distinguish the different parts." Every pane — rail, repository tree, history, the commit panel, settings, agent reviews, the start pane — becomes a card on a desk: one border, a 6 px radius, a hair of shadow, with a 6 px gutter of the window colour between them, and the bottom splitter living in that gutter. The desk colour is the window background token darkened so a card reads against it, in both themes. Gate: the e2e suite green, a pixel test that the desk actually shows between two panes in both themes, and a look at the window in light, dark and at 150 % zoom.
+- [x] Tokens: the window background becomes the desk (a step darker in both themes) and gains a card shadow, a 6 px gutter and a 6 px radius; theme/panels.ts exports the one pane style. Done ec9bf2084.
+- [x] Shell: rail, tree, history, commit panel, settings, agent reviews and the start pane each take the card; the gutters go in, the pane borders come out, and the bottom splitter becomes the gutter. Done ec9bf2084.
+- [x] Test: desk.spec.ts samples the pixels between two panes and finds the desk there, in light and dark, at 100 % and 150 %. Done ec9bf2084.
+- [ ] Gate: tsc, eslint, prettier, vitest, the e2e suite and the visual subset (@grid, @themes, @bottom) green, plus a look at the window in both themes and at 150 % zoom.
+- [ ] Release v0.20.5: version bump, Windows artifacts, the zip smoke-tested from a clean extract, tag, CI green, assets and latest.json verified.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
