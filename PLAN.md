@@ -937,7 +937,7 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Gate: a Wait review opened through the shim shows in the inbox and comes back changes_requested with the line comment, then approved. Done 2026-09-18 with mcp-probe.mjs and a real Claude Code session.
 - [ ] Owner tick: with PowerGit running, `claude mcp add powergit -- powergit mcp` and a Wait review from a real agent session lands in the inbox and comes back with the comments.
 
-### v0.20.3 — The start pane (current) (ACTIVE)
+### v0.20.3 — The start pane
 **Goal:** Prototype B of docs/prototypes/recents-v2.html, picked by the owner on 2026-09-22: opening the recent repositories stops covering the app. The picker becomes the main pane — the same one a cold start shows instead of "Open a repository to see its history." — with the list on the left and the chosen repository on the right: its path, working tree, what is to push and to pull, its recent history, and Open / Terminal here / Copy path / Remove. The three you live in can be pinned to the top. The modal dialog goes; Escape puts the grid back. The engine learns when each repository was last opened and can peek at one it has not opened, without starting a session. Gate: the e2e suite green on the rewritten specs, and a look at the pane in both themes and at 150 % zoom before it goes to the owner.
 - [x] Engine: recents.json gains lastOpened (written by Remember) and pinned (toggled by PUT /repos/recents/pin); both survive the prune. RecentsStoreTests cover them.
 - [x] Engine: GET /repos/peek — one or many roots, read-only, cached: branch, ahead/behind, changed count, and the last 8 commits for a single root. Never opens a session.
@@ -947,6 +947,14 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Owner tick: open the app cold, land on the pane, pin two repositories, open one from it.
 - [ ] Owner on the released build: "The 'xx min ago' is on the same line as the branch name. They overlap. Better split." Fixed in dee69ecf5 — the row's first line is the name and the time, the second the branch and the state; his sentence is a test at three widths. His to tick.
 - [ ] Owner on v0.20.4: "I would like to have the branch names longer if possible, so separate row for the rest would be good." Done 339578512 — the chip takes the row's width and wraps onto a second line, two at most. His to tick.
+
+### v0.20.5 — The desk — the panes become cards (current) (ACTIVE)
+**Goal:** Prototype D of docs/prototypes/contrast.html, picked by the owner on 2026-09-22 ("I like the cards best. Let's ship that asap") after his report that "we're missing a bit of contrast and separators in the app. Right now its all just white and its hard to distinguish the different parts." Every pane — rail, repository tree, history, the commit panel, settings, agent reviews, the start pane — becomes a card on a desk: one border, a 6 px radius, a hair of shadow, with a 6 px gutter of the window colour between them, and the bottom splitter living in that gutter. The desk colour is the window background token darkened so a card reads against it, in both themes. Gate: the e2e suite green, a pixel test that the desk actually shows between two panes in both themes, and a look at the window in light, dark and at 150 % zoom.
+- [x] Tokens: the window background becomes the desk (a step darker in both themes) and gains a card shadow, a 6 px gutter and a 6 px radius; theme/panels.ts exports the one pane style. Done ec9bf2084.
+- [x] Shell: rail, tree, history, commit panel, settings, agent reviews and the start pane each take the card; the gutters go in, the pane borders come out, and the bottom splitter becomes the gutter. Done ec9bf2084.
+- [x] Test: desk.spec.ts samples the pixels between two panes and finds the desk there, in light and dark, at 100 % and 150 %. Done ec9bf2084.
+- [ ] Gate: tsc, eslint, prettier, vitest, the e2e suite and the visual subset (@grid, @themes, @bottom) green, plus a look at the window in both themes and at 150 % zoom.
+- [ ] Release v0.20.5: version bump, Windows artifacts, the zip smoke-tested from a clean extract, tag, CI green, assets and latest.json verified.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
@@ -965,14 +973,6 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] CI hygiene from the same look: grid-columns.spec's scrollbar case runs on a made three-lane repository instead of the checkout's own graph, whose lanes grow while pages load — on the Ubuntu runner the auto-fit at the end met the 35 % Graph cap and rightly kept the scrollbar (red on 3 of the day's 5 runs). Known and left: graph-nav's "a parent below the loaded window" case fails once in ~4 runs under load (the second page's 30 s poll), and the @grid visual baselines are the checkout's own rows and drift with every commit — they want a made fixture too.
 
 Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the owner's explicit call ("Can we release 0.20? If possible quickly" — and, asked about the two open ticks, "tag now, tick after"). The v0.20.1 owner tick is open too. Anything either of them turns up goes into v0.20.4.
-
-### v0.20.5 — The desk — the panes become cards
-**Goal:** Prototype D of docs/prototypes/contrast.html, picked by the owner on 2026-09-22 ("I like the cards best. Let's ship that asap") after his report that "we're missing a bit of contrast and separators in the app. Right now its all just white and its hard to distinguish the different parts." Every pane — rail, repository tree, history, the commit panel, settings, agent reviews, the start pane — becomes a card on a desk: one border, a 6 px radius, a hair of shadow, with a 6 px gutter of the window colour between them, and the bottom splitter living in that gutter. The desk colour is the window background token darkened so a card reads against it, in both themes. Gate: the e2e suite green, a pixel test that the desk actually shows between two panes in both themes, and a look at the window in light, dark and at 150 % zoom.
-- [x] Tokens: the window background becomes the desk (a step darker in both themes) and gains a card shadow, a 6 px gutter and a 6 px radius; theme/panels.ts exports the one pane style. Done ec9bf2084.
-- [x] Shell: rail, tree, history, commit panel, settings, agent reviews and the start pane each take the card; the gutters go in, the pane borders come out, and the bottom splitter becomes the gutter. Done ec9bf2084.
-- [x] Test: desk.spec.ts samples the pixels between two panes and finds the desk there, in light and dark, at 100 % and 150 %. Done ec9bf2084.
-- [ ] Gate: tsc, eslint, prettier, vitest, the e2e suite and the visual subset (@grid, @themes, @bottom) green, plus a look at the window in both themes and at 150 % zoom.
-- [ ] Release v0.20.5: version bump, Windows artifacts, the zip smoke-tested from a clean extract, tag, CI green, assets and latest.json verified.
 
 ## Backlog
 - Drop leftover 2021 origin branches
