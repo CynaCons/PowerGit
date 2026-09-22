@@ -406,7 +406,15 @@ test("auto-scroll does not re-center the viewport on an unrelated re-render", as
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   )
 
-  expect(await gridBody.evaluate((el) => el.scrollTop)).toBe(scrolledTop)
+  // The bug this guards is a jump of the whole viewport back to the selected
+  // row — tens of thousands of pixels. Demanding the identical scrollTop also
+  // caught the browser's own scroll anchoring re-measuring virtual rows after
+  // the resize (the Ubuntu runner drifts about 23 px, Windows none), so the
+  // assertion is now one row of tolerance, plus the fact that matters: the
+  // selected row is still out of sight.
+  const after = await gridBody.evaluate((el) => el.scrollTop)
+  expect(Math.abs(after - scrolledTop)).toBeLessThanOrEqual(28)
+  await expect(rows.nth(5)).not.toBeInViewport()
 })
 
 test("grid Home/End/PageUp/PageDown move the selection", async ({ page }) => {

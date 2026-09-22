@@ -34,8 +34,17 @@ test("click → diff on screen latency", async ({ page }) => {
   await expect(page.getByTestId("diff-view")).toBeVisible({ timeout: 15_000 })
   await expect(page.getByTestId("diff-loading")).toHaveCount(0, { timeout: 15_000 })
 
+  // Rows come from this repository's own history, so which commits they are
+  // changes with every merge: a --no-ff merge can list exactly the files of
+  // the commit it merged and show that commit's patch for the same first
+  // file, and then neither the list nor the diff text ever changes and the
+  // row cannot be measured at all (both CI runners, 2026-09-22). Such a row
+  // is skipped rather than recorded as a miss — five measurable rows out of
+  // the first twenty is the sample.
   const samples: Sample[] = []
-  for (const row of [3, 5, 7, 9, 11]) {
+  const skipped: string[] = []
+  for (const row of [3, 5, 7, 9, 11, 13, 15, 17, 19]) {
+    if (samples.length === 5) break
     const sample = await rows.nth(row).evaluate(async (el, row) => {
       const q = (id: string) => document.querySelector(`[data-testid="${id}"]`)
       const filesText = () => q("file-list")?.textContent ?? ""
@@ -76,18 +85,19 @@ test("click → diff on screen latency", async ({ page }) => {
       }
       return { row, toClass: Math.round(toClass), toFiles: Math.round(toFiles), toDiff: Math.round(toDiff) }
     }, row)
-    samples.push(sample)
     await expect(rows.nth(row)).toHaveClass(/selected/)
+    if (sample.toClass >= 0 && sample.toFiles >= 0 && sample.toDiff >= 0) samples.push(sample)
+    else skipped.push(`row ${row}`)
   }
 
   const summary = samples.map((s) => `row ${s.row}: class ${s.toClass} ms, files ${s.toFiles} ms, diff ${s.toDiff} ms`)
-  test.info().annotations.push({ type: "latency", description: summary.join(" | ") })
+  test.info().annotations.push({
+    type: "latency",
+    description: summary.join(" | ") + (skipped.length ? ` (skipped ${skipped.join(", ")})` : ""),
+  })
   const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]
   const worstDiff = Math.max(...samples.map((s) => s.toDiff))
-  expect(
-    samples.every((s) => s.toClass >= 0 && s.toFiles >= 0 && s.toDiff >= 0),
-    `every stage observed: ${summary.join(" | ")}`,
-  ).toBe(true)
+  expect(samples.length, `measurable rows (skipped ${skipped.join(", ") || "none"})`).toBeGreaterThanOrEqual(5)
   // Dev build, steady state, this repository: 2026-09-05 baseline was a
   // median of ~1100 ms (150 ms debounce, a wasted diff request for the
   // previous file, then files → diff serially). After v0.13.14 (leading-edge
