@@ -373,12 +373,17 @@ export class EngineClient {
     return json<RepoPeek[]>(await this.get(`/repos/peek?${query}`, { signal }))
   }
 
+  /** One root with its last `history` commits. The route answers an array whatever it is asked. */
   async peekRepo(root: string, history: number, signal?: AbortSignal): Promise<RepoPeek> {
-    return json<RepoPeek>(await this.get(`/repos/peek?root=${encodeURIComponent(root)}&history=${history}`, { signal }))
+    const peeks = json<RepoPeek[]>(
+      await this.get(`/repos/peek?root=${encodeURIComponent(root)}&history=${history}`, { signal }),
+    )
+    return (await peeks)[0] ?? { root, exists: false }
   }
 
+  /** The route answers 204, so there is no body to read. */
   async pinRecent(root: string, pinned: boolean): Promise<void> {
-    await json<{ ok: boolean }>(await this.put(`/repos/recents/pin`, { root, pinned }))
+    await this.put(`/repos/recents/pin`, { root, pinned })
   }
 
   /** Removes one root from the recents list for good (v0.14.2). */

@@ -36,5 +36,5 @@ test("cold start stays on empty Browse when reopening the last repository is off
   await page.route("**/repos/recents", (route) => route.fulfill({ json: [fixture] }))
 
   await page.goto("/")
-  await expect(page.getByTestId("grid-open-repo")).toBeVisible()
+  await expect(page.getByTestId("start-pane")).toBeVisible()
 })

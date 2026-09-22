@@ -159,6 +159,62 @@ fn percent_decode(value: &str) -> Option<String> {
 }
 
 /// Tauri command: where the sidecar log lives (shown by the recovery panel).
+/// "Terminal here" on the start pane (v0.20.3): a terminal opened in the
+/// repository's directory. Windows tries Windows Terminal first and falls
+/// back to cmd, which is always there; Linux walks the emulators Debian and
+/// Fedora ship, since there is no portable "open a terminal" call; macOS has
+/// `open -a Terminal`. The first one that spawns wins, and the caller gets
+/// the reason when none does — this is a button, so a silent nothing is the
+/// one outcome to avoid.
+#[tauri::command]
+fn open_terminal(app: AppHandle, path: String) -> Result<(), String> {
+    let dir = PathBuf::from(&path);
+    if !dir.is_dir() {
+        return Err(format!("{path} is not a directory"));
+    }
+    let attempts = terminal_commands(&dir);
+    let mut last: Option<String> = None;
+    for (program, args) in &attempts {
+        match std::process::Command::new(program)
+            .args(args)
+            .current_dir(&dir)
+            .spawn()
+        {
+            Ok(_) => {
+                log_line(
+                    &app.state::<EngineState>(),
+                    &format!("terminal opened with {program} in {path}"),
+                );
+                return Ok(());
+            }
+            Err(e) => last = Some(format!("{program}: {e}")),
+        }
+    }
+    Err(last.unwrap_or_else(|| "no terminal found".into()))
+}
+
+/// The candidates for `open_terminal`, in the order they are tried. Split out
+/// so the order is a unit test rather than a guess.
+fn terminal_commands(dir: &std::path::Path) -> Vec<(&'static str, Vec<String>)> {
+    let d = dir.to_string_lossy().into_owned();
+    if cfg!(target_os = "windows") {
+        vec![
+            ("wt.exe", vec!["-d".into(), d.clone()]),
+            ("cmd.exe", vec!["/c".into(), "start".into(), "".into(), "cmd.exe".into()]),
+        ]
+    } else if cfg!(target_os = "macos") {
+        vec![("open", vec!["-a".into(), "Terminal".into(), d])]
+    } else {
+        vec![
+            ("x-terminal-emulator", vec![]),
+            ("gnome-terminal", vec![]),
+            ("konsole", vec![]),
+            ("xfce4-terminal", vec![]),
+            ("xterm", vec![]),
+        ]
+    }
+}
+
 #[tauri::command]
 fn engine_log_path(state: tauri::State<EngineState>) -> Option<String> {
     state
@@ -1005,6 +1061,7 @@ pub fn run() {
             write_text_file,
             last_incident,
             log_dir,
+            open_terminal,
             recover
         ])
         .setup(|app| {
@@ -1266,4 +1323,19 @@ mod tests {
         assert_eq!(&t[10..11], "T");
         assert!(t.starts_with("20"));
     }
+    #[test]
+    fn terminal_candidates_are_tried_in_order() {
+        let dir = std::env::temp_dir();
+        let candidates = super::terminal_commands(&dir);
+        assert!(!candidates.is_empty());
+        if cfg!(target_os = "windows") {
+            assert_eq!(candidates[0].0, "wt.exe");
+            assert!(candidates[0].1.iter().any(|a| a == &dir.to_string_lossy().into_owned()));
+            assert_eq!(candidates[1].0, "cmd.exe");
+        } else if !cfg!(target_os = "macos") {
+            assert_eq!(candidates[0].0, "x-terminal-emulator");
+            assert_eq!(candidates.last().unwrap().0, "xterm");
+        }
+    }
+
 }

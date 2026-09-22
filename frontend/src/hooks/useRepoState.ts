@@ -21,7 +21,7 @@ export type RefreshScope = { revisions?: boolean; refs?: boolean; status?: boole
 
 export type RepoStateDeps = {
   session: EngineSession
-  history: Pick<History, "reloadHistory" | "resetHistory">
+  history: Pick<History, "reloadHistory" | "resetHistory" | "loadingTarget">
 }
 
 export type RepoState = ReturnType<typeof useRepoState>
@@ -48,6 +48,9 @@ export function useRepoState({ session, history }: RepoStateDeps) {
   // 500 ms, so a shorter tail would let echoes through.
   const inFlight = useRef(0)
   const muteUntil = useRef(0)
+  // True while the grid is paging towards a commit (history.loadingTarget).
+  const navigating = useRef(false)
+  navigating.current = history.loadingTarget !== null
   const refreshSequence = useRef(0)
   // What the completed sweeps observed, by what they fetched: a status-only
   // poll says nothing about refs, so a refs event above `full` still
@@ -58,6 +61,12 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     async (scope?: RefreshScope) => {
       if (!client.hasRepo) return
       const s = scope ?? { revisions: true, refs: true, status: true, stashes: true }
+      // A sweep must not reload the history while the grid is paging towards
+      // a commit below the loaded window (the compass, v0.18.12): reloading
+      // puts the list back to page 0 and the pages the navigation has
+      // gathered are lost, so it never arrives. The pages it is fetching are
+      // fresh anyway; refs and status still refresh. graph-nav.spec's "a
+      // parent below the loaded window" failed on CI exactly here.
       // The status safety-net poll keeps its previous object when unchanged;
       // do not make that no-op render App for an invisible indicator
       // (v0.18.18, owner: "slow, sluggish, lagging").
@@ -74,7 +83,7 @@ export function useRepoState({ session, history }: RepoStateDeps) {
         const msg = handleFailure(e, what)
         if (!firstError) firstError = `${what}: ${msg}`
       }
-      if (s.revisions) jobs.push(reloadHistory().catch(fail("history")))
+      if (s.revisions && !navigating.current) jobs.push(reloadHistory().catch(fail("history")))
       if (s.refs) jobs.push(client.refs().then(setRefs).catch(fail("refs")))
       if (s.status)
         jobs.push(

@@ -8,10 +8,12 @@ export function relativeTime(value: string | undefined, now = new Date()): strin
   if (!value) return "—"
   const elapsed = Math.max(0, now.getTime() - new Date(value).getTime())
   if (elapsed < 60_000) return "now"
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)} min ago`
   if (elapsed < DAY) return `${Math.floor(elapsed / 3_600_000)} h ago`
   if (elapsed < 2 * DAY) return "yesterday"
   if (elapsed < 14 * DAY) return `${Math.floor(elapsed / DAY)} d ago`
-  return `${Math.floor(elapsed / (7 * DAY))} weeks ago`
+  const weeks = Math.floor(elapsed / (7 * DAY))
+  return weeks === 1 ? "a week ago" : `${weeks} weeks ago`
 }
 
 export function recentGroup(repo: RecentInfo, now = new Date()): RecentGroup {

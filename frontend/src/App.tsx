@@ -7,6 +7,7 @@ import { ErrorBanner } from "./components/ErrorBanner"
 import { FileHistoryView } from "./components/FileHistoryView"
 import { GitConsole } from "./components/GitConsole"
 import { CollapsedLeftPanel, HistoryPane } from "./components/HistoryPane"
+import { StartPaneView } from "./components/StartPaneView"
 import { JobPanel } from "./components/JobPanel"
 import { NavRail } from "./components/NavRail"
 import { OperationBanner } from "./components/OperationBanner"
@@ -42,6 +43,7 @@ import { withArtificialRows } from "./graph/artificial"
 import { findRefTarget } from "./components/refChipsModel"
 import { useAutoFetch } from "./hooks/useAutoFetch"
 import { useBrowseHotkeys } from "./hooks/useBrowseHotkeys"
+import { useStartPane } from "./hooks/useStartPane"
 import { useDiagnosticSnapshot } from "./hooks/useDiagnosticSnapshot"
 import { useHeartbeat } from "./hooks/useHeartbeat"
 import { AgentReviewsView } from "./components/agentReviews/AgentReviewsView"
@@ -55,8 +57,10 @@ import { useAgentReviewsPage } from "./hooks/useAgentReviewsPage"
 // session derives the repo-bound one every component reads via useEngine().
 export default function App({ base }: { base: EngineClient }) {
   const session = useEngineSession(base)
-  const { view, state, client, engineError, setEngineError, recents, forgetRecent, demo } = session
+  const { view, state, client, engineError, setEngineError, demo } = session
   const { live, offline, repo } = view
+  // The recent repositories are a pane now, not a dialog (v0.20.3).
+  const startPane = useStartPane(state.phase !== "no-repository")
   // Which refs the graph shows (v0.18.5): the tree's ticks, per repository.
   const graphFilter = useGraphRefFilter(client.repoId)
   const history = useHistory({
@@ -167,7 +171,7 @@ export default function App({ base }: { base: EngineClient }) {
     selectRow: (i: number) => setSelectedSha(rows[i]?.rev.id ?? null),
     openStash: () => open({ kind: "stash" }),
     openRepo: () => void openFolder(),
-    openRecents: () => open({ kind: "recents" }),
+    openRecents: () => startPane.toggle(),
     openSettings: settings.toggle,
     openSnapshot: () => void takeDiagnosticSnapshot(),
     recover: () => setRecoveryOpen(true),
@@ -329,7 +333,9 @@ export default function App({ base }: { base: EngineClient }) {
               )}
               {!settings.open && (
                 <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-                  {agentReviewsPage.open ? (
+                  {startPane.open ? (
+                    <StartPaneView session={session} repoState={repoState} onClose={startPane.close} />
+                  ) : agentReviewsPage.open ? (
                     <AgentReviewsView
                       engine={client}
                       sessions={agentReviews.sessions}
@@ -419,8 +425,6 @@ export default function App({ base }: { base: EngineClient }) {
           dialogs={dialogs}
           actions={actions}
           repo={repo}
-          recents={recents}
-          onForgetRecent={forgetRecent}
           repoState={repoState}
           jobs={jobs}
           onFileHistory={fileHistory.open}
@@ -434,10 +438,7 @@ export default function App({ base }: { base: EngineClient }) {
           view={view}
           onClose={() => setRecoveryOpen(false)}
           onRetry={() => (setRecoveryOpen(false), session.retry())}
-          onOpenRepository={() => {
-            setRecoveryOpen(false)
-            void openFolder()
-          }}
+          onOpenRepository={() => (setRecoveryOpen(false), void openFolder())}
         />
       </Box>
     </EngineProvider>

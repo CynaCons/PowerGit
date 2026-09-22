@@ -12,12 +12,10 @@ test("saved recent repositories appear after reopening with no active repository
   await page.route("**/repos/recents", (route) =>
     route.fulfill({ json: [{ id: "saved", name: "My Ubuntu project", root: "/home/me/project", branch: "main" }] }),
   )
+  // With no repository open the start pane is the front door (v0.20.3), so
+  // the saved list is on screen without a click.
   await page.goto("/")
-  await expect(page.getByTestId("grid-open-repo")).toBeVisible()
-  await page.getByTestId("recents-button").click()
-  await expect(page.getByTestId("recent-card")).toContainText("My Ubuntu project")
+  await expect(page.getByTestId("start-row")).toContainText("My Ubuntu project")
   await page.reload()
-  await expect(page.getByTestId("grid-open-repo")).toBeVisible()
-  await page.getByTestId("recents-button").click()
-  await expect(page.getByTestId("recent-card")).toContainText("My Ubuntu project")
+  await expect(page.getByTestId("start-row")).toContainText("My Ubuntu project")
 })

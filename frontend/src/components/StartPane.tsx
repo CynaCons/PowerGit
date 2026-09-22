@@ -95,7 +95,9 @@ export function StartPane(props: StartPaneProps) {
       onKeyDown={onKeyDown}
       sx={{
         display: "grid",
-        gridTemplateColumns: "330px 1fr",
+        // The list gives way before the preview does when the content
+        // area is narrow — a 150 % zoom leaves about 960 px for both.
+        gridTemplateColumns: "minmax(232px, min(330px, 34%)) minmax(0, 1fr)",
         minHeight: 0,
         height: "100%",
         bgcolor: "background.paper",
@@ -359,6 +361,7 @@ function Marked({ text, range }: { text: string; range: MatchRange | null }): Re
       {text.slice(0, range.start)}
       <Box
         component="mark"
+        data-testid="start-match"
         sx={{
           bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.28 : 0.16),
           color: "inherit",

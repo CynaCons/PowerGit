@@ -38,7 +38,6 @@ export type ConfirmRequest = {
 export type DialogState =
   | { kind: "none" }
   | { kind: "commit"; amend: boolean; initialMsg?: string }
-  | { kind: "recents" }
   | { kind: "stash" }
   | { kind: "context"; target: ContextTarget }
   | { kind: "refContext"; target: RefContextTarget }

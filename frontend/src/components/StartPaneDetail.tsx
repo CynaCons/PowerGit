@@ -30,7 +30,16 @@ export function StartPaneDetail({ repo, peek, current, onOpen, onForget, onTermi
   return (
     <Box
       data-testid="start-detail"
-      sx={{ minHeight: 0, overflow: "auto", px: 3.75, pt: 3.25, display: "flex", flexDirection: "column" }}
+      sx={{
+        minHeight: 0,
+        minWidth: 0,
+        px: 3.75,
+        pt: 3.25,
+        display: "grid",
+        // Head, a scrolling middle, and the verbs pinned to the bottom: at
+        // 150 % zoom a single scrolling column pushed Open off the window.
+        gridTemplateRows: "auto auto auto 1fr auto",
+      }}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Typography component="h2" sx={{ fontSize: 23, lineHeight: 1.3, fontWeight: 600, letterSpacing: "-.01em" }}>
@@ -69,14 +78,24 @@ export function StartPaneDetail({ repo, peek, current, onOpen, onForget, onTermi
         </IconButton>
       </Box>
       <Box
-        sx={{ display: "flex", gap: 2.75, mt: 2.25, py: 1.5, borderTop: 1, borderBottom: 1, borderColor: "divider" }}
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          columnGap: 2.75,
+          rowGap: 1,
+          mt: 2.25,
+          py: 1.5,
+          borderTop: 1,
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
       >
         <Fact label="Working tree" value={peek?.changed ? `${peek.changed} changed` : "clean"} />
         <Fact label="To push" value={peek?.ahead ? String(peek.ahead) : "—"} />
         <Fact label="To pull" value={peek?.behind ? String(peek.behind) : "—"} />
         <Fact label="Last opened" value={relativeTime(repo.lastOpened)} />
       </Box>
-      <Box data-testid="start-history" sx={{ mt: 2 }}>
+      <Box data-testid="start-history" sx={{ mt: 2, minHeight: 0, overflow: "auto" }}>
         <Typography
           sx={{
             fontSize: 11,
@@ -92,6 +111,7 @@ export function StartPaneDetail({ repo, peek, current, onOpen, onForget, onTermi
         {peek?.commits?.slice(0, 8).map((commit, index, commits) => (
           <Box
             key={commit.sha}
+            data-testid="start-commit"
             sx={{
               display: "grid",
               gridTemplateColumns: "16px 1fr auto",
@@ -146,8 +166,9 @@ export function StartPaneDetail({ repo, peek, current, onOpen, onForget, onTermi
       </Box>
       <Box
         sx={{
-          mt: "auto",
           py: 2,
+          flexWrap: "wrap",
+          rowGap: 1,
           borderTop: 1,
           borderColor: "divider",
           display: "flex",

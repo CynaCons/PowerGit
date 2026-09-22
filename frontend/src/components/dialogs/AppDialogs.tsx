@@ -6,7 +6,6 @@ import type { GitActions } from "../../hooks/useGitActions"
 import type { Jobs } from "../../hooks/useJobs"
 import type { RepoState } from "../../hooks/useRepoState"
 import { CommitDialog } from "../CommitDialog"
-import { RecentsDialog } from "../RecentsDialog"
 import { RemoteDialog } from "../RemoteDialog"
 import { StashDialog } from "../StashDialog"
 import { CheckoutBranchDialog } from "./CheckoutBranchDialog"
@@ -30,9 +29,8 @@ export type AppDialogsProps = {
   dialogs: Dialogs
   actions: GitActions
   repo: RepoInfo | null
-  recents: RepoInfo[]
   onForgetRecent?: (root: string) => void
-  repoState: Pick<RepoState, "status" | "setStatus" | "refs" | "branchNames" | "dirty" | "refresh" | "openFolder">
+  repoState: Pick<RepoState, "status" | "setStatus" | "refs" | "branchNames" | "dirty" | "refresh">
   jobs: Jobs
   /** v0.16.0: the commit dialog's "View file history". */
   onFileHistory?: (path: string) => void
@@ -41,22 +39,20 @@ export type AppDialogsProps = {
 }
 
 // Every modal surface of the shell, driven by the single DialogState. The
-// always-mounted MUI dialogs (commit, recents, stash) get an `open` flag so
+// always-mounted MUI dialogs (commit, stash) get an `open` flag so
 // their exit transitions play; the rest mount on demand. Settings is not a
 // dialog since v0.18.0: it is a page in App.tsx (settings/SettingsView).
 export function AppDialogs({
   dialogs,
   actions,
   repo,
-  recents,
-  onForgetRecent,
   repoState,
   jobs,
   onFileHistory,
   rows = NO_ROWS,
 }: AppDialogsProps) {
   const { dialog, open, close } = dialogs
-  const { status, setStatus, refs, branchNames, dirty, refresh, openFolder } = repoState
+  const { status, setStatus, refs, branchNames, dirty, refresh } = repoState
   const ctxTarget = dialog.kind === "context" ? dialog.target : null
   const currentBranch = repo?.branch ?? ""
   const tagNames = (refs?.tags ?? []).map((t) => t.name)
@@ -79,21 +75,6 @@ export function AppDialogs({
           await actions.commit(msg)
         }}
         onFileHistory={onFileHistory}
-      />
-
-      <RecentsDialog
-        open={dialog.kind === "recents"}
-        onClose={() => {
-          close("recents")
-          focusGrid()
-        }}
-        recents={recents}
-        onForget={onForgetRecent}
-        onPick={(p) => {
-          if (p) void openFolder(p)
-        }}
-        currentRoot={repo?.root ?? null}
-        onOpenFolder={() => void openFolder()}
       />
 
       <RevisionContextMenu
