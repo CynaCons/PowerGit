@@ -1,4 +1,3 @@
-import CallSplitIcon from "@mui/icons-material/CallSplit"
 import SearchIcon from "@mui/icons-material/Search"
 import StarBorderIcon from "@mui/icons-material/StarBorder"
 import StarIcon from "@mui/icons-material/Star"
@@ -7,12 +6,12 @@ import IconButton from "@mui/material/IconButton"
 import InputBase from "@mui/material/InputBase"
 import Link from "@mui/material/Link"
 import Typography from "@mui/material/Typography"
-import { alpha } from "@mui/material/styles"
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import type { RecentInfo, RepoPeek } from "../engine"
 import { StartPaneDetail } from "./StartPaneDetail"
-import { matchRecent, type MatchRange, type RecentMatch } from "./recentsModel"
+import { matchRecent, type RecentMatch } from "./recentsModel"
 import { groupRecents, relativeTime } from "./startPaneModel"
+import { Branch, Marked } from "./StartPaneMarks"
 import { useDelayedForget } from "./useDelayedForget"
 
 export type StartPaneProps = {
@@ -349,48 +348,10 @@ function StartRow({
   )
 }
 
-function Branch({ text, range }: { text?: string; range: MatchRange | null }) {
-  return text ? (
-    <Box
-      component="span"
-      className="ref"
-      data-testid="start-branch"
-      title={text}
-      sx={{ minWidth: 0, maxWidth: "22ch", height: 18, fontSize: 11, overflow: "hidden" }}
-    >
-      <CallSplitIcon />
-      {/* The chip clips, so the branch that does not fit ends in an ellipsis
-          rather than mid-letter; the whole name is the title. */}
-      <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-        <Marked text={text} range={range} />
-      </Box>
-    </Box>
-  ) : null
-}
 function stateText(peek?: RepoPeek) {
   if (!peek || !peek.exists) return ""
   if (peek.changed) return `● ${peek.changed} changed`
   if (peek.ahead) return `↑ ${peek.ahead} ahead`
   if (peek.behind) return `↓ ${peek.behind} behind`
   return "clean"
-}
-function Marked({ text, range }: { text: string; range: MatchRange | null }): ReactNode {
-  if (!range) return text
-  return (
-    <>
-      {text.slice(0, range.start)}
-      <Box
-        component="mark"
-        data-testid="start-match"
-        sx={{
-          bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.28 : 0.16),
-          color: "inherit",
-          borderRadius: "2px",
-        }}
-      >
-        {text.slice(range.start, range.end)}
-      </Box>
-      {text.slice(range.end)}
-    </>
-  )
 }

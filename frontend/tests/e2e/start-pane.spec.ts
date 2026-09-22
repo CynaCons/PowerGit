@@ -44,7 +44,7 @@ test.describe("the start pane", () => {
   // same line as the branch name. They overlap." A branch name that fills
   // the row is what shows it.
   let long = ""
-  const LONG_BRANCH = "feature/the-branch-name-that-fills-the-row"
+  const LONG_BRANCH = "feature/the-branch-name-that-fills-the-row-and-then-some"
   // By name, not by data-root: a Windows path in a CSS attribute selector
   // would have its backslashes read as escapes.
   const rowOf = (page: Page, dir: string) => page.getByTestId("start-row").filter({ hasText: basename(dir) })
@@ -193,29 +193,33 @@ test.describe("the start pane", () => {
     await expect.poll(async () => (await recents()).map((r) => r.root)).not.toContain(a.toLowerCase())
   })
 
-  test("a long branch name and 'xx min ago' never share a line, whatever the list's width", async ({ page }) => {
+  test("a long branch name is shown whole, wrapped onto a second line, and never runs under the time", async ({
+    page,
+  }) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
     await page.getByTestId("recents-button").click()
     await page.getByTestId("start-filter").fill("pg-longbranch")
     const row = page.getByTestId("start-row").first()
-    await expect(row.getByTestId("start-branch")).toContainText("feature/the-branch")
+    const branch = row.getByTestId("start-branch")
+    await expect(branch).toHaveText(LONG_BRANCH)
 
-    // 900 px is the narrowest the content area gets here; 1600 the widest.
-    for (const width of [900, 1280, 1600]) {
+    for (const width of [1280, 1600]) {
       await page.setViewportSize({ width, height: 900 })
-      const branch = (await row.getByTestId("start-branch").boundingBox())!
+      // Owner (2026-09-22): "I would like to have the branch names longer if
+      // possible, so separate row for the rest would be good" — the chip
+      // grows to a second line instead of cutting the name off.
+      const shown = await branch.evaluate((el) => {
+        const inner = el.lastElementChild as HTMLElement
+        return { clipped: inner.scrollHeight > inner.clientHeight + 1, lines: Math.round(inner.clientHeight / 16) }
+      })
+      expect(shown.clipped, `branch clipped at ${width} px`).toBe(false)
+      expect(shown.lines, `branch lines at ${width} px`).toBeLessThanOrEqual(2)
+
+      // And the first line still belongs to the name and the time (v0.20.4).
       const when = (await row.getByTestId("start-when").boundingBox())!
-      const overlap =
-        branch.x < when.x + when.width &&
-        when.x < branch.x + branch.width &&
-        branch.y < when.y + when.height &&
-        when.y < branch.y + branch.height
-      expect(overlap, `branch and time overlap at ${width} px`).toBe(false)
-      // Split, as the owner asked: the time is not on the branch's line.
-      expect(Math.abs(branch.y - when.y), `branch and time share a line at ${width} px`).toBeGreaterThan(4)
-      // And the row still says both things.
-      await expect(row.getByTestId("start-when")).not.toHaveText("")
+      const box = (await branch.boundingBox())!
+      expect(when.y + when.height, `time overlaps the branch at ${width} px`).toBeLessThanOrEqual(box.y + 2)
     }
   })
 })
