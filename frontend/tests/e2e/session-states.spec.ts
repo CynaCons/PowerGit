@@ -79,7 +79,9 @@ test("an evicted session drops to no-repository with a reason and a way out", as
   const bar = page.getByTestId("engine-status")
   await expect(bar).toHaveAttribute("data-phase", "no-repository", { timeout: 10_000 })
   await expect(page.getByTestId("status-session")).toContainText(/no longer has this repository/i)
-  await expect(page.getByTestId("grid-open-repo")).toBeVisible()
+  // The way out is the start pane (v0.20.3): the recents and Open folder…
+  await expect(page.getByTestId("start-pane")).toBeVisible()
+  await expect(page.getByTestId("start-open-folder")).toBeVisible()
   await page.unroute(`${base}/status`)
 })
 

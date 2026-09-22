@@ -82,7 +82,10 @@ test("a change applies at once and Reset puts it back", async ({ page }) => {
 
 test("the repository row opens the repository switcher", async ({ page }) => {
   await page.goto("/")
+  await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
+  // Since v0.20.3 the switcher is the start pane, not a dialog over the app.
   await page.getByTestId("rail-repo").click()
-  await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.getByTestId("start-pane")).toBeVisible()
   await page.keyboard.press("Escape")
+  await expect(page.getByTestId("start-pane")).toHaveCount(0)
 })
