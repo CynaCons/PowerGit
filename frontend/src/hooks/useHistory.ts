@@ -386,7 +386,11 @@ export function useHistory({ client, demo, live, setEngineError, onFailure, filt
       setHighlightRoot(null)
     }
     setLoaded(false)
-    setRevisions([])
+    // A ref-filter change leaves the old rows on screen until the new list's
+    // first page replaces them (v0.20.7): on thousands of refs that page is
+    // ~5 s of git, and the grid sat blank meanwhile (docs/perf/audit-2026-09-23.md).
+    // revisionsRef is already empty, so the reply replaces instead of merging.
+    if (!opts?.keepSelection) setRevisions([])
   }, [])
 
   /** Ctrl+Shift+B: the row becomes the root; the same row again exits.

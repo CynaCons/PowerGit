@@ -72,6 +72,9 @@ export function HistoryPane({
   onRecover,
 }: HistoryPaneProps) {
   const empty = rows.length === 0 && !loadingTail
+  // Rows while loading are the previous list, kept through a ref-filter
+  // reload (useHistory.resetHistory): dimmed, and said so.
+  const stale = loading && rows.length > 0
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }} component="div">
       <Box
@@ -81,6 +84,8 @@ export function HistoryPane({
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
+          position: "relative",
+          "& .grid-body": { opacity: stale ? 0.55 : 1 },
         }}
       >
         {empty && (
@@ -111,6 +116,14 @@ export function HistoryPane({
                 }
               />
             )}
+          </Box>
+        )}
+        {stale && (
+          <Box
+            data-testid="grid-reloading"
+            sx={{ position: "absolute", top: 36, right: 16, zIndex: 3, pointerEvents: "none" }}
+          >
+            <LoadingState label="Filtering history…" testid="grid-reloading-label" />
           </Box>
         )}
         <RevisionGrid

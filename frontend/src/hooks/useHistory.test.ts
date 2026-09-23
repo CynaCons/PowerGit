@@ -295,6 +295,29 @@ describe("useHistory: a reload while one is in flight (v0.18.9)", () => {
     expect(latest?.rows).toHaveLength(0)
   })
 
+  // v0.20.7 (perf audit 2026-09-23): ticking a remote folder of 5,000 refs is
+  // ~5 s of git for the first page, and the grid used to sit blank for it.
+  it("a ref-filter reset keeps the old rows on screen until the new list's page 0 replaces them", async () => {
+    const filter: RevisionFilter = { path: "doc.txt", follow: false }
+    await render(filter)
+    await answer(calls[0], page("A", 0, 5))
+    expect(latest?.rows.map((r) => r.rev.id)).toEqual(page("A", 0, 5).map((r) => r.id))
+
+    await act(async () => {
+      latest!.resetHistory({ keepSelection: true })
+      void latest!.reloadHistory()
+    })
+    await settle()
+    expect(latest?.loaded).toBe(false)
+    expect(latest?.rows.map((r) => r.rev.id)).toEqual(page("A", 0, 5).map((r) => r.id))
+
+    // The new list replaces the old one; nothing is merged into it.
+    await answer(calls[calls.length - 1], page("B", 0, 3))
+    expect(latest?.loaded).toBe(true)
+    expect(latest?.rows.map((r) => r.rev.id)).toEqual(page("B", 0, 3).map((r) => r.id))
+    expect(failures).toEqual([])
+  })
+
   it("a filter change during a reload aborts the old one and requests the new filter's page 0 at once", async () => {
     const follow: RevisionFilter = { path: "doc.txt", follow: true }
     const noFollow: RevisionFilter = { path: "doc.txt", follow: false }
