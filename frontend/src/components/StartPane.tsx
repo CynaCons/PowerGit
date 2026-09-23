@@ -111,7 +111,9 @@ export function StartPane(props: StartPaneProps) {
           display: "flex",
           flexDirection: "column",
           minHeight: 0,
-          bgcolor: "var(--pg-surface-sunken, #f6f8fb)",
+          // Paper, like the graph (v0.20.8): on the sunken grey the paper-white
+          // cursor row read as the ordinary one and the rest as greyed out.
+          bgcolor: "background.paper",
         }}
       >
         <Box
@@ -294,12 +296,18 @@ function StartRow({
         py: 0.875,
         pr: 1.25,
         pl: 1.5,
+        // The cursor row wears the graph's selection (owner on v0.20.7: "the
+        // colors are swapped between selection and non-selection"), and a
+        // hairline parts every row from the next.
         borderLeft: "2px solid",
         borderLeftColor: cursor ? "var(--pg-grid-sel-border, #2563eb)" : "transparent",
-        bgcolor: cursor ? "background.paper" : "transparent",
+        borderBottom: "1px solid var(--pg-border-soft, #e6eaf0)",
+        bgcolor: cursor ? "var(--pg-grid-sel, #dbeafe)" : "transparent",
         color: "text.primary",
         cursor: "default",
-        "&:hover": { bgcolor: cursor ? "background.paper" : "var(--pg-grid-hover, rgba(37, 99, 235, 0.08))" },
+        "&:hover": {
+          bgcolor: cursor ? "var(--pg-grid-sel, #dbeafe)" : "var(--pg-grid-hover, rgba(37, 99, 235, 0.08))",
+        },
       }}
     >
       <Box

@@ -124,6 +124,65 @@ test.describe("the start pane", () => {
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
   })
 
+  // Owner (2026-09-23, on v0.20.7): "the list view of the recent repos has
+  // color issues and need better separation between the rows. I think the
+  // colors are swapped between selection and non-selection." The list sat on
+  // the sunken grey and the cursor row was plain paper white, so the chosen
+  // row looked like the ordinary one and every other row looked greyed out.
+  for (const theme of ["light", "dark"] as const) {
+    test(`the row under the cursor carries the selection colour, the others the list's surface, with a line between rows (${theme})`, async ({
+      page,
+    }) => {
+      await page.addInitScript((t) => window.localStorage.setItem("pg.theme", t), theme)
+      await page.goto("/")
+      await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
+      await page.getByTestId("recents-button").click()
+      await page.getByTestId("start-filter").fill("pg-start-")
+      const rows = page.getByTestId("start-row")
+      await expect(rows).toHaveCount(2)
+      await expect(rows.nth(0)).toHaveAttribute("data-cursor", "true")
+
+      const colours = await page.evaluate(() => {
+        // The colour a row shows: its own background, else the first ancestor's.
+        const shown = (el: Element | null): string => {
+          for (let e = el; e; e = e.parentElement) {
+            const bg = getComputedStyle(e).backgroundColor
+            if (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") return bg
+          }
+          return "none"
+        }
+        const resolve = (css: string) => {
+          const probe = document.createElement("div")
+          probe.style.background = css
+          document.body.appendChild(probe)
+          const bg = getComputedStyle(probe).backgroundColor
+          probe.remove()
+          return bg
+        }
+        const rows = [...document.querySelectorAll('[data-testid="start-row"]')]
+        const cursor = rows.find((r) => r.getAttribute("data-cursor") === "true")!
+        const other = rows.find((r) => r !== cursor)!
+        return {
+          cursor: shown(cursor),
+          other: shown(other),
+          selection: resolve("var(--pg-grid-sel)"),
+          paper: shown(document.querySelector('[data-testid="start-detail-path"]')),
+          separators: rows.map((r) => {
+            const s = getComputedStyle(r)
+            return { width: parseFloat(s.borderBottomWidth), colour: s.borderBottomColor }
+          }),
+        }
+      })
+      expect(colours.cursor).toBe(colours.selection)
+      expect(colours.other).toBe(colours.paper)
+      expect(colours.other).not.toBe(colours.cursor)
+      for (const line of colours.separators) {
+        expect(line.width).toBeGreaterThanOrEqual(1)
+        expect(line.colour).not.toBe("rgba(0, 0, 0, 0)")
+      }
+    })
+  }
+
   test("the arrows walk the list, the preview follows, and Enter opens what is under the cursor", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })

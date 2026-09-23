@@ -973,6 +973,13 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Linux: WebKitGTK's GPU path on by default; POWERGIT_SOFTWARE_RENDER=1 restores the software path; cargo check in WSL.
 - [x] Gate and release v0.20.7 as a beta: tsc, eslint, prettier, vitest 488, engine 228, e2e 191 (two split-width specs polled), resolution 20, @grid 2, WSL smoke on both render paths.
 
+### v0.20.8 — Owner reports on v0.20.7 — Linux graph scrolling, the recent repositories list (current) (ACTIVE)
+**Goal:** Owner 2026-09-23: "The scrolling in the graph on linux is not smooth." and "the recent-repositories with the listview of the recent repos, has color issues and need better separation between the rows. I think the colors are swapped between selection and non-selection."
+- [x] Recent repositories: the cursor row wears the graph's selection, the others the paper, a hairline between rows; start-pane.spec red first in light and dark, then green.
+- [ ] Owner tick: the recent repositories list reads right in light and dark.
+- [ ] Linux graph scrolling: the owner's machine facts (build, GPU, session, scale, software-render try) before any change.
+- [ ] Owner tick: graph scrolling on Linux is smooth.
+
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
 
