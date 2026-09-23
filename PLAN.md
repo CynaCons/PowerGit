@@ -973,11 +973,17 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Linux: WebKitGTK's GPU path on by default; POWERGIT_SOFTWARE_RENDER=1 restores the software path; cargo check in WSL.
 - [x] Gate and release v0.20.7 as a beta: tsc, eslint, prettier, vitest 488, engine 228, e2e 191 (two split-width specs polled), resolution 20, @grid 2, WSL smoke on both render paths.
 
-### v0.20.8 — Owner reports on v0.20.7 — Linux graph scrolling, the recent repositories list (current) (ACTIVE)
+### v0.20.8 — Owner reports on v0.20.7 — Linux graph scrolling, the recent repositories list (2026-09-23) (COMPLETE)
 **Goal:** Owner 2026-09-23: "The scrolling in the graph on linux is not smooth." and "the recent-repositories with the listview of the recent repos, has color issues and need better separation between the rows. I think the colors are swapped between selection and non-selection."
 - [x] Recent repositories: the cursor row wears the graph's selection, the others the paper, a hairline between rows; start-pane.spec red first in light and dark, then green.
 - [ ] Owner tick: the recent repositories list reads right in light and dark.
-- [ ] Linux graph scrolling: the owner's machine facts (build, GPU, session, scale, software-render try) before any change.
+- [x] Linux graph scrolling: owner's snapshot (0.20.7, Wayland, WebKitGTK 2.50.4, both renderers ~10–15 fps, large repo) → Settings → Diagnostics → Measure graph scrolling, which splits a frame on his machine (canvas / row paint / row layout / plain-list control); scroll-benchmark.spec.
+- [x] Release v0.20.8 at the owner's call ("ok"), with the recent-repositories tick open: vitest, e2e 194 (diff-view polled), zip smoke.
+
+### v0.20.9 — Linux graph scrolling — from the owner's benchmark (current) (ACTIVE)
+**Goal:** Owner on v0.20.7: "Not smooth means like 10-15 fps while scrolling. We have a large repo." Read his Measure graph scrolling result from v0.20.8, fix what it names, and get his tick.
+- [ ] Read the owner's benchmark snapshot: which of canvas, row paint, row layout or the webview itself holds the frame.
+- [ ] Fix what it names, measured with the same benchmark.
 - [ ] Owner tick: graph scrolling on Linux is smooth.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
