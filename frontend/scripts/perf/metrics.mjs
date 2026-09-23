@@ -208,7 +208,8 @@ export async function stopProfile(cdp, top = 12) {
       self.set(key, (self.get(key) ?? 0) + dt)
       continue
     }
-    const key = `${name} ${file}${f.lineNumber >= 0 ? ":" + (f.lineNumber + 1) : ""}`
+    // The column matters in a minified bundle: one line holds most of the app.
+    const key = `${name} ${file}${f.lineNumber >= 0 ? ":" + (f.lineNumber + 1) + ":" + (f.columnNumber + 1) : ""}`
     self.set(key, (self.get(key) ?? 0) + dt)
   }
   const rows = [...self.entries()]

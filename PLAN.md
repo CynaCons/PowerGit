@@ -959,11 +959,11 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 
 ### v0.20.6 — Perf audit — the graph on Windows and on Linux (current) (ACTIVE)
 **Goal:** Owner 2026-09-23: "run a performance audit on the app, to be sure that our graph engine is really super smooth, also on linux." Re-measure the graph on the production build after v0.18.13–18, and measure Linux (WebKitGTK) for the first time. Measures, does not fix; report in docs/perf/audit-2026-09-23.md.
-- [ ] Windows, production build: the graph scenarios of perf-audit.mjs on PowerGit, flutter and vscode, against the 2026-09-16 dev numbers.
-- [ ] In-app frame probe (opt-in build flag): scripted scroll, hover and select in the real webview, frame times out to a file.
-- [ ] Linux setup in WSL: .NET 10 user-local, the engine built for Linux, the test repositories on ext4.
-- [ ] Linux, real WebKitGTK: the probe on the three repositories, Wayland and X11; Windows WebView2 the same for comparison.
-- [ ] Report: docs/perf/audit-2026-09-23.md with a one-page answer for the owner and proposed fixes if any.
+- [x] Windows, production build: the graph scenarios of perf-audit.mjs on PowerGit, flutter and vscode, against the 2026-09-16 dev numbers. Hover 12–14 ms, scroll no long task; a new skim scenario finds ~26–40 ms of style recalc per frame on a scrollbar drag.
+- [x] In-app frame probe (opt-in build flag): scripted scroll, hover and select in the real webview, frame times out to a file.
+- [x] Linux setup in WSL: the engine cross-published linux-x64 from Windows (no .NET in WSL), the shell built in WSL, the test repositories on ext4.
+- [x] Linux, real WebKitGTK in WSLg: 7 configurations; the grid scrolls as fast as a plain-list control (~12 fps, software paint at dpr 2), GPU path broken in WSLg. WebView2: PowerGit 60 fps at dpr 2; flutter/vscode runs stopped by a low-memory reap, not rerun.
+- [x] Report: docs/perf/audit-2026-09-23.md — Windows smooth; scrollbar drag restyles 26–40 ms/frame everywhere; Linux GPU switches need a run on real Ubuntu.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
@@ -1030,3 +1030,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - The release workflow's Linux job lists dist deb/*.deb for upload but no .deb has been attached since at least v0.18.18 — the bundle is not produced or lands elsewhere. Check tauri.conf's bundle targets, or drop the glob and say AppImage only.
 - Engine flake on the Ubuntu runner (2026-09-22, once): ReviewsTests.Round_trip_uses_the_review_file... expected the change version to stand still after a second identical WriteReview and saw 5 -> 9. The watcher sees the .powergit write asynchronously on Linux, so the second assertion races it. Windows is green. Settle the watcher before asserting, or compare kinds rather than the counter.
 - Owner 2026-09-22: "we're missing a bit of contrast and separators in the app. Right now its all just white." Prototypes in docs/prototypes/contrast.html (A rules, B bands, C tinted chrome, D cards); waiting on his letter.
+- Linux GPU switches: run the perf probe on the owner's Ubuntu machine, shipped vs POWERGIT_KEEP_DMABUF=1 + POWERGIT_KEEP_COMPOSITING=1 (docs/perf/audit-2026-09-23.md §6).
+- Scrollbar drag: reuse row elements on big jumps (keyed by slot); skim p95 200 ms → ≤ 33 ms in Chromium (audit 2026-09-23 #2).
+- Engine: cache or replace `git submodule status --recursive` on refs refresh (0.8–0.9 s on Windows with submodules; audit 2026-09-23 #3).
+- Ref filter over thousands of refs: show a spinner or keep the old rows during the ~5 s reload (audit 2026-09-23 #4).

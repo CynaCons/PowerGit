@@ -115,6 +115,40 @@ export async function scroll(ctx) {
   )
 }
 
+/** A scrollbar drag (v0.20.6): top to bottom of the loaded rows in 60
+ *  frames, so every frame shows a screen of rows that were not mounted. */
+export async function skim(ctx) {
+  const { page } = ctx
+  await page.getByTestId("grid-body").evaluate((el) => (el.scrollTop = 0))
+  await sleep(300)
+  return measure(
+    ctx,
+    "skim",
+    async () => {
+      const deltas = await page.getByTestId("grid-body").evaluate(async (el) => {
+        const end = el.scrollHeight - el.clientHeight
+        const out = []
+        let last = performance.now()
+        for (let i = 1; i <= 60; i++) {
+          el.scrollTop = (end * i) / 60
+          const t = await new Promise((r) => requestAnimationFrame(r))
+          out.push(t - last)
+          last = t
+        }
+        return out
+      })
+      const sorted = [...deltas].sort((a, b) => a - b)
+      return {
+        frames: deltas.length,
+        frameP50Ms: Math.round(sorted[Math.floor(sorted.length / 2)]),
+        frameP95Ms: Math.round(sorted[Math.floor(sorted.length * 0.95)]),
+        frameMaxMs: Math.round(sorted[sorted.length - 1]),
+      }
+    },
+    { profile: true },
+  )
+}
+
 export async function hover(ctx) {
   const { page } = ctx
   await page.getByTestId("grid-body").evaluate((el) => (el.scrollTop = 0))
@@ -265,18 +299,18 @@ export async function filter(ctx) {
       await boxes.first().click()
       if (i < 4) await sleep(100)
     }
-    const reload = page.evaluate(() => window.__pgPerf.rowsReload(60000))
+    // Rows back first: on thousands of refs one reload is ~5 s of git with
+    // an empty grid, which rowsStable alone would call settled and empty.
+    const r1 = await page.evaluate(() => window.__pgPerf.rowsReload(60000))
     const s1 = await stable()
-    const r1 = await reload
     const ticked = await page
       .getByTestId("tree-filter-count")
       .textContent()
       .catch(() => null)
     const t1 = await now()
     await page.getByTestId("tree-filter-all").click()
-    const reload2 = page.evaluate(() => window.__pgPerf.rowsReload(60000))
+    const r2 = await page.evaluate(() => window.__pgPerf.rowsReload(60000))
     const s2 = await stable()
-    const r2 = await reload2
     const count = await page
       .getByTestId("tree-filter-count")
       .textContent()
@@ -317,4 +351,4 @@ export async function refresh(ctx) {
   })
 }
 
-export const GRAPH_SCENARIOS = { boot, scroll, hover, select, expand, ancestry, filter, refresh }
+export const GRAPH_SCENARIOS = { boot, scroll, skim, hover, select, expand, ancestry, filter, refresh }

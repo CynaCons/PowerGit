@@ -12,6 +12,10 @@ import { AppThemeProvider } from "./theme/AppThemeProvider"
 
 installDiagnostics()
 
+// Perf probe builds only (docs/perf/audit-2026-09-23.md); absent from a normal build.
+if (import.meta.env.VITE_PERF_PROBE)
+  void import("./perf/probe").then((m) => m.installProbe(import.meta.env.VITE_PERF_PROBE!))
+
 // The engine location (port + token) is resolved once, before the first
 // render, so no component ever sees a client pointing at the wrong port.
 void bootstrapEngine().then((base) => {
