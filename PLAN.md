@@ -948,14 +948,22 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Owner on the released build: "The 'xx min ago' is on the same line as the branch name. They overlap. Better split." Fixed in dee69ecf5 — the row's first line is the name and the time, the second the branch and the state; his sentence is a test at three widths. His to tick.
 - [ ] Owner on v0.20.4: "I would like to have the branch names longer if possible, so separate row for the rest would be good." Done 339578512 — the chip takes the row's width and wraps onto a second line, two at most. His to tick.
 
-### v0.20.5 — The desk — the panes become cards (current) (ACTIVE)
+### v0.20.5 — The desk — the panes become cards (2026-09-23) (COMPLETE)
 **Goal:** Prototype D of docs/prototypes/contrast.html, picked by the owner on 2026-09-22 ("I like the cards best. Let's ship that asap") after his report that "we're missing a bit of contrast and separators in the app. Right now its all just white and its hard to distinguish the different parts." Every pane — rail, repository tree, history, the commit panel, settings, agent reviews, the start pane — becomes a card on a desk: one border, a 6 px radius, a hair of shadow, with a 6 px gutter of the window colour between them, and the bottom splitter living in that gutter. The desk colour is the window background token darkened so a card reads against it, in both themes. Gate: the e2e suite green, a pixel test that the desk actually shows between two panes in both themes, and a look at the window in light, dark and at 150 % zoom.
 - [x] Tokens: the window background becomes the desk (a step darker in both themes) and gains a card shadow, a 6 px gutter and a 6 px radius; theme/panels.ts exports the one pane style. Done ec9bf2084.
 - [x] Shell: rail, tree, history, commit panel, settings, agent reviews and the start pane each take the card; the gutters go in, the pane borders come out, and the bottom splitter becomes the gutter. Done ec9bf2084.
 - [x] Test: desk.spec.ts samples the pixels between two panes and finds the desk there, in light and dark, at 100 % and 150 %. Done ec9bf2084.
 - [x] Gate: tsc, eslint, prettier, vitest 487, the e2e suite, the engine suite 222 and the visual baselines green, plus a look at the window in both themes and at 150 %. Done 71acf2f7d.
 - [x] Release v0.20.5: tagged 80d53f593, the three release jobs green, zip smoke-tested from a clean extract (engine 0.20.5), assets and the signed latest.json verified, showcase and Pages refreshed.
-- [ ] Owner tick: open the released build and say the panes read apart, in light and in dark.
+- [x] Owner tick: open the released build and say the panes read apart, in light and in dark. Owner on 2026-09-23, on the v0.20.5 build: "This is very good."
+
+### v0.20.6 — Perf audit — the graph on Windows and on Linux (current) (ACTIVE)
+**Goal:** Owner 2026-09-23: "run a performance audit on the app, to be sure that our graph engine is really super smooth, also on linux." Re-measure the graph on the production build after v0.18.13–18, and measure Linux (WebKitGTK) for the first time. Measures, does not fix; report in docs/perf/audit-2026-09-23.md.
+- [ ] Windows, production build: the graph scenarios of perf-audit.mjs on PowerGit, flutter and vscode, against the 2026-09-16 dev numbers.
+- [ ] In-app frame probe (opt-in build flag): scripted scroll, hover and select in the real webview, frame times out to a file.
+- [ ] Linux setup in WSL: .NET 10 user-local, the engine built for Linux, the test repositories on ext4.
+- [ ] Linux, real WebKitGTK: the probe on the three repositories, Wayland and X11; Windows WebView2 the same for comparison.
+- [ ] Report: docs/perf/audit-2026-09-23.md with a one-page answer for the owner and proposed fixes if any.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
