@@ -1105,27 +1105,222 @@ public sealed partial class GitHost
         }
 
         List<SubmoduleDto> submodules = [];
+        AddSubmodules(root, "", submodules, 0);
+        return new RefTreeDto([.. branches], [.. remotes], [.. tags], [.. submodules]);
+    }
+
+    /// <summary>
+    ///  What `git submodule status --recursive` lists, without it (v0.20.7):
+    ///  that command runs `describe` per module and cost 0.8 s on Windows for
+    ///  two nested submodules, on every refs refresh. One pathspec-limited
+    ///  `ls-files --stage` per level gives the gitlinks and their recorded
+    ///  commits; an initialised module's checked-out commit is read from its
+    ///  git dir. Same rows, same order (depth first), same Head: the
+    ///  checked-out commit, or the recorded one when not initialised.
+    /// </summary>
+    private void AddSubmodules(string dir, string prefix, List<SubmoduleDto> into, int depth)
+    {
         // A repository without a .gitmodules cannot have configured
         // submodules; avoid a process on every ref refresh in that common case.
-        if (File.Exists(Path.Combine(root, ".gitmodules")))
+        string gitmodules = Path.Combine(dir, ".gitmodules");
+        if (depth > 8 || !File.Exists(gitmodules))
         {
-            CommandResult sm = Run(root, "submodule", "status", "--recursive");
-            if (sm.ExitCode == 0)
+            return;
+        }
+
+        foreach ((string path, string recorded) in Gitlinks(dir, gitmodules))
+        {
+            string full = Path.Combine(dir, path.Replace('/', Path.DirectorySeparatorChar));
+            string? head = CheckedOutCommit(full);
+            string relative = prefix + path;
+            into.Add(new SubmoduleDto(Path.GetFileName(path), relative, head ?? recorded));
+            if (head is not null)
             {
-                foreach (string line in sm.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                AddSubmodules(full, relative + "/", into, depth + 1);
+            }
+        }
+    }
+
+    private readonly Dictionary<string, (string Stamp, List<(string Path, string Recorded)> Links)> _gitlinks = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///  The gitlinks named by a .gitmodules and their recorded commits, one
+    ///  `ls-files` per level, kept until .gitmodules or the index changes (a
+    ///  refs refresh then runs no process for submodules at all).
+    /// </summary>
+    private List<(string Path, string Recorded)> Gitlinks(string dir, string gitmodules)
+    {
+        string? gitDir = GitDirOf(dir);
+        string stamp = Stamp(gitmodules) + "|" + (gitDir is null ? "" : Stamp(Path.Combine(gitDir, "index")));
+        lock (_gitlinks)
+        {
+            if (_gitlinks.TryGetValue(dir, out var cached) && cached.Stamp == stamp)
+            {
+                return cached.Links;
+            }
+        }
+
+        List<(string Path, string Recorded)> links = [];
+        List<string> paths = SubmodulePaths(gitmodules);
+        CommandResult ls = paths.Count == 0
+            ? new CommandResult(1, "", "")
+            : Run(dir, ["ls-files", "--stage", "-z", "--", .. paths.Select(p => ":(literal)" + p)]);
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        foreach (string entry in ls.ExitCode == 0 ? ls.StdOut.Split('\0', StringSplitOptions.RemoveEmptyEntries) : [])
+        {
+            // "<mode> <sha> <stage>\t<path>"; only gitlinks are submodules,
+            // and a conflicted one has several stages but is one row.
+            int tab = entry.IndexOf('\t');
+            string[] meta = tab < 0 ? [] : entry[..tab].Split(' ');
+            if (meta.Length >= 3 && meta[0] == "160000" && seen.Add(entry[(tab + 1)..]))
+            {
+                links.Add((entry[(tab + 1)..], meta[1]));
+            }
+        }
+
+        lock (_gitlinks)
+        {
+            _gitlinks[dir] = (stamp, links);
+        }
+
+        return links;
+
+        static string Stamp(string file)
+        {
+            FileInfo f = new(file);
+            return f.Exists ? $"{f.LastWriteTimeUtc.Ticks}:{f.Length}" : "-";
+        }
+    }
+
+    /// <summary>The <c>path = …</c> values of a .gitmodules file.</summary>
+    private static List<string> SubmodulePaths(string gitmodules)
+    {
+        List<string> paths = [];
+        try
+        {
+            foreach (string raw in File.ReadLines(gitmodules))
+            {
+                string line = raw.Trim();
+                int eq = line.IndexOf('=');
+                if (eq < 0 || !line[..eq].Trim().Equals("path", StringComparison.OrdinalIgnoreCase))
                 {
-                    string trimmed = line.TrimStart(' ', '-', '+', 'U');
-                    string[] bits = trimmed.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
-                    if (bits.Length >= 2)
+                    continue;
+                }
+
+                string value = line[(eq + 1)..].Trim();
+                if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+                {
+                    value = value[1..^1];
+                }
+
+                if (value.Length > 0 && !paths.Contains(value))
+                {
+                    paths.Add(value);
+                }
+            }
+        }
+        catch (IOException)
+        {
+        }
+
+        return paths;
+    }
+
+    /// <summary>
+    ///  The commit checked out in a submodule's working tree, or null when it
+    ///  is not initialised (no <c>.git</c>). Read from its git dir; a HEAD the
+    ///  files cannot resolve falls back to <c>rev-parse HEAD</c>.
+    /// </summary>
+    private string? CheckedOutCommit(string worktree)
+    {
+        string? gitDir = GitDirOf(worktree);
+        if (gitDir is null)
+        {
+            return null;
+        }
+
+        string? sha = ResolveHeadFromFiles(gitDir);
+        if (sha is not null)
+        {
+            return sha;
+        }
+
+        CommandResult rev = Run(worktree, "rev-parse", "HEAD");
+        return rev.ExitCode == 0 ? rev.StdOut.Trim() : null;
+    }
+
+    /// <summary>A working tree's git dir from its <c>.git</c> (a directory, or a <c>gitdir:</c> file), without a process.</summary>
+    private static string? GitDirOf(string worktree)
+    {
+        string dotGit = Path.Combine(worktree, ".git");
+        if (Directory.Exists(dotGit))
+        {
+            return dotGit;
+        }
+
+        try
+        {
+            string line = File.Exists(dotGit) ? File.ReadAllText(dotGit).Trim() : "";
+            if (line.StartsWith("gitdir:", StringComparison.Ordinal))
+            {
+                string dir = Path.GetFullPath(Path.Combine(worktree, line["gitdir:".Length..].Trim().Replace('/', Path.DirectorySeparatorChar)));
+                return Directory.Exists(dir) ? dir : null;
+            }
+        }
+        catch (IOException)
+        {
+        }
+
+        return null;
+    }
+
+    private static string? ResolveHeadFromFiles(string gitDir)
+    {
+        try
+        {
+            string head = File.ReadAllText(Path.Combine(gitDir, "HEAD")).Trim();
+            if (!head.StartsWith("ref: ", StringComparison.Ordinal))
+            {
+                return IsSha(head) ? head : null;
+            }
+
+            // A linked git dir keeps its refs in the common dir.
+            string refName = head[5..].Trim();
+            string commonFile = Path.Combine(gitDir, "commondir");
+            string common = File.Exists(commonFile)
+                ? Path.GetFullPath(Path.Combine(gitDir, File.ReadAllText(commonFile).Trim()))
+                : gitDir;
+            foreach (string baseDir in new[] { gitDir, common }.Distinct())
+            {
+                string loose = Path.Combine(baseDir, refName.Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(loose))
+                {
+                    string sha = File.ReadAllText(loose).Trim();
+                    return IsSha(sha) ? sha : null;
+                }
+            }
+
+            string packed = Path.Combine(common, "packed-refs");
+            if (File.Exists(packed))
+            {
+                foreach (string line in File.ReadLines(packed))
+                {
+                    if (line.Length > 41 && line[40] == ' ' && line[41..] == refName)
                     {
-                        submodules.Add(new SubmoduleDto(Path.GetFileName(bits[1]), bits[1], bits[0]));
+                        return IsSha(line[..40]) ? line[..40] : null;
                     }
                 }
             }
         }
+        catch (IOException)
+        {
+        }
 
-        return new RefTreeDto([.. branches], [.. remotes], [.. tags], [.. submodules]);
+        return null;
     }
+
+    private static bool IsSha(string s)
+        => (s.Length == 40 || s.Length == 64) && s.All(Uri.IsHexDigit);
 
     public GitConfigDto GetConfig() => GetConfig(null);
 
