@@ -63,6 +63,10 @@ test("pointercancel releases the handle and persists the width like pointerup", 
   await page.reload()
   await expect(page.getByTestId("grid-row").first()).toBeVisible()
   await page.getByRole("tab", { name: /Diff/ }).click()
-  const persisted = (await page.getByTestId("file-list").boundingBox())!
-  expect(Math.abs(persisted.width - after.width)).toBeLessThan(2)
+  // Polled: under a loaded full-suite run the first frame after the reload
+  // can still carry the default width (seen 2026-09-23); the saved one must
+  // arrive, not be there on the very first read.
+  await expect
+    .poll(async () => Math.abs((await page.getByTestId("file-list").boundingBox())!.width - after.width))
+    .toBeLessThan(2)
 })

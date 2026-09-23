@@ -35,6 +35,10 @@ test("dragging the bottom split handle resizes the file column and persists the 
   await page.locator('[data-testid="grid-row"]:not([data-artificial])').first().click()
   await page.getByRole("tab", { name: /Diff/ }).click()
 
-  const persisted = (await page.getByTestId("file-list").boundingBox())!
-  expect(Math.abs(persisted.width - after.width)).toBeLessThan(2)
+  // Polled: under a loaded full-suite run the first frame after the reload
+  // can still carry the default width (seen 2026-09-23); the saved one must
+  // arrive, not be there on the very first read.
+  await expect
+    .poll(async () => Math.abs((await page.getByTestId("file-list").boundingBox())!.width - after.width))
+    .toBeLessThan(2)
 })
