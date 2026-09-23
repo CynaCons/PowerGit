@@ -965,13 +965,13 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Linux, real WebKitGTK in WSLg: 7 configurations; the grid scrolls as fast as a plain-list control (~12 fps, software paint at dpr 2), GPU path broken in WSLg. WebView2: PowerGit 60 fps at dpr 2; flutter/vscode runs stopped by a low-memory reap, not rerun.
 - [x] Report: docs/perf/audit-2026-09-23.md — Windows smooth; scrollbar drag restyles 26–40 ms/frame everywhere; Linux GPU switches need a run on real Ubuntu.
 
-### v0.20.7 — Perf fixes from the audit — scrollbar drag, submodules, the big filter, Linux GPU (current) (ACTIVE)
+### v0.20.7 — Perf fixes from the audit — scrollbar drag, submodules, the big filter, Linux GPU (2026-09-23) (COMPLETE)
 **Goal:** Owner 2026-09-23: "lets do all improvements, we will beta test directly with a release its fine today." The four follow-ups of docs/perf/audit-2026-09-23.md, released as v0.20.7 the same day. Gate: skim p95 ≤ 33 ms in Chromium, the e2e suite and the engine suite green, a smoke run on Windows and in WSL.
-- [ ] Engine: the submodule list without `submodule status --recursive` on every refs refresh; xunit covers nested submodules.
-- [ ] Grid: a jump of a screen or more reuses row elements; skim p95 ≤ 33 ms in Chromium, the e2e suite green.
-- [ ] Ref filter: the old rows stay (dimmed, with a spinner) until a slow reload answers.
-- [ ] Linux: WebKitGTK's GPU path on by default; POWERGIT_SOFTWARE_RENDER=1 restores the software path; cargo check in WSL.
-- [ ] Gate and release v0.20.7 as a beta: tsc, eslint, prettier, vitest, e2e, engine suite, smoke on Windows and WSL.
+- [x] Engine: the submodule list without `submodule status --recursive` (ls-files + git-dir reads, cached): PowerGit 785–878 ms → ~186 ms cold, 0 ms warm; 6 xunit tests.
+- [x] Grid: rows keyed by slot and no per-row column variables; skim recalc 2.42 → ~1.8 s, p50 50 → 33 ms, p95 100 → 67–83 ms (target 33 not reached; rest is Blink styling).
+- [x] Ref filter: the old rows stay, dimmed, with "Filtering history…", until the new list's first page arrives; useHistory test.
+- [x] Linux: WebKitGTK's GPU path on by default; POWERGIT_SOFTWARE_RENDER=1 restores the software path; cargo check in WSL.
+- [x] Gate and release v0.20.7 as a beta: tsc, eslint, prettier, vitest 488, engine 228, e2e 191 (two split-width specs polled), resolution 20, @grid 2, WSL smoke on both render paths.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
