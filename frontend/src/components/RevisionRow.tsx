@@ -1,4 +1,4 @@
-import { memo } from "react"
+import { memo, useLayoutEffect, useRef } from "react"
 import type { AuthorIdentity } from "../graph/authorIdentity"
 import type { GraphRow } from "../graph/types"
 import { RefChips, type RefMenuKind } from "./RefChips"
@@ -60,9 +60,18 @@ export const RevisionRow = memo(function RevisionRow({
   onExpand,
   onFold,
 }: Props) {
+  // The element is recycled across commits (slot keys, RevisionGrid), so it
+  // is handed to the virtualizer again for every commit it shows: the size
+  // cache and the ResizeObserver behind measureRef are keyed by SHA.
+  const ref = useRef<HTMLDivElement>(null)
+  const sha = row.rev.id
+  useLayoutEffect(() => {
+    measureRef(ref.current)
+    return () => measureRef(null)
+  }, [measureRef, sha])
   return (
     <div
-      ref={measureRef}
+      ref={ref}
       className={`grid-row${selected ? " selected" : ""}${hovered ? " hovered" : ""}${sameAuthor ? " author-same" : ""}${expanded ? " expanded" : ""}`}
       data-testid="grid-row"
       data-index={index}

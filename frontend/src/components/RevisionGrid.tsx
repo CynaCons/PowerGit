@@ -228,6 +228,14 @@ export function RevisionGrid({
 
   const virtualItems = virtualizer.getVirtualItems()
   const end = (virtualItems[virtualItems.length - 1]?.index ?? 0) + 1
+  // Rows are keyed by slot, not SHA (v0.20.7): index modulo a pool at least
+  // as large as the rendered range, so a row keeps its element while it is on
+  // screen, a 28 px step recycles the one element that left, and a scrollbar
+  // drag rewrites a screen of elements in place instead of mounting a new one
+  // (docs/perf/audit-2026-09-23.md). The range is contiguous, so no two
+  // rendered rows share a slot. Rounded to a power of two so the pool, and
+  // with it every key, only changes when the window grows past one.
+  const pool = 2 ** Math.ceil(Math.log2(Math.max(64, virtualItems.length)))
   useViewportAnchor(rows, selected, virtualItems, virtualizer, parentRef, lastScrolledSha)
 
   // The canvas geometry: the visible bands plus a neighbour on each side
@@ -486,7 +494,7 @@ export function RevisionGrid({
             const row = rows[item.index]
             return (
               <RevisionRow
-                key={row.rev.id}
+                key={item.index % pool}
                 row={row}
                 index={item.index}
                 start={item.start}
