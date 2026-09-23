@@ -615,6 +615,7 @@ fn write_snapshot(app: &AppHandle, frontend: String, trigger: &str) -> Result<St
         ("POWERGIT_X11", env_fact("POWERGIT_X11")),
         ("POWERGIT_NO_FRAME_SYNC", env_fact("POWERGIT_NO_FRAME_SYNC")),
         ("POWERGIT_PROBE_PAINT", env_fact("POWERGIT_PROBE_PAINT")),
+        ("POWERGIT_SOFTWARE_RENDER", env_fact("POWERGIT_SOFTWARE_RENDER")),
         ("POWERGIT_KEEP_DMABUF", env_fact("POWERGIT_KEEP_DMABUF")),
         ("POWERGIT_KEEP_COMPOSITING", env_fact("POWERGIT_KEEP_COMPOSITING")),
         ("webkit", webkit_version()),

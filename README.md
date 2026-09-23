@@ -88,10 +88,10 @@ asks in a native dialog whether to restart. The next launch says what
 happened and where the snapshot is. If the window looks frozen but the
 app still reacts, press **Diagnostic snapshot twice**: the app takes that
 as "the display is dead", reloads its view, and a third press offers a
-restart in a native dialog. On Linux the shell starts WebKitGTK without
-its DMA-BUF renderer and without accelerated compositing, the usual
-causes of black, non-redrawing windows (`POWERGIT_KEEP_DMABUF=1` and
-`POWERGIT_KEEP_COMPOSITING=1` restore the defaults). On a Wayland session
+restart in a native dialog. On Linux WebKitGTK paints with the GPU since
+0.20.7; if the window goes black or stops redrawing on your
+driver/compositor, `POWERGIT_SOFTWARE_RENDER=1` turns its DMA-BUF
+renderer and accelerated compositing off, as every release before 0.20.7 did. On a Wayland session
 the AppImage now runs natively on Wayland instead of XWayland;
 `POWERGIT_X11=1` restores XWayland, and `POWERGIT_NO_FRAME_SYNC=1` turns
 off X11 frame synchronisation there. If the picture ever freezes while the

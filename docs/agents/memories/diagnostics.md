@@ -85,10 +85,12 @@ on Linux. Settings → Diagnostics → "Open logs folder" opens it. Files:
 
 ## Linux display stack
 
-`main.rs` sets, before WebKit starts and unless the variable is already
-set: `WEBKIT_DISABLE_DMABUF_RENDERER=1` (v0.14.2; keep the default with
-`POWERGIT_KEEP_DMABUF=1`) and `WEBKIT_DISABLE_COMPOSITING_MODE=1`
-(v0.15.0; `POWERGIT_KEEP_COMPOSITING=1`).
+Since v0.20.7 `main.rs` leaves WebKitGTK on its GPU path by default (the
+2026-09-23 perf audit: the switches below painted every Linux graph in
+software). `POWERGIT_SOFTWARE_RENDER=1` sets, unless already set,
+`WEBKIT_DISABLE_DMABUF_RENDERER=1` (the v0.14.2 default) and
+`WEBKIT_DISABLE_COMPOSITING_MODE=1` (the v0.15.0 default).
+`POWERGIT_KEEP_DMABUF` / `POWERGIT_KEEP_COMPOSITING` are no longer read.
 
 ### WebKitGTK ≥ 2.43.2: the compositing switch is a no-op
 

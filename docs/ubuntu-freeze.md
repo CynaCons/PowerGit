@@ -431,7 +431,10 @@ Run for a week with the usual background-then-return usage and report
 2. If it still freezes on Wayland: `POWERGIT_X11=1 POWERGIT_NO_FRAME_SYNC=1
 ./PowerGit_*.AppImage` — back on X11 with the frame-sync path disabled.
 3. If it still freezes: `POWERGIT_KEEP_DMABUF=1 POWERGIT_KEEP_COMPOSITING=1`
-   (H3 test; a shape change is informative).
+   (H3 test; a shape change is informative). **Since v0.20.7 the GPU path
+   is the default** (docs/perf/audit-2026-09-23.md); the software path this
+   step turned off is now `POWERGIT_SOFTWARE_RENDER=1`, and a freeze that
+   appears with 0.20.7 and goes away with it points at H3.
 
 A week without a freeze on Wayland closes the case on evidence.
 
