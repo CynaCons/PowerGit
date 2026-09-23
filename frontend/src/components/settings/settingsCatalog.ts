@@ -174,6 +174,13 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
         keywords: ["app log", "developer tools", "devtools", "inspector", "logs folder", "console", "debug"],
       },
       {
+        id: "diagnostics.scrollBenchmark",
+        title: "Measure graph scrolling",
+        description:
+          "Closes Settings and scrolls the graph by itself for about 40 seconds, several ways, then writes the frame rates to the app log. Take a diagnostic snapshot afterwards to send them.",
+        keywords: ["benchmark", "fps", "frame rate", "smooth", "scroll", "performance", "slow", "linux"],
+      },
+      {
         id: "diagnostics.recovery",
         title: "Recovery experiments",
         description:

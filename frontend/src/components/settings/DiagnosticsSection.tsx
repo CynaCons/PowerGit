@@ -2,6 +2,7 @@ import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
 import { useState } from "react"
+import { report } from "../../diagnostics"
 import { openDeveloperTools, openLogsFolder } from "../../diagnostics/snapshot"
 import { describeThrown } from "../../engine"
 import { isTauriShell } from "../../shell"
@@ -16,6 +17,23 @@ import { isShown, type SettingId } from "./settingsCatalog"
 // reset.
 
 type Props = { visible: Set<SettingId> | null; onClose: () => void }
+
+/** The graph scroll benchmark (v0.20.8): Settings closes, the grid is back on
+ *  screen, the probe scrolls it for about 40 s, and the result lands in the
+ *  app log — which a diagnostic snapshot carries — shown when it is done. */
+async function measureGraphScrolling() {
+  report("info", "perf", "scroll benchmark: started, about 40 s; leave the window alone")
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  try {
+    const { runScrollBenchmark, summarizeBenchmark } = await import("../../perf/probe")
+    const result = await runScrollBenchmark()
+    report("info", "perf", `scroll benchmark: ${summarizeBenchmark(result)}`)
+    report("info", "perf", `scroll benchmark data: ${JSON.stringify(result)}`)
+  } catch (e) {
+    report("warn", "perf", `scroll benchmark failed: ${describeThrown(e)}`)
+  }
+  openConsoleTab("app")
+}
 
 export function DiagnosticsSection({ visible, onClose }: Props) {
   const [devtools, setDevtools] = useState<{ failed: boolean; message?: string } | null>(null)
@@ -75,6 +93,21 @@ export function DiagnosticsSection({ visible, onClose }: Props) {
               : "Asked the system for the inspector. If no window appeared, it is unavailable here: use Open app log, which needs none."}
           </Typography>
         )}
+      </SettingRow>
+      <SettingRow id="diagnostics.scrollBenchmark" hidden={!isShown(visible, "diagnostics.scrollBenchmark")}>
+        <Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              onClose()
+              void measureGraphScrolling()
+            }}
+            data-testid="scroll-benchmark"
+          >
+            Measure graph scrolling
+          </Button>
+        </Box>
       </SettingRow>
       <SettingRow id="diagnostics.recovery" hidden={!isShown(visible, "diagnostics.recovery")}>
         <RecoverySection />

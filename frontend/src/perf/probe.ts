@@ -45,7 +45,11 @@ function frameStats(from: number, to: number, vsync: number) {
   }
 }
 
+let instrumented = false
+
 function instrument() {
+  if (instrumented) return
+  instrumented = true
   const loop = (t: number) => {
     if (recording && lastFrame) frames.push({ at: t, delta: t - lastFrame })
     lastFrame = t
@@ -312,6 +316,72 @@ async function run(sink: string, config: ProbeConfig) {
   }
   report.runs = runs
   await fetch(`${sink}/report`, { method: "POST", body: JSON.stringify(report) })
+}
+
+/** One fling with a temporary stylesheet applied: which part of a frame the
+ *  graph costs on this machine (canvas drawing, row painting, row layout). */
+async function flingWith(vsync: number, css: string) {
+  const style = document.createElement("style")
+  style.textContent = css
+  document.head.appendChild(style)
+  try {
+    await sleep(300)
+    return await fling(vsync, 24, 4000)
+  } finally {
+    style.remove()
+  }
+}
+
+export type ScrollBenchmark = Record<string, unknown>
+
+/**
+ * Settings → Diagnostics → Measure graph scrolling (v0.20.8, owner on
+ * v0.20.7: "not smooth means like 10-15 fps while scrolling. We have a large
+ * repo."). Runs on the grid on screen, in the installed app, and splits a
+ * scroll frame: the grid as is, without the canvas, without painting the row
+ * text, without laying the rows out, and a plain list as the webview's own
+ * ceiling. The result goes to the app log, so a diagnostic snapshot carries it.
+ */
+export async function runScrollBenchmark(): Promise<ScrollBenchmark> {
+  instrument()
+  const el = body()
+  if (!el || !document.querySelector(ROW)) throw new Error("no graph on screen")
+  const start = el.scrollTop
+  const canvas = document.querySelector<HTMLCanvasElement>(".graph-canvas")
+  const vsync = await measureVsync()
+  const result: ScrollBenchmark = {
+    userAgent: navigator.userAgent,
+    dpr: window.devicePixelRatio,
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    rowsLoaded: loadedRows(),
+    rowsInDom: document.querySelectorAll(ROW).length,
+    elementsInGrid: el.getElementsByTagName("*").length,
+    canvasPx: canvas ? `${canvas.width}x${canvas.height}` : null,
+    vsyncMs: round(vsync),
+  }
+  try {
+    result.control = await control(vsync, 24, 3000)
+    result.grid = await fling(vsync, 24, 4000)
+    result.noCanvas = await flingWith(vsync, ".graph-canvas { visibility: hidden !important; }")
+    result.noRowPaint = await flingWith(vsync, ".grid-row > * { visibility: hidden !important; }")
+    // The cells out of layout, the row itself kept: a row of height 0 would
+    // be re-measured by the virtualizer and collapse the list.
+    result.noRowLayout = await flingWith(vsync, ".grid-row > * { display: none !important; }")
+    result.skim = await skim(vsync)
+    result.jump = await jump(vsync)
+  } finally {
+    el.scrollTop = start
+  }
+  return result
+}
+
+/** The fps line of each scenario, for a one-line log entry a person can read. */
+export function summarizeBenchmark(b: ScrollBenchmark): string {
+  const fps = (k: string) => (b[k] as { fps?: number; p95?: number } | undefined) ?? {}
+  const parts = ["control", "grid", "noCanvas", "noRowPaint", "noRowLayout", "skim", "jump"].map(
+    (k) => `${k} ${fps(k).fps ?? "–"} fps (p95 ${fps(k).p95 ?? "–"} ms)`,
+  )
+  return `${parts.join(" · ")} · dpr ${String(b.dpr)} · canvas ${String(b.canvasPx)} · ${String(b.rowsInDom)} rows / ${String(b.elementsInGrid)} elements in the grid`
 }
 
 export async function installProbe(sink: string) {
