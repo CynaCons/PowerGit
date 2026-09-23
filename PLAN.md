@@ -957,13 +957,21 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Release v0.20.5: tagged 80d53f593, the three release jobs green, zip smoke-tested from a clean extract (engine 0.20.5), assets and the signed latest.json verified, showcase and Pages refreshed.
 - [x] Owner tick: open the released build and say the panes read apart, in light and in dark. Owner on 2026-09-23, on the v0.20.5 build: "This is very good."
 
-### v0.20.6 — Perf audit — the graph on Windows and on Linux (current) (ACTIVE)
+### v0.20.6 — Perf audit — the graph on Windows and on Linux (2026-09-23) (COMPLETE)
 **Goal:** Owner 2026-09-23: "run a performance audit on the app, to be sure that our graph engine is really super smooth, also on linux." Re-measure the graph on the production build after v0.18.13–18, and measure Linux (WebKitGTK) for the first time. Measures, does not fix; report in docs/perf/audit-2026-09-23.md.
 - [x] Windows, production build: the graph scenarios of perf-audit.mjs on PowerGit, flutter and vscode, against the 2026-09-16 dev numbers. Hover 12–14 ms, scroll no long task; a new skim scenario finds ~26–40 ms of style recalc per frame on a scrollbar drag.
 - [x] In-app frame probe (opt-in build flag): scripted scroll, hover and select in the real webview, frame times out to a file.
 - [x] Linux setup in WSL: the engine cross-published linux-x64 from Windows (no .NET in WSL), the shell built in WSL, the test repositories on ext4.
 - [x] Linux, real WebKitGTK in WSLg: 7 configurations; the grid scrolls as fast as a plain-list control (~12 fps, software paint at dpr 2), GPU path broken in WSLg. WebView2: PowerGit 60 fps at dpr 2; flutter/vscode runs stopped by a low-memory reap, not rerun.
 - [x] Report: docs/perf/audit-2026-09-23.md — Windows smooth; scrollbar drag restyles 26–40 ms/frame everywhere; Linux GPU switches need a run on real Ubuntu.
+
+### v0.20.7 — Perf fixes from the audit — scrollbar drag, submodules, the big filter, Linux GPU (current) (ACTIVE)
+**Goal:** Owner 2026-09-23: "lets do all improvements, we will beta test directly with a release its fine today." The four follow-ups of docs/perf/audit-2026-09-23.md, released as v0.20.7 the same day. Gate: skim p95 ≤ 33 ms in Chromium, the e2e suite and the engine suite green, a smoke run on Windows and in WSL.
+- [ ] Engine: the submodule list without `submodule status --recursive` on every refs refresh; xunit covers nested submodules.
+- [ ] Grid: a jump of a screen or more reuses row elements; skim p95 ≤ 33 ms in Chromium, the e2e suite green.
+- [ ] Ref filter: the old rows stay (dimmed, with a spinner) until a slow reload answers.
+- [ ] Linux: WebKitGTK's GPU path on by default; POWERGIT_SOFTWARE_RENDER=1 restores the software path; cargo check in WSL.
+- [ ] Gate and release v0.20.7 as a beta: tsc, eslint, prettier, vitest, e2e, engine suite, smoke on Windows and WSL.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
