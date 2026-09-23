@@ -22,8 +22,9 @@ test("diff view does not wrap and shows a line-number gutter", async ({ page }) 
   // At least one rendered line must carry a gutter number on either side.
   const gutters = diff.locator('[data-testid="diff-gutter"]')
   await expect(gutters.first()).toBeAttached()
-  const texts = await gutters.allTextContents()
-  expect(texts.some((t) => /\d/.test(t))).toBe(true)
+  // Polled: under a loaded full-suite run the first gutters can be attached
+  // before their numbers are (seen 2026-09-23, green alone 9/9).
+  await expect.poll(async () => (await gutters.allTextContents()).some((t) => /\d/.test(t))).toBe(true)
 })
 
 test("blob view does not wrap long lines", async ({ page }) => {
