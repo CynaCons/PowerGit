@@ -980,11 +980,12 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] Linux graph scrolling: owner's snapshot (0.20.7, Wayland, WebKitGTK 2.50.4, both renderers ~10–15 fps, large repo) → Settings → Diagnostics → Measure graph scrolling, which splits a frame on his machine (canvas / row paint / row layout / plain-list control); scroll-benchmark.spec.
 - [x] Release v0.20.8 at the owner's call ("ok"), with the recent-repositories tick open: vitest, e2e 194 (diff-view polled), zip smoke.
 
-### v0.20.9 — Linux graph scrolling — from the owner's benchmark (current) (ACTIVE)
+### v0.20.9 — Linux graph scrolling — from the owner's benchmark (2026-10-08) (COMPLETE)
 **Goal:** Owner on v0.20.7: "Not smooth means like 10-15 fps while scrolling. We have a large repo." Read his Measure graph scrolling result from v0.20.8, fix what it names, and get his tick.
-- [ ] Read the owner's benchmark snapshot: which of canvas, row paint, row layout or the webview itself holds the frame.
-- [ ] Fix what it names, measured with the same benchmark.
+- [x] Owner's benchmark (eve-EVE-23862, ~35 lanes, dpr 1): control 59–60 fps, graph 26–30, same with 16 or 49 rows and with the canvas hidden — a fixed per-frame cost; the canvas was redrawn on every 28 px step.
+- [x] Canvas keeps a window of ±32 rows and redraws only when the scroll leaves it (useCanvasWindow); WebKitGTK 36-lane repo: draw time per second 123–140 → 0–8 ms; palette cached per theme; graph-canvas-window.spec.
 - [ ] Owner tick: graph scrolling on Linux is smooth.
+- [x] Release v0.20.9 at the owner's call ("yes release it"), with the Linux tick open: vitest 495, e2e 195, @grid 2, resolution 20, zip smoke.
 
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
