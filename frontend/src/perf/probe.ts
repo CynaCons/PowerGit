@@ -4,6 +4,8 @@
 // in only when VITE_PERF_PROBE is set (main.tsx); the report goes to the
 // sink (scripts/perf/probe-sink.mjs) as JSON. docs/perf/audit-2026-09-23.md.
 
+import { drawStats } from "../graph/draw"
+
 type Frame = { at: number; delta: number }
 type ProbeConfig = { repoId?: string; label: string; runs: number }
 
@@ -140,12 +142,22 @@ async function fling(vsync: number, pxPerFrame: number, ms: number) {
   await sleep(300)
   recording = true
   const from = performance.now()
+  const draw0 = { ...drawStats }
   while (performance.now() - from < ms) {
     el.scrollTop += pxPerFrame
     await nextFrame()
   }
   recording = false
-  return { pxPerFrame, ...frameStats(from, performance.now(), vsync) }
+  const stats = frameStats(from, performance.now(), vsync)
+  // The canvas's own script time (drawRows), per redraw and per second.
+  const draws = drawStats.calls - draw0.calls
+  const drawMs = drawStats.ms - draw0.ms
+  return {
+    pxPerFrame,
+    drawMsPerRedraw: draws ? round(drawMs / draws) : null,
+    drawMsPerSecond: round((drawMs * 1000) / Math.max(1, stats.ms)),
+    ...stats,
+  }
 }
 
 /** Control: the same fling on a plain scrolling list with no React and no
@@ -377,11 +389,11 @@ export async function runScrollBenchmark(): Promise<ScrollBenchmark> {
 
 /** The fps line of each scenario, for a one-line log entry a person can read. */
 export function summarizeBenchmark(b: ScrollBenchmark): string {
-  const fps = (k: string) => (b[k] as { fps?: number; p95?: number } | undefined) ?? {}
+  const fps = (k: string) => (b[k] as { fps?: number; p95?: number; drawMsPerRedraw?: number | null } | undefined) ?? {}
   const parts = ["control", "grid", "noCanvas", "noRowPaint", "noRowLayout", "skim", "jump"].map(
     (k) => `${k} ${fps(k).fps ?? "–"} fps (p95 ${fps(k).p95 ?? "–"} ms)`,
   )
-  return `${parts.join(" · ")} · dpr ${String(b.dpr)} · canvas ${String(b.canvasPx)} · ${String(b.rowsInDom)} rows / ${String(b.elementsInGrid)} elements in the grid`
+  return `${parts.join(" · ")} · canvas draw ${fps("grid").drawMsPerRedraw ?? "–"} ms per redraw · dpr ${String(b.dpr)} · canvas ${String(b.canvasPx)} · ${String(b.rowsInDom)} rows / ${String(b.elementsInGrid)} elements in the grid`
 }
 
 export async function installProbe(sink: string) {

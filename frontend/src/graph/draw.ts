@@ -72,28 +72,12 @@ export function drawRows(
   ancestry: Ancestry | null = null,
   options: GraphOptions = DEFAULT_GRAPH_OPTIONS,
 ): void {
+  const started = performance.now()
   const { top: origin, bands } = geometry
   ctx.clearRect(0, 0, width, Math.max(1, geometry.height))
   ctx.lineCap = "butt"
   ctx.lineJoin = "round"
-  // Read tokens from the document root, not the canvas element: WebKit has a
-  // long-standing bug (bugs.webkit.org #14563) where getComputedStyle() can
-  // return an empty string for a custom property on some elements (canvas
-  // included), which would otherwise silently fall through to these
-  // fallbacks every frame instead of picking up the real token. Root-element
-  // lookups are the well-tested path. See docs/agents/memories/webkitgtk-css.md.
-  const rootStyle = getComputedStyle(document.documentElement)
-  const selectedFill = rootStyle.getPropertyValue("--pg-grid-sel").trim() || "#dbeafe"
-  const selectedBorder = rootStyle.getPropertyValue("--pg-grid-sel-border").trim() || "#2563eb"
-  const hoverFill = rootStyle.getPropertyValue("--pg-grid-hover").trim() || "rgba(37, 99, 235, 0.08)"
-  const laneColors = LANE_COLORS.map((fallback, i) => rootStyle.getPropertyValue(`--pg-lane-${i + 1}`).trim() || fallback)
-  const headOutline = rootStyle.getPropertyValue("--pg-lane-head").trim() || "#1a1a1a"
-  // Branch history highlight (v0.14.0): commits reachable from HEAD keep
-  // their lane colour (and a ring); with `dim`, everything else is painted
-  // in the Git Extensions non-relative grey. A colour swap rather than
-  // globalAlpha keeps the canvas identical on WebKitGTK and never blends
-  // over the selection band.
-  const nonRelative = rootStyle.getPropertyValue("--pg-lane-non-relative").trim() || NON_RELATIVE_COLOR
+  const { selectedFill, selectedBorder, hoverFill, laneColors, headOutline, nonRelative } = palette()
   const dimming = ancestry !== null && options.dim
   const ringing = ancestry !== null && options.ring
 
@@ -184,6 +168,61 @@ export function drawRows(
 
     ctx.restore()
   }
+  drawStats.calls += 1
+  drawStats.ms += performance.now() - started
+}
+
+/** Time spent in drawRows, read by the scroll benchmark (src/perf/probe.ts). */
+export const drawStats = { calls: 0, ms: 0 }
+
+type Palette = {
+  selectedFill: string
+  selectedBorder: string
+  hoverFill: string
+  laneColors: string[]
+  headOutline: string
+  nonRelative: string
+}
+
+let paletteCache: { theme: string | null; value: Palette } | null = null
+
+/**
+ * The graph's colours, read once per theme (v0.20.9). They used to be read
+ * on every redraw: on WebKitGTK a getComputedStyle on the root after the
+ * rows changed costs a style pass of the whole page, every scroll frame
+ * (owner's Ubuntu benchmark: 26–30 fps on a graph whose plain-list control
+ * ran at 60). The tokens only change with the theme, which AppThemeProvider
+ * mirrors on <html data-theme>.
+ *
+ * Read from the document root, not the canvas element: WebKit has a
+ * long-standing bug (bugs.webkit.org #14563) where getComputedStyle() can
+ * return an empty string for a custom property on some elements (canvas
+ * included). Root-element lookups are the well-tested path. See
+ * docs/agents/memories/webkitgtk-css.md.
+ */
+function palette(): Palette {
+  const theme = document.documentElement.getAttribute("data-theme")
+  if (paletteCache && paletteCache.theme === theme) return paletteCache.value
+  const root = getComputedStyle(document.documentElement)
+  const token = (name: string, fallback: string) => root.getPropertyValue(name).trim() || fallback
+  const value: Palette = {
+    selectedFill: token("--pg-grid-sel", "#dbeafe"),
+    selectedBorder: token("--pg-grid-sel-border", "#2563eb"),
+    hoverFill: token("--pg-grid-hover", "rgba(37, 99, 235, 0.08)"),
+    laneColors: LANE_COLORS.map((fallback, i) => token(`--pg-lane-${i + 1}`, fallback)),
+    headOutline: token("--pg-lane-head", "#1a1a1a"),
+    // Branch history highlight (v0.14.0): commits reachable from HEAD keep
+    // their lane colour (and a ring); with `dim`, everything else is painted
+    // in the Git Extensions non-relative grey. A colour swap rather than
+    // globalAlpha keeps the canvas identical on WebKitGTK and never blends
+    // over the selection band.
+    nonRelative: token("--pg-lane-non-relative", NON_RELATIVE_COLOR),
+  }
+  // Only a palette that found its tokens is kept: before the theme has
+  // injected them every read falls back, and caching that would pin the
+  // fallbacks until the next theme switch.
+  if (root.getPropertyValue("--pg-grid-sel").trim()) paletteCache = { theme, value }
+  return value
 }
 
 // A child's first parent, for the first-parent scope; rows are few per

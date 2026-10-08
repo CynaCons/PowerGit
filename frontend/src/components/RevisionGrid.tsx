@@ -10,7 +10,8 @@ import { GraphOptionsBar } from "./GraphOptionsBar"
 import { RevisionRow } from "./RevisionRow"
 import { ROW_HEIGHT, type GraphRow } from "../graph/types"
 import { clampWidth, DEFAULT_WIDTHS, loadWidths, saveWidths, type ColumnKey, type ColumnWidths } from "./gridColumns"
-import { chipBudget, gridGeometry, type RowBand } from "./gridGeometry"
+import { useCanvasWindow } from "../hooks/useCanvasWindow"
+import { chipBudget } from "./gridGeometry"
 import { useHeldKey } from "./heldKey"
 import { useViewportAnchor } from "../hooks/useViewportAnchor"
 
@@ -238,16 +239,9 @@ export function RevisionGrid({
   const pool = 2 ** Math.ceil(Math.log2(Math.max(64, virtualItems.length)))
   useViewportAnchor(rows, selected, virtualItems, virtualizer, parentRef, lastScrolledSha)
 
-  // The canvas geometry: the visible bands plus a neighbour on each side
-  // (graph/draw.ts). getVirtualItems() is memoised inside the virtualizer,
-  // so this only recomputes when a row moved or changed height.
-  const geometry = useMemo(() => {
-    const bandOf = (index: number): RowBand | undefined => {
-      const m = virtualizer.measurementsCache[index]
-      return m ? { index: m.index, start: m.start, size: m.size } : undefined
-    }
-    return gridGeometry(virtualItems, bandOf)
-  }, [virtualItems, virtualizer])
+  // The canvas covers a window of rows kept until the rendered range leaves it
+  // (v0.20.9, hooks/useCanvasWindow.ts): no redraw on every 28 px step.
+  const geometry = useCanvasWindow(virtualItems, rows.length, virtualizer)
 
   // Jumping to a ref can select a row far outside the viewport; keep the
   // selection visible. Only do this when the *commit* changed - not merely
