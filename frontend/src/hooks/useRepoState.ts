@@ -268,17 +268,20 @@ export function useRepoState({ session, history }: RepoStateDeps) {
     }
   }, [live, client, refresh])
 
-  async function openFolder(path?: string) {
+  /** Opens a repository, asking for the folder when no path is given. True
+   *  when one opened — false for a cancelled picker or a failed open — so the
+   *  start pane can step aside for its history (v0.20.10). */
+  async function openFolder(path?: string): Promise<boolean> {
     let target = path
     if (!target) {
       if ("__TAURI_INTERNALS__" in window) {
         const { open } = await import("@tauri-apps/plugin-dialog")
         const picked = await open({ directory: true, multiple: false, title: "Open repository" })
-        if (typeof picked !== "string") return
+        if (typeof picked !== "string") return false
         target = picked
       } else {
         const answer = window.prompt("Open repository path")
-        if (!answer) return
+        if (!answer) return false
         target = answer
       }
     }
@@ -287,8 +290,10 @@ export function useRepoState({ session, history }: RepoStateDeps) {
       setEngineError(null)
       // Same session reopened: the load effect will not fire, refresh here.
       if (loadedFor.current === info.id) await refresh()
+      return true
     } catch (err) {
       setEngineError(`Open repository: ${handleFailure(err, "open")}`)
+      return false
     }
   }
 

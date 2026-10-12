@@ -60,7 +60,7 @@ export default function App({ base }: { base: EngineClient }) {
   const { view, state, client, engineError, setEngineError, demo } = session
   const { live, offline, repo } = view
   // The recent repositories are a pane now, not a dialog (v0.20.3).
-  const startPane = useStartPane(state.phase !== "no-repository")
+  const startPane = useStartPane(state.phase !== "no-repository", repo?.root ?? null)
   // Which refs the graph shows (v0.18.5): the tree's ticks, per repository.
   const graphFilter = useGraphRefFilter(client.repoId)
   const history = useHistory({

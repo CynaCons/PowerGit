@@ -987,6 +987,14 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Owner tick: graph scrolling on Linux is smooth.
 - [x] Release v0.20.9 at the owner's call ("yes release it"), with the Linux tick open: vitest 495, e2e 195, @grid 2, resolution 20, zip smoke.
 
+### v0.20.10 — Recent repositories, third pass — Open folder opens the history; a new picker design (current) (ACTIVE)
+**Goal:** Owner 2026-10-12: "The UI to select the recent repositories is really not good. I think we have to redesign it." and "when someone does a file open to open a new project, we should directly open the Git history of that project." Fix the open path now; show visual proposals; build the one he picks.
+- [x] Open folder… opens the repository's history: the start pane closes when a folder opens (even the one already open) and whenever the open repository changes; start-pane.spec red first.
+- [ ] Visual proposals for the recent-repositories picker: docs/prototypes/recents-v3.html, several directions side by side.
+- [ ] Owner picks a direction.
+- [ ] Build the picked design; e2e and a look in light, dark and 150 %.
+- [ ] Owner tick: picking and opening a repository feels right.
+
 ## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
 

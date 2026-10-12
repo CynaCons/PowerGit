@@ -7,13 +7,17 @@ import { useCallback, useEffect, useState } from "react"
  *
  * With no repository open there is no grid to go back to, so the pane is the
  * front door and Escape does nothing. Opening a repository closes it, which
- * is what picking one from the list means.
+ * is what picking one from the list means — and since v0.20.10 that holds
+ * for every way in, keyed on the repository that is open (`repoKey`): Open
+ * folder… from the pane, the rail, Ctrl+O. Owner (2026-10-12): "When the user
+ * has gone to the extent that he has selected a project, he wants to read the
+ * history of that project."
  */
-export function useStartPane(hasRepo: boolean) {
+export function useStartPane(hasRepo: boolean, repoKey: string | null = null) {
   const [asked, setAsked] = useState(false)
   useEffect(() => {
     if (hasRepo) setAsked(false)
-  }, [hasRepo])
+  }, [hasRepo, repoKey])
   return {
     open: asked || !hasRepo,
     close: useCallback(() => setAsked(false), []),

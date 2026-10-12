@@ -62,7 +62,9 @@ export function StartPaneView({ session, repoState, onClose }: Props) {
       }}
       onForget={forgetRecent}
       onPin={pin}
-      onOpenFolder={() => void repoState.openFolder()}
+      // A folder chosen is a repository to read (owner, 2026-10-12): the pane
+      // steps aside for its history, even when it is the one already open.
+      onOpenFolder={() => void repoState.openFolder().then((opened) => opened && onClose())}
       onTerminal={terminal}
       onCopyPath={(target) => void copyToClipboard(target)}
       onClose={onClose}

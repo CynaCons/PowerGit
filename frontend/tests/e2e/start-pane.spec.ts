@@ -124,6 +124,26 @@ test.describe("the start pane", () => {
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
   })
 
+  // Owner (2026-10-12): "when someone does a file open to open a new
+  // project, we should directly open the Git history of that project. When
+  // the user has gone to the extent that he has selected a project, he wants
+  // to read the history of that project. We shouldn't just show that project
+  // in the list of recent and then he has to double click on it to open it."
+  test("Open folder… from the pane opens that repository's history and the pane goes away", async ({ page }) => {
+    await page.goto(`/?repo=${bId}`)
+    await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
+    await page.getByTestId("recents-button").click()
+    await expect(page.getByTestId("start-pane")).toBeVisible()
+
+    // The browser build asks for the path; the desktop app shows the folder picker.
+    page.once("dialog", (dialog) => void dialog.accept(a))
+    await page.getByTestId("start-open-folder").click()
+
+    await expect(page.getByTestId("start-pane")).toHaveCount(0, { timeout: 30_000 })
+    await expect(page.getByTestId("title-strip")).toContainText(basename(a), { timeout: 30_000 })
+    await expect(page.getByTestId("grid-row").first()).toBeVisible()
+  })
+
   // Owner (2026-09-23, on v0.20.7): "the list view of the recent repos has
   // color issues and need better separation between the rows. I think the
   // colors are swapped between selection and non-selection." The list sat on
