@@ -1,0 +1,314 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Recent repositories, third pass</title>
+<style>
+  :root {
+    --page: #e3e7ee; --desk: #dfe4ec; --surface: #ffffff; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff;
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08);
+    --chip-bg: #eff6ff; --chip-fg: #2563eb;
+    --ok: #059669; --warn: #a16207;
+    --shadow: 0 18px 48px rgba(16, 24, 39, 0.24); --card: 0 1px 2px rgba(16, 24, 39, 0.08);
+    --l1: #f064a0; --l2: #78b4e6; --l3: #24c221; --l4: #e6a23c; --l5: #9b6be6; --l6: #20b2aa;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --page: #0c1117; --desk: #0e141b; --surface: #182029; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220;
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12);
+    --chip-bg: #1f3a5f; --chip-fg: #bfdbfe;
+    --ok: #34d399; --warn: #fbbf24;
+    --shadow: 0 18px 48px rgba(0, 0, 0, 0.55); --card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header.top { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header.top h1 { font-size: 17px; margin: 0; }
+  header.top nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  header.top a, header.top button { font: inherit; font-size: 13px; color: var(--text-2); text-decoration: none; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  header.top a:hover, header.top button:hover { background: var(--hover); }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+  .intro { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; }
+  .intro h2 { margin: 0 0 8px; font-size: 16px; }
+  .intro ul { margin: 6px 0 0; padding-left: 20px; }
+  section.option { margin: 0 0 40px; }
+  section.option > h2 { font-size: 18px; margin: 0 0 4px; }
+  section.option > p.lede { margin: 0 0 12px; color: var(--text-2); max-width: 900px; }
+  .pros { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; max-width: 980px; }
+  .pros div { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+  .pros b { display: block; margin-bottom: 4px; }
+  .pros ul { margin: 0; padding-left: 18px; }
+  @media (max-width: 760px) { .pros { grid-template-columns: 1fr; } }
+
+  /* the app window */
+  .win { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--desk); height: 560px; display: grid; grid-template-rows: 40px 1fr; }
+  .win.tall { height: 600px; }
+  .strip { display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 13px; min-width: 0; }
+  .logo { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .logo i { width: 14px; height: 14px; border-radius: 3px; background: linear-gradient(135deg, #1553c9, #20b2aa); display: inline-block; }
+  .strip .sep { width: 1px; height: 18px; background: var(--border); }
+  .strip .dots { margin-left: auto; display: flex; gap: 8px; color: var(--meta); }
+  .body { display: grid; grid-template-columns: 52px 220px 1fr; gap: 6px; padding: 6px; min-height: 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--card); min-height: 0; overflow: hidden; }
+  .rail { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0; color: var(--meta); font-size: 16px; }
+  .rail span { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; }
+  .rail span.on { background: var(--sel-bg); color: var(--sel-border); }
+  .tree { padding: 10px 12px; font-size: 12.5px; color: var(--text-2); }
+  .tree h4 { margin: 0 0 6px; font-size: 12px; color: var(--meta); text-transform: uppercase; letter-spacing: .04em; }
+  .tree div { padding: 2px 0 2px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .graph { position: relative; }
+  .graph svg { display: block; }
+  .grow { display: grid; grid-template-columns: 150px 1fr 120px 90px; align-items: center; height: 26px; font-size: 12.5px; padding-right: 12px; border-bottom: 1px solid transparent; }
+  .grow .m { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .grow .a, .grow .d { color: var(--meta); font-size: 12px; white-space: nowrap; overflow: hidden; }
+  .grow.sel .m, .grow.sel .a, .grow.sel .d { background: var(--sel-bg); }
+  .rows { position: absolute; inset: 0; }
+  .dim::after { content: ""; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.06); pointer-events: none; }
+
+  /* shared bits */
+  .chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 1px 7px; border-radius: 9px; background: var(--chip-bg); color: var(--chip-fg); font-size: 11.5px; font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .when { color: var(--meta); font-size: 11.5px; white-space: nowrap; }
+  .state { font-size: 11.5px; white-space: nowrap; }
+  .state.clean { color: var(--ok); }
+  .state.dirty { color: var(--warn); }
+  .kbd { font: 11px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--meta); background: var(--surface); }
+  .search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-bottom: 1px solid var(--border-soft); color: var(--meta); font-size: 13.5px; }
+  .search b { color: var(--text); font-weight: 400; }
+  .search .caret { width: 1px; height: 16px; background: var(--text); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .grp { display: flex; justify-content: space-between; padding: 8px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--meta); }
+  .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 6px 12px; border-left: 2px solid transparent; cursor: default; }
+  .item + .item { border-top: 1px solid var(--border-soft); }
+  .item .n { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .n small { font-weight: 400; color: var(--meta); }
+  .item.cur { background: var(--sel-bg); border-left-color: var(--sel-border); }
+  .item:hover:not(.cur) { background: var(--hover); }
+  .foot { display: flex; gap: 14px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--border-soft); font-size: 12.5px; color: var(--meta); }
+  .foot a { color: var(--primary); text-decoration: none; font-weight: 500; }
+  .note { position: absolute; background: #fef9c3; color: #713f12; border: 1px solid #facc15; border-radius: 6px; padding: 5px 9px; font-size: 12px; box-shadow: var(--card); max-width: 230px; z-index: 5; }
+  :root[data-theme="dark"] .note { background: #3f2a06; color: #fde68a; border-color: #a16207; }
+
+  /* A · switcher */
+  .switch-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--sel-border); background: var(--sel-bg); font-weight: 600; }
+  .switch-btn .chip { font-weight: 400; }
+  .popover { position: absolute; top: 44px; left: 96px; width: 460px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); z-index: 4; overflow: hidden; }
+
+  /* B · tabs */
+  .tabs { display: flex; align-items: flex-end; gap: 2px; height: 40px; padding: 0 8px; background: var(--desk); border-bottom: 1px solid var(--border); overflow: hidden; }
+  .tab { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-bottom: none; border-radius: 7px 7px 0 0; background: var(--sunken); font-size: 12.5px; max-width: 220px; min-width: 0; color: var(--text-2); }
+  .tab .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .tab .x { color: var(--meta); }
+  .tab.on { background: var(--surface); color: var(--text); height: 34px; box-shadow: inset 0 2px 0 var(--sel-border); }
+  .tab.plus { padding: 0 12px; font-weight: 600; }
+  .win.tabbed { grid-template-rows: 40px 40px 1fr; }
+
+  /* C · rail section */
+  .body.rail-repos { grid-template-columns: 52px 260px 1fr; }
+  .repos { display: flex; flex-direction: column; height: 100%; }
+  .repos .head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 6px; font-weight: 600; font-size: 13px; }
+  .repos .head span { color: var(--meta); font-weight: 400; font-size: 12px; }
+  .repos .list { flex: 1; overflow: hidden; }
+  .repos .item { padding: 5px 12px; }
+  .repos .item .n { font-size: 13px; }
+  .split { border-top: 1px solid var(--border); padding: 8px 12px; font-size: 12px; color: var(--meta); }
+
+  /* D · welcome */
+  .welcome { display: grid; place-items: start center; padding: 40px 24px; overflow: hidden; }
+  .welcome .box { width: min(720px, 100%); }
+  .welcome h3 { margin: 0 0 4px; font-size: 22px; }
+  .welcome .sub { color: var(--meta); margin-bottom: 18px; }
+  .welcome .acts { display: flex; gap: 10px; margin-bottom: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .welcome .listcard { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--card); overflow: hidden; }
+  .wrow { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) 90px 80px; gap: 12px; align-items: center; padding: 8px 14px; }
+  .wrow + .wrow { border-top: 1px solid var(--border-soft); }
+  .wrow .n { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wrow .p { color: var(--meta); font: 11.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wrow.cur { background: var(--sel-bg); box-shadow: inset 2px 0 0 var(--sel-border); }
+
+  /* Today */
+  .today { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+  .today .l { border-right: 1px solid var(--border); background: var(--surface); }
+  .today .r { padding: 18px 22px; }
+  .today .r h3 { margin: 0 0 6px; font-size: 20px; }
+</style>
+
+<header class="top">
+  <h1>Recent repositories — third pass</h1>
+  <nav>
+    <a href="#a">A · Switcher</a><a href="#b">B · Tabs</a><a href="#c">C · In the rail</a><a href="#d">D · Welcome</a><a href="#today">Today</a>
+  </nav>
+  <button id="theme" type="button">Dark</button>
+</header>
+
+<main>
+  <div class="intro">
+    <h2>What every proposal does</h2>
+    Owner, 2026-10-12: <i>"The UI to select the recent repositories is really not good … When the user has gone to the extent that he has selected a project, he wants to read the history of that project."</i>
+    <ul>
+      <li><b>One click opens.</b> A single click (or Enter) opens the repository straight into its history. No select-then-double-click, no preview to get past.</li>
+      <li><b>Open folder… lands in the history</b>, never back in a list (already fixed in the tree, a6be167e9).</li>
+      <li><b>The task is the name.</b> Most recents are checkouts of two projects, one per task branch, so rows are grouped by project and lead with the branch.</li>
+      <li><b>Keyboard first:</b> <span class="kbd">Ctrl</span>+<span class="kbd">R</span> opens the picker anywhere, type to filter, <span class="kbd">↑</span><span class="kbd">↓</span> and <span class="kbd">Enter</span>. Pin with the star; remove with <span class="kbd">Del</span>.</li>
+    </ul>
+    Names are invented (<code>atlas-…</code>, <code>orion-…</code>) to follow the pattern without publishing real ones.
+  </div>
+
+  <section class="option" id="a">
+    <h2>A · Switcher — the repository name in the title strip opens a dropdown over the graph</h2>
+    <p class="lede">You never leave the history to change repository. Click the name (or <span class="kbd">Ctrl</span>+<span class="kbd">R</span>), type a few letters of the task, press Enter. The graph behind stays put until the new one arrives.</p>
+    <div class="win" data-graph="a">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span><span class="sep"></span>
+        <span class="switch-btn">atlas-FEAT-23862 <span class="chip">FEAT-23862-mb-container-ci</span> ▾</span>
+        <span class="dots"><span class="kbd">Ctrl</span><span class="kbd">R</span></span></div>
+      <div class="body dim"><div class="card rail"></div><div class="card tree"></div><div class="card graph"></div></div>
+      <div class="popover">
+        <div class="search">⌕ <b>atlas</b><span class="caret"></span><span style="margin-left:auto" class="kbd">Esc</span></div>
+        <div data-list="a"></div>
+        <div class="foot"><a href="#a">Open folder…</a><span style="margin-left:auto">↑↓ move · Enter open · ☆ pin</span></div>
+      </div>
+      <div class="note" style="right:24px;bottom:24px">One click on a row opens it. The row under the cursor shows its state; nothing else to read first.</div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>Switching between task checkouts many times a day</li><li>The history is always one Esc away</li><li>Smallest change: a dropdown, not a page</li></ul></div>
+      <div><b>Costs</b><ul><li>No room for a repository's recent commits before opening (the history itself is that preview)</li><li>Needs a welcome screen when nothing is open — D or the same list full-width</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="b">
+    <h2>B · Tabs — the repositories you work in stay open as tabs</h2>
+    <p class="lede">Like a browser: each repository you open becomes a tab and keeps its scroll and selection. "+" opens the same filtered list as A, and Open folder… adds a tab. Close a tab with its ×; the list of recents is unchanged.</p>
+    <div class="win tabbed" data-graph="b">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span><span class="dots">⋯</span></div>
+      <div class="tabs">
+        <span class="tab on"><span class="t">atlas-FEAT-23862</span><span class="x">×</span></span>
+        <span class="tab"><span class="t">orion-FET-exploration</span><span class="x">×</span></span>
+        <span class="tab"><span class="t">atlas-r6-boot</span><span class="x">×</span></span>
+        <span class="tab"><span class="t">orion-APS-4570</span><span class="x">×</span></span>
+        <span class="tab plus">+</span>
+      </div>
+      <div class="body"><div class="card rail"></div><div class="card tree"></div><div class="card graph"></div></div>
+      <div class="note" style="left:520px;top:30px">"+" opens A's list; one click adds a tab and shows its history.</div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>Two or three checkouts in parallel (a fix on one, a review on another)</li><li>Each tab keeps its place in the history</li></ul></div>
+      <div><b>Costs</b><ul><li>An engine session per open tab (memory, file watchers)</li><li>Biggest change of the four; tab bar takes 40 px of height</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="c">
+    <h2>C · In the rail — a Repositories list that is always there</h2>
+    <p class="lede">The left pane gets a Repositories section above the branch tree (or as a tab of it): the current one highlighted, the rest one click away, grouped by project. Like Fork's sidebar or SourceTree's bookmarks.</p>
+    <div class="win" data-graph="c">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span><span class="sep"></span><b>atlas-FEAT-23862</b><span class="dots">⋯</span></div>
+      <div class="body rail-repos"><div class="card rail"></div>
+        <div class="card"><div class="repos"><div class="head">Repositories <span>⌕ filter</span></div><div class="list" data-list="c"></div>
+          <div class="split">Branches · Remotes · Tags ▾</div></div></div>
+        <div class="card graph"></div></div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>Seeing which checkout you are in, all the time</li><li>No overlay, no mode: the list is just there</li></ul></div>
+      <div><b>Costs</b><ul><li>Competes with the branch tree for the left pane's height</li><li>Less room per row: the branch is shortened sooner</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="d">
+    <h2>D · Welcome — a plain page when nothing is open, A everywhere else</h2>
+    <p class="lede">Only at start (or after closing a repository): one column, the actions on top, then the recent ones as rows you click once. Once a repository is open the title-strip switcher of A takes over; this page never sits between you and a history again.</p>
+    <div class="win tall">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span><span class="dots">⋯</span></div>
+      <div class="welcome"><div class="box">
+        <h3>Open a repository</h3>
+        <div class="sub">Click one to open its history. <span class="kbd">Ctrl</span>+<span class="kbd">R</span> brings this list back from anywhere.</div>
+        <div class="acts"><span class="btn primary">📁 Open folder…</span><span class="btn" style="margin-left:auto">⌕ Filter</span></div>
+        <div class="listcard" data-list="d"></div>
+      </div></div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>A first launch that is obvious</li><li>Wide rows: name, task branch and state all fit</li></ul></div>
+      <div><b>Costs</b><ul><li>Two surfaces to keep consistent (this page and A's dropdown)</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="today">
+    <h2>Today — for comparison (v0.20.8)</h2>
+    <p class="lede">The pane replaces the graph; a click selects and shows the preview on the right, opening takes a double click, Enter or the Open button.</p>
+    <div class="win">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span><span class="sep"></span><b>atlas-FEAT-23862</b></div>
+      <div class="body" style="grid-template-columns:52px 1fr"><div class="card rail"></div>
+        <div class="card today"><div class="l"><div class="search">⌕ Filter</div><div data-list="today"></div></div>
+          <div class="r"><h3>orion-FET-exploration</h3><span class="chip">alex/flashing-fet-exploration</span>
+            <p class="when">~/projects/orion-FET-exploration</p><p style="color:var(--meta)">Working tree clean · Recent history …</p>
+            <span class="btn primary">Open</span></div></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const REPOS = [
+    { n: "atlas-FEAT-23862", b: "FEAT-23862-mb-container-ci", p: "atlas", w: "now", s: "open now", cur: true },
+    { n: "orion-FET-exploration", b: "alex/flashing-fet-exploration", p: "orion", w: "5 d", s: "clean" },
+    { n: "orion-laser-eye-safety", b: "HEAD (detached)", p: "orion", w: "1 w", s: "3 changed" },
+    { n: "atlas-laser-eye-safety", b: "HEAD (detached)", p: "atlas", w: "1 w", s: "clean" },
+    { n: "orion-r6-boot", b: "alex/r6_boot_optimisation", p: "orion", w: "1 w", s: "clean" },
+    { n: "atlas-r6-boot", b: "alex/r6_boot_optimisation", p: "atlas", w: "1 w", s: "↑2" },
+    { n: "orion-APS-4570", b: "APS-4570-sleep-phase1", p: "orion", w: "10 d", s: "clean" },
+    { n: "atlas-ASD-108285", b: "ASD-108285-reboot-closed-ssh", p: "atlas", w: "11 d", s: "clean" },
+    { n: "model", b: "main", p: "other", w: "3 w", s: "clean" },
+    { n: "drawio-fork", b: "master", p: "other", w: "1 mo", s: "clean" },
+  ]
+  const state = (s) => `<span class="state ${s === "clean" ? "clean" : s === "open now" ? "" : "dirty"}">${s}</span>`
+  const groups = (list) => {
+    const out = []
+    for (const [p, label] of [["atlas", "atlas · 4 checkouts"], ["orion", "orion · 4 checkouts"], ["other", "Other"]]) {
+      const items = list.filter((r) => r.p === p)
+      if (items.length) out.push({ label, items })
+    }
+    return out
+  }
+  const item = (r, star = true) =>
+    `<div class="item${r.cur ? " cur" : ""}"><div class="n">${r.n}</div><div class="when">${r.w}${star ? " ☆" : ""}</div>` +
+    `<div style="min-width:0"><span class="chip">${r.b}</span></div>${state(r.s)}</div>`
+  const fill = (key, html) => document.querySelectorAll(`[data-list="${key}"]`).forEach((el) => (el.innerHTML = html))
+
+  fill("a", groups(REPOS.filter((r) => r.p === "atlas"))
+    .map((g) => `<div class="grp"><span>${g.label}</span><span>${g.items.length}</span></div>` + g.items.map((r) => item(r)).join(""))
+    .join("") + `<div class="grp"><span>Pinned</span><span>1</span></div>` + item(REPOS[8]))
+  fill("c", groups(REPOS).map((g) => `<div class="grp"><span>${g.label.split(" ·")[0]}</span><span>${g.items.length}</span></div>` + g.items.slice(0, 3).map((r) => item(r, false)).join("")).join(""))
+  fill("d", REPOS.slice(0, 7).map((r, i) =>
+    `<div class="wrow${i === 1 ? " cur" : ""}"><div class="n">${r.n}</div><div style="min-width:0"><span class="chip">${r.b}</span></div>${state(r.s)}<span class="when">${r.w}</span></div>`).join(""))
+  fill("today", `<div class="grp"><span>Today</span><span>1</span></div>` + REPOS.slice(0, 7).map((r) => item({ ...r, cur: r.n === "orion-FET-exploration" })).join(""))
+
+  // A fake graph behind every window: lanes, nodes and rows.
+  const LANES = ["var(--l1)", "var(--l2)", "var(--l3)", "var(--l4)", "var(--l5)", "var(--l6)"]
+  const SUBJ = ["Merge branch 'feature/flash' into main", "Fix container CI cache key", "Bump toolchain to 13.2", "Add sleep phase 1 hooks", "Reboot: close ssh before reset", "Refactor boot sequence timing", "Docs: flashing guide", "Merge pull request #412", "Tests: laser safety thresholds", "CI: run on self-hosted runners"]
+  document.querySelectorAll(".graph").forEach((g, k) => {
+    const rows = 22, lanes = 5
+    let svg = `<svg width="150" height="${rows * 26}" style="position:absolute;left:0;top:0">`
+    for (let l = 0; l < lanes; l++) svg += `<line x1="${14 + l * 16}" y1="0" x2="${14 + l * 16}" y2="${rows * 26}" stroke="${LANES[l]}" stroke-width="2"/>`
+    let html = ""
+    for (let i = 0; i < rows; i++) {
+      const l = (i * 3 + k) % lanes
+      svg += `<circle cx="${14 + l * 16}" cy="${13 + i * 26}" r="5" fill="${LANES[l]}" stroke="#1a1a1a" stroke-width="1"/>`
+      html += `<div class="grow${i === 2 ? " sel" : ""}"><span></span><span class="m">${SUBJ[(i + k) % SUBJ.length]}</span><span class="a">Alex Martin</span><span class="d">${i + 1} h ago</span></div>`
+    }
+    g.innerHTML = svg + `</svg><div class="rows">${html}</div>`
+  })
+  document.querySelectorAll(".card.rail").forEach((r) => (r.innerHTML = ["⌂", "⎇", "✓", "⇣", "⇡", "⚙"].map((c, i) => `<span class="${i === 0 ? "on" : ""}">${c}</span>`).join("")))
+  document.querySelectorAll(".card.tree").forEach((t) => (t.innerHTML = `<h4>Branches</h4>${["main", "FEAT-23862-mb-container-ci", "release/rc7", "alex/r6_boot"].map((b) => `<div>⎇ ${b}</div>`).join("")}<h4 style="margin-top:12px">Remotes</h4><div>origin</div><h4 style="margin-top:12px">Tags</h4><div>v7.0.0</div>`))
+
+  const btn = document.getElementById("theme")
+  btn.onclick = () => {
+    const dark = document.documentElement.getAttribute("data-theme") !== "dark"
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light")
+    btn.textContent = dark ? "Light" : "Dark"
+  }
+</script>
