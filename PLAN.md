@@ -1002,7 +1002,7 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Settings yields: a click on any rail item (Recent repositories, Commit, …) closes Settings and shows that view; e2e red first.
 - [ ] Owner tick: Settings reads plain and the rail always responds.
 
-## v0.21 — The agent bridge, finished — modes, the agent convention, Notify hygiene and the Linux path
+## v0.21 — The agent bridge, finished — review rounds on the board, modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
 
 
@@ -1019,6 +1019,43 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [x] CI hygiene from the same look: grid-columns.spec's scrollbar case runs on a made three-lane repository instead of the checkout's own graph, whose lanes grow while pages load — on the Ubuntu runner the auto-fit at the end met the 35 % Graph cap and rightly kept the scrollbar (red on 3 of the day's 5 runs). Known and left: graph-nav's "a parent below the loaded window" case fails once in ~4 runs under load (the second page's 30 s poll), and the @grid visual baselines are the checkout's own rows and drift with every commit — they want a made fixture too.
 
 Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the owner's explicit call ("Can we release 0.20? If possible quickly" — and, asked about the two open ticks, "tag now, tick after"). The v0.20.1 owner tick is open too. Anything either of them turns up goes into v0.20.4.
+
+### v0.21.1 — Agent review rounds — the engine: rounds, a verdict per change, agent_review_revise (PLANNED)
+**Goal:** Owner 2026-10-13: "give user the possibility to approve or reject lines and give comments to the agents … the review shall be cadenced by the agents through MCP." Design: docs/design/agent-review-rounds.md §3, §5, §6 (prototype docs/prototypes/agent-review-v3.html, layout A, picked by the owner). Session v2 with rounds and captured patches; change identity across rounds; verdicts from v0.19's line marks; the MCP tools. No UI and no board in this iteration.
+- [ ] Session v2: rounds with the patch captured when each round opens, change ids h<n>, comments with ids; v1 sessions read as one round (design §3.1).
+- [ ] Change identity across rounds: carried / revised / new / removed by path, hash and old-side overlap (§3.2); xunit on fixture diffs.
+- [ ] Line marks per round (key <sid>-r<n>), copied for carried changes; a change's verdict from its marks: accept / reject / mixed / undecided (§3.3).
+- [ ] Routes: round diff, verdict, comments, send round (wakes wait), resolve; GET returns v2 (§6).
+- [ ] MCP: agent_review_revise (new), agent_review_get with round, agent_review_wait returns the round's verdicts and comments (§5); mcp-probe.mjs drives two rounds.
+- [ ] Gate: engine suite green; mcp-probe open → send → revise → approve.
+
+### v0.21.2 — Agent review rounds — powerboard as the review's channel (PLANNED)
+**Goal:** Owner 2026-10-13: "I want powerboard to be the communication medium between PowerGit / user and the agent … the agent listens to a board dedicated to the review. Feedback from the user is pushed on that board." Design §4: the engine reads and writes powerboard's board.db (no Python), one channel per review, posts as powergit (events) and human (the user), reads without touching anyone's read position; no board.db → today's agent_review_wait.
+- [ ] Board adapter: locate board.db as powerboard does, open WAL + busy_timeout 10 s, schema check, never create the file; Microsoft.Data.Sqlite (check sidecar size and the AppImage matrix).
+- [ ] Channel per review (review-<repo>-<id4>, optional board name on open); open/revise/send/approve/cancel post the texts of design §4.3.
+- [ ] Read the channel by id (never write seen); agent posts starting c<n>: become replies in the review file; GET/POST /agent-reviews/{id}/board, GET /board/status.
+- [ ] Presence from seen.updated of the session's agent name ("last read 10:44").
+- [ ] Tests: xunit against a temp board.db with powerboard's schema (post, read, no seen writes, names, unknown schema, missing file); mcp-probe with a real powerboard read loop.
+- [ ] Gate: engine suite green; a powerboard read on the channel sees the round posts, and a post there shows as a reply.
+
+### v0.21.3 — Agent review rounds — the full view, layout A (PLANNED)
+**Goal:** Owner 2026-10-13: "should we go full view instead of just the bottom panels?" and "I'm okay for A. This is very good." Build tabs A, Inbox and States of docs/prototypes/agent-review-v3.html (design §7): the inbox and a review take the window except the rail; files, the diff with a verdict per change, the board column with the round box. Gate: the e2e specs, a look in light, dark and 150 %, the owner's tick.
+- [ ] Full view: AgentReviewsView leaves the file-history slot and takes the main area like Settings; the rail wins; Escape / ← back to the inbox, then the history.
+- [ ] Inbox: rows with title, mode, agent, repo and branch, files, presence dot, whose turn, age; filter Waiting for you / Open / All; the badge counts reviews waiting for you.
+- [ ] Review: top bar with round buttons; files column with progress; the diff with a verdict bar per change (Accept / Reject / Comment), origin chips, faded carried and removed cards; threads with Add to round / Ask now.
+- [ ] Board column: feed with c<n> links into the diff, the Board box, presence, and the round box (counts, note, Send round n / Approve all / Cancel).
+- [ ] States: round sent (verdicts locked), agent not reading, no powerboard (rounds list), Notify (no Send), approved (read-only); keys A / R / C / J / K, Ctrl+Enter.
+- [ ] Tests: vitest (round summary, verdict ↔ marks, turn labels); e2e on a fake two-round session and a temp board: verdicts, Ask now, a reply under its line, Send, Approve, the rail leaves a review, the fallback.
+- [ ] Gate: tsc, eslint, vitest, e2e green; a look in light, dark and 150 % against the prototype.
+- [ ] Owner tick: a review reads like the prototype and the rail always responds.
+
+### v0.21.4 — Agent review rounds — presence in powerboard, the agent convention, a real two-round review (PLANNED)
+**Goal:** Close the loop with a real agent. powerboard records a read only when it returns, so a long wait looks like an old read (design §4.4): a small powerboard change (its own repository) makes "the agent is reading" true. The agent convention goes into docs/agents/mcp-agent-review.md (§5). Gate: a real Claude Code session with powerboard does two rounds against PowerGit, and the owner ticks it.
+- [ ] powerboard (its own repository): while read waits, touch seen.updated every 5 s; PowerGit shows "reading this channel" under 15 s, else "last read … ago" (design §4.4).
+- [ ] docs/agents/mcp-agent-review.md: the board loop (open → read → get/revise → approved), the c<n>: reply prefix, the powerboard name equal to agent; README's Agent review section.
+- [ ] Linux: the round trip from the AppImage on Ubuntu (board.db under ~/.local/share/powerboard).
+- [ ] Gate: a real Claude Code session with powerboard does two rounds against PowerGit (a question between rounds, one rejection, one approval).
+- [ ] Owner tick: a real agent review, two rounds, on his machine.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1071,3 +1108,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Scrollbar drag: reuse row elements on big jumps (keyed by slot); skim p95 200 ms → ≤ 33 ms in Chromium (audit 2026-09-23 #2).
 - Engine: cache or replace `git submodule status --recursive` on refs refresh (0.8–0.9 s on Windows with submodules; audit 2026-09-23 #3).
 - Ref filter over thousands of refs: show a spinner or keep the old rows during the ~5 s reload (audit 2026-09-23 #4).
+- Agent review rounds (owner 2026-10-13): planned as v0.21.1–v0.21.4; design docs/design/agent-review-rounds.md, prototype docs/prototypes/agent-review-v3.html (layout A picked).

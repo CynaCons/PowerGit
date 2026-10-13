@@ -1,0 +1,638 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent review on the board</title>
+<style>
+  :root {
+    --page: #e3e7ee; --desk: #dfe4ec; --surface: #ffffff; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --faint: #8a94a3;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff;
+    --sel-bg: #dbeafe; --sel-border: #2563eb;
+    --chip-bg: #eff6ff; --chip-fg: #2563eb;
+    --add-bg: #e6f7ec; --add-fg: #0f5132; --del-bg: #fdecec; --del-fg: #842029;
+    --ok: #059669; --ok-bg: #ecfdf5; --bad: #dc2626; --bad-bg: #fef2f2; --wait: #b45309; --wait-bg: #fffbeb;
+    --agent: #7c3aed; --agent-bg: #f5f3ff; --sys: #475569; --sys-bg: #f1f5f9;
+    --card: 0 1px 2px rgba(16, 24, 39, 0.08);
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --page: #0c1117; --desk: #0e141b; --surface: #182029; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --faint: #6b7686;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220;
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa;
+    --chip-bg: #1f3a5f; --chip-fg: #bfdbfe;
+    --add-bg: #0f2e1d; --add-fg: #9be9b5; --del-bg: #3a1518; --del-fg: #f5b5b5;
+    --ok: #34d399; --ok-bg: #0b3d2e; --bad: #f87171; --bad-bg: #3a1518; --wait: #fbbf24; --wait-bg: #3a2a0a;
+    --agent: #a78bfa; --agent-bg: #2a2142; --sys: #a3b0c2; --sys-bg: #1d2530;
+    --card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tabs button, .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.small { padding: 2px 8px; font-size: 12px; }
+  .btn.ok[aria-pressed="true"] { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); font-weight: 600; }
+  .btn.bad[aria-pressed="true"] { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
+  .spacer { flex: 1; }
+  main { padding: 0 16px 24px; }
+  .note { max-width: 1040px; color: var(--text-2); margin: 4px 0 12px; }
+  .note b { color: var(--text); }
+  h3 { margin: 18px 0 8px; font-size: 14px; }
+
+  /* Window: full view — rail + one review surface, no repository tree, no bottom panel */
+  .win { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; background: var(--desk); padding: 6px; border-radius: 8px; border: 1px solid var(--border); height: 760px; }
+  .pane { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--card); min-width: 0; min-height: 0; }
+  .rail { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+  .rail i { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; font-style: normal; color: var(--meta); position: relative; font-size: 14px; }
+  .rail i.on { background: var(--sel-bg); color: var(--sel-border); }
+  .rail i sup { position: absolute; top: -4px; right: -6px; background: var(--wait); color: #fff; border-radius: 8px; font-size: 10px; padding: 0 4px; line-height: 15px; }
+  .surface { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-width: 0; min-height: 0; }
+  .cols { display: grid; gap: 6px; min-height: 0; }
+  .cols.a { grid-template-columns: 220px minmax(0, 1fr) 340px; }
+  .cols.c { grid-template-columns: 220px minmax(0, 1fr); }
+  .scroll { overflow: auto; min-height: 0; }
+  .pad { padding: 10px 12px; }
+  .h { font-weight: 600; }
+  .meta { color: var(--meta); font-size: 12px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .chip { display: inline-block; border-radius: 10px; padding: 0 7px; font-size: 11px; line-height: 18px; background: var(--chip-bg); color: var(--chip-fg); white-space: nowrap; }
+  .chip.wait { background: var(--wait-bg); color: var(--wait); }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); }
+  .chip.bad { background: var(--bad-bg); color: var(--bad); }
+  .chip.agent { background: var(--agent-bg); color: var(--agent); }
+  .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
+
+  /* Diff */
+  .hunk { border: 1px solid var(--border); border-radius: 6px; margin: 0 0 10px; overflow: hidden; background: var(--surface); }
+  .hunk.accept { border-color: var(--ok); }
+  .hunk.reject { border-color: var(--bad); }
+  .hunk.carried { opacity: .62; }
+  .hhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 8px; background: var(--sunken); border-bottom: 1px solid var(--border-soft); }
+  .hunk.accept .hhead { background: var(--ok-bg); }
+  .hunk.reject .hhead { background: var(--bad-bg); }
+  table.diff { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; }
+  table.diff td { padding: 0 6px; white-space: pre; vertical-align: top; }
+  table.diff td.n { width: 1%; color: var(--faint); text-align: right; user-select: none; cursor: pointer; }
+  table.diff tr:hover td.n::after { content: " +"; color: var(--primary); }
+  table.diff tr.add td.s { background: var(--add-bg); color: var(--add-fg); }
+  table.diff tr.del td.s { background: var(--del-bg); color: var(--del-fg); }
+  table.diff tr.picked td { box-shadow: inset 3px 0 0 var(--primary); }
+  .thread { margin: 4px 8px 8px 46px; border: 1px solid var(--border); border-radius: 6px; background: var(--sunken); font-family: "Segoe UI", system-ui, sans-serif; white-space: normal; }
+  .msg { padding: 6px 9px; border-top: 1px solid var(--border-soft); }
+  .msg:first-child { border-top: 0; }
+  .who { font-weight: 600; font-size: 12px; }
+  .who.agent { color: var(--agent); }
+  textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 5px; resize: vertical; min-height: 44px; }
+
+  .flist > div { padding: 6px 10px; border-bottom: 1px solid var(--border-soft); cursor: pointer; }
+  .flist > div.on { background: var(--sel-bg); }
+  .bar { height: 5px; border-radius: 3px; background: var(--border-soft); display: flex; overflow: hidden; margin-top: 4px; }
+  .bar span { display: block; }
+
+  /* The board */
+  .board { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; }
+  .bhead { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); }
+  .feed { overflow: auto; padding: 8px 10px; display: grid; gap: 8px; align-content: start; }
+  .post { border-radius: 6px; padding: 6px 9px; border: 1px solid var(--border-soft); background: var(--surface); }
+  .post.agent { border-left: 3px solid var(--agent); }
+  .post.human { border-left: 3px solid var(--primary); }
+  .post.sys { background: var(--sys-bg); color: var(--sys); border: 0; font-size: 12px; }
+  .post .t { white-space: pre-wrap; }
+  .post pre { margin: 4px 0 0; padding: 6px; font-size: 11px; white-space: pre-wrap; }
+  .post .ref { font-family: var(--mono); font-size: 11px; color: var(--primary); cursor: pointer; }
+  .compose { border-top: 1px solid var(--border-soft); padding: 8px 10px; display: grid; gap: 6px; }
+  .roundbox { border-top: 1px solid var(--border-soft); padding: 8px 10px; display: grid; gap: 6px; background: var(--sunken); }
+  .typing { color: var(--meta); font-style: italic; font-size: 12px; }
+
+  /* Option C: board first */
+  .conv { max-width: 900px; margin: 0 auto; display: grid; gap: 10px; }
+
+  /* Cadence */
+  .seq { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seq .col { text-align: center; font-weight: 600; padding: 8px; background: var(--sunken); border-bottom: 1px solid var(--border); }
+  .seq .step { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--border-soft); }
+  .seq .step div { padding: 6px 10px; min-height: 30px; }
+  .seq .step.phase { background: var(--sunken); font-weight: 600; }
+  .seq .step.phase div { grid-column: 1 / -1; }
+  table.tools { border-collapse: collapse; width: 100%; background: var(--surface); border: 1px solid var(--border); }
+  table.tools td, table.tools th { border-bottom: 1px solid var(--border-soft); padding: 6px 10px; text-align: left; vertical-align: top; }
+  pre { background: var(--sunken); border: 1px solid var(--border); border-radius: 6px; padding: 10px; overflow: auto; font-family: var(--mono); font-size: 12px; margin: 0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .q { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; max-width: 1040px; }
+  .q h3 { margin: 0 0 6px; }
+  .q ul { margin: 4px 0 0; padding-left: 18px; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 1040px; }
+  .mini { background: var(--desk); border: 1px solid var(--border); border-radius: 6px; padding: 4px; display: grid; gap: 4px; height: 170px; }
+  .mini div { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; color: var(--meta); display: grid; place-items: center; text-align: center; }
+  @media (max-width: 1200px) { .cols.a { grid-template-columns: 180px minmax(0, 1fr) 300px; } }
+  @media (max-width: 1000px) { .cols.a, .cols.c, .two, .compare { grid-template-columns: 1fr; } .win { height: auto; } .seq, .seq .step { font-size: 11px; } }
+  @media (max-width: 640px) { .win { grid-template-columns: 1fr; } .rail { flex-direction: row; justify-content: center; } }
+</style>
+
+<header>
+  <h1>Agent review — full view, powerboard as the channel (design A)</h1>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <span class="spacer"></span>
+  <button class="btn" id="theme">Dark</button>
+</header>
+<main id="main"></main>
+
+<script>
+// ---- Data: one invented review --------------------------------------------
+const review = {
+  id: "9c1e", title: "Fix the token refresh race",
+  why: "Two refreshes could run at once after a 401 and the second overwrote a fresh token with a stale one.",
+  agentName: "auth-fix", client: "Claude Code",
+  repo: "atlas", worktree: "C:/src/atlas-auth-fix", branch: "fix/refresh-race", base: "4e1a9c07",
+  channel: "review-atlas-9c1e",
+};
+const hunks1 = [
+  { id: "h1", file: "src/Auth/TokenStore.cs", at: "@@ -40,9 +40,11 @@ public sealed class TokenStore", lines: [
+    [" ", 40, 40, "    public async Task<Token> RefreshAsync(CancellationToken ct)"],
+    [" ", 41, 41, "    {"],
+    ["-", 42, null, "        lock (_gate)"],
+    ["-", 43, null, "        {"],
+    ["+", null, 42, "        await _gate.WaitAsync(ct);"],
+    ["+", null, 43, "        try"],
+    ["+", null, 44, "        {"],
+    ["+", null, 45, "            if (_current.ExpiresAt > _clock.Now) return _current;"],
+    [" ", 44, 46, "            _current = await _client.RefreshAsync(_current, ct);"],
+    ["+", null, 47, "        }"],
+    ["+", null, 48, "        finally { _gate.Release(); }"],
+  ]},
+  { id: "h2", file: "src/Auth/TokenStore.cs", at: "@@ -61,6 +63,7 @@ public sealed class TokenStore", lines: [
+    [" ", 61, 63, "        _current = token;"],
+    ["+", null, 64, "        _log.LogInformation(\"Token refreshed: {Token}\", token.Value);"],
+    [" ", 62, 65, "        Changed?.Invoke(this, token);"],
+  ]},
+  { id: "h3", file: "src/Auth/RefreshLoop.cs", at: "@@ -18,7 +18,7 @@ internal sealed class RefreshLoop", lines: [
+    [" ", 18, 18, "    private static TimeSpan Backoff(int attempt) =>"],
+    ["-", 19, null, "        TimeSpan.FromSeconds(Math.Pow(2, attempt));"],
+    ["+", null, 19, "        TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, attempt)));"],
+  ]},
+  { id: "h4", file: "src/Auth/RefreshLoop.cs", at: "@@ -33,8 +33,6 @@ internal sealed class RefreshLoop", lines: [
+    [" ", 33, 33, "        var token = await _store.RefreshAsync(ct);"],
+    ["-", 34, null, "        if (token is null)"],
+    ["-", 35, null, "            return;"],
+    [" ", 36, 34, "        Schedule(token.ExpiresAt - Skew);"],
+  ]},
+  { id: "h5", file: "tests/Auth/RefreshTests.cs", at: "@@ -0,0 +1,8 @@", lines: [
+    ["+", null, 1, "[Fact]"],
+    ["+", null, 2, "public async Task Two_refreshes_after_a_401_call_the_server_once()"],
+    ["+", null, 3, "{"],
+    ["+", null, 4, "    var server = new FakeTokenServer(delay: TimeSpan.FromMilliseconds(50));"],
+    ["+", null, 5, "    var store = new TokenStore(server, Clock.Fixed);"],
+    ["+", null, 6, "    await Task.WhenAll(store.RefreshAsync(default), store.RefreshAsync(default));"],
+    ["+", null, 7, "    Assert.Equal(1, server.Calls);"],
+    ["+", null, 8, "}"],
+  ]},
+];
+const hunks2 = [
+  { ...hunks1[0], carried: "accept" },
+  { ...hunks1[2], carried: "accept" },
+  { id: "h4b", file: "src/Auth/RefreshLoop.cs", at: "@@ -33,8 +33,8 @@ internal sealed class RefreshLoop", revised: true, lines: [
+    [" ", 33, 33, "        var token = await _store.RefreshAsync(ct);"],
+    ["-", 34, null, "        if (token is null)"],
+    ["-", 35, null, "            return;"],
+    ["+", null, 34, "        if (token is null)"],
+    ["+", null, 35, "            return; // signed out while refreshing"],
+    [" ", 36, 36, "        Schedule(token.ExpiresAt - Skew);"],
+  ]},
+  { ...hunks1[4], carried: "accept" },
+];
+
+// Comments live on the board; the diff shows each one under its line.
+// kind: "round" = sent with the next round; "ask" = posted at once.
+const comments1 = [
+  { id: "c1", h: "h2", file: "src/Auth/TokenStore.cs", line: 64, kind: "round", text: "This writes the bearer token to the log. Remove the line." },
+  { id: "c2", h: "h4", file: "src/Auth/RefreshLoop.cs", line: 34, kind: "round", text: "RefreshAsync can return null after a sign-out. Keep the check." },
+  { id: "c3", h: "h1", file: "src/Auth/TokenStore.cs", line: 45, kind: "ask", text: "Why check ExpiresAt here and not in the caller?",
+    reply: "The second caller waits on the semaphore while the first refreshes. When it gets in, the token is already fresh, so it returns it instead of refreshing again. Two_refreshes_after_a_401_call_the_server_once covers it." },
+];
+const comments2 = [
+  { id: "c2", h: "h4b", file: "src/Auth/RefreshLoop.cs", line: 34, kind: "round", text: "RefreshAsync can return null after a sign-out. Keep the check.",
+    reply: "Restored. I removed it because RefreshAsync no longer returns null on the happy path; sign-out still does." },
+];
+
+// Board posts. author: "powergit" (events), "human" (you, through PowerGit or the terminal), agent name.
+const t = (m) => `10:${String(m).padStart(2, "0")}`;
+const feed1 = [
+  { a: "powergit", at: t(42), text: `Round 1 opened · review ${review.id} · 3 files, 5 changes\n${review.title}` },
+  { a: review.agentName, at: t(42), text: "Listening here. Ask on this channel if anything is unclear." },
+  { a: "human", at: t(44), ref: "c3", text: "c3 · src/Auth/TokenStore.cs:45\nWhy check ExpiresAt here and not in the caller?" },
+  { a: review.agentName, at: t(44), ref: "c3", text: "c3: " + comments1[2].reply },
+];
+const roundPost = `Round 1 sent · review 9c1e · 3 accepted, 1 rejected, 1 undecided, 2 comments
+Good fix. Two things inline.`;
+const roundBlock = `✗ h2  src/Auth/TokenStore.cs:64   c1  This writes the bearer token to the log. Remove the line.
+? h4  src/Auth/RefreshLoop.cs:34   c2  RefreshAsync can return null after a sign-out. Keep the check.
+✓ h1 h3 h5
+details: agent_review_get review_id=9c1e round=1`;
+const feed2 = [
+  ...feed1,
+  { a: "human", at: t(47), round: 1, text: roundPost, block: roundBlock },
+  { a: review.agentName, at: t(47), text: "c1: removing the log line.\nc2: restoring the check. Revising." },
+  { a: "powergit", at: t(51), text: "Round 2 opened · 3 unchanged (accepted), 1 revised, 1 removed" },
+  { a: review.agentName, at: t(51), ref: "c2", text: "c2: " + comments2[0].reply },
+];
+
+// ---- State ---------------------------------------------------------------
+const state = {
+  tab: "A", stateView: "revising", round: 1, file: null, picked: null, typing: false,
+  verdict: { h1: "accept", h3: "accept", h2: "reject", h5: "accept" },
+  extra: { 1: [], 2: [] },          // posts added while playing with the mock
+  extraComments: { 1: [], 2: [] },
+};
+const hunksOf = (r) => (r === 1 ? hunks1 : hunks2);
+const commentsOf = (r) => [...(r === 1 ? comments1 : comments2), ...state.extraComments[r]];
+const feedOf = (r) => [...(r === 1 ? feed1 : feed2), ...state.extra[r]];
+const decision = (h) => state.verdict[h.id] ?? h.carried ?? null;
+const files = (r) => [...new Set(hunksOf(r).map((h) => h.file))];
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function counts(r) {
+  const hs = hunksOf(r);
+  const a = hs.filter((h) => decision(h) === "accept").length;
+  const x = hs.filter((h) => decision(h) === "reject").length;
+  const c = commentsOf(r).filter((m) => m.kind === "round" && !m.reply).length;
+  return { a, x, open: hs.length - a - x, c, n: hs.length };
+}
+
+// ---- Pieces --------------------------------------------------------------
+function rail() {
+  return `<nav class="pane rail"><i title="History">⎇</i><i title="Commit">✎</i><i title="Recent">▤</i><i class="on" title="Agent reviews">⚑<sup>2</sup></i><span class="spacer"></span><i title="Settings">⚙</i></nav>`;
+}
+function verdictButtons(h) {
+  const d = decision(h);
+  return `<button class="btn small ok" data-v="accept" data-h="${h.id}" aria-pressed="${d === "accept"}">✓ Accept</button>
+    <button class="btn small bad" data-v="reject" data-h="${h.id}" aria-pressed="${d === "reject"}">✗ Reject</button>
+    <button class="btn small" data-c="${h.id}">Comment</button>`;
+}
+function threadHtml(h) {
+  const cs = commentsOf(state.round).filter((c) => c.h === h.id);
+  const draft = state.picked && state.picked.h === h.id;
+  if (!cs.length && !draft) return "";
+  const msgs = cs.map((c) => `<div class="msg"><div class="row"><span class="who">You</span><span class="meta">${c.id} · line ${c.line}</span>${c.kind === "ask" ? `<span class="chip">asked on the board</span>` : `<span class="chip wait">goes with the round</span>`}</div>${esc(c.text)}</div>
+    ${c.reply ? `<div class="msg"><div class="who agent">${review.agentName}</div>${esc(c.reply)}</div>` : ""}`).join("");
+  const box = draft ? `<div class="msg"><div class="who">You <span class="meta">· line ${state.picked.line}</span></div><textarea placeholder="Comment to the agent"></textarea>
+    <div class="row" style="margin-top:4px"><button class="btn small primary" data-save="round">Add to round</button><button class="btn small" data-save="ask">Ask now</button><button class="btn small" data-cancel>Cancel</button>
+    <span class="meta">Ask now posts it on ${review.channel} at once.</span></div></div>` : "";
+  return `<tr><td colspan="3"><div class="thread">${msgs}${box}</div></td></tr>`;
+}
+function hunkHtml(h, withFile = false) {
+  const d = decision(h);
+  const cls = [d, h.carried && !state.verdict[h.id] ? "carried" : ""].join(" ");
+  const tag = h.carried ? `<span class="chip ok">accepted in round 1 · unchanged</span>` : h.revised ? `<span class="chip agent">revised in round 2</span>` : "";
+  const rows = h.lines.map(([k, o, n, s]) => {
+    const line = n ?? o;
+    const picked = state.picked && state.picked.h === h.id && state.picked.line === line;
+    return `<tr class="${k === "+" ? "add" : k === "-" ? "del" : ""} ${picked ? "picked" : ""}" data-line="${line}" data-h="${h.id}"><td class="n">${o ?? ""}</td><td class="n">${n ?? ""}</td><td class="s">${k}${esc(s)}</td></tr>`;
+  }).join("");
+  return `<div class="hunk ${cls}" id="hunk-${h.id}">
+    <div class="hhead">${withFile ? `<span class="mono h">${h.file}</span>` : ""}<span class="mono meta ell">${esc(h.at)}</span>${tag}<span class="spacer"></span>${verdictButtons(h)}</div>
+    <table class="diff">${rows}${threadHtml(h)}</table></div>`;
+}
+function summaryChips(r) {
+  const c = counts(r);
+  return `<span class="chip ok">${c.a} accepted</span> <span class="chip bad">${c.x} rejected</span> <span class="chip">${c.c} comment${c.c === 1 ? "" : "s"} for the round</span> ${c.open ? `<span class="chip wait">${c.open} undecided</span>` : ""}`;
+}
+function sendLabel(r) {
+  const c = counts(r);
+  return c.open === 0 && c.x === 0 ? `Approve all (${c.n})` : `Send round ${r}`;
+}
+// The screen variants of option A (tab "States"); "live" is the main mock.
+const VARIANTS = {
+  live: { chip: (r) => `<span class="chip wait">Wait · round ${r} · your turn</span>` },
+  revising: { chip: () => `<span class="chip agent">Wait · round 1 sent · auth-fix is revising</span>` },
+  stale: { chip: (r) => `<span class="chip wait">Wait · round ${r} · your turn</span>` },
+  noboard: { chip: (r) => `<span class="chip wait">Wait · round ${r} · your turn</span>` },
+  approved: { chip: () => `<span class="chip ok">Approved · round 2 · 10:56</span>` },
+  notify: { chip: () => `<span class="chip">Notify · the agent did not wait</span>` },
+};
+let variant = "live";
+function topBar() {
+  const r = state.round;
+  return `<div class="pane pad">
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn small" title="Back to the inbox">←</button>
+      <span class="h">${review.title}</span>
+      ${VARIANTS[variant].chip(r)}
+      <span class="spacer"></span>
+      ${[1, 2].map((x) => `<button class="btn small ${r === x ? "primary" : ""}" data-round="${x}">Round ${x}</button>`).join("")}
+    </div>
+    <div class="row meta" style="margin-top:4px;flex-wrap:wrap">
+      <span>${review.client} · ${review.agentName}</span>·<span class="mono">${review.branch}</span>·<span>${review.worktree}</span>·<span>base <span class="mono">${review.base}</span></span>
+    </div>
+    <div style="margin-top:4px">${review.why}</div></div>`;
+}
+function fileList() {
+  const r = state.round, fs = files(r);
+  if (!fs.includes(state.file)) state.file = fs[0];
+  return `<div class="pane flist scroll"><div class="pad meta">Files · round ${state.round}</div>${fs.map((f) => {
+    const hs = hunksOf(r).filter((h) => h.file === f);
+    const a = hs.filter((h) => decision(h) === "accept").length, x = hs.filter((h) => decision(h) === "reject").length;
+    const pct = (k) => (100 * k) / hs.length;
+    return `<div class="${f === state.file ? "on" : ""}" data-file="${f}"><div class="row"><span class="mono ell">${f.split("/").pop()}</span><span class="spacer"></span><span class="meta">${a + x}/${hs.length}</span></div>
+      <div class="meta ell">${f}</div><div class="bar"><span style="width:${pct(a)}%;background:var(--ok)"></span><span style="width:${pct(x)}%;background:var(--bad)"></span></div></div>`;
+  }).join("")}</div>`;
+}
+function postHtml(p, embed = false) {
+  const kind = p.a === "powergit" ? "sys" : p.a === "human" ? "human" : "agent";
+  const who = p.a === "powergit" ? "powergit" : p.a === "human" ? "You" : p.a;
+  if (kind === "sys") return `<div class="post sys"><span class="mono">${p.at}</span> · ${esc(p.text).replace(/\n/g, " — ")}</div>`;
+  const ref = p.ref ? ` <span class="ref" data-jump="${p.ref}">${p.ref} ↗</span>` : "";
+  let body = `<div class="t">${esc(p.text)}</div>${p.block ? `<pre>${esc(p.block)}</pre>` : ""}`;
+  if (embed && p.embed) body += p.embed();
+  return `<div class="post ${kind}"><div class="row"><span class="who ${kind === "agent" ? "agent" : ""}">${who}</span><span class="meta">${p.a === "human" ? "human · " : ""}${p.at}</span>${ref}</div>${body}</div>`;
+}
+function roundsColumn() {
+  // No powerboard on this machine: today's wait, with the rounds as a list.
+  return `<div class="pane board">
+    <div class="bhead"><div class="h">Rounds</div><div class="meta">powerboard not found · the agent waits in agent_review_wait</div></div>
+    <div class="feed"><div class="post sys">10:42 · Round 1 opened · 3 files, 5 changes</div><div class="post sys">auth-fix is waiting for round 1</div>
+      <div class="meta">Questions between rounds need powerboard. Comments go with the round.</div></div>
+    <div></div>
+    <div class="roundbox"><div>${summaryChips(state.round)}</div><textarea placeholder="Note with the round (optional)"></textarea>
+      <div class="row"><button class="btn primary" style="flex:1">${sendLabel(state.round)}</button><button class="btn small">Approve all</button><button class="btn small">Cancel review</button></div></div></div>`;
+}
+function boardPane() {
+  const r = state.round;
+  if (variant === "noboard") return roundsColumn();
+  const presence = {
+    stale: `<span class="dot" style="background:var(--faint)"></span><span>${review.agentName} last read this channel 14 min ago · posts wait here until it reads again</span>`,
+    approved: `<span class="dot" style="background:var(--faint)"></span><span>${review.agentName} stopped reading · review closed</span>`,
+    notify: `<span class="dot" style="background:var(--faint)"></span><span>${review.agentName} is not waiting · it reads this channel when it comes back</span>`,
+  }[variant] ?? `<span class="dot"></span><span>${review.agentName} is reading this channel · 3 s ago</span>`;
+  let feed = feedOf(r);
+  if (variant === "revising") feed = [...feed1, feed2[feed1.length], feed2[feed1.length + 1]];
+  if (variant === "approved") feed = [...feed2, { a: "human", at: t(56), text: "Approved · review 9c1e · round 2 · 5 of 5 changes" }, { a: review.agentName, at: t(56), text: "Committed as 7d2f01a on fix/refresh-race. Done." }, { a: "powergit", at: t(56), text: "Review closed · approved" }];
+  if (variant === "notify") feed = [{ a: "powergit", at: t(42), text: "Notify opened · review 9c1e · 3 files, 5 changes" }, { a: review.agentName, at: t(42), text: "FYI, not waiting. I'll read this channel before I push." }];
+  const closed = variant === "approved";
+  const roundbox = closed
+    ? `<div class="roundbox"><div class="meta">Closed. Verdicts and the conversation are kept in the review file.</div></div>`
+    : variant === "revising"
+      ? `<div class="roundbox"><div class="meta">Round 1 sent at 10:47. Round 2 shows here when ${review.agentName} calls agent_review_revise. Verdicts are read-only until then.</div><div class="row"><button class="btn small">Cancel review</button></div></div>`
+      : variant === "notify"
+        ? `<div class="roundbox"><div>${summaryChips(r)}</div><div class="meta">No Send: the agent did not wait. Verdicts and comments go on the board as you make them.</div><div class="row"><button class="btn small">Mark read</button></div></div>`
+        : `<div class="roundbox"><div>${summaryChips(r)}</div><textarea placeholder="Note with the round (optional)"></textarea>
+      <div class="row"><button class="btn primary" style="flex:1">${sendLabel(r)}</button><button class="btn small">Approve all</button><button class="btn small">Cancel review</button></div></div>`;
+  return `<div class="pane board">
+    <div class="bhead"><div class="row"><span class="h">Board</span><span class="mono">${review.channel}</span><span class="spacer"></span><span class="meta">powerboard</span></div>
+      <div class="row meta" style="margin-top:2px">${presence}</div></div>
+    <div class="feed" id="feed">${feed.map((p) => postHtml(p)).join("")}${state.typing ? `<div class="typing">${review.agentName} has the message…</div>` : ""}</div>
+    ${closed ? "<div></div>" : `<div class="compose"><textarea id="say" placeholder="Message ${review.agentName} on ${review.channel}"></textarea>
+      <div class="row"><span class="meta">Posts now. The agent answers here; no round needed.</span><span class="spacer"></span><button class="btn small" data-say>Post</button></div></div>`}
+    ${roundbox}
+  </div>`;
+}
+
+// ---- The inbox, full view -------------------------------------------------------
+function inbox() {
+  const rows = [
+    ["Fix the token refresh race", "auth-fix · Claude Code", "atlas · fix/refresh-race", "Wait", "round 1 · your turn", "wait", "3 files", "5 min", true],
+    ["Release script: sign the AppImage after repair", "release-fix · Codex", "powergit · wt/release-sign", "Wait", "round 2 · your turn", "wait", "1 file", "22 min", true],
+    ["Rename the telemetry module", "cleanup · Claude Code", "atlas · chore/rename-telemetry", "Notify", "unread", "", "41 files", "1 h", false],
+    ["Parser: accept trailing commas", "parser · Cursor", "model · fix/trailing-comma", "Wait", "round 1 sent · agent revising", "agent", "2 files", "2 h", true],
+    ["Bump the UI kit", "deps · Codex", "atlas · deps/ui-kit", "Wait", "approved · round 1", "ok", "3 files", "yesterday", false],
+  ];
+  return `<div class="win" style="height:560px">${rail()}<div class="surface">
+    <div class="pane pad"><div class="row"><span class="h">Agent reviews</span><span class="chip wait">2 waiting for you</span><span class="spacer"></span>
+      <button class="btn small primary">Waiting for you</button><button class="btn small">Open</button><button class="btn small">All</button></div></div>
+    <div class="pane scroll">${rows.map(([title, agent, where, mode, status, tone, files, age, live]) => `
+      <div class="row" style="padding:9px 12px;border-bottom:1px solid var(--border-soft);cursor:pointer" data-tab="A">
+        <div style="flex:1;min-width:0"><div class="row"><span class="h ell">${title}</span><span class="chip ${mode === "Wait" ? "wait" : ""}">${mode}</span></div>
+          <div class="meta ell">${agent} · <span class="mono">${where}</span> · ${files}</div></div>
+        <span class="row meta" style="width:150px"><span class="dot" style="background:${live ? "var(--ok)" : "var(--faint)"}"></span>${live ? "agent on the board" : "agent not reading"}</span>
+        <span class="chip ${tone}" style="width:190px;text-align:center">${status}</span>
+        <span class="meta" style="width:70px;text-align:right">${age}</span></div>`).join("")}
+    </div></div></div>`;
+}
+
+// ---- The states of A ---------------------------------------------------------------
+function statesTab() {
+  const list = [
+    ["revising", "Round sent, agent revising", "Verdicts lock; the board stays open for questions."],
+    ["stale", "Agent not reading the channel", "The last read is older than a minute. Posts wait on the board."],
+    ["noboard", "No powerboard on this machine", "The board column becomes the rounds list; the agent waits in agent_review_wait as today."],
+    ["notify", "Notify: the agent did not wait", "No Send button. What you mark and write goes on the board for later."],
+    ["approved", "Approved", "Everything read-only; the review file keeps the verdicts and the conversation."],
+  ];
+  const pick = state.stateView ?? "revising";
+  const [, label, text] = list.find(([k]) => k === pick);
+  variant = pick;
+  const keep = state.round;
+  state.round = pick === "approved" ? 2 : 1;
+  const html = optionA();
+  variant = "live";
+  state.round = keep;
+  return `<div class="row" style="flex-wrap:wrap;margin-bottom:8px">${list.map(([k, l]) => `<button class="btn small ${k === pick ? "primary" : ""}" data-state="${k}">${l}</button>`).join("")}</div>
+    <p class="note"><b>${label}.</b> ${text}</p>${html}`;
+}
+
+// ---- Option A: diff first, board on the right -------------------------------
+function optionA() {
+  const r = state.round;
+  const removed = r === 2 && state.file === "src/Auth/TokenStore.cs"
+    ? `<div class="hunk carried"><div class="hhead"><span class="chip ok">removed after your rejection</span><span class="meta">h2 · line 64, the token log</span></div></div>` : "";
+  const diff = hunksOf(r).filter((h) => h.file === state.file).map((h) => hunkHtml(h)).join("") + removed;
+  return `<div class="win">${rail()}<div class="surface">${topBar()}
+    <div class="cols a">${fileList()}
+      <div class="pane pad scroll">${diff}<div class="meta">Click a line number to comment. Verdicts are per change; unchanged accepted changes stay accepted in the next round.</div></div>
+      ${boardPane()}</div></div></div>`;
+}
+
+// ---- Option C: board first, the changes inside the posts ----------------------
+function optionC() {
+  const r = state.round;
+  const opened = (p) => p.a === "powergit" && /Round \d opened/.test(p.text);
+  const posts = feedOf(r).map((p) => {
+    if (!opened(p)) return postHtml(p);
+    const round = p.text.startsWith("Round 2") ? 2 : 1;
+    const hs = hunksOf(round).filter((h) => round === r);
+    const inner = hs.length ? hs.map((h) => hunkHtml(h, true)).join("") : `<div class="meta">Changes shown in round ${round}.</div>`;
+    return `<div class="post sys"><span class="mono">${p.at}</span> · ${esc(p.text).replace(/\n/g, " — ")}</div><div>${inner}</div>`;
+  }).join("");
+  return `<div class="win">${rail()}<div class="surface">${topBar()}
+    <div class="cols c">${fileList()}
+      <div class="pane board"><div class="bhead"><div class="row"><span class="h">Board</span><span class="mono">${review.channel}</span><span class="spacer"></span><span class="dot"></span><span class="meta">${review.agentName} reading · 3 s ago</span></div></div>
+        <div class="feed"><div class="conv">${posts}${state.typing ? `<div class="typing">${review.agentName} has the message…</div>` : ""}</div></div>
+        <div class="compose"><div class="conv" style="width:100%"><textarea id="say" placeholder="Message ${review.agentName}"></textarea>
+          <div class="row" style="margin-top:6px">${summaryChips(r)}<span class="spacer"></span><button class="btn small" data-say>Post</button><button class="btn primary">${sendLabel(r)}</button></div></div></div>
+      </div></div></div></div>`;
+}
+
+// ---- Full view vs bottom panel ----------------------------------------------
+function fullView() {
+  return `<div class="note">Today the session opens in the history's place, with the repository tree and the bottom panel around it. A review is a task of its own; the proposal gives it the whole window except the rail, like Settings and the start pane. The rail stays and always works: a click on History leaves the review where it was (v0.20.11's rule for Settings).</div>
+  <div class="compare">
+    <div><div class="h">Today</div><div class="mini" style="grid-template-columns:30px 120px 1fr;grid-template-rows:1fr 60px">
+      <div style="grid-row:1/3">rail</div><div style="grid-row:1/3">repository tree</div><div>review session (list, diff)</div><div>bottom panel</div></div></div>
+    <div><div class="h">Proposed: full view</div><div class="mini" style="grid-template-columns:30px 90px 1fr 120px;grid-template-rows:28px 1fr">
+      <div style="grid-row:1/3">rail</div><div style="grid-column:2/5">title · why · rounds</div><div>files</div><div>diff with verdicts</div><div>board channel</div></div></div>
+  </div>
+  <div class="q" style="margin-top:12px"><b>My pick: full view.</b> The diff needs the width, and the board needs a column of its own to be a conversation and not a footnote. The inbox (the list of reviews) also opens full; Escape or ← goes back to it.</div>`;
+}
+
+// ---- The cadence ----------------------------------------------------------------
+function cadence() {
+  const S = (cells) => `<div class="step">${cells.map((c) => `<div>${c}</div>`).join("")}</div>`;
+  const P = (text) => `<div class="step phase"><div>${text}</div></div>`;
+  return `<div class="note">Two MCP servers, each doing one job. <b>powergit mcp</b> carries the review itself: the changes, the rounds, the verdicts, stored under <span class="mono">.powergit/agent-reviews/</span>. <b>powerboard</b> carries the conversation: the agent waits on the review's channel with <span class="mono">read(wait_seconds)</span>, and PowerGit posts there for you. The agent no longer blocks in <span class="mono">agent_review_wait</span>, so you can ask questions between rounds and it answers at once.</div>
+  <div class="seq"><div class="col">Agent</div><div class="col">powergit mcp</div><div class="col">PowerGit</div><div class="col">powerboard channel</div><div class="col">You</div>
+    ${P("Open")}
+    ${S(["changes files, calls <b>agent_review_open</b>", "→ stores round 1", "inbox badge; review opens full view", "<span class='mono'>powergit</span>: Round 1 opened", ""])}
+    ${S(["gets <span class='mono'>board: review-atlas-9c1e</span>, calls powerboard <b>read</b>(wait 3600)", "", "", "agent listening", ""])}
+    ${P("Talk, any time")}
+    ${S(["", "", "posts your question", "<span class='mono'>human</span>: c3 · TokenStore.cs:45 Why …?", "Comment → <b>Ask now</b>, or the Board box"])}
+    ${S(["read returns; answers with <b>post</b>; reads again", "", "shows the answer under line 45 and on the board", "<span class='mono'>auth-fix</span>: c3: The second caller …", "reads it"])}
+    ${P("Round")}
+    ${S(["", "", "writes verdicts to the review file, posts the round", "<span class='mono'>human</span>: Round 1 sent · 3 accepted, 1 rejected … (one line per comment)", "<b>Send round 1</b>"])}
+    ${S(["read returns the round; calls <b>agent_review_get</b> round=1 for exact ids if needed", "→ verdicts + comments (JSON)", "", "", ""])}
+    ${S(["fixes, calls <b>agent_review_revise</b> with replies", "→ stores round 2", "carried / revised / removed", "<span class='mono'>powergit</span>: Round 2 opened; replies posted by the agent", ""])}
+    ${P("Close")}
+    ${S(["read returns <i>approved</i>; commits; stops reading", "", "review closed, kept in the inbox", "<span class='mono'>human</span>: Approved · round 2 · 5 of 5", "<b>Approve all</b>"])}
+  </div>
+  <h3>Tools</h3>
+  <table class="tools"><tr><th>Server</th><th>Tool</th><th>Status</th><th>What it does</th></tr>
+    <tr><td>powergit</td><td class="mono">agent_review_open</td><td><b>changed</b></td><td>Opens the review (mode, title, why, base/head or worktree). Creates the board channel <span class="mono">review-&lt;repo&gt;-&lt;id&gt;</span>, posts "Round 1 opened", returns the channel name. <span class="mono">board</span> lets the agent pick the name.</td></tr>
+    <tr><td>powergit</td><td class="mono">agent_review_revise</td><td><b>new</b></td><td>Next round from the current worktree; replies per comment id. PowerGit posts "Round n opened".</td></tr>
+    <tr><td>powergit</td><td class="mono">agent_review_get</td><td><b>changed</b></td><td>Takes <span class="mono">round</span>; returns verdicts per change and comments with file, line and id. The board post is the readable copy, this is the exact one.</td></tr>
+    <tr><td>powergit</td><td class="mono">agent_review_wait</td><td>kept</td><td>For agents without powerboard: blocks until the round is sent, as today.</td></tr>
+    <tr><td>powerboard</td><td class="mono">read / post</td><td>exists</td><td>The agent waits on the channel and answers there. Nothing changes in powerboard.</td></tr>
+  </table>
+  <h3>What lands on the channel</h3>
+  <div class="two"><pre>[10:42] powergit
+Round 1 opened · review 9c1e · 3 files, 5 changes
+Fix the token refresh race
+
+[10:44] human
+c3 · src/Auth/TokenStore.cs:45
+Why check ExpiresAt here and not in the caller?
+
+[10:44] auth-fix
+c3: The second caller waits on the semaphore …
+
+[10:47] human
+Round 1 sent · review 9c1e · 3 accepted, 1 rejected,
+1 undecided, 2 comments
+Good fix. Two things inline.
+✗ h2  src/Auth/TokenStore.cs:64  c1  This writes the bearer
+      token to the log. Remove the line.
+? h4  src/Auth/RefreshLoop.cs:34  c2  RefreshAsync can return
+      null after a sign-out. Keep the check.
+✓ h1 h3 h5
+details: agent_review_get review_id=9c1e round=1</pre>
+<pre>// The agent's side, from the convention in
+// docs/agents/mcp-agent-review.md
+open = powergit.agent_review_open(mode="wait", title, why, base)
+loop:
+  msgs = powerboard.read(me="auth-fix",
+                         channel=open.board, wait_seconds=3600)
+  for m in msgs:
+    "Round n sent"  → fix, then
+                      powergit.agent_review_revise(review_id, replies)
+    "Approved"      → commit, stop
+    "Cancelled"     → stop
+    anything else from human → answer with powerboard.post
+
+// Who writes what on the channel
+//   powergit  events: opened, round n opened, closed
+//   human     you: questions, rounds, approve
+//             (PowerGit posts as human for you;
+//              powerboard post from a terminal works too)
+//   auth-fix  the agent</pre></div>`;
+}
+
+// ---- Questions -------------------------------------------------------------------
+function questions() {
+  return `<div class="q"><h3>1 · Full view</h3>The review and the inbox take the window except the rail; the repository tree and the bottom panel go while they are open. The rail always works. <b>Decided (owner picked A, which is full view).</b></div>
+  <div class="q"><h3>2 · Layout</h3>A: files, the diff with verdicts, the board column with the round controls. <b>Decided: A</b> (owner 2026-10-13).</div>
+  <div class="q"><h3>3 · How PowerGit talks to powerboard</h3>The engine reads and writes powerboard's SQLite file (board.db; WAL, busy timeout 10 s, as powerboard opens it) with a schema check; no Python needed. No board.db, or an unknown schema: the board column becomes the rounds list and agents use agent_review_wait. <b>Default.</b></div>
+  <div class="q"><h3>4 · Where the verdicts live</h3>The review file in the repository is the record (rounds, verdicts, comments, replies); the board has a readable copy and the conversation, and drops messages after 7 days. PowerGit copies the agent's replies into the review file as they arrive. <b>Default.</b></div>
+  <div class="q"><h3>5 · What Accept does to git</h3>Nothing: the agent commits. Staging the accepted changes is a later option. <b>Default.</b></div>
+  <div class="q"><h3>6 · How fine a decision is</h3>Review mode (v0.19) already marks each changed line ok or rejected. Accept / Reject on a change marks all its lines; single lines can still be marked with Space. A change whose lines disagree goes to the agent as <span class="mono">mixed</span> with the rejected lines listed. Comments are per line. <b>Default.</b></div>`;
+}
+
+// ---- Shell -------------------------------------------------------------------------
+const tabs = [
+  ["A", "A · Diff + board (picked)", optionA, "<b>A</b>: full view. Files, the diff with a verdict on each change, and the review's powerboard channel on the right. Try: post on the board, comment on a line with <b>Ask now</b>, switch to Round 2."],
+  ["inbox", "Inbox", inbox, "The list of reviews, full view. A click on a row opens it in A."],
+  ["states", "States", statesTab, "The other screens of A."],
+  ["full", "Full view", fullView, "Bottom panel or full view."],
+  ["C", "C · Board first (not picked)", optionC, "<b>C</b>, kept for the record: the channel is the page. Each \"Round opened\" post carries that round's changes."],
+  ["cad", "The cadence (MCP + powerboard)", cadence, "How a review moves between the agent, PowerGit, the board and you."],
+  ["q", "Decisions", questions, "Owner 2026-10-13: \"I'm okay for A. This is very good.\" The rest are the defaults the plan builds on; any of them can still change."],
+];
+function render() {
+  document.getElementById("tabs").innerHTML = tabs.map(([k, l]) => `<button role="tab" aria-selected="${state.tab === k}" data-tab="${k}">${l}</button>`).join("");
+  const tab = tabs.find(([k]) => k === state.tab);
+  document.getElementById("main").innerHTML = `<p class="note">${tab[3]}</p>${tab[2]()}`;
+  const feed = document.getElementById("feed");
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+const now = () => { const d = new Date(); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
+function agentAnswers(text) {
+  state.typing = true; render();
+  setTimeout(() => {
+    state.typing = false;
+    state.extra[state.round].push({ a: review.agentName, at: now(), text });
+    render();
+  }, 1400);
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-tab],[data-v],[data-c],[data-round],[data-file],[data-line],[data-save],[data-cancel],[data-say],[data-jump],[data-state],#theme");
+  if (!el) return;
+  const d = el.dataset, r = state.round;
+  if (el.id === "theme") {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    el.textContent = dark ? "Light" : "Dark";
+    return;
+  }
+  if (d.tab) state.tab = d.tab;
+  else if (d.state) state.stateView = d.state;
+  else if (d.v) state.verdict[d.h] = state.verdict[d.h] === d.v ? undefined : d.v;
+  else if (d.c) { const h = hunksOf(r).find((x) => x.id === d.c); const l = h.lines.find((x) => x[0] !== " "); state.picked = { h: h.id, line: l[2] ?? l[1] }; }
+  else if (d.round) { state.round = +d.round; state.picked = null; }
+  else if (d.file) state.file = d.file;
+  else if (d.line && e.target.classList.contains("n")) state.picked = { h: d.h, line: +d.line };
+  else if (d.cancel !== undefined) state.picked = null;
+  else if (d.save) {
+    const v = el.closest(".msg").querySelector("textarea").value.trim();
+    if (!v) return;
+    const h = hunksOf(r).find((x) => x.id === state.picked.h);
+    const id = `c${4 + state.extraComments[1].length + state.extraComments[2].length}`;
+    const c = { id, h: h.id, file: h.file, line: state.picked.line, kind: d.save, text: v };
+    state.extraComments[r].push(c);
+    state.picked = null;
+    if (d.save === "ask") {
+      state.extra[r].push({ a: "human", at: now(), ref: id, text: `${id} · ${h.file}:${c.line}\n${v}` });
+      agentAnswers(`${id}: Looking at line ${c.line} — I'll answer here, and fix it in the next round if it needs a change.`);
+      return;
+    }
+  } else if (d.say !== undefined) {
+    const v = document.getElementById("say").value.trim();
+    if (!v) return;
+    state.extra[r].push({ a: "human", at: now(), text: v });
+    agentAnswers("Got it. Answering on this channel; anything that changes code comes in the next round.");
+    return;
+  } else if (d.jump) {
+    const c = commentsOf(r).find((x) => x.id === d.jump);
+    if (!c) return;
+    state.tab = "A"; state.file = c.file; render();
+    document.getElementById(`hunk-${c.h}`)?.scrollIntoView({ block: "center" });
+    return;
+  } else return;
+  render();
+});
+render();
+</script>

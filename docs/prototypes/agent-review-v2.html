@@ -1,0 +1,485 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent review rounds</title>
+<style>
+  :root {
+    --page: #e3e7ee; --desk: #dfe4ec; --surface: #ffffff; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --faint: #8a94a3;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff;
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08);
+    --chip-bg: #eff6ff; --chip-fg: #2563eb;
+    --add-bg: #e6f7ec; --add-fg: #0f5132; --del-bg: #fdecec; --del-fg: #842029;
+    --ok: #059669; --ok-bg: #ecfdf5; --bad: #dc2626; --bad-bg: #fef2f2; --wait: #b45309; --wait-bg: #fffbeb;
+    --agent: #7c3aed; --agent-bg: #f5f3ff;
+    --card: 0 1px 2px rgba(16, 24, 39, 0.08);
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --page: #0c1117; --desk: #0e141b; --surface: #182029; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --faint: #6b7686;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220;
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12);
+    --chip-bg: #1f3a5f; --chip-fg: #bfdbfe;
+    --add-bg: #0f2e1d; --add-fg: #9be9b5; --del-bg: #3a1518; --del-fg: #f5b5b5;
+    --ok: #34d399; --ok-bg: #0b3d2e; --bad: #f87171; --bad-bg: #3a1518; --wait: #fbbf24; --wait-bg: #3a2a0a;
+    --agent: #a78bfa; --agent-bg: #2a2142;
+    --card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tabs button, .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.small { padding: 2px 8px; font-size: 12px; }
+  .btn.ok[aria-pressed="true"] { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); font-weight: 600; }
+  .btn.bad[aria-pressed="true"] { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
+  .spacer { flex: 1; }
+  main { padding: 0 16px 24px; }
+  .note { max-width: 980px; color: var(--text-2); margin: 4px 0 12px; }
+  .note b { color: var(--text); }
+
+  /* The window mock */
+  .win { display: grid; grid-template-columns: 44px 1fr; gap: 6px; background: var(--desk); padding: 6px; border-radius: 8px; border: 1px solid var(--border); min-height: 640px; }
+  .pane { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--card); min-width: 0; }
+  .rail { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+  .rail i { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; font-style: normal; color: var(--meta); position: relative; font-size: 14px; }
+  .rail i.on { background: var(--sel-bg); color: var(--sel-border); }
+  .rail i sup { position: absolute; top: -4px; right: -6px; background: var(--wait); color: #fff; border-radius: 8px; font-size: 10px; padding: 0 4px; line-height: 15px; }
+  .body { display: grid; gap: 6px; min-width: 0; }
+  .pad { padding: 10px 12px; }
+  .h { font-weight: 600; }
+  .meta { color: var(--meta); font-size: 12px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .chip { display: inline-block; border-radius: 10px; padding: 0 7px; font-size: 11px; line-height: 18px; background: var(--chip-bg); color: var(--chip-fg); white-space: nowrap; }
+  .chip.wait { background: var(--wait-bg); color: var(--wait); }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); }
+  .chip.bad { background: var(--bad-bg); color: var(--bad); }
+  .chip.agent { background: var(--agent-bg); color: var(--agent); }
+  .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+  /* Diff */
+  .hunk { border: 1px solid var(--border); border-radius: 6px; margin: 0 0 10px; overflow: hidden; background: var(--surface); }
+  .hunk.accept { border-color: var(--ok); }
+  .hunk.reject { border-color: var(--bad); }
+  .hunk.carried { opacity: .62; }
+  .hhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 8px; background: var(--sunken); border-bottom: 1px solid var(--border-soft); }
+  .hunk.accept .hhead { background: var(--ok-bg); }
+  .hunk.reject .hhead { background: var(--bad-bg); }
+  table.diff { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; }
+  table.diff td { padding: 0 6px; white-space: pre; vertical-align: top; }
+  table.diff td.n { width: 1%; color: var(--faint); text-align: right; user-select: none; cursor: pointer; }
+  table.diff tr:hover td.n::after { content: " +"; color: var(--primary); }
+  table.diff tr.add td.s { background: var(--add-bg); color: var(--add-fg); }
+  table.diff tr.del td.s { background: var(--del-bg); color: var(--del-fg); }
+  table.diff tr.picked td { box-shadow: inset 3px 0 0 var(--primary); }
+  .thread { margin: 4px 8px 8px 46px; border: 1px solid var(--border); border-radius: 6px; background: var(--sunken); font-family: "Segoe UI", system-ui, sans-serif; white-space: normal; }
+  .msg { padding: 6px 9px; border-top: 1px solid var(--border-soft); }
+  .msg:first-child { border-top: 0; }
+  .who { font-weight: 600; font-size: 12px; }
+  .who.agent { color: var(--agent); }
+  textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 5px; resize: vertical; min-height: 44px; }
+
+  /* Layout A */
+  .a-grid { display: grid; grid-template-columns: 230px minmax(0, 1fr) 270px; gap: 6px; }
+  .flist > div { padding: 6px 10px; border-bottom: 1px solid var(--border-soft); cursor: pointer; }
+  .flist > div.on { background: var(--sel-bg); }
+  .bar { height: 5px; border-radius: 3px; background: var(--border-soft); display: flex; overflow: hidden; margin-top: 4px; }
+  .bar span { display: block; }
+  .roundtabs { display: flex; gap: 4px; }
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .timeline li { padding: 6px 0 6px 14px; border-left: 2px solid var(--border); margin-left: 4px; position: relative; }
+  .timeline li::before { content: ""; position: absolute; left: -6px; top: 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+  .timeline li.now::before { background: var(--wait); }
+  .timeline li.done::before { background: var(--ok); }
+
+  /* Layout B */
+  .seg { display: flex; gap: 3px; }
+  .seg span { flex: 1; height: 8px; border-radius: 2px; background: var(--border); cursor: pointer; }
+  .seg span.accept { background: var(--ok); } .seg span.reject { background: var(--bad); } .seg span.cur { outline: 2px solid var(--primary); outline-offset: 1px; }
+  kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--sunken); }
+
+  /* Layout C */
+  .conv { max-width: 860px; margin: 0 auto; display: grid; gap: 10px; }
+  .bubble { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 10px 12px; }
+  .bubble.agent { border-left: 3px solid var(--agent); }
+  .bubble.you { border-left: 3px solid var(--primary); }
+
+  /* Cadence */
+  .seq { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seq .col { text-align: center; font-weight: 600; padding: 8px; background: var(--sunken); border-bottom: 1px solid var(--border); }
+  .seq .step { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border-soft); }
+  .seq .step div { padding: 6px 10px; min-height: 30px; }
+  .seq .arrow { position: relative; color: var(--text-2); }
+  table.tools { border-collapse: collapse; width: 100%; background: var(--surface); border: 1px solid var(--border); }
+  table.tools td, table.tools th { border-bottom: 1px solid var(--border-soft); padding: 6px 10px; text-align: left; vertical-align: top; }
+  pre { background: var(--sunken); border: 1px solid var(--border); border-radius: 6px; padding: 10px; overflow: auto; font-family: var(--mono); font-size: 12px; margin: 0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .q { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; max-width: 980px; }
+  .q h3 { margin: 0 0 6px; font-size: 14px; }
+  .q ul { margin: 4px 0 0; padding-left: 18px; }
+  @media (max-width: 1100px) { .a-grid { grid-template-columns: 1fr; } .two { grid-template-columns: 1fr; } .seq, .seq .step { font-size: 11px; } }
+  @media (max-width: 640px) { .win { grid-template-columns: 1fr; } .rail { flex-direction: row; justify-content: center; } }
+</style>
+
+<header>
+  <h1>Agent review — rounds, per-change decisions, comments back to the agent</h1>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <span class="spacer"></span>
+  <button class="btn" id="theme">Dark</button>
+</header>
+<main id="main"></main>
+
+<script>
+// ---- Data: one invented review, two rounds -------------------------------
+const review = {
+  title: "Fix the token refresh race",
+  why: "Two refreshes could run at once after a 401 and the second overwrote a fresh token with a stale one.",
+  agent: "Claude Code · atlas-auth-fix",
+  repo: "atlas", worktree: "C:/src/atlas-auth-fix", branch: "fix/refresh-race",
+  base: "4e1a9c07", mode: "Wait",
+};
+// lines: [type, oldNo, newNo, text]
+const hunks1 = [
+  { id: "h1", file: "src/Auth/TokenStore.cs", at: "@@ -40,9 +40,11 @@ public sealed class TokenStore", lines: [
+    [" ", 40, 40, "    public async Task<Token> RefreshAsync(CancellationToken ct)"],
+    [" ", 41, 41, "    {"],
+    ["-", 42, null, "        lock (_gate)"],
+    ["-", 43, null, "        {"],
+    ["+", null, 42, "        await _gate.WaitAsync(ct);"],
+    ["+", null, 43, "        try"],
+    ["+", null, 44, "        {"],
+    ["+", null, 45, "            if (_current.ExpiresAt > _clock.Now) return _current;"],
+    [" ", 44, 46, "            _current = await _client.RefreshAsync(_current, ct);"],
+    ["+", null, 47, "        }"],
+    ["+", null, 48, "        finally { _gate.Release(); }"],
+  ]},
+  { id: "h2", file: "src/Auth/TokenStore.cs", at: "@@ -61,6 +63,7 @@ public sealed class TokenStore", lines: [
+    [" ", 61, 63, "        _current = token;"],
+    ["+", null, 64, "        _log.LogInformation(\"Token refreshed: {Token}\", token.Value);"],
+    [" ", 62, 65, "        Changed?.Invoke(this, token);"],
+  ]},
+  { id: "h3", file: "src/Auth/RefreshLoop.cs", at: "@@ -18,7 +18,7 @@ internal sealed class RefreshLoop", lines: [
+    [" ", 18, 18, "    private static TimeSpan Backoff(int attempt) =>"],
+    ["-", 19, null, "        TimeSpan.FromSeconds(Math.Pow(2, attempt));"],
+    ["+", null, 19, "        TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, attempt)));"],
+  ]},
+  { id: "h4", file: "src/Auth/RefreshLoop.cs", at: "@@ -33,8 +33,6 @@ internal sealed class RefreshLoop", lines: [
+    [" ", 33, 33, "        var token = await _store.RefreshAsync(ct);"],
+    ["-", 34, null, "        if (token is null)"],
+    ["-", 35, null, "            return;"],
+    [" ", 36, 34, "        Schedule(token.ExpiresAt - Skew);"],
+  ]},
+  { id: "h5", file: "tests/Auth/RefreshTests.cs", at: "@@ -0,0 +1,9 @@", lines: [
+    ["+", null, 1, "[Fact]"],
+    ["+", null, 2, "public async Task Two_refreshes_after_a_401_call_the_server_once()"],
+    ["+", null, 3, "{"],
+    ["+", null, 4, "    var server = new FakeTokenServer(delay: TimeSpan.FromMilliseconds(50));"],
+    ["+", null, 5, "    var store = new TokenStore(server, Clock.Fixed);"],
+    ["+", null, 6, "    await Task.WhenAll(store.RefreshAsync(default), store.RefreshAsync(default));"],
+    ["+", null, 7, "    Assert.Equal(1, server.Calls);"],
+    ["+", null, 8, "}"],
+  ]},
+];
+// Round 2: h2 removed, h4 rewritten, the rest unchanged (decisions carried).
+const hunks2 = [
+  { ...hunks1[0], carried: "accept" },
+  { ...hunks1[2], carried: "accept" },
+  { id: "h4b", file: "src/Auth/RefreshLoop.cs", at: "@@ -33,8 +33,8 @@ internal sealed class RefreshLoop", revised: true, lines: [
+    [" ", 33, 33, "        var token = await _store.RefreshAsync(ct);"],
+    ["-", 34, null, "        if (token is null)"],
+    ["-", 35, null, "            return;"],
+    ["+", null, 34, "        if (token is null)"],
+    ["+", null, 35, "            return; // signed out while refreshing"],
+    [" ", 36, 36, "        Schedule(token.ExpiresAt - Skew);"],
+  ]},
+  { ...hunks1[4], carried: "accept" },
+];
+const threads1 = {
+  h2: [{ who: "you", line: 64, text: "This writes the bearer token to the log. Remove the line." }],
+  h4: [{ who: "you", line: 34, text: "RefreshAsync can return null after a sign-out. Keep the check." }],
+};
+const threads2 = {
+  h4b: [
+    { who: "you", line: 34, text: "RefreshAsync can return null after a sign-out. Keep the check." },
+    { who: "agent", text: "Restored. I removed it because RefreshAsync no longer returns null on the happy path; sign-out still does." },
+  ],
+};
+const removedInRound2 = [{ file: "src/Auth/TokenStore.cs", id: "h2", reply: "Removed the log line (round 1, line 64)." }];
+
+// ---- State ---------------------------------------------------------------
+const state = {
+  tab: "A", round: 1, file: null, cur: 0,
+  verdict: { h1: "accept", h3: "accept", h2: "reject" },  // round 1, partly decided
+  picked: null,
+};
+const hunksOf = (r) => (r === 1 ? hunks1 : hunks2);
+const threadsOf = (r) => (r === 1 ? threads1 : threads2);
+const decision = (h) => state.verdict[h.id] ?? h.carried ?? null;
+const files = (r) => [...new Set(hunksOf(r).map((h) => h.file))];
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function counts(r) {
+  const hs = hunksOf(r);
+  const a = hs.filter((h) => decision(h) === "accept").length;
+  const x = hs.filter((h) => decision(h) === "reject").length;
+  const c = Object.values(threadsOf(r)).reduce((n, t) => n + t.filter((m) => m.who === "you").length, 0);
+  return { a, x, open: hs.length - a - x, c, n: hs.length };
+}
+
+// ---- Pieces --------------------------------------------------------------
+function verdictButtons(h) {
+  const d = decision(h);
+  return `<button class="btn small ok" data-v="accept" data-h="${h.id}" aria-pressed="${d === "accept"}">✓ Accept</button>
+    <button class="btn small bad" data-v="reject" data-h="${h.id}" aria-pressed="${d === "reject"}">✗ Reject</button>
+    <button class="btn small" data-c="${h.id}">Comment</button>`;
+}
+function threadHtml(h) {
+  const t = threadsOf(state.round)[h.id] ?? [];
+  const draft = state.picked && state.picked.h === h.id;
+  if (!t.length && !draft) return "";
+  const msgs = t.map((m) => `<div class="msg"><div class="who ${m.who}">${m.who === "you" ? "You" : "Agent"}${m.line ? ` <span class="meta">· line ${m.line}</span>` : ""}</div>${esc(m.text)}</div>`).join("");
+  const box = draft ? `<div class="msg"><div class="who">You <span class="meta">· line ${state.picked.line}</span></div><textarea placeholder="Comment to the agent"></textarea><div class="row" style="margin-top:4px"><button class="btn small primary" data-save="${h.id}">Add</button><button class="btn small" data-cancel>Cancel</button></div></div>` : "";
+  return `<tr><td colspan="3"><div class="thread">${msgs}${box}</div></td></tr>`;
+}
+function hunkHtml(h, opts = {}) {
+  const d = decision(h);
+  const cls = [d, h.carried && !state.verdict[h.id] ? "carried" : ""].join(" ");
+  const tag = h.carried ? `<span class="chip ok">accepted in round 1 · unchanged</span>` : h.revised ? `<span class="chip agent">revised in round 2</span>` : "";
+  const rows = h.lines.map(([t, o, n, s]) => {
+    const line = n ?? o;
+    const picked = state.picked && state.picked.h === h.id && state.picked.line === line;
+    return `<tr class="${t === "+" ? "add" : t === "-" ? "del" : ""} ${picked ? "picked" : ""}" data-line="${line}" data-h="${h.id}"><td class="n">${o ?? ""}</td><td class="n">${n ?? ""}</td><td class="s">${t}${esc(s)}</td></tr>`;
+  }).join("");
+  return `<div class="hunk ${cls}">
+    <div class="hhead">${opts.file ? `<span class="mono h">${h.file}</span>` : ""}<span class="mono meta ell">${esc(h.at)}</span>${tag}<span class="spacer"></span>${verdictButtons(h)}</div>
+    <table class="diff">${rows}${threadHtml(h)}</table></div>`;
+}
+function rail() {
+  return `<nav class="pane rail"><i title="History">⎇</i><i title="Commit">✎</i><i title="Recent">▤</i><i class="on" title="Agent reviews">⚑<sup>2</sup></i><span class="spacer"></span><i title="Settings">⚙</i></nav>`;
+}
+function submitLabel(r) {
+  const c = counts(r);
+  if (c.open === 0 && c.x === 0) return `Approve all (${c.n})`;
+  return `Send round ${r} to the agent`;
+}
+function submitSummary(r) {
+  const c = counts(r);
+  return `<span class="chip ok">${c.a} accepted</span> <span class="chip bad">${c.x} rejected</span> <span class="chip">${c.c} comment${c.c === 1 ? "" : "s"}</span> ${c.open ? `<span class="chip wait">${c.open} undecided</span>` : ""}`;
+}
+function roundTabs() {
+  return `<div class="roundtabs">${[1, 2].map((r) => `<button class="btn small ${state.round === r ? "primary" : ""}" data-round="${r}">Round ${r}${r === 2 ? " · after your comments" : ""}</button>`).join("")}</div>`;
+}
+function header() {
+  return `<div class="pane pad"><div class="row"><span class="h">${review.title}</span><span class="chip wait">${review.mode} · agent is waiting 3 min</span><span class="spacer"></span>${roundTabs()}</div>
+    <div class="meta" style="margin-top:4px">${review.agent} · <span class="mono">${review.branch}</span> · ${review.worktree} · base <span class="mono">${review.base}</span></div>
+    <div style="margin-top:4px">${review.why}</div></div>`;
+}
+
+// ---- Layout A: the diff with a verdict per change -------------------------
+function layoutA() {
+  const r = state.round, fs = files(r);
+  if (!fs.includes(state.file)) state.file = fs[0];
+  const flist = fs.map((f) => {
+    const hs = hunksOf(r).filter((h) => h.file === f);
+    const a = hs.filter((h) => decision(h) === "accept").length, x = hs.filter((h) => decision(h) === "reject").length;
+    const pct = (k) => (100 * k) / hs.length;
+    return `<div class="${f === state.file ? "on" : ""}" data-file="${f}"><div class="row"><span class="mono ell">${f.split("/").pop()}</span><span class="spacer"></span><span class="meta">${a + x}/${hs.length}</span></div>
+      <div class="meta ell">${f}</div><div class="bar"><span style="width:${pct(a)}%;background:var(--ok)"></span><span style="width:${pct(x)}%;background:var(--bad)"></span></div></div>`;
+  }).join("");
+  const removed = r === 2 ? removedInRound2.filter((x) => x.file === state.file).map((x) => `<div class="hunk carried"><div class="hhead"><span class="chip ok">your rejection applied</span><span class="meta">${x.reply}</span></div></div>`).join("") : "";
+  const diff = hunksOf(r).filter((h) => h.file === state.file).map((h) => hunkHtml(h)).join("") + removed;
+  const tl = `<ul class="timeline">
+      <li class="done"><b>Round 1 opened</b><div class="meta">agent_review_open · 3 files · 5 changes</div></li>
+      <li class="${r === 1 ? "now" : "done"}"><b>${r === 1 ? "Waiting for you" : "You sent round 1"}</b><div class="meta">${r === 1 ? "agent_review_wait is blocking" : "3 accepted · 2 rejected · 2 comments"}</div></li>
+      ${r === 2 ? `<li class="done"><b>Round 2 from the agent</b><div class="meta">agent_review_revise · 2 replies</div></li><li class="now"><b>Waiting for you</b><div class="meta">3 carried · 1 revised · 1 removed</div></li>` : `<li><b>Round 2</b><div class="meta">after the agent revises</div></li>`}
+    </ul>`;
+  return `<div class="win">${rail()}<div class="body">${header()}
+    <div class="a-grid">
+      <div class="pane flist"><div class="pad meta">Files · round ${r}</div>${flist}</div>
+      <div class="pane pad" style="overflow:auto">${diff}
+        <div class="meta">Click a line number to comment on that line. Each change (hunk) takes a verdict; unchanged accepted changes stay accepted in the next round.</div></div>
+      <div class="pane pad" style="display:grid;gap:10px;align-content:start">
+        <div><div class="h">Rounds</div>${tl}</div>
+        <div><div class="h">Note to the agent</div><textarea placeholder="Optional summary sent with the round"></textarea></div>
+        <div>${submitSummary(r)}</div>
+        <button class="btn primary">${submitLabel(r)}</button>
+        <div class="row"><button class="btn small">Approve all</button><button class="btn small">Reject all</button><span class="spacer"></span><button class="btn small">Cancel review</button></div>
+        <div class="meta">Undecided changes go back as undecided. The agent gets the verdicts, the comments and their line numbers.</div>
+      </div>
+    </div></div></div>`;
+}
+
+// ---- Layout B: one change at a time --------------------------------------
+function layoutB() {
+  const r = state.round, hs = hunksOf(r);
+  state.cur = Math.min(state.cur, hs.length - 1);
+  const h = hs[state.cur];
+  const seg = hs.map((x, i) => `<span class="${decision(x) ?? ""} ${i === state.cur ? "cur" : ""}" data-go="${i}" title="${x.file}"></span>`).join("");
+  return `<div class="win">${rail()}<div class="body">${header()}
+    <div class="pane pad">
+      <div class="row"><span class="meta">Change ${state.cur + 1} of ${hs.length}</span><span class="spacer"></span>${submitSummary(r)}</div>
+      <div class="seg" style="margin:8px 0 12px">${seg}</div>
+      <div class="row" style="margin-bottom:6px"><span class="mono h">${h.file}</span></div>
+      ${hunkHtml(h)}
+      <div class="row" style="margin-top:8px;flex-wrap:wrap">
+        <button class="btn" data-go="${Math.max(0, state.cur - 1)}">← Previous</button>
+        <button class="btn" data-go="${Math.min(hs.length - 1, state.cur + 1)}">Next →</button>
+        <span class="meta"><kbd>A</kbd> accept · <kbd>R</kbd> reject · <kbd>C</kbd> comment · <kbd>J</kbd>/<kbd>K</kbd> next/previous · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> send</span>
+        <span class="spacer"></span><button class="btn primary">${submitLabel(r)}</button>
+      </div>
+    </div></div></div>`;
+}
+
+// ---- Layout C: the conversation -------------------------------------------
+function layoutC() {
+  const r1 = hunks1.map((h) => {
+    const d = decision(h);
+    return `<details ${d ? "" : "open"}><summary class="row" style="cursor:pointer;padding:3px 0"><span class="mono ell">${h.file}</span><span class="meta mono ell">${esc(h.at.split(" @@")[0])}</span><span class="spacer"></span>${d ? `<span class="chip ${d === "accept" ? "ok" : "bad"}">${d === "accept" ? "accepted" : "rejected"}</span>` : `<span class="chip wait">undecided</span>`}</summary>${hunkHtml({ ...h })}</details>`;
+  }).join("");
+  return `<div class="win">${rail()}<div class="body">
+    <div class="pane pad"><div class="row"><span class="h">${review.title}</span><span class="chip wait">${review.mode} · agent is waiting</span><span class="spacer"></span><span class="meta">${review.agent}</span></div></div>
+    <div class="pane pad" style="overflow:auto"><div class="conv">
+      <div class="bubble agent"><div class="row"><span class="who agent">Agent</span><span class="meta">round 1 · 10:42 · 3 files, 5 changes</span></div>
+        <p style="margin:6px 0">${review.why}</p>${r1}</div>
+      <div class="bubble you"><div class="row"><span class="who">You</span><span class="meta">draft</span><span class="spacer"></span>${submitSummary(1)}</div>
+        <textarea style="margin-top:6px" placeholder="Note to the agent">Good fix. Two things inline.</textarea>
+        <div class="row" style="margin-top:6px"><span class="spacer"></span><button class="btn primary">Send round 1</button></div></div>
+      <div class="bubble agent" style="opacity:.55"><div class="row"><span class="who agent">Agent</span><span class="meta">round 2 appears here when the agent revises</span></div></div>
+    </div></div></div></div>`;
+}
+
+// ---- The cadence (MCP) -----------------------------------------------------
+function cadence() {
+  const steps = [
+    ["changes files in its worktree, then calls <b>agent_review_open</b>", "→ forwards to PowerGit", "session + round 1 stored under .powergit/agent-reviews/; inbox badge", ""],
+    ["calls <b>agent_review_wait</b> (blocks, Wait mode)", "→ long poll", "shows round 1, 'agent is waiting'", "reads; accepts / rejects each change; comments on lines"],
+    ["", "", "← round 1 decisions written", "clicks <b>Send round 1</b>"],
+    ["wait returns: <span class='mono'>changes_requested</span>, verdict per change, comments with file + line", "← result", "", ""],
+    ["reverts rejected changes, fixes commented lines, calls <b>agent_review_revise</b> with a reply per comment", "→", "round 2: carried, revised and removed changes; replies in the threads", ""],
+    ["calls <b>agent_review_wait</b> again", "→", "", "decides what is left; <b>Approve all</b>"],
+    ["wait returns <span class='mono'>approved</span>; agent commits (or PowerGit stages the accepted changes, see question 2)", "← result", "session closed, kept in the inbox as approved", ""],
+  ];
+  return `<div class="note">The agent drives the rounds; PowerGit shows them and collects your decisions. Nothing new on the transport: the same <span class="mono">powergit mcp</span> pipe as v0.20.1. Tools marked <b>new</b> or <b>changed</b> are what this concept adds.</div>
+  <div class="seq"><div class="col">Agent</div><div class="col">powergit mcp</div><div class="col">PowerGit</div><div class="col">You</div>
+    ${steps.map((s) => `<div class="step">${s.map((c) => `<div>${c}</div>`).join("")}</div>`).join("")}</div>
+  <h3>Tools</h3>
+  <table class="tools"><tr><th>Tool</th><th>Status</th><th>What it does</th></tr>
+    <tr><td class="mono">agent_review_open</td><td>exists</td><td>Opens a session (mode, title, why, base/head or worktree, files). Becomes round 1.</td></tr>
+    <tr><td class="mono">agent_review_wait</td><td><b>changed</b></td><td>Blocks until you send a round. Returns the verdict per change and comments with file, line and change id, not only the session status.</td></tr>
+    <tr><td class="mono">agent_review_revise</td><td><b>new</b></td><td>Opens the next round of the same session from the current worktree. Carries replies to your comments. Unchanged accepted changes stay accepted.</td></tr>
+    <tr><td class="mono">agent_review_get / _list</td><td>exists</td><td>Read a session / the list.</td></tr>
+    <tr><td class="mono">agent_review_cancel</td><td>exists</td><td>The agent drops the review.</td></tr>
+  </table>
+  <h3>What the agent gets back from wait</h3>
+  <div class="two"><pre>{
+  "review_id": "9c1e…",
+  "round": 1,
+  "status": "changes_requested",
+  "note": "Good fix. Two things inline.",
+  "changes": [
+    { "id": "h1", "file": "src/Auth/TokenStore.cs",
+      "new_lines": [42, 48], "verdict": "accept" },
+    { "id": "h2", "file": "src/Auth/TokenStore.cs",
+      "new_lines": [64, 64], "verdict": "reject" },
+    { "id": "h3", "file": "src/Auth/RefreshLoop.cs",
+      "new_lines": [19, 19], "verdict": "accept" },
+    { "id": "h4", "file": "src/Auth/RefreshLoop.cs",
+      "new_lines": [34, 34], "verdict": "undecided" },
+    { "id": "h5", "file": "tests/Auth/RefreshTests.cs",
+      "new_lines": [1, 8], "verdict": "accept" }
+  ],
+  "comments": [
+    { "id": "c1", "change": "h2", "line": 64,
+      "body": "This writes the bearer token to the log. Remove the line." },
+    { "id": "c2", "change": "h4", "line": 34,
+      "body": "RefreshAsync can return null after a sign-out. Keep the check." }
+  ]
+}</pre><pre>// agent → agent_review_revise
+{
+  "review_id": "9c1e…",
+  "note": "Removed the log line, restored the null check.",
+  "replies": [
+    { "comment": "c1", "body": "Removed." },
+    { "comment": "c2", "body": "Restored. I removed it because …" }
+  ]
+}
+
+// Change identity across rounds:
+//  same file + same patch text  → carried,
+//      keeps its verdict (shown faded)
+//  same file, overlapping lines → revised,
+//      verdict reset, thread kept
+//  gone                         → removed,
+//      shown as "your rejection applied"</pre></div>`;
+}
+
+// ---- Questions ---------------------------------------------------------------
+function questions() {
+  return `<div class="q"><h3>1 · Which layout?</h3>A keeps the diff in front (as in today's session view) and the rounds on the right. B is the fastest for many small changes, keyboard first. C reads as a conversation with the agent and shows the rounds best, but long diffs push everything down. <b>My pick: A</b>, with B's keys (A / R / C / J / K) inside it.</div>
+  <div class="q"><h3>2 · What does Accept do to git?</h3><ul>
+    <li><b>Nothing</b>: decisions only go back to the agent; the agent commits. Simplest, and git stays in the agent's hands.</li>
+    <li><b>Stage</b>: Approve stages the accepted changes in that worktree (git apply --cached), so the agent commits exactly what you accepted.</li>
+    <li><b>Commit</b>: PowerGit commits the accepted changes itself.</li></ul><b>My pick: Nothing in v1, Stage as a later option</b>.</div>
+  <div class="q"><h3>3 · How fine is a decision?</h3>Per change (a git hunk), with comments per line. Per-line verdicts are possible (split a hunk on a selection) but every line then needs an id the agent can map back. <b>My pick: per hunk, comments per line</b>.</div>
+  <div class="q"><h3>4 · Notify mode</h3>Notify sessions (the agent does not wait) show the same view with verdicts but no Send button; your decisions and comments are there when the agent next calls agent_review_get. Or Notify stays read-only with Ack only. <b>My pick: same view, Send hidden</b>.</div>
+  <div class="q"><h3>Out of scope here</h3>The protect list, remote or cloud agents, GitHub PR sync, several reviewers — as in the v0.20 plan.</div>`;
+}
+
+// ---- Shell -----------------------------------------------------------------
+const tabs = [
+  ["cad", "The cadence (MCP)", cadence, "How a review moves between the agent and you."],
+  ["A", "A · Diff with verdicts", layoutA, "<b>A</b>: today's session view, extended. Files left, the diff with a verdict bar on every change and threads under the lines, rounds and Send on the right. Switch rounds at the top right to see round 2."],
+  ["B", "B · One change at a time", layoutB, "<b>B</b>: a queue. One change fills the pane; accept, reject or comment and the next one comes up. The strip at the top is every change, coloured by verdict."],
+  ["C", "C · Conversation", layoutC, "<b>C</b>: the review as a thread. Each round is a message from the agent with its changes inside; your round is a reply."],
+  ["q", "Questions", questions, "Four decisions before building."],
+];
+function render() {
+  document.getElementById("tabs").innerHTML = tabs.map(([k, l]) => `<button role="tab" aria-selected="${state.tab === k}" data-tab="${k}">${l}</button>`).join("");
+  const t = tabs.find(([k]) => k === state.tab);
+  document.getElementById("main").innerHTML = `<p class="note">${t[3]}</p>${t[2]()}`;
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-tab],[data-v],[data-c],[data-round],[data-file],[data-go],[data-line],[data-save],[data-cancel],#theme");
+  if (!el) return;
+  const d = el.dataset;
+  if (el.id === "theme") {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    el.textContent = dark ? "Light" : "Dark";
+    return;
+  }
+  if (d.tab) state.tab = d.tab;
+  else if (d.v) state.verdict[d.h] = state.verdict[d.h] === d.v ? undefined : d.v;
+  else if (d.c) { const h = hunksOf(state.round).find((x) => x.id === d.c); const l = h.lines.find((x) => x[0] !== " "); state.picked = { h: h.id, line: l[2] ?? l[1] }; }
+  else if (d.round) { state.round = +d.round; state.picked = null; }
+  else if (d.file) state.file = d.file;
+  else if (d.go !== undefined) state.cur = +d.go;
+  else if (d.line && e.target.classList.contains("n")) state.picked = { h: d.h, line: +d.line };
+  else if (d.save) { const v = el.closest(".msg").querySelector("textarea").value.trim(); if (v) (threadsOf(state.round)[d.save] ??= []).push({ who: "you", line: state.picked.line, text: v }); state.picked = null; }
+  else if (d.cancel !== undefined) state.picked = null;
+  else return;
+  render();
+});
+document.addEventListener("keydown", (e) => {
+  if (state.tab !== "B" || e.target.tagName === "TEXTAREA") return;
+  const hs = hunksOf(state.round), h = hs[state.cur];
+  const k = e.key.toLowerCase();
+  if (k === "a") { state.verdict[h.id] = "accept"; state.cur = Math.min(hs.length - 1, state.cur + 1); }
+  else if (k === "r") { state.verdict[h.id] = "reject"; state.cur = Math.min(hs.length - 1, state.cur + 1); }
+  else if (k === "j") state.cur = Math.min(hs.length - 1, state.cur + 1);
+  else if (k === "k") state.cur = Math.max(0, state.cur - 1);
+  else if (k === "c") { const l = h.lines.find((x) => x[0] !== " "); state.picked = { h: h.id, line: l[2] ?? l[1] }; }
+  else return;
+  render();
+});
+render();
+</script>
