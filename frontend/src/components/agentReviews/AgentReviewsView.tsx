@@ -1,66 +1,63 @@
-import CloseIcon from "@mui/icons-material/Close"
-import RefreshIcon from "@mui/icons-material/Refresh"
 import Box from "@mui/material/Box"
-import IconButton from "@mui/material/IconButton"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
-import { useEffect, useState } from "react"
-import type { AgentReview, AgentReviewSummary, EngineClient } from "../../engine"
-import { getAgentReview } from "../../engine/agentReviews"
-import { AgentReviewList } from "./AgentReviewList"
-import { AgentReviewSession } from "./AgentReviewSession"
+import type { AgentReviewSummary, EngineClient } from "../../engine"
+import { useAgentReviewSession } from "../../hooks/useAgentReviewSession"
 import { paneSx } from "../../theme/panels"
+import { AgentReviewInbox } from "./AgentReviewInbox"
+import { AgentReviewSession } from "./AgentReviewSession"
+import { ReviewScreen } from "./ReviewScreen"
+
+// The agent reviews take the whole window except the rail (v0.21.3, owner
+// 2026-10-13: "should we go full view instead of just the bottom panels?"):
+// the inbox, or one review. A review opened before v0.21 (version 1, no
+// rounds) keeps the v0.20 session view.
 
 export function AgentReviewsView({
   engine,
-  sessions,
-  sessionId,
-  refresh,
-  onOpen,
-  onList,
+  page,
+  inbox,
   onClose,
 }: {
   engine: EngineClient
-  sessions: AgentReviewSummary[]
-  sessionId: string | null
-  refresh: () => Promise<void>
-  onOpen: (id: string) => void
-  onList: () => void
+  page: { sessionId: string | null; openSession: (id: string) => void; openList: () => void }
+  inbox: { sessions: AgentReviewSummary[]; refresh: () => Promise<void> }
   onClose: () => void
 }) {
-  const [session, setSession] = useState<AgentReview | null>(null)
-  useEffect(() => {
-    setSession(null)
-    if (!sessionId) return
-    const ctrl = new AbortController()
-    void getAgentReview(engine, sessionId, ctrl.signal).then((value) => !ctrl.signal.aborted && setSession(value))
-    return () => ctrl.abort()
-  }, [engine, sessionId])
-  const resolved = () => {
-    onList()
-    void refresh()
-  }
+  const { sessionId, openSession: onOpen, openList: onList } = page
+  const { sessions, refresh } = inbox
+  const { session, reload } = useAgentReviewSession(engine, sessionId)
+  const changed = () => void refresh()
   return (
-    <Paper
-      data-testid="agent-reviews-view"
-      sx={{ ...paneSx, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
-    >
-      <Box sx={{ height: 44, px: 1.5, display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider" }}>
-        <Typography sx={{ fontWeight: 600, flex: 1 }}>
-          Agent reviews {sessions.length > 0 && `(${sessions.length})`}
-        </Typography>
-        <IconButton aria-label="Refresh agent reviews" onClick={() => void refresh()}>
-          <RefreshIcon />
-        </IconButton>
-        <IconButton aria-label="Close agent reviews" onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      {sessionId && session ? (
-        <AgentReviewSession session={session} engine={engine} onBack={onList} onResolved={resolved} />
+    <Box data-testid="agent-reviews-view" sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex" }}>
+      {!sessionId ? (
+        <AgentReviewInbox sessions={sessions} onOpen={onOpen} onRefresh={() => void refresh()} onClose={onClose} />
+      ) : !session ? (
+        <Paper sx={{ ...paneSx, flex: 1, p: 3 }}>
+          <Typography color="text.secondary">Loading the review…</Typography>
+        </Paper>
+      ) : session.rounds && session.rounds.length > 0 ? (
+        <ReviewScreen
+          key={session.id}
+          engine={engine}
+          session={session}
+          reload={reload}
+          onBack={onList}
+          onChanged={changed}
+        />
       ) : (
-        <AgentReviewList sessions={sessions} onOpen={onOpen} />
+        <Paper sx={{ ...paneSx, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <AgentReviewSession
+            session={session}
+            engine={engine}
+            onBack={onList}
+            onResolved={() => {
+              onList()
+              changed()
+            }}
+          />
+        </Paper>
       )}
-    </Paper>
+    </Box>
   )
 }

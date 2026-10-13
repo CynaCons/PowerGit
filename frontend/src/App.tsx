@@ -171,7 +171,7 @@ export default function App({ base }: { base: EngineClient }) {
     selectRow: (i: number) => setSelectedSha(rows[i]?.rev.id ?? null),
     openStash: () => open({ kind: "stash" }),
     openRepo: () => void openFolder(),
-    openRecents: () => startPane.toggle(),
+    openRecents: () => (agentReviewsPage.close(), startPane.toggle()),
     openSettings: settings.toggle,
     openSnapshot: () => void takeDiagnosticSnapshot(),
     recover: () => setRecoveryOpen(true),
@@ -195,6 +195,7 @@ export default function App({ base }: { base: EngineClient }) {
     openAgentReviews: () => {
       fileHistory.close()
       settings.close()
+      startPane.close()
       agentReviewsPage.openList()
     },
     closeAgentReviews: () => {
@@ -313,6 +314,13 @@ export default function App({ base }: { base: EngineClient }) {
             <Box ref={contentRef} className="pg-desk-row" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
               {settings.open ? (
                 <SettingsView onClose={settings.close} />
+              ) : agentReviewsPage.open && !startPane.open ? (
+                <AgentReviewsView
+                  engine={client}
+                  page={agentReviewsPage}
+                  inbox={agentReviews}
+                  onClose={chrome.closeAgentReviews}
+                />
               ) : leftOpen ? (
                 <RepoTree
                   tree={refs}
@@ -331,20 +339,10 @@ export default function App({ base }: { base: EngineClient }) {
               ) : (
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
-              {!settings.open && (
+              {!settings.open && !(agentReviewsPage.open && !startPane.open) && (
                 <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
                   {startPane.open ? (
                     <StartPaneView session={session} repoState={repoState} onClose={startPane.close} />
-                  ) : agentReviewsPage.open ? (
-                    <AgentReviewsView
-                      engine={client}
-                      sessions={agentReviews.sessions}
-                      sessionId={agentReviewsPage.sessionId}
-                      refresh={agentReviews.refresh}
-                      onOpen={agentReviewsPage.openSession}
-                      onList={agentReviewsPage.openList}
-                      onClose={chrome.closeAgentReviews}
-                    />
                   ) : fileHistory.target ? (
                     <FileHistoryView
                       target={fileHistory.target}

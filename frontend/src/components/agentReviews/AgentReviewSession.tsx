@@ -15,7 +15,7 @@ import { DiffTab } from "../DiffTab"
 import type { Loadable } from "../loadable"
 import { ReviewBar } from "../ReviewBar"
 import { ConfirmDialog } from "../dialogs/ConfirmDialog"
-import { ModeChip, StatusChip } from "./AgentReviewList"
+import { ModeChip, StatusChip } from "./AgentReviewChips"
 import { RequestChangesDialog } from "./RequestChangesDialog"
 
 export function AgentReviewSession({

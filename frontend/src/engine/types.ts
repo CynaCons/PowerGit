@@ -139,6 +139,8 @@ export type DiffDto = {
 }
 
 export type AgentReviewStatus = "pending" | "approved" | "changes_requested" | "cancelled" | "expired"
+/** Whose move it is in a review with rounds (v0.21.1); null once it is closed. */
+export type AgentReviewTurn = "user" | "agent" | null
 export type AgentReviewSummary = {
   id: string
   mode: "notify" | "wait"
@@ -150,20 +152,78 @@ export type AgentReviewSummary = {
   unread: boolean
   createdAt: string
   updatedAt: string
+  /** v0.21.1+: the latest round and whose turn it is; v0.21.2: the board channel and the agent's last read of it. */
+  round?: number
+  turn?: AgentReviewTurn
+  board?: string | null
+  lastRead?: string | null
 }
-export type AgentReview = Omit<AgentReviewSummary, "fileCount"> & {
-  version: 1
+export type AgentReviewFile = { path: string; status: string; patch: string | null }
+export type AgentReviewVerdict = "accept" | "reject" | "mixed" | "undecided"
+/** One change (a diff hunk) of a round, docs/design/agent-review-rounds.md §3. */
+export type AgentReviewChange = {
+  id: string
+  path: string
+  oldStart: number
+  oldLines: number
+  newStart: number
+  newLines: number
+  hash: string
+  origin: "new" | "carried" | "revised"
+  from: string | null
+  verdict: AgentReviewVerdict
+  rejectedLines: string[] | null
+}
+export type AgentReviewRound = {
+  n: number
+  openedAt: string
+  sentAt: string | null
+  note: string | null
+  files: AgentReviewFile[]
+  changes: AgentReviewChange[]
+  removed: string[]
+}
+export type AgentReviewReply = { author: string; body: string; at: string; boardId: number | null }
+export type AgentReviewThread = {
+  id: string
+  round: number
+  change: string | null
+  path: string
+  line: string
+  body: string
+  kind: "round" | "ask"
+  postedAt: string
+  replies: AgentReviewReply[]
+}
+export type AgentReview = Omit<AgentReviewSummary, "fileCount" | "round" | "turn" | "lastRead"> & {
+  version: 1 | 2
   why: string
   base: string | null
   head: string | null
   worktree: boolean
-  files: { path: string; status: string; patch: string | null }[]
+  files: AgentReviewFile[]
   resolvedAt: string | null
   resolution: {
     summary: string | null
     comments: { path: string; line: string; side: "new" | "old"; body: string }[]
   } | null
   reason: string | null
+  /** Version 2 (v0.21.1): null on a version-1 session. */
+  board?: string | null
+  boardCursor?: number
+  rounds?: AgentReviewRound[] | null
+  comments?: AgentReviewThread[] | null
+}
+export type BoardMessage = { id: number; author: string; text: string; at: string }
+/** v0.21.2: a review's powerboard channel; `reading` while the agent's last read is under 15 s old. */
+export type AgentReviewBoard = {
+  available: boolean
+  channel: string | null
+  reason: string | null
+  messages: BoardMessage[]
+  agent: string | null
+  lastRead: string | null
+  reading: boolean
 }
 export type AgentReviewList = { sessions: AgentReviewSummary[]; badge: number }
 /** v0.16.0: the two index bits Git Extensions shows as check marks. A file git

@@ -101,9 +101,14 @@ test.describe("agent reviews", () => {
       await page.getByTestId("agent-review-request-changes").click()
       await page.getByTestId("agent-review-summary").fill("Guard the null case")
       await page.getByTestId("agent-review-send").click()
+      // v0.21.3: the inbox starts on what waits for the owner; a resolved review is under All.
+      await page.getByTestId("inbox-filter-all").click()
       await expect(
-        page.getByTestId("agent-review-row").filter({ hasText: "Guard the parser" }).getByTestId("agent-review-status"),
-      ).toHaveText("Changes requested")
+        page
+          .getByTestId("agent-review-row")
+          .filter({ hasText: "Guard the parser" })
+          .getByTestId("agent-review-turn-label"),
+      ).toHaveText("changes requested")
       const changed = JSON.parse(readFileSync(join(folder, `${changeId}.json`), "utf8"))
       expect(changed.status).toBe("changes_requested")
       expect(changed.resolution).toEqual({

@@ -96,6 +96,11 @@ export type Tokens = {
     rejectedBg: string
     /** = selectionBg */
     cursorBg: string
+    /** Agent review rounds (v0.21.3): an accepted change, and what the agent wrote. */
+    accept: string
+    acceptBg: string
+    agent: string
+    agentBg: string
   }
   graph: {
     /** Git Extensions AppColor.GraphBranch1–7 (light) — parity, do not tune. */
@@ -179,6 +184,10 @@ export const light: Tokens = {
     rejected: "#d3000B",
     rejectedBg: "rgba(211, 0, 11, 0.10)",
     cursorBg: "#dbeafe",
+    accept: "#047857",
+    acceptBg: "rgba(5, 150, 105, 0.10)",
+    agent: "#7c3aed",
+    agentBg: "rgba(124, 58, 237, 0.08)",
   },
   graph: {
     lanes: ["#f064a0", "#78b4e6", "#24c221", "#a078f0", "#dd3228", "#1ac6a6", "#e7b00f"],
@@ -261,6 +270,10 @@ export const dark: Tokens = {
     rejected: "#ff8a80",
     rejectedBg: "rgba(255, 138, 128, 0.14)",
     cursorBg: "#1f3a5f",
+    accept: "#34d399",
+    acceptBg: "rgba(52, 211, 153, 0.14)",
+    agent: "#a78bfa",
+    agentBg: "rgba(167, 139, 250, 0.14)",
   },
   graph: {
     // Same hues as the GE set, lifted where a lane fell under 3:1 against
@@ -358,6 +371,10 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-review-rejected": t.review.rejected,
     "--pg-review-rejected-bg": t.review.rejectedBg,
     "--pg-review-cursor-bg": t.review.cursorBg,
+    "--pg-review-accept": t.review.accept,
+    "--pg-review-accept-bg": t.review.acceptBg,
+    "--pg-agent": t.review.agent,
+    "--pg-agent-bg": t.review.agentBg,
     "--pg-lane-non-relative": t.graph.nonRelative,
     "--pg-lane-head": t.graph.headOutline,
     "--pg-row-height": `${metrics.rowHeight}px`,
