@@ -987,15 +987,16 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Owner tick: graph scrolling on Linux is smooth.
 - [x] Release v0.20.9 at the owner's call ("yes release it"), with the Linux tick open: vitest 495, e2e 195, @grid 2, resolution 20, zip smoke.
 
-### v0.20.10 — Recent repositories, third pass — Open folder opens the history; a new picker design (current) (ACTIVE)
+### v0.20.10 — Recent repositories, third pass — Open folder opens the history; a new picker design (2026-10-13) (COMPLETE)
 **Goal:** Owner 2026-10-12: "The UI to select the recent repositories is really not good. I think we have to redesign it." and "when someone does a file open to open a new project, we should directly open the Git history of that project." Fix the open path now; show visual proposals; build the one he picks.
 - [x] Open folder… opens the repository's history: the start pane closes when a folder opens (even the one already open) and whenever the open repository changes; start-pane.spec red first.
 - [x] Visual proposals: recents-v3.html (switcher, tabs, rail, welcome) — owner: not convinced, wants names, paths and worktrees, maybe cards → recents-v4.html (E repository cards, F worktree cards, G tree with paths).
 - [x] Owner picks E, repository cards (2026-10-13: "This is very good. Let's go with option E.").
-- [ ] Build the picked design; e2e and a look in light, dark and 150 %.
+- [x] Build E: GET /repos/workspaces (git worktree list per repository, recents merged) + repository cards (every worktree, never-opened dimmed, one click opens, filter on name/branch/path); vitest 507, engine 237, start-pane 11; looked at in light, dark, 150 %.
 - [ ] Owner tick: picking and opening a repository feels right.
+- [ ] Release v0.20.10 at the owner's call ("can you just release the 20.10?"): local full e2e stopped by low memory at 10/197, so CI's full suite on the pushed head is the gate before the tag; the zip is smoke-tested from the release.
 
-### v0.20.11 — Settings — no filler text, and the rail always wins over Settings
+### v0.20.11 — Settings — no filler text, and the rail always wins over Settings (current) (ACTIVE)
 **Goal:** Owner 2026-10-13: "sometimes in the settings there is like AI slop comments … This is an engineering tool. The tool says what it does and that's it." and "the settings view still overrides all the other views … it feels like the click is not working just because the setting is always taking over."
 - [ ] UI copy: every description and helper line in Settings (and the rest of the app) says what the control does, nothing else; the update row's reassurance goes; a test lists the removed phrases.
 - [ ] Settings yields: a click on any rail item (Recent repositories, Commit, …) closes Settings and shows that view; e2e red first.
