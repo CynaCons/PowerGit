@@ -1,0 +1,261 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Repositories and worktrees</title>
+<style>
+  :root {
+    --page: #e3e7ee; --desk: #dfe4ec; --surface: #ffffff; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --faint: #8a94a3;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff;
+    --sel-bg: #dbeafe; --sel-border: #2563eb; --hover: rgba(37, 99, 235, 0.08);
+    --chip-bg: #eff6ff; --chip-fg: #2563eb; --main-bg: #ecfdf5; --main-fg: #047857;
+    --mark: #fde68a; --ok: #059669; --warn: #a16207;
+    --shadow: 0 18px 48px rgba(16, 24, 39, 0.24); --card: 0 1px 2px rgba(16, 24, 39, 0.08);
+    --r1: #2563eb; --r2: #7c3aed; --r3: #059669;
+    --mono: "Fira Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --page: #0c1117; --desk: #0e141b; --surface: #182029; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --faint: #6b7686;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220;
+    --sel-bg: #1f3a5f; --sel-border: #60a5fa; --hover: rgba(96, 165, 250, 0.12);
+    --chip-bg: #1f3a5f; --chip-fg: #bfdbfe; --main-bg: #0b3d2e; --main-fg: #86efac;
+    --mark: #854d0e; --ok: #34d399; --warn: #fbbf24;
+    --shadow: 0 18px 48px rgba(0, 0, 0, 0.55); --card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --r1: #60a5fa; --r2: #a78bfa; --r3: #34d399;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header.top { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header.top h1 { font-size: 17px; margin: 0; }
+  header.top nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  header.top a, header.top button { font: inherit; font-size: 13px; color: var(--text-2); text-decoration: none; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  .intro { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; }
+  .intro h2 { margin: 0 0 8px; font-size: 16px; }
+  .intro ul { margin: 6px 0 0; padding-left: 20px; }
+  section.option { margin: 0 0 44px; }
+  section.option > h2 { font-size: 18px; margin: 0 0 4px; }
+  section.option > p.lede { margin: 0 0 12px; color: var(--text-2); max-width: 940px; }
+  .pros { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; max-width: 1000px; }
+  .pros div { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+  .pros b { display: block; margin-bottom: 4px; }
+  .pros ul { margin: 0; padding-left: 18px; }
+  @media (max-width: 760px) { .pros { grid-template-columns: 1fr; } }
+
+  .win { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--desk); height: 640px; display: grid; grid-template-rows: 40px 1fr; }
+  .strip { display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 13px; }
+  .logo { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .logo i { width: 14px; height: 14px; border-radius: 3px; background: linear-gradient(135deg, #1553c9, #20b2aa); display: inline-block; }
+  .pane { margin: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--card); overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border-soft); }
+  .field { flex: 1; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--meta); font-size: 13.5px; background: var(--surface); }
+  .field b { color: var(--text); font-weight: 400; }
+  .field .caret { width: 1px; height: 16px; background: var(--text); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; font-size: 12.5px; }
+  .seg span { padding: 5px 10px; color: var(--meta); }
+  .seg span.on { background: var(--sel-bg); color: var(--text); font-weight: 600; }
+  .scroll { flex: 1; overflow: hidden; padding: 14px; }
+  .kbd { font: 11px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--meta); background: var(--surface); }
+
+  .chip { display: inline-flex; align-items: center; max-width: 100%; padding: 1px 7px; border-radius: 9px; background: var(--chip-bg); color: var(--chip-fg); font: 11.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; background: var(--main-bg); color: var(--main-fg); }
+  .path { font: 11.5px var(--mono); color: var(--meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: ltr; }
+  .path .base { color: var(--faint); }
+  .when { color: var(--meta); font-size: 11.5px; white-space: nowrap; }
+  .state { font-size: 11.5px; white-space: nowrap; }
+  .state.clean { color: var(--ok); }
+  .state.dirty { color: var(--warn); }
+  .never { opacity: .6; }
+  .never .when { font-style: italic; }
+  mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+  .note { position: absolute; background: #fef9c3; color: #713f12; border: 1px solid #facc15; border-radius: 6px; padding: 5px 9px; font-size: 12px; box-shadow: var(--card); max-width: 250px; z-index: 5; }
+  :root[data-theme="dark"] .note { background: #3f2a06; color: #fde68a; border-color: #a16207; }
+
+  /* E · repository cards */
+  .cards-e { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; align-items: start; }
+  .rc { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); box-shadow: var(--card); }
+  .rc .h { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border-soft); background: var(--sunken); }
+  .rc .h .disc { grid-row: span 2; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-weight: 700; }
+  .rc .h .t { font-weight: 700; font-size: 15px; }
+  .rc .h .c { font-size: 12px; color: var(--meta); }
+  .wt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; padding: 7px 12px; border-left: 3px solid transparent; }
+  .wt + .wt { border-top: 1px solid var(--border-soft); }
+  .wt .n { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wt.cur { background: var(--sel-bg); border-left-color: var(--sel-border); }
+  .wt:hover:not(.cur) { background: var(--hover); }
+  .rc .more { padding: 6px 12px; font-size: 12px; color: var(--primary); border-top: 1px solid var(--border-soft); }
+
+  /* F · worktree cards */
+  .sect { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 8px; }
+  .sect b { font-size: 14px; }
+  .sect .path { flex: 1; }
+  .cards-f { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .wc { position: relative; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 10px 14px; background: var(--surface); box-shadow: var(--card); display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow: hidden; }
+  .wc::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); }
+  .wc .br { font: 600 13px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wc .fn { font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wc .last { font-size: 12px; color: var(--meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px dashed var(--border-soft); padding-top: 4px; margin-top: 2px; }
+  .wc .row { display: flex; justify-content: space-between; gap: 8px; }
+  .wc.cur { box-shadow: 0 0 0 2px var(--sel-border); background: var(--sel-bg); }
+
+  /* G · tree with paths */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  .tbl th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--meta); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); }
+  .tbl td { padding: 6px 10px; border-bottom: 1px solid var(--border-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tbl tr.repo td { background: var(--sunken); font-weight: 700; }
+  .tbl tr.repo td:first-child::before { content: "▾ "; color: var(--meta); }
+  .tbl tr.wtr td:first-child { padding-left: 30px; position: relative; }
+  .tbl tr.wtr td:first-child::before { content: ""; position: absolute; left: 16px; top: 0; bottom: 50%; width: 9px; border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .tbl tr.cur td { background: var(--sel-bg); }
+  .tbl tr.cur td:first-child { box-shadow: inset 3px 0 0 var(--sel-border); }
+  .tbl tr.wtr:hover:not(.cur) td { background: var(--hover); }
+</style>
+
+<header class="top">
+  <h1>Repositories and worktrees — fourth pass</h1>
+  <nav><a href="#e">E · Repository cards</a><a href="#f">F · Worktree cards</a><a href="#g">G · Tree with paths</a></nav>
+  <button id="theme" type="button">Dark</button>
+</header>
+
+<main>
+  <div class="intro">
+    <h2>Built around worktrees</h2>
+    Owner, 2026-10-13: <i>"I would prefer a design where it takes in consideration the names and the paths … and very importantly would be better able to handle work trees … I would like to more easily find my work trees … or maybe we can try something that would be based on cards."</i>
+    <ul>
+      <li><b>Worktrees belong to their repository.</b> PowerGit reads each folder's <code>.git</code> link to find its main repository and groups them. The main checkout is marked <span class="tag">main</span>.</li>
+      <li><b>All of a repository's worktrees are listed</b>, not only the ones opened before: <code>git worktree list</code> finds the rest. They are shown dimmed as <i>never opened</i>.</li>
+      <li><b>Name, branch and path</b> are all on screen, and the filter matches any of them.</li>
+      <li><b>One click opens</b> the worktree's history. Open folder… does the same, and adds the folder's siblings to the list.</li>
+    </ul>
+    Names and paths are invented, following the pattern of two big repositories with many task worktrees.
+  </div>
+
+  <section class="option" id="e">
+    <h2>E · Repository cards — one card per repository, its worktrees inside</h2>
+    <p class="lede">The repositories you work in, as cards. Each one lists its worktrees: folder, branch, where it lives, its state. You find a worktree by first finding its repository, which is how you think of it anyway.</p>
+    <div class="win">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span></div>
+      <div class="pane">
+        <div class="bar"><div class="field">⌕ <span>Filter by name, branch or path</span></div><span class="seg"><span class="on">Recent</span><span>A–Z</span></span><span class="btn primary">📁 Open folder…</span></div>
+        <div class="scroll"><div class="cards-e" data-e></div></div>
+      </div>
+      <div class="note" style="right:22px;bottom:22px">Dimmed rows were never opened in PowerGit; git knows them, so they are here.</div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>Many worktrees of a few repositories: the card is the repository</li><li>Never-opened worktrees appear without an Open folder…</li></ul></div>
+      <div><b>Costs</b><ul><li>A repository with 15 worktrees makes a tall card ("+ 9 more" folds it)</li><li>Standalone repositories get small cards</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="f">
+    <h2>F · Worktree cards — every worktree a card, in sections by repository</h2>
+    <p class="lede">The worktree is the thing you open, so it gets the card: its branch large (that is the task), the folder and path under it, its state and its last commit. Sections keep each repository's worktrees together; the coloured edge is the repository.</p>
+    <div class="win">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span></div>
+      <div class="pane">
+        <div class="bar"><div class="field">⌕ <span>Filter by name, branch or path</span></div><span class="seg"><span class="on">By repository</span><span>Recent first</span></span><span class="btn primary">📁 Open folder…</span></div>
+        <div class="scroll" data-f></div>
+      </div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>Recognising a task at a glance: the branch and last commit are on the card</li><li>Filtering narrows the grid without losing the sections</li></ul></div>
+      <div><b>Costs</b><ul><li>Fewer worktrees fit on screen than in a list (about 12 at 1600 px)</li><li>Paths are shortened in the middle on narrow cards</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="g">
+    <h2>G · Tree with paths — repositories and their worktrees in one sortable list</h2>
+    <p class="lede">Dense and explicit, like a file explorer: each repository is a row that folds, its worktrees indented under it, with the path in its own column. Sort by any column; the filter marks what matched, path included.</p>
+    <div class="win">
+      <div class="strip"><span class="logo"><i></i>PowerGit</span></div>
+      <div class="pane">
+        <div class="bar"><div class="field">⌕ <span>Filter by name, branch or path</span></div><span class="btn primary">📁 Open folder…</span></div>
+        <div class="scroll" style="padding:0"><table class="tbl" data-g>
+          <colgroup><col style="width:26%" /><col style="width:24%" /><col style="width:32%" /><col style="width:10%" /><col style="width:8%" /></colgroup>
+          <thead><tr><th>Name</th><th>Branch</th><th>Path</th><th>State</th><th>Opened</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+    <div class="pros">
+      <div><b>Good for</b><ul><li>The most worktrees per screen (about 20)</li><li>Paths compared side by side; sorting by path finds where things live</li></ul></div>
+      <div><b>Costs</b><ul><li>Least visual: no cards, all text</li><li>Wide: the path column wants 1400 px or more</li></ul></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const HOME = "~/projects/"
+  const REPOS = [
+    { name: "atlas", color: "var(--r1)", path: "atlas", wts: [
+      { f: "atlas", b: "main", main: true, s: "clean", w: "2 d", last: "Merge pull request #418 from release/rc8" },
+      { f: "atlas-FEAT-23862", b: "FEAT-23862-mb-container-ci", s: "open now", w: "now", last: "Fix container CI cache key", cur: true },
+      { f: "atlas-RC7-release", b: "release/rc7", s: "clean", w: "4 d", last: "Bump version to 7.0.3" },
+      { f: "atlas-r6-boot", b: "alex/r6_boot_optimisation", s: "↑2", w: "1 w", last: "Defer the sensor probe to after mount" },
+      { f: "atlas-laser-eye-safety", b: "HEAD (detached at 4f1c2e9)", s: "clean", w: "1 w", last: "Tests: laser safety thresholds" },
+      { f: "atlas-ASD-108285", b: "ASD-108285-reboot-closed-ssh", s: "clean", w: "11 d", last: "Reboot: close ssh before reset" },
+      { f: "atlas-hotfix-7-0-2", b: "hotfix/7.0.2", s: "clean", w: "", last: "Hotfix: watchdog timeout", never: true },
+    ] },
+    { name: "orion", color: "var(--r2)", path: "orion", wts: [
+      { f: "orion", b: "master", main: true, s: "clean", w: "3 d", last: "Merge branch 'feature/sleep'" },
+      { f: "orion-FET-exploration", b: "alex/flashing-fet-exploration", s: "clean", w: "5 d", last: "Try FET flashing over USB" },
+      { f: "orion-r6-boot", b: "alex/r6_boot_optimisation", s: "clean", w: "1 w", last: "Parallel init of the radio stack" },
+      { f: "orion-APS-4570", b: "APS-4570-sleep-phase1", s: "3 changed", w: "10 d", last: "Add sleep phase 1 hooks" },
+      { f: "orion-smrgen", b: "master", s: "clean", w: "2 w", last: "Generator: emit headers once" },
+      { f: "orion-r5-tsync", b: "rc5-tsync-test", s: "clean", w: "", last: "tsync: log drift", never: true },
+    ] },
+    { name: "PowerGit", color: "var(--r3)", path: "powergit", wts: [
+      { f: "powergit", b: "powergit", main: true, s: "clean", w: "1 d", last: "grid: the graph canvas keeps a window of rows" },
+    ] },
+  ]
+  const STANDALONE = [{ f: "model", b: "main", s: "clean", w: "3 w", p: "experiments/model" }, { f: "drawio-fork", b: "master", s: "clean", w: "1 mo", p: "forks/drawio-fork" }]
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+  const hit = (s, q) => (q && s.includes(q) ? esc(s).replace(q, `<mark>${q}</mark>`) : esc(s))
+  const path = (p, q) => `<span class="path"><span class="base">${HOME}</span>${hit(p, q)}</span>`
+  const st = (s) => `<span class="state ${s === "clean" ? "clean" : s === "open now" ? "" : "dirty"}">${s}</span>`
+  const when = (w, never) => `<span class="when">${never ? "never opened" : w}</span>`
+
+  // E
+  document.querySelector("[data-e]").innerHTML =
+    REPOS.map((r) => {
+      const shown = r.wts.slice(0, 6)
+      const more = r.wts.length - shown.length
+      return `<div class="rc"><div class="h"><span class="disc" style="background:${r.color}">${r.name[0].toUpperCase()}</span><span class="t">${r.name}</span><span class="c">${r.wts.length} worktree${r.wts.length > 1 ? "s" : ""}</span><span>${path(r.path)}</span><span></span></div>` +
+        shown.map((w) => `<div class="wt${w.cur ? " cur" : ""}${w.never ? " never" : ""}"><span class="n">${w.f} ${w.main ? '<span class="tag">main</span>' : ""}</span>${when(w.w, w.never)}<span style="min-width:0"><span class="chip">${w.b}</span></span>${st(w.s)}<span style="grid-column:1/3">${path(w.f)}</span></div>`).join("") +
+        (more > 0 ? `<div class="more">+ ${more} more</div>` : "") + `</div>`
+    }).join("") +
+    `<div class="rc"><div class="h"><span class="disc" style="background:var(--meta)">·</span><span class="t">Other repositories</span><span class="c">2</span><span></span><span></span></div>` +
+    STANDALONE.map((s) => `<div class="wt"><span class="n">${s.f}</span>${when(s.w)}<span><span class="chip">${s.b}</span></span>${st(s.s)}<span style="grid-column:1/3">${path(s.p)}</span></div>`).join("") + `</div>`
+
+  // F and G unfiltered: the full page is what has to read well
+  const q = ""
+  document.querySelector("[data-f]").innerHTML = REPOS.map((r) => {
+    const ws = r.wts.filter((w) => !q || w.f.includes(q) || w.b.includes(q))
+    const rest = r.wts.length - ws.length
+    if (!ws.length) return ""
+    return `<div class="sect"><b style="color:${r.color}">● ${r.name}</b>${path(r.path)}<span class="when">${r.wts.length} worktree${r.wts.length > 1 ? "s" : ""}</span></div>` +
+      `<div class="cards-f" style="--accent:${r.color}">` +
+      ws.map((w) => `<div class="wc${w.cur ? " cur" : ""}${w.never ? " never" : ""}"><div class="row"><span class="br">${hit(w.b, q)}</span>${w.main ? '<span class="tag">main</span>' : ""}</div><span class="fn">${hit(w.f, q)}</span>${path(w.f, q)}<div class="row">${st(w.s)}${when(w.w, w.never)}</div><span class="last">${esc(w.last)}</span></div>`).join("") + `</div>`
+  }).join("") + `<div class="sect"><b>● Other repositories</b></div><div class="cards-f" style="--accent:var(--meta)">` + STANDALONE.map((w) => `<div class="wc"><div class="row"><span class="br">${w.b}</span></div><span class="fn">${w.f}</span>${path(w.p)}<div class="row">${st(w.s)}${when(w.w)}</div></div>`).join("") + `</div>`
+
+  // G (filtered on "r6": matches stay, their repository stays as context)
+  document.querySelector("[data-g] tbody").innerHTML = REPOS.map((r) => {
+    const ws = r.wts
+    return `<tr class="repo"><td>${r.name} <span class="when" style="font-weight:400">· ${ws.length} worktree${ws.length > 1 ? "s" : ""}</span></td><td></td><td>${path(r.path)}</td><td></td><td></td></tr>` +
+      ws.map((w) => `<tr class="wtr${w.cur ? " cur" : ""}${w.never ? " never" : ""}"><td>${hit(w.f, q)} ${w.main ? '<span class="tag">main</span>' : ""}</td><td><span class="chip">${hit(w.b, q)}</span></td><td>${path(w.f, q)}</td><td>${st(w.s)}</td><td>${when(w.w, w.never)}</td></tr>`).join("")
+  }).join("") + REPOS.flatMap((r) => r.wts).filter((w) => !(w.f.includes(q) || w.b.includes(q))).slice(0, 0).join("") +
+    `<tr class="repo"><td>Other repositories</td><td></td><td></td><td></td><td></td></tr>` + STANDALONE.map((w) => `<tr class="wtr"><td>${w.f}</td><td><span class="chip">${w.b}</span></td><td>${path(w.p)}</td><td>${st(w.s)}</td><td>${when(w.w)}</td></tr>`).join("")
+
+  const btn = document.getElementById("theme")
+  btn.onclick = () => {
+    const dark = document.documentElement.getAttribute("data-theme") !== "dark"
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light")
+    btn.textContent = dark ? "Light" : "Dark"
+  }
+</script>
