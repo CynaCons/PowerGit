@@ -83,18 +83,50 @@ public sealed record DiffDto(
 public sealed record AgentReviewFileDto(string Path, string Status, string? Patch);
 public sealed record AgentReviewCommentDto(string Path, string Line, string Side, string Body);
 public sealed record AgentReviewResolutionDto(string? Summary, IReadOnlyList<AgentReviewCommentDto> Comments);
+/// <summary>
+///  An agent review session. Version 2 (v0.21.1, docs/design/agent-review-rounds.md
+///  §3.1) adds the rounds, the comment threads and the board channel; a
+///  version-1 file reads with those null and is served as one round.
+///  <see cref="Files"/> is always the latest round's files.
+/// </summary>
 public sealed record AgentReviewDto(
     int Version, string Id, string Mode, string Title, string Why, string? Agent,
     string? Branch, string? Base, string? Head, bool Worktree,
     IReadOnlyList<AgentReviewFileDto> Files, string Status, bool Unread,
     string CreatedAt, string UpdatedAt, string? ResolvedAt,
-    AgentReviewResolutionDto? Resolution, string? Reason);
+    AgentReviewResolutionDto? Resolution, string? Reason,
+    string? Board = null, long BoardCursor = 0,
+    IReadOnlyList<AgentReviewRoundDto>? Rounds = null,
+    IReadOnlyList<AgentReviewThreadDto>? Comments = null);
+/// <summary>One change (a diff hunk) of a round. Origin: new / carried / revised;
+///  verdict: accept / reject / mixed / undecided, stamped when the round is sent.</summary>
+public sealed record AgentReviewChangeDto(
+    string Id, string Path, int OldStart, int OldLines, int NewStart, int NewLines,
+    string Hash, string Origin, string? From, string Verdict, IReadOnlyList<string>? RejectedLines);
+public sealed record AgentReviewRoundDto(
+    int N, string OpenedAt, string? SentAt, string? Note,
+    IReadOnlyList<AgentReviewFileDto> Files, IReadOnlyList<AgentReviewChangeDto> Changes,
+    IReadOnlyList<string> Removed);
+public sealed record AgentReviewReplyDto(string Author, string Body, string At, long? BoardId);
+/// <summary>A comment with its id (c1, c2 …), the line key it sits on and the
+///  agent's replies. Kind: round (sent with the round) or ask (posted at once).</summary>
+public sealed record AgentReviewThreadDto(
+    string Id, int Round, string? Change, string Path, string Line, string Body,
+    string Kind, string PostedAt, IReadOnlyList<AgentReviewReplyDto> Replies);
 public sealed record AgentReviewSummaryDto(
     string Id, string Mode, string Title, string? Agent, string? Branch,
-    int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt);
+    int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt,
+    int Round = 1, string? Turn = null, string? Board = null);
 public sealed record AgentReviewRequest(
     string Mode, string Title, string? Why, string? Agent, string? Branch,
-    string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files);
+    string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files,
+    string? Board = null);
+public sealed record AgentReviewReplyRequest(string Comment, string Body);
+public sealed record AgentReviewReviseRequest(
+    string? Note, IReadOnlyList<AgentReviewReplyRequest>? Replies, string? Head,
+    IReadOnlyList<AgentReviewFileDto>? Files);
+public sealed record AgentReviewSendRequest(string? Note);
+public sealed record AgentReviewAskRequest(int Round, string Path, string Line, string Body);
 public sealed record AgentReviewResolveRequest(string Action, string? Summary, string? Reason);
 public sealed record AgentReviewWaitDto(AgentReviewDto Session, bool TimedOut);
 public sealed record AgentReviewListDto(IReadOnlyList<AgentReviewSummaryDto> Sessions, int Badge);

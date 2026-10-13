@@ -42,9 +42,11 @@ public sealed class AgentReviewsTests : IClassFixture<WebApplicationFactory<Prog
 
         AgentReviewDto changes = host.CreateAgentReview(Request());
         host.WriteReview(changes.Id, "{\"files\":{\"f.txt\":{\"comments\":[{\"line\":\"+2\",\"text\":\"needs a guard\"}]}}}");
+        // v0.21.1: with rounds, "request changes" sends the round back; the comment becomes a thread.
         result = host.ResolveAgentReview(changes.Id, new("request_changes", "please fix", null));
-        Assert.Equal("changes_requested", result.Status); Assert.Equal("please fix", result.Resolution!.Summary);
-        Assert.Equal(new("f.txt", "+2", "new", "needs a guard"), Assert.Single(result.Resolution.Comments));
+        Assert.Equal("pending", result.Status); Assert.Equal("please fix", result.Rounds![0].Note);
+        AgentReviewThreadDto thread = Assert.Single(result.Comments!);
+        Assert.Equal(("f.txt", "+2", "needs a guard"), (thread.Path, thread.Line, thread.Body));
 
         AgentReviewDto cancelled = host.CreateAgentReview(Request());
         Assert.Equal("owner", host.ResolveAgentReview(cancelled.Id, new("cancel", null, null)).Reason);

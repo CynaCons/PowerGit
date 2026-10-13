@@ -208,15 +208,14 @@ The agent's powerboard name must equal the `agent` it passes to
 
 In the repository group of `Program.cs`, next to today's `/agent-reviews` routes (`/{sid}`, `/{sid}/resolve`, `/{sid}/wait`, `/{sid}/diff`). The review key regex is in `GitHost.Reviews.cs`.
 
-- `GET  /agent-reviews/{id}` — version 2 session (rounds, comments).
-- `GET  /agent-reviews/{id}/rounds/{n}/diff?path=` — the round's patch for a file.
-- `PUT  /agent-reviews/{id}/rounds/{n}/verdict` — `{change, verdict}`; writes the line marks.
-- `POST /agent-reviews/{id}/comments` — `{round, change, path, line, body, kind}`; `ask` posts at once.
-- `POST /agent-reviews/{id}/rounds/{n}/send` — `{note}`; stamps `sentAt`, posts the round, wakes `wait`.
-- `POST /agent-reviews/{id}/resolve` — approve / cancel as today, plus the board post.
-- `GET  /agent-reviews/{id}/board?after=` — the channel's messages after an id, and the presence.
-- `POST /agent-reviews/{id}/board` — `{text}` from the Board box, as `human`.
-- `GET  /board/status` — found / not found / unknown schema, and the path.
+- `GET  /agent-reviews/{id}` — the session, version 2 (rounds, comments).
+- `GET  /agent-reviews/{id}/diff?path=&round=` — a round's captured patch for a file (the latest round by default).
+- Verdicts have no route of their own: the owner's marks go through the existing review-file route (`PUT /reviews/{key}`, key `<id>` or `<id>-r<n>`), and the engine reads them when the round is sent (v0.21.1 build decision: one store for marks, not two).
+- `POST /agent-reviews/{id}/ask` — `{round, path, line, body}`; a thread of kind `ask`, posted on the board at once.
+- `POST /agent-reviews/{id}/send` — `{note}`; stamps the verdicts and `sentAt`, turns the review file's comments into threads, wakes `wait`, posts the round.
+- `POST /agent-reviews/{id}/revise` — what `agent_review_revise` does, for tests and scripts.
+- `POST /agent-reviews/{id}/resolve` — approve / cancel / ack as before; `request_changes` on a session with rounds is a send.
+- `GET  /agent-reviews/{id}/board?after=` and `POST /agent-reviews/{id}/board`, `GET /board/status` — v0.21.2.
 
 ## 7. UI (layout A)
 

@@ -26,7 +26,7 @@ public sealed partial class GitHost
     private bool _reviewsExcluded;
 
     internal static readonly Regex ReviewKeyPattern = new(
-        "^[0-9a-f]{40}([0-9a-f]{24})?(-(worktree|index))?$",
+        "^[0-9a-f]{40}(([0-9a-f]{24})?(-(worktree|index))?|-r[0-9]{1,3})$",
         RegexOptions.Compiled);
 
     private string ReviewPath(string key)

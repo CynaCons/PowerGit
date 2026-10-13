@@ -4,7 +4,7 @@ namespace PowerGit.Engine.Mcp;
 
 public sealed class McpTools(RepoRegistry registry)
 {
-    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel"];
+    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise"];
 
     public object Open(JsonElement args, CancellationToken ct)
     {
@@ -21,7 +21,7 @@ public sealed class McpTools(RepoRegistry registry)
         }
         AgentReviewDto session = host.CreateAgentReview(new(
             Required(args, "mode"), Required(args, "title"), String(args, "why"), String(args, "agent"),
-            String(args, "branch") ?? host.Current?.Branch, baseSha, headSha, worktree, files));
+            String(args, "branch") ?? host.Current?.Branch, baseSha, headSha, worktree, files, String(args, "board")), ct);
         return Payload(host, session, false, ct);
     }
 
@@ -37,6 +37,22 @@ public sealed class McpTools(RepoRegistry registry)
     {
         GitHost host = Host(args, out _);
         AgentReviewDto session = host.GetAgentReview(Required(args, "review_id")) ?? throw new KeyNotFoundException("agent review session not found");
+        int? round = args.TryGetProperty("round", out JsonElement value) && value.TryGetInt32(out int parsed) ? parsed : null;
+        return Payload(host, session, false, ct, round);
+    }
+
+    /// <summary>v0.21.1: the agent's next round, with a reply per comment it answers.</summary>
+    public object Revise(JsonElement args, CancellationToken ct)
+    {
+        GitHost host = Host(args, out _);
+        List<AgentReviewReplyRequest> replies = [];
+        if (args.TryGetProperty("replies", out JsonElement list))
+        {
+            if (list.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("replies must be an array");
+            foreach (JsonElement reply in list.EnumerateArray()) replies.Add(new(Required(reply, "comment"), Required(reply, "body")));
+        }
+        AgentReviewDto session = host.ReviseAgentReview(Required(args, "review_id"),
+            new(String(args, "note"), replies, String(args, "head_sha"), Files(args)), ct);
         return Payload(host, session, false, ct);
     }
 
@@ -73,8 +89,9 @@ public sealed class McpTools(RepoRegistry registry)
         }
     }
 
-    private static object Payload(GitHost host, AgentReviewDto session, bool timedOut, CancellationToken ct)
+    private static object Payload(GitHost host, AgentReviewDto session, bool timedOut, CancellationToken ct, int? roundNumber = null)
     {
+        if (session.Rounds is { Count: > 0 }) return RoundPayload(host, session, timedOut, roundNumber);
         Dictionary<string, string> diffs = [];
         foreach (AgentReviewFileDto file in session.Files)
         {
@@ -94,6 +111,47 @@ public sealed class McpTools(RepoRegistry registry)
             session_file = sessionFile,
             review_file = reviewFile,
             export_markdown = ReviewMarkdown.Render(session, review, diffs),
+        };
+    }
+
+    /// <summary>
+    ///  A session with rounds (design §5): the round (the latest, or the one
+    ///  asked for), whose turn it is, each change with its verdict and line
+    ///  ranges, the changes the round removed, and every comment thread.
+    /// </summary>
+    private static object RoundPayload(GitHost host, AgentReviewDto session, bool timedOut, int? roundNumber)
+    {
+        AgentReviewRoundDto round = roundNumber is null ? session.Rounds![^1]
+            : session.Rounds!.FirstOrDefault(r => r.N == roundNumber) ?? throw new InvalidOperationException($"no round {roundNumber}");
+        string root = host.Current!.Root;
+        string key = GitHost.RoundKey(session.Id, round.N);
+        Dictionary<string, string> diffs = round.Files.Where(f => f.Patch is not null).ToDictionary(f => f.Path, f => f.Patch!);
+        static int[] Span(int start, int count) => [start, start + Math.Max(count, 1) - 1];
+        return new
+        {
+            review_id = session.Id, session.Status, session.Mode, session.Title,
+            round = round.N,
+            rounds = session.Rounds!.Count,
+            turn = GitHost.TurnOf(session),
+            board = session.Board,
+            timed_out = timedOut,
+            note = round.Note,
+            sent_at = round.SentAt,
+            changes = round.Changes.Select(c => new
+            {
+                c.Id, file = c.Path, c.Origin, c.From,
+                old_lines = Span(c.OldStart, c.OldLines), new_lines = Span(c.NewStart, c.NewLines),
+                c.Verdict, rejected_lines = c.RejectedLines,
+            }),
+            removed = round.Removed,
+            comments = (session.Comments ?? []).Select(t => new
+            {
+                t.Id, t.Round, change = t.Change, file = t.Path, t.Line, t.Body, t.Kind,
+                replies = t.Replies.Select(r => new { r.Author, r.Body, r.At }),
+            }),
+            session_file = Path.Combine(root, GitHost.AgentReviewsDirectory, session.Id + ".json"),
+            review_file = Path.Combine(root, GitHost.ReviewsDirectory, key + ".json"),
+            export_markdown = ReviewMarkdown.Render(session, host.ReadReview(key), diffs),
         };
     }
 

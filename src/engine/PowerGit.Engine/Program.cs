@@ -704,16 +704,35 @@ repo.MapGet("/agent-reviews/{sid}/wait", async (string sid, int? timeoutMs, GitH
     catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
 });
 
-repo.MapGet("/agent-reviews/{sid}/diff", (string sid, string? path, GitHost git, HttpContext ctx) =>
+repo.MapGet("/agent-reviews/{sid}/diff", (string sid, string? path, int? round, GitHost git, HttpContext ctx) =>
 {
     try
     {
         if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("path is required");
-        return Results.Ok(git.GetAgentReviewDiff(sid, path, ctx.RequestAborted));
+        return Results.Ok(git.GetAgentReviewDiff(sid, path, ctx.RequestAborted, round));
     }
     catch (KeyNotFoundException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 404); }
     catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
 });
+
+// v0.21.1 rounds (docs/design/agent-review-rounds.md §6): the owner sends a
+// round back or asks at once; the agent revises (MCP, or here for tests).
+static IResult AgentReviewCall(Func<object> call)
+{
+    try { return Results.Ok(call()); }
+    catch (KeyNotFoundException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 404); }
+    catch (AgentReviewStateException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 409); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+}
+
+repo.MapPost("/agent-reviews/{sid}/send", (string sid, AgentReviewSendRequest body, GitHost git) =>
+    AgentReviewCall(() => git.SendAgentReviewRound(sid, body.Note)));
+
+repo.MapPost("/agent-reviews/{sid}/revise", (string sid, AgentReviewReviseRequest body, GitHost git, HttpContext ctx) =>
+    AgentReviewCall(() => git.ReviseAgentReview(sid, body, ctx.RequestAborted)));
+
+repo.MapPost("/agent-reviews/{sid}/ask", (string sid, AgentReviewAskRequest body, GitHost git) =>
+    AgentReviewCall(() => git.AskAgentReview(sid, body)));
 
 repo.MapPost("/ignore", (IgnoreRequest body, GitHost git) =>
 {

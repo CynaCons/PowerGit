@@ -60,10 +60,34 @@ public sealed class McpHostTests
         host.WriteReview(id, "{\"reviewed\":1,\"changed\":1,\"files\":{\"f.txt\":{\"lines\":{},\"comments\":[{\"line\":\"+2\",\"text\":\"needs a guard\"}]}}}");
         host.ResolveAgentReview(id, new("request_changes", "fix", null));
         JsonElement result = await waiting.WaitAsync(TimeSpan.FromSeconds(15));
-        Assert.Equal("changes_requested", result.GetProperty("status").GetString());
+        // v0.21.1: "request changes" sends round 1 back; the review stays open, the agent's turn.
+        Assert.Equal("pending", result.GetProperty("status").GetString());
+        Assert.Equal("agent", result.GetProperty("turn").GetString());
         Assert.Equal("needs a guard", result.GetProperty("comments")[0].GetProperty("body").GetString());
         Assert.Contains("f.txt", result.GetProperty("export_markdown").GetString());
         Assert.Contains("needs a guard", result.GetProperty("export_markdown").GetString());
+    }
+
+    [Fact]
+    public async Task Revise_opens_round_two_with_replies_and_wait_returns_verdicts()
+    {
+        await using Harness h = await Harness.Start(); await using Client c = await h.Connect();
+        JsonElement opened = await c.Tool("agent_review_open", new { repo_path = h.Repo.Dir, mode = "wait", title = "Guard", agent = "auth-fix", files = new[] { new { path = "f.txt", patch = "@@ -1 +1,2 @@\n a\n+b\n" } } });
+        string id = opened.GetProperty("review_id").GetString()!;
+        Assert.Equal((1, "user"), (opened.GetProperty("round").GetInt32(), opened.GetProperty("turn").GetString()));
+        Assert.Equal("h1", opened.GetProperty("changes")[0].GetProperty("id").GetString());
+        h.Host.WriteReview(id, "{\"files\":{\"f.txt\":{\"lines\":{\"+2\":\"rejected\"},\"comments\":[{\"line\":\"+2\",\"text\":\"not b\"}]}}}");
+        Task<JsonElement> waiting = c.Tool("agent_review_wait", new { repo_path = h.Repo.Dir, review_id = id, timeout_ms = 10000 });
+        h.Host.SendAgentReviewRound(id, "one thing");
+        JsonElement back = await waiting.WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.Equal("reject", back.GetProperty("changes")[0].GetProperty("verdict").GetString());
+        Assert.Equal("one thing", back.GetProperty("note").GetString());
+        JsonElement two = await c.Tool("agent_review_revise", new { repo_path = h.Repo.Dir, review_id = id, note = "now c", replies = new[] { new { comment = "c1", body = "done" } }, files = new[] { new { path = "f.txt", patch = "@@ -1 +1,2 @@\n a\n+c\n" } } });
+        Assert.Equal((2, "user"), (two.GetProperty("round").GetInt32(), two.GetProperty("turn").GetString()));
+        Assert.Equal("revised", two.GetProperty("changes")[0].GetProperty("origin").GetString());
+        Assert.Equal("done", two.GetProperty("comments")[0].GetProperty("replies")[0].GetProperty("body").GetString());
+        JsonElement first = await c.Tool("agent_review_get", new { repo_path = h.Repo.Dir, review_id = id, round = 1 });
+        Assert.Equal(1, first.GetProperty("round").GetInt32());
     }
 
     [Fact]

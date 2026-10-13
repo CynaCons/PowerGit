@@ -85,13 +85,46 @@ try {
   )
   console.log(opened.review_id)
 
-  const waited = payloadFrom(
-    await request("tools/call", {
-      name: "agent_review_wait",
-      arguments: { repo_path: repoPath, review_id: opened.review_id, timeout_ms: 90000 },
-    }),
-  )
+  const wait = async () =>
+    payloadFrom(
+      await request("tools/call", {
+        name: "agent_review_wait",
+        arguments: { repo_path: repoPath, review_id: opened.review_id, timeout_ms: 90000 },
+      }),
+    )
+
+  // v0.21.1: rounds. When the owner sends round 1 back, answer each comment
+  // and open round 2 with a changed patch; then wait for the close.
+  let waited = await wait()
   console.log(JSON.stringify(waited))
+  let rounds = 1
+  while (waited.status === "pending" && waited.turn === "agent" && rounds < 3) {
+    const replies = (waited.comments ?? [])
+      .filter((c) => c.round === waited.round && c.replies.length === 0)
+      .map((c) => ({ comment: c.id, body: `probe: seen ${c.id}` }))
+    waited = payloadFrom(
+      await request("tools/call", {
+        name: "agent_review_revise",
+        arguments: {
+          repo_path: repoPath,
+          review_id: opened.review_id,
+          note: `round ${waited.round + 1} from the probe`,
+          replies,
+          files: [
+            {
+              path: "f.txt",
+              status: "M",
+              patch: `--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-old\n+new ${waited.round + 1}\n`,
+            },
+          ],
+        },
+      }),
+    )
+    rounds = waited.round
+    console.log(`round ${rounds} opened`)
+    waited = await wait()
+    console.log(JSON.stringify(waited))
+  }
   child.stdin.end()
   process.exitCode = waited.timed_out || waited.status === "pending" ? 3 : 0
 } catch (error) {

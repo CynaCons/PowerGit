@@ -40,28 +40,50 @@ public sealed partial class GitHost
         return ResolveInRoot(RequireRoot(), AgentReviewsDirectory + "/" + id + ".json");
     }
 
-    public AgentReviewDto CreateAgentReview(AgentReviewRequest req)
+    /// <summary>
+    ///  A new session is version 2 (v0.21.1): round 1 is opened at once, its
+    ///  patch captured, so the owner reviews what the agent showed even if the
+    ///  worktree moves on.
+    /// </summary>
+    public AgentReviewDto CreateAgentReview(AgentReviewRequest req, CancellationToken ct = default)
     {
         AgentReviewRequest clean = ValidateAgentReviewRequest(req);
         string id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(20));
         string now = Timestamp();
-        AgentReviewDto session = new(1, id, clean.Mode, clean.Title, clean.Why!, clean.Agent,
-            clean.Branch, clean.Base, clean.Head, clean.Worktree ?? false, clean.Files!, "pending", true,
-            now, now, null, null, null);
-        WriteAgentReview(session);
+        int nextId = 1;
+        AgentReviewRoundDto round = OpenRound(1, clean.Base, clean.Head, clean.Worktree ?? false, clean.Files!, [], ref nextId, ct);
+        AgentReviewDto session = new(2, id, clean.Mode, clean.Title, clean.Why!, clean.Agent,
+            clean.Branch, clean.Base, clean.Head, clean.Worktree ?? false, round.Files, "pending", true,
+            now, now, null, null, null, Rounds: [round], Comments: []);
+        session = AttachBoard(session, clean.Board);
+        lock (_agentReviewWriteGate) WriteAgentReview(session);
+        AfterRoundOpened(session, round);
         return session;
     }
+
+    /// <summary>The board channel for a new session (v0.21.2); unchanged without powerboard.</summary>
+    private AgentReviewDto AttachBoard(AgentReviewDto session, string? requested)
+    {
+        string? board = null;
+        BoardChannelFor(session, requested, ref board);
+        return board is null ? session : session with { Board = board };
+    }
+
+    partial void BoardChannelFor(AgentReviewDto session, string? requested, ref string? board);
 
     public AgentReviewDto UpdateAgentReview(string id, AgentReviewRequest req)
     {
         AgentReviewDto current = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
         if (current.Status != "pending") throw new AgentReviewStateException("agent review session is not pending");
         AgentReviewRequest clean = ValidateAgentReviewRequest(req);
+        // A session with rounds changes its files only through a revise.
+        bool rounds = current.Rounds is { Count: > 0 };
         AgentReviewDto updated = current with
         {
             Mode = clean.Mode, Title = clean.Title, Why = clean.Why!, Agent = clean.Agent,
-            Branch = clean.Branch, Base = clean.Base, Head = clean.Head,
-            Worktree = clean.Worktree ?? false, Files = clean.Files!, UpdatedAt = Timestamp(),
+            Branch = clean.Branch, Base = rounds ? current.Base : clean.Base, Head = rounds ? current.Head : clean.Head,
+            Worktree = rounds ? current.Worktree : clean.Worktree ?? false, Files = rounds ? current.Files : clean.Files!,
+            UpdatedAt = Timestamp(),
         };
         WriteAgentReview(updated);
         return updated;
@@ -78,7 +100,7 @@ public sealed partial class GitHost
                 try
                 {
                     AgentReviewDto? item = JsonSerializer.Deserialize<AgentReviewDto>(File.ReadAllText(file), AgentReviewJson);
-                    if (item is not null && item.Version == 1 && item.Files is not null
+                    if (item is not null && item.Version is 1 or 2 && item.Files is not null
                         && item.Id is not null && AgentReviewIdPattern.IsMatch(item.Id)) sessions.Add(item);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
@@ -86,7 +108,8 @@ public sealed partial class GitHost
         }
         sessions.Sort((a, b) => string.CompareOrdinal(b.CreatedAt, a.CreatedAt));
         AgentReviewSummaryDto[] summaries = [.. sessions.Select(ToSummary)];
-        int badge = sessions.Count(s => (s.Mode == "wait" && s.Status == "pending") || (s.Mode == "notify" && s.Unread));
+        // A Wait review counts while it is the owner's turn; a Notify one while unread.
+        int badge = sessions.Count(s => (s.Mode == "wait" && s.Status == "pending" && TurnOf(s) != "agent") || (s.Mode == "notify" && s.Unread && s.Status == "pending"));
         return new AgentReviewListDto(summaries, badge);
     }
 
@@ -99,6 +122,11 @@ public sealed partial class GitHost
 
     public AgentReviewDto ResolveAgentReview(string id, AgentReviewResolveRequest req)
     {
+        lock (_agentReviewWriteGate) return ResolveLocked(id, req);
+    }
+
+    private AgentReviewDto ResolveLocked(string id, AgentReviewResolveRequest req)
+    {
         AgentReviewDto current = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
         string action = req.Action?.Trim() ?? "";
         string now = Timestamp();
@@ -109,6 +137,13 @@ public sealed partial class GitHost
             if (action is not ("approve" or "request_changes" or "cancel" or "expire"))
                 throw new InvalidOperationException("unknown agent review action");
             if (current.Status != "pending") throw new AgentReviewStateException("agent review session is not pending");
+            // With rounds, "request changes" is sending the round back (the lock is re-entrant).
+            if (action == "request_changes" && current.Rounds is { Count: > 0 }) return SendAgentReviewRound(id, req.Summary);
+            if (action == "approve" && LatestRound(current) is { } open)
+            {
+                AgentReviewRoundDto stamped = StampVerdicts(current, open) with { SentAt = open.SentAt ?? now, Note = Clean(req.Summary) ?? open.Note };
+                current = current with { Rounds = [.. current.Rounds!.Take(current.Rounds!.Count - 1), stamped], Comments = CollectRoundComments(current, stamped) };
+            }
             updated = action switch
             {
                 "approve" => current with { Status = "approved", UpdatedAt = now, ResolvedAt = now, Resolution = new(req.Summary, []) },
@@ -118,6 +153,7 @@ public sealed partial class GitHost
             };
         }
         WriteAgentReview(updated);
+        if (updated.Status != "pending") AfterClosed(updated);
         return updated;
     }
 
@@ -142,7 +178,8 @@ public sealed partial class GitHost
             Task signal;
             lock (_agentReviewsLock) signal = _agentReviewsChanged.Task;
             AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
-            if (session.Status != "pending") return new(session, false);
+            // With rounds the wait also ends when the round comes back to the agent.
+            if (session.Status != "pending" || TurnOf(session) == "agent") return new(session, false);
             TimeSpan remaining = deadline - DateTime.UtcNow;
             if (remaining <= TimeSpan.Zero) return new(session, true);
             Task delay = Task.Delay(remaining, ct);
@@ -151,14 +188,21 @@ public sealed partial class GitHost
             {
                 await delay;
                 session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
-                return new(session, session.Status == "pending");
+                return new(session, session.Status == "pending" && TurnOf(session) != "agent");
             }
         }
     }
 
-    public DiffDto GetAgentReviewDiff(string id, string path, CancellationToken ct)
+    public DiffDto GetAgentReviewDiff(string id, string path, CancellationToken ct, int? round = null)
     {
         AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
+        if (session.Rounds is { Count: > 0 } rounds)
+        {
+            AgentReviewRoundDto chosen = round is null ? rounds[^1] : rounds.FirstOrDefault(r => r.N == round) ?? throw new InvalidOperationException($"no round {round}");
+            AgentReviewFileDto inRound = chosen.Files.FirstOrDefault(f => f.Path == path) ?? throw new InvalidOperationException($"path is not in round {chosen.N}: {path}");
+            string text = inRound.Patch ?? "";
+            return new(path, text, false, text.Length);
+        }
         AgentReviewFileDto file = session.Files.FirstOrDefault(f => f.Path == path)
             ?? throw new InvalidOperationException($"path is not in agent review: {path}");
         ResolveInRoot(RequireRoot(), path);
@@ -243,7 +287,8 @@ public sealed partial class GitHost
     private static int LineNumber(string line) => int.TryParse(line.AsSpan(1), out int value) ? value : int.MaxValue;
     private static string Timestamp() => DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture);
     private static AgentReviewSummaryDto ToSummary(AgentReviewDto s) =>
-        new(s.Id, s.Mode, s.Title, s.Agent, s.Branch, s.Files.Count, s.Status, s.Unread, s.CreatedAt, s.UpdatedAt);
+        new(s.Id, s.Mode, s.Title, s.Agent, s.Branch, s.Files.Count, s.Status, s.Unread, s.CreatedAt, s.UpdatedAt,
+            LatestRound(s)?.N ?? 1, TurnOf(s), s.Board);
 }
 
 public sealed class AgentReviewStateException(string message) : InvalidOperationException(message);

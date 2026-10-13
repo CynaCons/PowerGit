@@ -222,6 +222,7 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
                 "agent_review_get" => _tools.Get(args, _stopping.Token),
                 "agent_review_list" => _tools.List(args),
                 "agent_review_cancel" => _tools.Cancel(args, _stopping.Token),
+                "agent_review_revise" => _tools.Revise(args, _stopping.Token),
                 _ => throw new InvalidOperationException($"unknown tool: {name}"),
             };
             string text = JsonSerializer.Serialize(payload, Json);
@@ -234,9 +235,10 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
     }
 
     private static object[] ToolDescriptors() => [
-        Tool("agent_review_open", "Open a PowerGit agent review.", ["repo_path", "mode", "title"], new { repo_path = S(), mode = S(), title = S(), why = S(), agent = S(), branch = S(), base_sha = S(), head_sha = S(), worktree = B(), files = new { type = "array", items = new { type = "object" } } }),
-        Tool("agent_review_wait", "Wait for an owner decision without auto-approving.", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), timeout_ms = I() }),
-        Tool("agent_review_get", "Get an agent review.", ["repo_path", "review_id"], new { repo_path = S(), review_id = S() }),
+        Tool("agent_review_open", "Open a PowerGit agent review; round 1 is what the owner sees. Returns review_id, round, turn and board (the powerboard channel to read for the owner's messages, or null).", ["repo_path", "mode", "title"], new { repo_path = S(), mode = S(), title = S(), why = S(), agent = S(), branch = S(), base_sha = S(), head_sha = S(), worktree = B(), files = new { type = "array", items = new { type = "object" } }, board = S() }),
+        Tool("agent_review_wait", "Wait until the owner sends the round back or closes the review; never auto-approves. Returns the round's changes with verdicts (accept, reject, mixed, undecided) and the comments.", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), timeout_ms = I() }),
+        Tool("agent_review_get", "Get an agent review: a round (the latest by default) with each change's verdict and line ranges, and every comment with its id and replies.", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), round = I() }),
+        Tool("agent_review_revise", "Open the next round of a review from the worktree as it is now (or head_sha, or files with patches), with a reply per comment answered: replies = [{comment: \"c1\", body}].", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), note = S(), head_sha = S(), replies = new { type = "array", items = new { type = "object" } }, files = new { type = "array", items = new { type = "object" } } }),
         Tool("agent_review_list", "List agent reviews for a repository.", ["repo_path"], new { repo_path = S() }),
         Tool("agent_review_cancel", "Cancel a pending agent review.", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), reason = S() }),
     ];
