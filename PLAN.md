@@ -1038,23 +1038,23 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Tests: xunit against a temp board.db with powerboard's schema (post, read, no seen writes, names, unknown schema, missing file); scripts/board-interop.py runs the engine against a board powerboard created, with powerboard's own code as the agent.
 - [x] Gate: engine suite 248 passed, 1 skipped; board-interop.py passes with dotnet run and the published sidecar (open, ask, an agent reply landing on the thread, send). Done 3698fc08a.
 
-### v0.21.3 — Agent review rounds — the full view, layout A (PLANNED) (current) (ACTIVE)
+### v0.21.3 — Agent review rounds — the full view, layout A (PLANNED) (2026-10-14) (COMPLETE)
 **Goal:** Owner 2026-10-13: "should we go full view instead of just the bottom panels?" and "I'm okay for A. This is very good." Build tabs A, Inbox and States of docs/prototypes/agent-review-v3.html (design §7): the inbox and a review take the window except the rail; files, the diff with a verdict per change, the board column with the round box. Gate: the e2e specs, a look in light, dark and 150 %, the owner's tick.
-- [ ] Full view: AgentReviewsView leaves the file-history slot and takes the main area like Settings; the rail wins; Escape / ← back to the inbox, then the history.
-- [ ] Inbox: rows with title, mode, agent, repo and branch, files, presence dot, whose turn, age; filter Waiting for you / Open / All; the badge counts reviews waiting for you.
-- [ ] Review: top bar with round buttons; files column with progress; the diff with a verdict bar per change (Accept / Reject / Comment), origin chips, faded carried and removed cards; threads with Add to round / Ask now.
-- [ ] Board column: feed with c<n> links into the diff, the Board box, presence, and the round box (counts, note, Send round n / Approve all / Cancel).
-- [ ] States: round sent (verdicts locked), agent not reading, no powerboard (rounds list), Notify (no Send), approved (read-only); keys A / R / C / J / K, Ctrl+Enter.
-- [ ] Tests: vitest (round summary, verdict ↔ marks, turn labels); e2e on a fake two-round session and a temp board: verdicts, Ask now, a reply under its line, Send, Approve, the rail leaves a review, the fallback.
-- [ ] Gate: tsc, eslint, vitest, e2e green; a look in light, dark and 150 % against the prototype.
+- [x] Full view: AgentReviewsView leaves the file-history slot and takes the main area like Settings; the rail wins; Escape / ← back to the inbox, then the history.
+- [x] Inbox: rows with title, mode, agent, repo and branch, files, presence dot, whose turn, age; filter Waiting for you / Open / All; the badge counts reviews waiting for you.
+- [x] Review: top bar with round buttons; files column with progress; the diff with a verdict bar per change (Accept / Reject / Comment), origin chips, faded carried and removed cards; threads with Add to round / Ask now.
+- [x] Board column: feed with c<n> links into the diff, the Board box, presence, and the round box (counts, note, Send round n / Approve all / Cancel).
+- [x] States: round sent (verdicts locked), agent not reading, no powerboard (rounds list), Notify (no Send), approved (read-only); keys A / R / C / J / K, Ctrl+Enter.
+- [x] Tests: vitest roundModel (hunks, verdicts, counts, labels); e2e agent-review-rounds.spec on a temporary board (verdicts, Ask now, the agent's reply under its line, Send, round 2 keeps the accepted change, Approve, the rail leaves a review) and the no-powerboard fallback; the v0.20 spec reads the inbox filter.
+- [x] Gate: tsc, lint, prettier, vitest 516; e2e agent reviews, start pane, settings page, desk, shell and review specs green on a private harness; looked at in light, dark and 150 % (below 900 px the files become a strip over the diff). Done 36350d4b1.
 - [ ] Owner tick: a review reads like the prototype and the rail always responds.
 
-### v0.21.4 — Agent review rounds — presence in powerboard, the agent convention, a real two-round review (PLANNED)
+### v0.21.4 — Agent review rounds — presence in powerboard, the agent convention, a real two-round review (PLANNED) (current) (ACTIVE)
 **Goal:** Close the loop with a real agent. powerboard records a read only when it returns, so a long wait looks like an old read (design §4.4): a small powerboard change (its own repository) makes "the agent is reading" true. The agent convention goes into docs/agents/mcp-agent-review.md (§5). Gate: a real Claude Code session with powerboard does two rounds against PowerGit, and the owner ticks it.
-- [ ] powerboard (its own repository): while read waits, touch seen.updated every 5 s; PowerGit shows "reading this channel" under 15 s, else "last read … ago" (design §4.4).
-- [ ] docs/agents/mcp-agent-review.md: the board loop (open → read → get/revise → approved), the c<n>: reply prefix, the powerboard name equal to agent; README's Agent review section.
-- [ ] Linux: the round trip from the AppImage on Ubuntu (board.db under ~/.local/share/powerboard).
-- [ ] Gate: a real Claude Code session with powerboard does two rounds against PowerGit (a question between rounds, one rejection, one approval).
+- [x] powerboard 0.3.0 (its own repository, f3f92fe, pushed and installed for the owner): while read waits, seen.updated refreshes every 5 s; PowerGit shows "reading this channel" under 15 s, else "last read … ago" (design §4.4).
+- [x] docs/agents/mcp-agent-review.md: rounds, the round payload, the board and the agent's loop (open → read → get/revise → approved), the cN: reply prefix, the powerboard name equal to agent; README's Agent review section. Done 0429bb2b3.
+- [x] Linux: the linux-x64 single-file engine passes scripts/board-interop.py in WSL Ubuntu and finds $XDG_DATA_HOME/powerboard/board.db; the AppImage on a real Ubuntu desktop is the owner's check (and the release matrix).
+- [x] Gate: a real Claude Code agent (claude -p, powergit mcp + powerboard) did two rounds against PowerGit: answered a board question in 6 s, revised the rejected change with a reply, committed only after Approved. It surfaced "1 of 2 accepted" on approve; fixed: approve accepts what is undecided. Done 0429bb2b3.
 - [ ] Owner tick: a real agent review, two rounds, on his machine.
 
 ## Backlog
