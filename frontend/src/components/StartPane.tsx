@@ -174,6 +174,11 @@ export function StartPane(props: StartPaneProps) {
           p: 1.75,
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+          // Each row of cards as tall as its tallest card: the cards clip
+          // their corners (overflow hidden), which lets a fixed-height grid
+          // squeeze auto rows below their content and stack the cards over
+          // one another. The grid scrolls instead.
+          gridAutoRows: "max-content",
           gap: 1.75,
           alignContent: "start",
         }}

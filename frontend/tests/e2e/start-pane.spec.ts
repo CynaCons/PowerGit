@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test"
-import { rmSync } from "node:fs"
 import { basename } from "node:path"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo } from "../repoFixture"
@@ -72,8 +71,10 @@ test.describe("the start pane", () => {
   })
 
   test.afterAll(async () => {
-    for (const dir of [wtA, wtB]) rmSync(dir, { recursive: true, force: true })
-    await removeRepo(wtMain)
+    // Off the worktrees first: the engine watches the one it has open, and
+    // Windows will not delete a watched folder.
+    await openRepoOnEngine(previousRepo ?? process.cwd())
+    for (const dir of [wtA, wtB, wtMain]) await removeRepo(dir)
     for (const root of [a, b, long, wtMain, wtA, wtB]) {
       await fetch(`${ENGINE_URL}/repos/recents?root=${encodeURIComponent(root)}`, {
         method: "DELETE",
@@ -174,6 +175,8 @@ test.describe("the start pane", () => {
   // to read the history of that project. We shouldn't just show that project
   // in the list of recent and then he has to double click on it to open it."
   test("Open folder… from the pane opens that repository's history and the pane goes away", async ({ page }) => {
+    // A session of its own: earlier tests opened others, and idle ones are evicted.
+    bId = (await openOnEngine(b)).id
     await page.goto(`/?repo=${bId}`)
     await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
     await page.getByTestId("recents-button").click()
