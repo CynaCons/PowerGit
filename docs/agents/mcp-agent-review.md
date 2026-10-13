@@ -2,7 +2,7 @@
 
 PowerGit hosts a same-machine MCP review gate in its engine sidecar. Coding agents connect through `powergit mcp`, a byte-for-byte stdio bridge to a private per-user named pipe on Windows or local socket on Linux/macOS. The endpoint carries no token on disk. PowerGit must be running; a second PowerGit instance does not host another endpoint.
 
-Choose **Silent** for ordinary work that needs no PowerGit session, **Notify** to leave an inbox item while the agent continues, or **Wait** when the owner must approve or request changes before the agent continues. Version 1 is local-only: it does not clone, push, synchronize cloud reviews, or support multiple users.
+Choose **Silent** for ordinary work that needs no PowerGit session, **Notify** to leave an inbox item while the agent continues, or **Wait** when the owner must review before the agent continues: they accept or reject each change, comment on lines, and send the round back; the agent revises until they approve. Version 1 is local-only: it does not clone, push, synchronize cloud reviews, or support multiple users.
 
 ## Configure a client
 
@@ -37,23 +37,47 @@ The release Windows binary uses the GUI subsystem, but child-process pipe handle
 
 ## Tools and payloads
 
-- `agent_review_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, branch?, base_sha?, head_sha?, worktree?, files?: [{ path, status?, patch? }] }`
-- `agent_review_wait` `{ repo_path, review_id, timeout_ms? }` (clamped 1–120 s)
-- `agent_review_get` `{ repo_path, review_id }`
+- `agent_review_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, branch?, base_sha?, head_sha?, worktree?, files?: [{ path, status?, patch? }], board? }` — opens round 1; its patch is captured now.
+- `agent_review_wait` `{ repo_path, review_id, timeout_ms? }` (clamped 1–120 s) — returns when the owner sends the round back or closes the review.
+- `agent_review_get` `{ repo_path, review_id, round? }` — a round (the latest by default).
+- `agent_review_revise` `{ repo_path, review_id, note?, replies?: [{ comment: "c1", body }], head_sha?, files? }` — opens the next round from the worktree as it is now (or `head_sha`, or the given patches).
 - `agent_review_list` `{ repo_path }`
 - `agent_review_cancel` `{ repo_path, review_id, reason? }`
 
-The payload is `{ review_id, status: pending|approved|changes_requested|cancelled|expired, mode, title, timed_out?, summary_note, comments: [{ path, line: "+12"|"-7", side: "new"|"old", body }], session_file, review_file, export_markdown }`. A `tools/call` response is `{ content: [{ type: "text", text: <payload JSON> }], structuredContent: <payload> }`; a failure sets `isError: true` and puts the message in the text item.
+Since v0.21 (docs/design/agent-review-rounds.md) a review has rounds. The payload of open, wait, get and revise is `{ review_id, status: pending|approved|cancelled|expired, mode, title, round, rounds, turn: "user"|"agent"|null, board, timed_out, note, sent_at, changes: [{ id: "h1", file, origin: new|carried|revised, from, old_lines: [start, end], new_lines: [start, end], verdict: accept|reject|mixed|undecided, rejected_lines }], removed: ["h2"], comments: [{ id: "c1", round, change, file, line: "+12"|"-7", body, kind: round|ask, replies: [{ author, body, at }] }], session_file, review_file, export_markdown }`. `turn` is `"user"` while the owner reviews and `"agent"` once a round is sent back. A change keeps its id while its patch text is unchanged (`carried`, with its verdict); a change at an overlapping place is `revised`, `from` the old id. `mixed` means some lines were rejected: `rejected_lines` lists them. Reviews opened before v0.21 return the v0.20 payload (`summary_note`, `comments: [{ path, line, side, body }]`).
 
-The protocol is JSON-RPC 2.0 over newline-delimited JSON. `initialize` negotiates protocol version `2025-06-18`; `serverInfo.name` is `powergit`.
+A `tools/call` response is `{ content: [{ type: "text", text: <payload JSON> }], structuredContent: <payload> }`; a failure sets `isError: true` and puts the message in the text item. The protocol is JSON-RPC 2.0 over newline-delimited JSON. `initialize` negotiates protocol version `2025-06-18`; `serverInfo.name` is `powergit`.
+
+## The board (powerboard)
+
+When [powerboard](https://github.com/CynaCons/powerboard) is installed (its `board.db` exists), a review gets a channel, returned as `board` (`review-<repo>-<id4>`, or the name passed in `board`). PowerGit posts there: `Round n opened` (as `powergit`), the owner's questions (`c3 · path:line` + text), the round sent back (`Round n sent · …`, one line per rejected, mixed or undecided change with its comments, then `details: agent_review_get review_id=… round=n`), `Approved · …` or `Cancelled · …` (as `human`). The owner can also post on the channel from PowerGit at any time.
+
+The agent's loop, with its powerboard name equal to the `agent` it passed to open:
+
+```text
+open = powergit.agent_review_open(mode="wait", title, why, agent=<me>, worktree=true | base_sha/head_sha)
+if open.board:
+  loop:
+    msgs = powerboard.read(me=<me>, channel=open.board, wait_seconds=3600)
+    "Round n sent"   → powergit.agent_review_get(review_id, round=n); fix what was rejected
+                       or commented; powergit.agent_review_revise(review_id, note, replies=[{comment, body}])
+    "Approved"       → commit; stop
+    "Cancelled"      → stop
+    "cN · path:line" → answer on the board: powerboard.post(me, open.board, "cN: <answer>")
+    anything else from human → answer with powerboard.post
+else:
+  powergit.agent_review_wait(...) in a loop, as above without the questions
+```
+
+An answer that starts with `cN:` lands under that comment's line in PowerGit. powerboard 0.3.0 and later keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older powerboard it shows when the agent last read it.
 
 ## Agent convention
 
-Use Silent, or Notify when a paper trail is useful, for large refactors and generated noise. Use Wait for engine, release, authentication, or IPC changes. Always give a one-line `why` and either base/head SHAs or patches so the UI can anchor the diff.
+Use Silent, or Notify when a paper trail is useful, for large refactors and generated noise. Use Wait for engine, release, authentication, or IPC changes. Always give a one-line `why` and either base/head SHAs, `worktree: true`, or patches so the UI can anchor the diff.
 
-Wait calls run in bounded slices. If the payload has `timed_out: true`, call `agent_review_wait` again; timeout never means approval. If PowerGit quits during a wait, the session expires with the `host_gone` reason.
+Wait calls run in bounded slices. If the payload has `timed_out: true`, call `agent_review_wait` again; timeout never means approval. If PowerGit quits during a wait, the review expires with the `host_gone` reason. Approval is the owner's alone; the agent commits after `Approved`, and only then.
 
-Session files live at `.powergit/agent-reviews/<id>.json`; review comments and marks live at `.powergit/reviews/<id>.json`. PowerGit adds `/.powergit/` to `.git/info/exclude` so neither file is committed.
+Review files live at `.powergit/agent-reviews/<id>.json` (rounds, verdicts, comments, replies); the owner's line marks live at `.powergit/reviews/<id>.json` for round 1 and `.powergit/reviews/<id>-r<n>.json` after. PowerGit adds `/.powergit/` to `.git/info/exclude` so none of them is committed.
 
 ## Endpoint rule and troubleshooting
 

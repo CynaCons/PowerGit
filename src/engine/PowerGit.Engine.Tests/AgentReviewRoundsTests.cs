@@ -159,6 +159,8 @@ public sealed class AgentReviewRoundsTests : IClassFixture<WebApplicationFactory
         AgentReviewDto approved = host.ResolveAgentReview(session.Id, new("approve", null, null));
         Assert.Equal("approved", approved.Status);
         Assert.NotNull(approved.Rounds![1].SentAt);
+        // Approve is approve all: the changes left undecided are accepted.
+        Assert.All(approved.Rounds![1].Changes, c => Assert.Equal("accept", c.Verdict));
         Assert.Throws<AgentReviewStateException>(() => host.ReviseAgentReview(session.Id, new(null, null, null, null), CancellationToken.None));
     }
 

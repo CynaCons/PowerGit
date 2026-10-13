@@ -142,7 +142,10 @@ public sealed partial class GitHost
             if (action == "request_changes" && current.Rounds is { Count: > 0 }) return SendAgentReviewRound(id, req.Summary);
             if (action == "approve" && LatestRound(current) is { } open)
             {
+                // Approve is "approve all": what the owner left undecided is accepted;
+                // a change they rejected keeps its verdict.
                 AgentReviewRoundDto stamped = StampVerdicts(current, open) with { SentAt = open.SentAt ?? now, Note = Clean(req.Summary) ?? open.Note };
+                stamped = stamped with { Changes = [.. stamped.Changes.Select(c => c.Verdict == "undecided" ? c with { Verdict = "accept" } : c)] };
                 current = current with { Rounds = [.. current.Rounds!.Take(current.Rounds!.Count - 1), stamped], Comments = CollectRoundComments(current, stamped) };
             }
             updated = action switch
