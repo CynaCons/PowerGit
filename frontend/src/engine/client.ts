@@ -30,6 +30,7 @@ import type {
   RepoInfo,
   RecentInfo,
   RepoPeek,
+  WorkspaceInfo,
   RepoStatus,
   ResetScope,
   RevisionDto,
@@ -366,6 +367,11 @@ export class EngineClient {
 
   async recents(): Promise<RecentInfo[]> {
     return json<RecentInfo[]>(await this.get(`/repos/recents`))
+  }
+
+  /** The recent repositories grouped with all their worktrees (v0.20.10). */
+  async workspaces(signal?: AbortSignal): Promise<WorkspaceInfo[]> {
+    return json<WorkspaceInfo[]>(await this.get(`/repos/workspaces`, { signal }))
   }
 
   async peekRepos(roots: string[], signal?: AbortSignal): Promise<RepoPeek[]> {

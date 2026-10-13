@@ -1,12 +1,12 @@
-import { useCallback } from "react"
+import { useCallback, useMemo } from "react"
 import { useEngineBase, type RecentInfo } from "../engine"
 import type { useEngineSession } from "../hooks/useEngineSession"
 import { useRecentsPeek } from "../hooks/useRecentsPeek"
 import type { RepoState } from "../hooks/useRepoState"
+import { useWorkspaces } from "../hooks/useWorkspaces"
 import { isTauriShell } from "../shell"
 import { copyToClipboard } from "./clipboard"
 import { StartPane } from "./StartPane"
-import { useSelectedRoot } from "./useSelectedRoot"
 
 type Props = {
   session: ReturnType<typeof useEngineSession>
@@ -15,21 +15,26 @@ type Props = {
 }
 
 // Everything the pane needs from the app, so the pane itself stays a
-// component that takes props and calls back: the peeks for the list and for
-// the selection, the pin that writes through to recents.json, the clipboard,
-// and "Terminal here" — a shell command, so it does nothing in the browser
-// the e2e suite drives.
+// component that takes props and calls back: the repositories with their
+// worktrees, a state peek for each worktree on it, the pin that writes
+// through to recents.json, the clipboard, and "Terminal here" — a shell
+// command, so it does nothing in the browser the e2e suite drives.
 export function StartPaneView({ session, repoState, onClose }: Props) {
   const engine = useEngineBase()
   const { recents, setRecents, forgetRecent } = session
   const currentRoot = session.view.repo?.root ?? null
-  const [root, setRoot] = useSelectedRoot(recents, currentRoot)
-  const { peeks, detail } = useRecentsPeek(recents, root)
+  const workspaces = useWorkspaces(recents)
+  // The peek reads any folder, so never-opened worktrees get their state too.
+  const peekTargets = useMemo<RecentInfo[]>(
+    () => workspaces.flatMap((w) => w.worktrees.map((t) => ({ name: t.name, root: t.root, branch: "", id: "" }))),
+    [workspaces],
+  )
+  const { peeks } = useRecentsPeek(peekTargets, null)
 
   const pin = useCallback(
     (target: string, pinned: boolean) => {
-      // The star answers at once and the list is re-read afterwards: the
-      // order the engine returns is the one that must win.
+      // A never-opened worktree is not in recents yet; pinning it has to
+      // wait until it is opened once (the engine answers 404, ignored).
       setRecents(recents.map((r: RecentInfo) => (r.root === target ? { ...r, pinned } : r)))
       void engine
         .pinRecent(target, pinned)
@@ -49,14 +54,12 @@ export function StartPaneView({ session, repoState, onClose }: Props) {
 
   return (
     <StartPane
-      recents={recents}
+      workspaces={workspaces}
       peeks={peeks}
-      detail={detail}
       currentRoot={currentRoot}
-      onSelect={setRoot}
       onOpen={(target) => {
-        // Picking one is leaving the pane, as picking a tile closed the
-        // dialog. The pane is already gone while the repository loads.
+        // Picking one is leaving the pane. The pane is already gone while
+        // the repository loads.
         onClose()
         void repoState.openFolder(target)
       }}

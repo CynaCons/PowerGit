@@ -17,6 +17,32 @@ export type RepoInfo = {
 
 export type RecentInfo = RepoInfo & { lastOpened?: string; pinned?: boolean }
 
+/** One worktree of a repository (v0.20.10, GET /repos/workspaces). */
+export type WorktreeInfo = {
+  root: string
+  name: string
+  /** Short branch name; null when detached. */
+  branch: string | null
+  head?: string
+  main: boolean
+  detached: boolean
+  locked?: boolean
+  prunable?: boolean
+  /** From recents; null when never opened in PowerGit. */
+  lastOpened: string | null
+  pinned: boolean
+  id: string | null
+}
+
+/** A repository and every worktree git lists for it (v0.20.10). */
+export type WorkspaceInfo = {
+  name: string
+  mainRoot: string | null
+  lastOpened: string | null
+  pinned: boolean
+  worktrees: WorktreeInfo[]
+}
+
 export type RepoPeek = {
   root: string
   exists: boolean

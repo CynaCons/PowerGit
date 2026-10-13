@@ -2,17 +2,45 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { RecentInfo } from "../engine"
+import type { WorkspaceInfo, WorktreeInfo } from "../engine"
 import { StartPane, type StartPaneProps } from "./StartPane"
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const recents: RecentInfo[] = [
-  { id: "1", name: "Alpha", root: "/alpha", branch: "main", pinned: true, lastOpened: new Date().toISOString() },
-  { id: "2", name: "Beta", root: "/beta", branch: "feature", lastOpened: new Date().toISOString() },
+const now = new Date().toISOString()
+const tree = (name: string, extra: Partial<WorktreeInfo> = {}): WorktreeInfo => ({
+  root: `/p/${name}`,
+  name,
+  branch: `feature/${name}`,
+  main: false,
+  detached: false,
+  lastOpened: now,
+  pinned: false,
+  id: name,
+  ...extra,
+})
+const workspaces: WorkspaceInfo[] = [
+  {
+    name: "alpha",
+    mainRoot: "/p/alpha",
+    lastOpened: now,
+    pinned: false,
+    worktrees: [
+      tree("alpha", { main: true, branch: "main" }),
+      tree("alpha-fix"),
+      tree("alpha-new", { lastOpened: null, id: null }),
+    ],
+  },
+  {
+    name: "beta",
+    mainRoot: "/p/beta",
+    lastOpened: now,
+    pinned: false,
+    worktrees: [tree("beta", { main: true, branch: "main" })],
+  },
 ]
 
-describe("StartPane", () => {
+describe("StartPane (repository cards)", () => {
   let host: HTMLDivElement
   let root: Root
   let props: StartPaneProps
@@ -21,10 +49,8 @@ describe("StartPane", () => {
     document.body.append(host)
     root = createRoot(host)
     props = {
-      recents,
+      workspaces,
       peeks: new Map(),
-      detail: null,
-      onSelect: vi.fn(),
       onOpen: vi.fn(),
       onForget: vi.fn(),
       onPin: vi.fn(),
@@ -41,6 +67,7 @@ describe("StartPane", () => {
     vi.useRealTimers()
   })
   const render = () => act(() => root.render(<StartPane {...props} />))
+  const all = (testid: string) => host.querySelectorAll(`[data-testid="${testid}"]`)
   const key = (value: string) =>
     act(() =>
       host
@@ -53,24 +80,41 @@ describe("StartPane", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }))
     })
 
-  it("renders groups, filters, walks the cursor and opens", () => {
+  it("draws a card per repository with every worktree, the never-opened one marked", () => {
     render()
-    expect(host.querySelectorAll('[data-testid="start-group"]')).toHaveLength(2)
+    expect(all("start-card")).toHaveLength(2)
+    expect(all("start-row")).toHaveLength(4)
+    const never = host.querySelector('[data-never="true"]')
+    expect(never?.getAttribute("data-root")).toBe("/p/alpha-new")
+    expect(never?.textContent).toContain("never opened")
+    expect(all("start-main")).toHaveLength(2)
+  })
+
+  it("opens on one click", () => {
+    render()
+    act(() => (all("start-row")[1] as HTMLElement).click())
+    expect(props.onOpen).toHaveBeenCalledWith("/p/alpha-fix")
+  })
+
+  it("filters by branch or path, walks the cursor with the arrows and opens with Enter", () => {
+    render()
     const input = host.querySelector('[data-testid="start-filter"]') as HTMLInputElement
-    type(input, "feature")
-    expect(host.querySelectorAll('[data-testid="start-row"]')).toHaveLength(1)
+    type(input, "feature/alpha-f")
+    expect(all("start-row")).toHaveLength(1)
+    type(input, "/p/beta")
+    expect(all("start-card")).toHaveLength(1)
     type(input, "")
     key("ArrowDown")
     key("Enter")
-    expect(props.onSelect).toHaveBeenCalledWith("/beta")
-    expect(props.onOpen).toHaveBeenCalledWith("/beta")
+    expect(props.onOpen).toHaveBeenCalledWith("/p/alpha-fix")
   })
 
-  it("pins and delays Delete with Undo", () => {
+  it("pins from the row, and delays Delete with Undo", () => {
     vi.useFakeTimers()
     render()
-    act(() => (host.querySelector('[data-testid="start-pin"]') as HTMLButtonElement).click())
-    expect(props.onPin).toHaveBeenCalledWith("/alpha", false)
+    act(() => (all("start-pin")[0] as HTMLButtonElement).click())
+    expect(props.onPin).toHaveBeenCalledWith("/p/alpha", true)
+    expect(props.onOpen).not.toHaveBeenCalled()
     key("Delete")
     expect(host.querySelector('[data-testid="start-undo"]')).not.toBeNull()
     act(() => (host.querySelector('[data-testid="start-undo"]') as HTMLButtonElement).click())
@@ -78,8 +122,14 @@ describe("StartPane", () => {
     expect(props.onForget).not.toHaveBeenCalled()
   })
 
+  it("offers no Remove on a worktree that was never opened", () => {
+    render()
+    const never = host.querySelector('[data-never="true"]')!
+    expect(never.querySelector('[data-testid="start-remove"]')).toBeNull()
+  })
+
   it("renders the empty state", () => {
-    props.recents = []
+    props.workspaces = []
     render()
     expect(host.querySelector('[data-testid="start-empty"]')?.textContent).toContain("No repositories yet")
   })

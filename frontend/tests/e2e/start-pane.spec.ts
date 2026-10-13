@@ -1,20 +1,18 @@
 import { expect, test, type Page } from "@playwright/test"
+import { rmSync } from "node:fs"
 import { basename } from "node:path"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo } from "../repoFixture"
 
-// The recent repositories, second pass. Owner (2026-09-22): "I don't like
-// the current UI for the 'select a recent project' - can we try new visuals?
-// Show me prototypes" → "ok for b" (prototype B of
-// docs/prototypes/recents-v2.html, v0.20.3): the picker stops being a dialog
-// over the app. It is the main pane — the list on the left with the filter,
-// the groups, the pins and the keys; on the right the repository you are
-// about to open, with its path, its state, its recent history and the verbs.
+// The recent repositories, fourth pass (v0.20.10). Owner (2026-10-13): "would
+// be better able to handle work trees … I would like to more easily find my
+// work trees … or maybe something based on cards" → "Let's go with option E"
+// (docs/prototypes/recents-v4.html): one card per repository with every
+// worktree git lists for it, opened or not; one click opens a worktree.
 //
-// What it replaces (recents.spec.ts, v0.18.7 and v0.18.9): a centred dialog
-// of tiles with an initials disc. The behaviour the owner asked for then is
-// still here and still asserted — the filter has the focus, 1–9 jump, the
-// arrows walk, Delete offers Undo instead of a confirm.
+// What the earlier passes asked for is still asserted (v0.18.7 dialog,
+// v0.20.3 pane): the filter has the focus, 1–9 open, the arrows walk, Enter
+// opens, Delete offers Undo instead of a confirm, the star pins.
 
 async function openOnEngine(path: string): Promise<{ id: string }> {
   const res = await fetch(`${ENGINE_URL}/repos/open`, {
@@ -49,21 +47,34 @@ test.describe("the start pane", () => {
   // would have its backslashes read as escapes.
   const rowOf = (page: Page, dir: string) => page.getByTestId("start-row").filter({ hasText: basename(dir) })
 
+  // A repository with two linked worktrees, only its main checkout opened.
+  let wtMain = ""
+  let wtA = ""
+  let wtB = ""
+
   test.beforeAll(async () => {
     previousRepo = await currentRepoPath()
     a = makeRepo("pg-start-a-")
     b = makeRepo("pg-start-b-")
-    // Newest first on the engine: B then A, so A heads the list and B is the
-    // one that is open in the first test.
     long = makeRepo("pg-longbranch-")
     git(long, "checkout", "-q", "-b", LONG_BRANCH)
+    wtMain = makeRepo("pg-wtrepo-")
+    wtA = `${wtMain}-task-a`
+    wtB = `${wtMain}-task-b`
+    git(wtMain, "worktree", "add", "-q", "-b", "task/a-first", wtA)
+    git(wtMain, "worktree", "add", "-q", "-b", "task/b-second", wtB)
+    // Newest first on the engine: B then A, so A heads the list and B is the
+    // one that is open in the first test.
+    await openOnEngine(wtMain)
     await openOnEngine(long)
     bId = (await openOnEngine(b)).id
     await openOnEngine(a)
   })
 
   test.afterAll(async () => {
-    for (const root of [a, b, long]) {
+    for (const dir of [wtA, wtB]) rmSync(dir, { recursive: true, force: true })
+    await removeRepo(wtMain)
+    for (const root of [a, b, long, wtMain, wtA, wtB]) {
       await fetch(`${ENGINE_URL}/repos/recents?root=${encodeURIComponent(root)}`, {
         method: "DELETE",
         headers: engineHeaders(),
@@ -90,13 +101,46 @@ test.describe("the start pane", () => {
     await expect(rowOf(page, a)).toContainText(basename(a))
     await expect(rowOf(page, a)).toContainText("main")
     await expect(rowOf(page, b)).toContainText("open now")
-    // The right-hand side follows the cursor: A is first, so A is previewed.
-    await expect(page.getByTestId("start-detail-path")).toHaveText(a)
-    await expect(page.getByTestId("start-commit").first()).toBeVisible()
+    // Each repository is a card; the worktree's path is on its row.
+    await expect(rowOf(page, a).getByTestId("start-path")).toHaveAttribute("title", a)
 
     await page.keyboard.press("1")
     await expect(page.getByTestId("start-pane")).toHaveCount(0)
     await expect(page.getByTestId("title-strip")).toContainText(basename(a), { timeout: 30_000 })
+  })
+
+  // Owner (2026-10-13): "very importantly would be better able to handle work
+  // trees … I would like to more easily find my work trees". Only the main
+  // checkout was ever opened; git knows the other two, so they are on its
+  // card, marked never opened, and one click opens one.
+  test("a repository's card lists every worktree, the never-opened ones too, and one click opens one", async ({
+    page,
+  }) => {
+    await page.goto("/")
+    await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
+    await page.getByTestId("recents-button").click()
+    await page.getByTestId("start-filter").fill(basename(wtMain))
+
+    const card = page.getByTestId("start-card").filter({ hasText: basename(wtMain) })
+    await expect(card).toHaveCount(1)
+    const rows = card.getByTestId("start-row")
+    await expect(rows).toHaveCount(3)
+    await expect(rows.nth(0)).toContainText(basename(wtMain))
+    await expect(rows.nth(0).getByTestId("start-main")).toBeVisible()
+    for (const [dir, branch] of [
+      [wtA, "task/a-first"],
+      [wtB, "task/b-second"],
+    ]) {
+      const row = rows.filter({ hasText: basename(dir) })
+      await expect(row).toHaveAttribute("data-never", "true")
+      await expect(row).toContainText("never opened")
+      await expect(row.getByTestId("start-branch")).toHaveText(branch)
+    }
+
+    await rows.filter({ hasText: basename(wtB) }).click()
+    await expect(page.getByTestId("start-pane")).toHaveCount(0)
+    await expect(page.getByTestId("title-strip")).toContainText(basename(wtB), { timeout: 30_000 })
+    await expect(page.getByTestId("status-branch")).toHaveText("task/b-second")
   })
 
   test("the filter marks what matched and counts; Escape clears it, then Escape puts the grid back", async ({
@@ -111,7 +155,7 @@ test.describe("the start pane", () => {
     const rows = page.getByTestId("start-row")
     await expect(rows).toHaveCount(2)
     await expect(rows.nth(0).getByTestId("start-match").first()).toHaveText("pg-start-")
-    await expect(page.getByTestId("start-count")).toHaveText(/^2 of \d+$/)
+    await expect(page.getByTestId("start-count")).toHaveText(/^2 of \d+ in 2 repositories$/)
 
     await filter.fill("nothing-like-this")
     await expect(page.getByTestId("start-empty")).toContainText('Nothing matches "nothing-like-this"')
@@ -186,10 +230,10 @@ test.describe("the start pane", () => {
           cursor: shown(cursor),
           other: shown(other),
           selection: resolve("var(--pg-grid-sel)"),
-          paper: shown(document.querySelector('[data-testid="start-detail-path"]')),
+          paper: shown(other.closest('[data-testid="start-card"]')),
           separators: rows.map((r) => {
             const s = getComputedStyle(r)
-            return { width: parseFloat(s.borderBottomWidth), colour: s.borderBottomColor }
+            return { width: parseFloat(s.borderTopWidth), colour: s.borderTopColor }
           }),
         }
       })
@@ -203,7 +247,7 @@ test.describe("the start pane", () => {
     })
   }
 
-  test("the arrows walk the list, the preview follows, and Enter opens what is under the cursor", async ({ page }) => {
+  test("the arrows walk the rows, and Enter opens what is under the cursor", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
     await page.getByTestId("recents-button").click()
@@ -212,22 +256,16 @@ test.describe("the start pane", () => {
     const rows = page.getByTestId("start-row")
     await expect(rows).toHaveCount(2)
     await expect(rows.nth(0)).toHaveAttribute("data-cursor", "true")
-    const first = (await rows.nth(0).boundingBox())!
-    const second = (await rows.nth(1).boundingBox())!
-    // One column, so ArrowDown is exactly one row down.
-    expect(Math.round(second.x)).toBe(Math.round(first.x))
-    expect(second.y).toBeGreaterThan(first.y)
-
+    // ArrowDown walks the rows in reading order, from one card to the next.
     await page.keyboard.press("ArrowDown")
     await expect(rows.nth(1)).toHaveAttribute("data-cursor", "true")
-    await expect(page.getByTestId("start-detail-path")).toHaveText(await rows.nth(1).getAttribute("data-root"))
 
     await page.keyboard.press("Enter")
     await expect(page.getByTestId("start-pane")).toHaveCount(0)
     await expect(page.getByTestId("title-strip")).toContainText(basename(b), { timeout: 30_000 })
   })
 
-  test("the star pins a repository to the top of the list, and the engine remembers it", async ({ page }) => {
+  test("the star pins a repository to the first card, and the engine remembers it", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("grid-row").first()).toBeVisible({ timeout: 30_000 })
     await page.getByTestId("recents-button").click()
@@ -235,9 +273,8 @@ test.describe("the start pane", () => {
     const row = rowOf(page, b)
     await row.hover()
     await row.getByTestId("start-pin").click()
-    // The first group is Pinned, and B is in it.
-    await expect(page.getByTestId("start-group").first()).toContainText("Pinned")
-    await expect(page.getByTestId("start-row").first()).toHaveAttribute("data-root", b)
+    // A pinned repository is the first card.
+    await expect(page.getByTestId("start-card").first()).toContainText(basename(b))
     await expect.poll(async () => (await recents()).find((r) => r.root === b.toLowerCase())?.pinned).toBe(true)
 
     await row.getByTestId("start-pin").click()
@@ -255,7 +292,7 @@ test.describe("the start pane", () => {
     await expect(rowA).toHaveCount(1)
     await page.getByTestId("start-filter").fill("pg-start-a")
     await expect(rowA).toHaveAttribute("data-cursor", "true")
-    await page.getByTestId("start-forget").click()
+    await rowA.getByTestId("start-remove").click()
     await expect(rowA).toHaveCount(0)
     await expect(page.getByTestId("start-undo")).toBeVisible()
 
@@ -266,7 +303,7 @@ test.describe("the start pane", () => {
     // Let the five seconds pass: Playwright's clock fires the timer the pane
     // arms after the click, as the dialog's did.
     await page.clock.install()
-    await page.getByTestId("start-forget").click()
+    await rowA.getByTestId("start-remove").click()
     await expect(rowA).toHaveCount(0)
     await page.clock.fastForward(5_000)
     await expect.poll(async () => (await recents()).map((r) => r.root)).not.toContain(a.toLowerCase())
