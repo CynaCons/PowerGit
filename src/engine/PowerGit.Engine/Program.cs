@@ -60,6 +60,10 @@ builder.Services.AddSingleton(_ => new RepositoryPeek(
     string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GIT_EXECUTABLE"))
         ? null
         : Environment.GetEnvironmentVariable("GIT_EXECUTABLE")));
+builder.Services.AddSingleton(_ => new Workspaces(
+    string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GIT_EXECUTABLE"))
+        ? null
+        : Environment.GetEnvironmentVariable("GIT_EXECUTABLE")));
 if (Environment.GetEnvironmentVariable("POWERGIT_MCP") != "0")
 {
     builder.Services.AddHostedService(sp => new McpHost(
@@ -143,6 +147,11 @@ app.MapGet("/repos/current", (RepoRegistry repos) =>
         : Results.Ok(repos.Current));
 
 app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
+
+// The recents as repositories with their worktrees (v0.20.10, the start
+// pane's repository cards): one `git worktree list` per repository.
+app.MapGet("/repos/workspaces", async (Workspaces workspaces, HttpContext ctx) =>
+    Results.Ok(await workspaces.ListAsync(RecentsStore.List(), ctx.RequestAborted)));
 
 app.MapPut("/repos/recents/pin", (PinRecentRequest body) =>
 {
