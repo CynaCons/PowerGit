@@ -996,7 +996,7 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Owner tick: picking and opening a repository feels right.
 - [ ] Release v0.20.10 at the owner's call ("can you just release the 20.10?"): local full e2e stopped by low memory at 10/197, so CI's full suite on the pushed head is the gate before the tag; the zip is smoke-tested from the release.
 
-### v0.20.11 — Settings — no filler text, and the rail always wins over Settings (current) (ACTIVE)
+### v0.20.11 — Settings — no filler text, and the rail always wins over Settings
 **Goal:** Owner 2026-10-13: "sometimes in the settings there is like AI slop comments … This is an engineering tool. The tool says what it does and that's it." and "the settings view still overrides all the other views … it feels like the click is not working just because the setting is always taking over."
 - [ ] UI copy: every description and helper line in Settings (and the rest of the app) says what the control does, nothing else; the update row's reassurance goes; a test lists the removed phrases.
 - [ ] Settings yields: a click on any rail item (Recent repositories, Commit, …) closes Settings and shows that view; e2e red first.
@@ -1020,25 +1020,25 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 
 Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the owner's explicit call ("Can we release 0.20? If possible quickly" — and, asked about the two open ticks, "tag now, tick after"). The v0.20.1 owner tick is open too. Anything either of them turns up goes into v0.20.4.
 
-### v0.21.1 — Agent review rounds — the engine: rounds, a verdict per change, agent_review_revise (PLANNED)
+### v0.21.1 — Agent review rounds — the engine: rounds, a verdict per change, agent_review_revise (PLANNED) (2026-10-13) (COMPLETE)
 **Goal:** Owner 2026-10-13: "give user the possibility to approve or reject lines and give comments to the agents … the review shall be cadenced by the agents through MCP." Design: docs/design/agent-review-rounds.md §3, §5, §6 (prototype docs/prototypes/agent-review-v3.html, layout A, picked by the owner). Session v2 with rounds and captured patches; change identity across rounds; verdicts from v0.19's line marks; the MCP tools. No UI and no board in this iteration.
-- [ ] Session v2: rounds with the patch captured when each round opens, change ids h<n>, comments with ids; v1 sessions read as one round (design §3.1).
-- [ ] Change identity across rounds: carried / revised / new / removed by path, hash and old-side overlap (§3.2); xunit on fixture diffs.
-- [ ] Line marks per round (key <sid>-r<n>), copied for carried changes; a change's verdict from its marks: accept / reject / mixed / undecided (§3.3).
-- [ ] Routes: round diff, verdict, comments, send round (wakes wait), resolve; GET returns v2 (§6).
-- [ ] MCP: agent_review_revise (new), agent_review_get with round, agent_review_wait returns the round's verdicts and comments (§5); mcp-probe.mjs drives two rounds.
-- [ ] Gate: engine suite green; mcp-probe open → send → revise → approve.
+- [x] Session v2: rounds with the patch captured when each round opens, change ids h<n>, comments with ids; v1 sessions read as one round (design §3.1).
+- [x] Change identity across rounds: carried / revised / new / removed by path, hash and old-side overlap (§3.2); xunit on fixture diffs.
+- [x] Line marks per round (key <sid>-r<n>), copied for carried changes; a change's verdict from its marks: accept / reject / mixed / undecided (§3.3).
+- [x] Routes: round diff, verdict, comments, send round (wakes wait), resolve; GET returns v2 (§6).
+- [x] MCP: agent_review_revise (new), agent_review_get with round, agent_review_wait returns the round's verdicts and comments (§5); mcp-probe.mjs drives two rounds.
+- [x] Gate: engine suite green (244, 1 skipped); McpHostTests drive open → send → revise → get over the real pipe. mcp-probe.mjs (now answers a round with a revise) runs through the shim at v0.21.4's real gate. Done 88000b80a.
 
-### v0.21.2 — Agent review rounds — powerboard as the review's channel (PLANNED)
+### v0.21.2 — Agent review rounds — powerboard as the review's channel (PLANNED) (2026-10-13) (COMPLETE)
 **Goal:** Owner 2026-10-13: "I want powerboard to be the communication medium between PowerGit / user and the agent … the agent listens to a board dedicated to the review. Feedback from the user is pushed on that board." Design §4: the engine reads and writes powerboard's board.db (no Python), one channel per review, posts as powergit (events) and human (the user), reads without touching anyone's read position; no board.db → today's agent_review_wait.
-- [ ] Board adapter: locate board.db as powerboard does, open WAL + busy_timeout 10 s, schema check, never create the file; Microsoft.Data.Sqlite (check sidecar size and the AppImage matrix).
-- [ ] Channel per review (review-<repo>-<id4>, optional board name on open); open/revise/send/approve/cancel post the texts of design §4.3.
-- [ ] Read the channel by id (never write seen); agent posts starting c<n>: become replies in the review file; GET/POST /agent-reviews/{id}/board, GET /board/status.
-- [ ] Presence from seen.updated of the session's agent name ("last read 10:44").
-- [ ] Tests: xunit against a temp board.db with powerboard's schema (post, read, no seen writes, names, unknown schema, missing file); mcp-probe with a real powerboard read loop.
-- [ ] Gate: engine suite green; a powerboard read on the channel sees the round posts, and a post there shows as a reply.
+- [x] Board adapter: locate board.db as powerboard does, open WAL + busy_timeout 10 s, schema check, never create the file; Microsoft.Data.Sqlite. Single-file sidecar +2.3 MB and loads SQLite (interop run on the published exe); the AppImage matrix runs at v0.21.4's Linux check.
+- [x] Channel per review (review-<repo>-<id4>, optional board name on open); open/revise/send/approve/cancel post the texts of design §4.3.
+- [x] Read the channel by id (never write seen); agent posts starting c<n>: become replies in the review file; GET/POST /agent-reviews/{id}/board, GET /board/status.
+- [x] Presence from seen.updated of the session's agent name ("last read 10:44").
+- [x] Tests: xunit against a temp board.db with powerboard's schema (post, read, no seen writes, names, unknown schema, missing file); scripts/board-interop.py runs the engine against a board powerboard created, with powerboard's own code as the agent.
+- [x] Gate: engine suite 248 passed, 1 skipped; board-interop.py passes with dotnet run and the published sidecar (open, ask, an agent reply landing on the thread, send). Done 3698fc08a.
 
-### v0.21.3 — Agent review rounds — the full view, layout A (PLANNED)
+### v0.21.3 — Agent review rounds — the full view, layout A (PLANNED) (current) (ACTIVE)
 **Goal:** Owner 2026-10-13: "should we go full view instead of just the bottom panels?" and "I'm okay for A. This is very good." Build tabs A, Inbox and States of docs/prototypes/agent-review-v3.html (design §7): the inbox and a review take the window except the rail; files, the diff with a verdict per change, the board column with the round box. Gate: the e2e specs, a look in light, dark and 150 %, the owner's tick.
 - [ ] Full view: AgentReviewsView leaves the file-history slot and takes the main area like Settings; the rail wins; Escape / ← back to the inbox, then the history.
 - [ ] Inbox: rows with title, mode, agent, repo and branch, files, presence dot, whose turn, age; filter Waiting for you / Open / All; the badge counts reviews waiting for you.
