@@ -212,9 +212,8 @@ public sealed class FilesTests : IClassFixture<WebApplicationFactory<Program>>
             InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
                 () => host.OpenFile("a.txt", Path.Combine(repo.Dir, "no-such-program.exe")));
             Assert.Contains("could not start", ex.Message);
-            InvalidOperationException shell = Assert.Throws<InvalidOperationException>(
-                () => host.OpenFile("a.txt", "powergit-no-such-command-xyz --flag"));
-            Assert.Contains("before opening the file", shell.Message);
+            // The bare command the shell rejects is in TimingTests: the engine
+            // gives the shell 400 ms to fail, which a loaded suite can miss.
         }
     }
 
