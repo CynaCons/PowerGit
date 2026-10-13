@@ -19,4 +19,10 @@ if (-not $env:POWERGIT_ENGINE_TOKEN) {
 if (-not $env:POWERGIT_DATA_DIR) {
   $env:POWERGIT_DATA_DIR = Join-Path ([System.IO.Path]::GetTempPath()) "powergit-dev-data"
 }
+# The same for powerboard (v0.21.2): agent reviews post on the board, and
+# the e2e fixtures must not land on the user's real one. A spec that needs a
+# board creates this file. POWERBOARD_DB wins if already set.
+if (-not $env:POWERBOARD_DB) {
+  $env:POWERBOARD_DB = Join-Path $env:POWERGIT_DATA_DIR "board.db"
+}
 & $dotnet run --project $project --urls "http://127.0.0.1:7733"

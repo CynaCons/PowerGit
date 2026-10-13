@@ -108,6 +108,7 @@ public sealed partial class GitHost
         }
         sessions.Sort((a, b) => string.CompareOrdinal(b.CreatedAt, a.CreatedAt));
         AgentReviewSummaryDto[] summaries = [.. sessions.Select(ToSummary)];
+        WithLastReads(summaries, sessions);
         // A Wait review counts while it is the owner's turn; a Notify one while unread.
         int badge = sessions.Count(s => (s.Mode == "wait" && s.Status == "pending" && TurnOf(s) != "agent") || (s.Mode == "notify" && s.Unread && s.Status == "pending"));
         return new AgentReviewListDto(summaries, badge);
@@ -233,7 +234,7 @@ public sealed partial class GitHost
         return req with { Mode = mode, Title = title, Why = req.Why ?? "", Worktree = req.Worktree ?? false, Files = files };
     }
 
-    private void WriteAgentReview(AgentReviewDto session)
+    private void WriteAgentReview(AgentReviewDto session, bool bump = true)
     {
         string path = AgentReviewPath(session.Id);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -245,7 +246,7 @@ public sealed partial class GitHost
         }
         catch { File.Delete(temporary); throw; }
         if (!_reviewsExcluded) { EnsureExcluded("/.powergit/"); _reviewsExcluded = true; }
-        BumpAgentReviews();
+        if (bump) BumpAgentReviews();
     }
 
     private void BumpAgentReviews()

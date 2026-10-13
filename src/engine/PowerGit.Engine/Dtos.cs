@@ -116,7 +116,7 @@ public sealed record AgentReviewThreadDto(
 public sealed record AgentReviewSummaryDto(
     string Id, string Mode, string Title, string? Agent, string? Branch,
     int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt,
-    int Round = 1, string? Turn = null, string? Board = null);
+    int Round = 1, string? Turn = null, string? Board = null, string? LastRead = null);
 public sealed record AgentReviewRequest(
     string Mode, string Title, string? Why, string? Agent, string? Branch,
     string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files,
@@ -127,6 +127,13 @@ public sealed record AgentReviewReviseRequest(
     IReadOnlyList<AgentReviewFileDto>? Files);
 public sealed record AgentReviewSendRequest(string? Note);
 public sealed record AgentReviewAskRequest(int Round, string Path, string Line, string Body);
+public sealed record BoardMessageDto(long Id, string Author, string Text, string At);
+/// <summary>v0.21.2: a review's powerboard channel. Reading is true while the
+///  agent's last read of the channel is under 15 s old.</summary>
+public sealed record AgentReviewBoardDto(
+    bool Available, string? Channel, string? Reason, IReadOnlyList<BoardMessageDto> Messages,
+    string? Agent, string? LastRead, bool Reading);
+public sealed record BoardPostRequest(string Text);
 public sealed record AgentReviewResolveRequest(string Action, string? Summary, string? Reason);
 public sealed record AgentReviewWaitDto(AgentReviewDto Session, bool TimedOut);
 public sealed record AgentReviewListDto(IReadOnlyList<AgentReviewSummaryDto> Sessions, int Badge);

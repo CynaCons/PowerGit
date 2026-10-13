@@ -42,6 +42,7 @@ if (-not (Test-Path $pidFile)) {
   if (-not (Test-Path $dotnet)) { $dotnet = "dotnet" }
   $env:POWERGIT_ENGINE_TOKEN = $token
   $env:POWERGIT_DATA_DIR = Join-Path $state "data"
+  $env:POWERBOARD_DB = Join-Path $state "data\board.db"
   $env:POWERGIT_ENGINE_ORIGINS = "http://127.0.0.1:$UiPort,http://localhost:$UiPort"
   $env:DOTNET_ROOT = Join-Path $env:LOCALAPPDATA "Microsoft\dotnet"
   $project = Join-Path $Root "src\engine\PowerGit.Engine\PowerGit.Engine.csproj"
