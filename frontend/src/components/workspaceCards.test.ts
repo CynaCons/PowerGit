@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { WorkspaceInfo, WorktreeInfo } from "../engine"
-import { FOLD_AT, buildCards, fallbackWorkspaces, matchTree, orderTrees } from "./workspaceCards"
+import { FOLD_AT, buildCards, fallbackWorkspaces, matchTree, orderTrees, withRecents } from "./workspaceCards"
 
 const tree = (name: string, extra: Partial<WorktreeInfo> = {}): WorktreeInfo => ({
   root: `C:/p/${name}`,
@@ -96,6 +96,35 @@ describe("buildCards", () => {
     const { rows, total } = buildCards([atlas], "", "recent", new Set(), "C:/p/atlas-old")
     expect(rows.map((r) => r.tree.name)).not.toContain("atlas-old")
     expect(total).toBe(4)
+  })
+})
+
+describe("withRecents", () => {
+  it("takes the pin from the recents list, which changes before the workspaces answer does", () => {
+    const [w] = withRecents(
+      [atlas],
+      [
+        {
+          name: "atlas-new",
+          root: "c:/P/atlas-new",
+          branch: "x",
+          id: "n",
+          pinned: true,
+          lastOpened: "2026-10-13T10:00:00Z",
+        },
+      ],
+    )
+    const tree = w.worktrees.find((t) => t.name === "atlas-new")!
+    expect(tree.pinned).toBe(true)
+    expect(tree.lastOpened).toBe("2026-10-13T10:00:00Z")
+    expect(w.pinned).toBe(true)
+    // An unpin in the list unpins at once, whatever the answer still says.
+    const [again] = withRecents(
+      [w],
+      [{ name: "atlas-new", root: "C:/p/atlas-new", branch: "x", id: "n", pinned: false }],
+    )
+    expect(again.worktrees.find((t) => t.name === "atlas-new")!.pinned).toBe(false)
+    expect(again.pinned).toBe(false)
   })
 })
 

@@ -41,6 +41,19 @@ export function fallbackWorkspaces(recents: RecentInfo[]): WorkspaceInfo[] {
   }))
 }
 
+/** The recents list's pins and last-opened times over the workspaces answer:
+ *  the list changes the moment a star is clicked, the answer a moment later. */
+export function withRecents(workspaces: WorkspaceInfo[], recents: RecentInfo[]): WorkspaceInfo[] {
+  const byRoot = new Map(recents.map((r) => [r.root.toLowerCase(), r]))
+  return workspaces.map((w) => {
+    const worktrees = w.worktrees.map((t) => {
+      const r = byRoot.get(t.root.toLowerCase())
+      return r ? { ...t, pinned: r.pinned ?? false, lastOpened: r.lastOpened ?? t.lastOpened } : t
+    })
+    return { ...w, worktrees, pinned: worktrees.some((t) => t.pinned) }
+  })
+}
+
 const time = (value: string | null) => (value ? Date.parse(value) || 0 : 0)
 
 /** Main first, then the most recently opened, then never-opened ones by name. */
