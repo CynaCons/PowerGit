@@ -7,26 +7,26 @@ import { DEFAULT_BEHAVIOUR, type Behaviour } from "../../theme/behaviour"
 export type BehaviourSwitch = { key: keyof Behaviour; label: string; testid: string }
 
 export const CONFIRM_SWITCHES: BehaviourSwitch[] = [
-  { key: "confirmForcePush", label: "Force-pushing a branch", testid: "settings-confirm-force-push" },
-  { key: "confirmDeleteBranch", label: "Deleting a branch or tag", testid: "settings-confirm-delete-branch" },
-  { key: "confirmResetHard", label: "Resetting hard (discards changes)", testid: "settings-confirm-reset-hard" },
+  { key: "confirmForcePush", label: "Force push", testid: "settings-confirm-force-push" },
+  { key: "confirmDeleteBranch", label: "Delete a branch or tag", testid: "settings-confirm-delete-branch" },
+  { key: "confirmResetHard", label: "Hard reset", testid: "settings-confirm-reset-hard" },
   {
     key: "confirmCheckoutDirty",
-    label: "Checking out with uncommitted changes",
+    label: "Checkout with uncommitted changes",
     testid: "settings-confirm-checkout-dirty",
   },
-  { key: "confirmAbortOperation", label: "Aborting a merge or rebase", testid: "settings-confirm-abort-operation" },
+  { key: "confirmAbortOperation", label: "Abort a merge or rebase", testid: "settings-confirm-abort-operation" },
 ]
 
 export const REBASE_SWITCHES: BehaviourSwitch[] = [
   {
     key: "defaultRebaseAutostash",
-    label: "Stash and restore local changes around a rebase",
+    label: "--autostash",
     testid: "settings-default-rebase-autostash",
   },
   {
     key: "defaultRebaseAutosquash",
-    label: "Fold fixup! and squash! commits during an interactive rebase",
+    label: "--autosquash",
     testid: "settings-default-rebase-autosquash",
   },
 ]
@@ -44,6 +44,6 @@ export function behaviourDefaults(keys: readonly (keyof Behaviour)[]): Partial<B
 }
 
 export function intervalLabel(minutes: number): string {
-  if (minutes === 0) return "Never"
+  if (minutes === 0) return "Off"
   return minutes === 1 ? "Every minute" : `Every ${minutes} minutes`
 }

@@ -48,7 +48,7 @@ describe("the switches", () => {
   })
 
   it("labels the fetch intervals", () => {
-    expect(intervalLabel(0)).toBe("Never")
+    expect(intervalLabel(0)).toBe("Off")
     expect(intervalLabel(1)).toBe("Every minute")
     expect(intervalLabel(5)).toBe("Every 5 minutes")
   })

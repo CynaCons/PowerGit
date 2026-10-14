@@ -171,7 +171,9 @@ export default function App({ base }: { base: EngineClient }) {
     selectRow: (i: number) => setSelectedSha(rows[i]?.rev.id ?? null),
     openStash: () => open({ kind: "stash" }),
     openRepo: () => void openFolder(),
-    openRecents: () => (agentReviewsPage.close(), startPane.toggle()),
+    // From Settings, Recent repositories shows the pane rather than
+    // toggling one that may already be open under the page.
+    openRecents: () => (agentReviewsPage.close(), settings.open ? startPane.show() : startPane.toggle()),
     openSettings: settings.toggle,
     openSnapshot: () => void takeDiagnosticSnapshot(),
     recover: () => setRecoveryOpen(true),
@@ -273,42 +275,44 @@ export default function App({ base }: { base: EngineClient }) {
         />
 
         <Box className="pg-desk" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-          {railBar ? (
-            <CommandRail
-              repoName={repo?.name}
-              onOpenRepo={chrome.openRepo}
-              onRecents={chrome.openRecents}
-              onSettings={chrome.openSettings}
-              settingsOpen={settings.open}
-              onSnapshot={chrome.openSnapshot}
-              live={live}
-              dirty={dirty}
-              operation={status?.state ?? "none"}
-              stashCount={stashes.length}
-              hasCurrent={current !== undefined}
-              remoteNames={remoteNames}
-              defaultRemote={defaultRemote}
-              jobs={jobs}
-              actions={actions}
-              refresh={chrome.refresh}
-              openStash={chrome.openStash}
-              onAgentReviews={chrome.openAgentReviews}
-              agentReviewsOpen={agentReviewsPage.open}
-              agentReviewsBadge={agentReviews.badge}
-            />
-          ) : (
-            <NavRail
-              repoName={repo?.name}
-              onOpenRepo={chrome.openRepo}
-              onRecents={chrome.openRecents}
-              onSettings={chrome.openSettings}
-              settingsOpen={settings.open}
-              onSnapshot={chrome.openSnapshot}
-              onAgentReviews={chrome.openAgentReviews}
-              agentReviewsOpen={agentReviewsPage.open}
-              agentReviewsBadge={agentReviews.badge}
-            />
-          )}
+          <Box sx={{ display: "flex", flexShrink: 0 }} onClickCapture={settings.railClick}>
+            {railBar ? (
+              <CommandRail
+                repoName={repo?.name}
+                onOpenRepo={chrome.openRepo}
+                onRecents={chrome.openRecents}
+                onSettings={chrome.openSettings}
+                settingsOpen={settings.open}
+                onSnapshot={chrome.openSnapshot}
+                live={live}
+                dirty={dirty}
+                operation={status?.state ?? "none"}
+                stashCount={stashes.length}
+                hasCurrent={current !== undefined}
+                remoteNames={remoteNames}
+                defaultRemote={defaultRemote}
+                jobs={jobs}
+                actions={actions}
+                refresh={chrome.refresh}
+                openStash={chrome.openStash}
+                onAgentReviews={chrome.openAgentReviews}
+                agentReviewsOpen={agentReviewsPage.open}
+                agentReviewsBadge={agentReviews.badge}
+              />
+            ) : (
+              <NavRail
+                repoName={repo?.name}
+                onOpenRepo={chrome.openRepo}
+                onRecents={chrome.openRecents}
+                onSettings={chrome.openSettings}
+                settingsOpen={settings.open}
+                onSnapshot={chrome.openSnapshot}
+                onAgentReviews={chrome.openAgentReviews}
+                agentReviewsOpen={agentReviewsPage.open}
+                agentReviewsBadge={agentReviews.badge}
+              />
+            )}
+          </Box>
 
           <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <Box ref={contentRef} className="pg-desk-row" sx={{ flex: 1, minHeight: 0, display: "flex" }}>

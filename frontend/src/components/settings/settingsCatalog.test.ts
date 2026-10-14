@@ -59,3 +59,42 @@ describe("the catalog", () => {
     expect(() => metaOf("nope.nothing")).toThrow()
   })
 })
+
+// v0.21.6, owner: "an engineering settings. Clean, straight, we don't need
+// opinions, we don't need lengthy text everywhere." These lines were on the
+// page before and must not come back; descriptions stay one short line.
+const REMOVED = [
+  "Changes apply as you make them",
+  "This app, every repository",
+  "Saved to this repository only",
+  "Saved to your global Git config",
+  "Nothing is checked until you ask",
+  "nothing installed until you say so",
+  "turn one off knowingly",
+  "Keeps the remote branches fresh",
+  "Asked the system for the inspector",
+  "the developer tools may be unavailable",
+  "Take a diagnostic snapshot afterwards",
+  "You are up to date",
+  "PowerGit closes, installs",
+]
+
+describe("the settings copy", () => {
+  const sources = import.meta.glob("./*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<
+    string,
+    string
+  >
+
+  it("has none of the removed lines", () => {
+    expect(Object.keys(sources).length).toBeGreaterThan(10)
+    for (const [file, text] of Object.entries(sources)) {
+      if (file.endsWith(".test.ts")) continue
+      for (const phrase of REMOVED) expect(text.includes(phrase), `${file}: "${phrase}"`).toBe(false)
+    }
+  })
+
+  it("keeps every description to one short line", () => {
+    for (const s of SETTINGS_CATALOG)
+      for (const r of s.rows) if (r.description) expect(r.description.length, r.id).toBeLessThanOrEqual(90)
+  })
+})

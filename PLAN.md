@@ -996,11 +996,8 @@ Tag `v0.18.18` on `ee7194bd1`, from iteration v0.18.18 (A–I delivered; the own
 - [ ] Owner tick: picking and opening a repository feels right.
 - [ ] Release v0.20.10 at the owner's call ("can you just release the 20.10?"): local full e2e stopped by low memory at 10/197, so CI's full suite on the pushed head is the gate before the tag; the zip is smoke-tested from the release.
 
-### v0.20.11 — Settings — no filler text, and the rail always wins over Settings
-**Goal:** Owner 2026-10-13: "sometimes in the settings there is like AI slop comments … This is an engineering tool. The tool says what it does and that's it." and "the settings view still overrides all the other views … it feels like the click is not working just because the setting is always taking over."
-- [ ] UI copy: every description and helper line in Settings (and the rest of the app) says what the control does, nothing else; the update row's reassurance goes; a test lists the removed phrases.
-- [ ] Settings yields: a click on any rail item (Recent repositories, Commit, …) closes Settings and shows that view; e2e red first.
-- [ ] Owner tick: Settings reads plain and the rail always responds.
+### v0.20.11 — Settings — no filler text, and the rail always wins over Settings ((renumbered)) (COMPLETE)
+**Goal:** Renumbered to v0.21.6 on 2026-10-14 so the release follows v0.21.5; its tasks moved there.
 
 ## v0.21 — The agent bridge, finished — review rounds on the board, modes, the agent convention, Notify hygiene and the Linux path
 > Everything the bridge still owes, moved here on 2026-09-22 so the start pane ships first in the 0.20 line. The iteration below keeps its old number (v0.20.2) because powerplan cannot renumber one.
@@ -1066,6 +1063,16 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Owner picks a proposal: A, "Same, crisper" (2026-10-14: "ok for a").
 - [x] Apply A to the dark tokens; vitest 516 with the contrast checks, lint; e2e dark-sensitive specs + shell 51 green; the dark visual baseline refreshed and looked at; dark at 100 % and 150 % looked at.
 - [ ] Release after v0.21.4; owner tick: dark mode reads better.
+
+### v0.21.6 — Settings — lean and plain, and the rail always wins over Settings (current) (ACTIVE)
+**Goal:** Owner 2026-10-14: "the settings view has a bit too much AI slop in it. I want it to be more of an engineering settings. Clean, straight, we don't need opinions, we don't need lengthy text everywhere … make it leaner and cleaner." Carries v0.20.11 (renumbered so the updater offers it after v0.21.5).
+- [x] Lean rows: label left, control right, the Git key (user.name, diff.tool…) instead of a sentence; no header slogan, no scope pill, no lengthy helper lines. [agent: claude]
+- [x] Copy: every remaining line says what the control does, or nothing; a unit test lists the removed phrases. [agent: claude]
+- [x] Settings yields: a click on any rail item other than the gear closes Settings and shows that view; e2e red first. [agent: claude]
+- [x] Tests: vitest, lint, settings e2e + shell; light and dark looked at, 100 % and 150 %. [agent: claude]
+- [ ] Release; owner tick: Settings reads plain and the rail always responds.
+- [x] Recent repositories: the branch chip no longer looks like the selected repository's highlight, and its icon sits on the text line (no gap under the name). [agent: claude]
+- [x] Recent repositories: clearer outside borders, and the worktree cards stand apart from the panel behind them. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches

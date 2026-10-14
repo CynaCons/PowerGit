@@ -26,6 +26,8 @@ export type Tokens = {
   surfaceAlt: string
   /** Footers and strips that sit a step below the surface. */
   surfaceSunken: string
+  /** Inside a pane, the ground cards sit on (Recent repositories, v0.21.6). */
+  well: string
   /** Blocks of monospace output (job output). */
   codeBg: string
   /** "Too large / binary" notices. */
@@ -40,6 +42,8 @@ export type Tokens = {
   border: string
   /** Grid header/footer rules. */
   borderSoft: string
+  /** The outline of a card on a well (v0.21.6). */
+  borderStrong: string
   primary: string
   primaryDark: string
   onPrimary: string
@@ -116,6 +120,7 @@ export const light: Tokens = {
   surface: "#ffffff",
   surfaceAlt: "#e3e7ee",
   surfaceSunken: "#f6f8fb",
+  well: "#e8ecf1",
   codeBg: "#f8fafc",
   noticeBg: "#fffbeb",
   text: "#101827",
@@ -124,6 +129,7 @@ export const light: Tokens = {
   textDisabled: "#64748b",
   border: "#d6dce5",
   borderSoft: "#e6eaf0",
+  borderStrong: "#bcc5d1",
   primary: "#1553c9",
   primaryDark: "#0f3f9c",
   onPrimary: "#ffffff",
@@ -207,6 +213,7 @@ export const dark: Tokens = {
   surface: "#182029",
   surfaceAlt: "#0a0e13",
   surfaceSunken: "#141b23",
+  well: "#0e1318",
   codeBg: "#14171b",
   noticeBg: "#3a2e0b",
   text: "#edf0f5",
@@ -215,6 +222,7 @@ export const dark: Tokens = {
   textDisabled: "#8f98a5",
   border: "#384354",
   borderSoft: "#2d3744",
+  borderStrong: "#526075",
   primary: "#5b94f7",
   primaryDark: "#4a7fe0",
   onPrimary: "#0b1220",
@@ -323,6 +331,7 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-surface": t.surface,
     "--pg-surface-alt": t.surfaceAlt,
     "--pg-surface-sunken": t.surfaceSunken,
+    "--pg-well": t.well,
     "--pg-code-bg": t.codeBg,
     "--pg-notice-bg": t.noticeBg,
     "--pg-text": t.text,
@@ -331,6 +340,7 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-text-disabled": t.textDisabled,
     "--pg-border": t.border,
     "--pg-border-soft": t.borderSoft,
+    "--pg-border-strong": t.borderStrong,
     "--pg-primary": t.primary,
     "--pg-primary-dark": t.primaryDark,
     "--pg-on-primary": t.onPrimary,

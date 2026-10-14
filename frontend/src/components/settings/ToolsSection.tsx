@@ -8,7 +8,7 @@ import { SettingSelect, SettingText } from "./controls"
 import { SettingRow } from "./SettingRow"
 import { SettingsSection } from "./SettingsSection"
 import { isShown, type SettingId } from "./settingsCatalog"
-import { useGitConfig, type GitScope } from "./useGitConfig"
+import { scopeTarget, useGitConfig, type GitScope } from "./useGitConfig"
 
 // Diff tool, merge tool and editor (v0.15.0; v0.18.0 applied as edited).
 // Git drives the tools it knows by name, so choosing one writes
@@ -56,11 +56,11 @@ function ToolRow({ id, hidden, kind, tools, value, disabled, onPick }: ToolRowPr
         label={label}
         testid={`settings-${kind}tool`}
       >
-        <option value="">Not set</option>
+        <option value="">Unset</option>
         {options.map((t) => (
           <option key={t.name} value={t.name} disabled={!t.found}>
             {t.label}
-            {t.found ? "" : " — not found"}
+            {t.found ? "" : " (not found)"}
           </option>
         ))}
         <option value={CUSTOM}>Custom command…</option>
@@ -74,7 +74,7 @@ function ToolRow({ id, hidden, kind, tools, value, disabled, onPick }: ToolRowPr
             onPick(v)
           }}
           label={`${label} name`}
-          placeholder={`${kind}.tool name, e.g. meld`}
+          placeholder="e.g. meld"
           testid={`settings-${kind}tool-command`}
           mono
         />
@@ -117,9 +117,7 @@ export function ToolsSection({ visible, scope, onScope }: Props) {
       visible={visible}
       scope={scope}
       onScope={onScope}
-      hint={
-        scope === "global" ? "Saved to your global Git config, for every repository." : "Saved to this repository only."
-      }
+      target={scopeTarget(scope)}
       status={status}
     >
       <ToolRow
@@ -158,31 +156,18 @@ export function ToolsSection({ visible, scope, onScope }: Props) {
         />
       </SettingRow>
       <SettingRow id="tools.vsCode" hidden={!isShown(visible, "tools.vsCode")}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
+          <Button variant="outlined" size="small" disabled={!vs?.found} onClick={applyVsCode}>
+            Use VS Code
+          </Button>
           <Typography
             component="code"
-            sx={{
-              fontFamily: MONO_FONT,
-              fontSize: 12,
-              px: 0.75,
-              py: 0.125,
-              borderRadius: 0.5,
-              bgcolor: "var(--pg-code-bg)",
-              border: 1,
-              borderColor: "var(--pg-border-soft)",
-            }}
+            data-testid="settings-vscode-path"
+            sx={{ fontFamily: MONO_FONT, fontSize: 11.5, color: "text.secondary" }}
           >
             {vs === null ? "…" : vs.found ? vs.path : "not found"}
           </Typography>
-          {vs?.found && (
-            <Typography component="span" sx={{ fontSize: 11, color: "var(--pg-status-ok)" }}>
-              found
-            </Typography>
-          )}
         </Box>
-        <Button variant="outlined" size="small" disabled={!vs?.found} onClick={applyVsCode}>
-          Use VS Code as editor / diff / merge
-        </Button>
         {vsError && (
           <Typography variant="caption" color="error">
             {vsError}

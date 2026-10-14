@@ -44,8 +44,8 @@ export function StartPaneCard({ card, offset, cursor, peeks, currentRoot, prefix
       data-testid="start-card"
       data-repo={repo.name}
       sx={{
-        border: 1,
-        borderColor: "divider",
+        // v0.21.6, owner: the outside borders "a tiny bit wider, maybe whiter".
+        border: "2px solid var(--pg-border-strong)",
         borderRadius: "8px",
         overflow: "hidden",
         bgcolor: "background.paper",

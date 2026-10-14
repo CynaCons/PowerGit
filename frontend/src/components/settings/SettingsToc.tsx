@@ -108,8 +108,13 @@ export function SettingsToc({ visible, children }: Props) {
           overflow: "auto",
           pt: 1,
           pr: 4,
-          pb: 7.5,
+          // Room under the last section, so the contents column can bring
+          // any row to the top of the list.
+          pb: "40vh",
           pl: 3.25,
+          // The rows stack their label over the control below 640 px.
+          containerType: "inline-size",
+          containerName: "settings-list",
           // Room above a section or row the contents column scrolled to.
           "& section, & [id^='setting-']": { scrollMarginTop: 8 },
         }}

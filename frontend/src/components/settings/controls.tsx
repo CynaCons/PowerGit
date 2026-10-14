@@ -9,7 +9,8 @@ import { MONO_FONT } from "../../theme"
 // the merge dialog's: no portal between a test, or a keyboard, and the
 // control. The row title is the label, so none of these floats one.
 
-const FIELD_SX = { minWidth: 260, "& .MuiInputBase-input": { py: 0.75 } }
+// One width for every field, so the control column lines up (v0.21.6).
+const FIELD_SX = { width: 320, maxWidth: "100%", "& .MuiInputBase-input": { py: 0.75 } }
 
 type SelectProps = {
   value: string
@@ -75,7 +76,7 @@ export function SettingText({ value, onCommit, testid, label, placeholder, mono,
           ...(mono && { style: { fontFamily: MONO_FONT, fontSize: 12.5 } }),
         },
       }}
-      sx={{ ...FIELD_SX, minWidth: 320 }}
+      sx={FIELD_SX}
     />
   )
 }

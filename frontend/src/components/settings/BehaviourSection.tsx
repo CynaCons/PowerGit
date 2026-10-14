@@ -25,7 +25,7 @@ export function BehaviourSection({ visible }: { visible: Set<SettingId> | null }
         onReset={() => setBehaviour({ openLastOnStart: DEFAULT_BEHAVIOUR.openLastOnStart })}
       >
         <SettingCheck
-          label="Open the last repository on start"
+          label="Open the last repository"
           testid="settings-open-last"
           checked={value.openLastOnStart}
           onChange={(next) => setBehaviour({ openLastOnStart: next })}
@@ -80,9 +80,9 @@ export function BehaviourSection({ visible }: { visible: Set<SettingId> | null }
           label="Merges by default"
           testid="settings-default-merge-ff"
         >
-          <option value="allow">Fast-forward when possible</option>
-          <option value="no">Always create a merge commit</option>
-          <option value="only">Fast-forward only, else refuse</option>
+          <option value="allow">--ff (fast-forward when possible)</option>
+          <option value="no">--no-ff (always a merge commit)</option>
+          <option value="only">--ff-only (refuse otherwise)</option>
         </SettingSelect>
       </SettingRow>
       <SettingRow

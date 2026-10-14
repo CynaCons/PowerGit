@@ -172,6 +172,9 @@ export function StartPane(props: StartPaneProps) {
           minHeight: 0,
           overflow: "auto",
           p: 1.75,
+          // The cards sit on a well a step below them (v0.21.6, owner: "different
+          // contrast between the background panel and the cards").
+          bgcolor: "var(--pg-well)",
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
           // Each row of cards as tall as its tallest card: the cards clip

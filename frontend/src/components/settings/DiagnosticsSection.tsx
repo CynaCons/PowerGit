@@ -88,9 +88,7 @@ export function DiagnosticsSection({ visible, onClose }: Props) {
             variant="caption"
             color={devtools.failed ? "error" : "text.secondary"}
           >
-            {devtools.failed
-              ? `${devtools.message} — use Open app log instead.`
-              : "Asked the system for the inspector. If no window appeared, it is unavailable here: use Open app log, which needs none."}
+            {devtools.failed ? devtools.message : "Inspector requested."}
           </Typography>
         )}
       </SettingRow>
@@ -105,7 +103,7 @@ export function DiagnosticsSection({ visible, onClose }: Props) {
             }}
             data-testid="scroll-benchmark"
           >
-            Measure graph scrolling
+            Run
           </Button>
         </Box>
       </SettingRow>

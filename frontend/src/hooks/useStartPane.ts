@@ -21,6 +21,7 @@ export function useStartPane(hasRepo: boolean, repoKey: string | null = null) {
   return {
     open: asked || !hasRepo,
     close: useCallback(() => setAsked(false), []),
+    show: useCallback(() => setAsked(true), []),
     toggle: useCallback(() => setAsked((on) => !on), []),
   }
 }

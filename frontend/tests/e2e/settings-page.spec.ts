@@ -48,6 +48,33 @@ test("the gear opens Settings as a page with a search box, in place of the graph
   await expect(settings).toHaveCount(0)
 })
 
+// v0.21.6, owner (2026-10-13): "the settings view still overrides all the
+// other views … it feels like the click is not working just because the
+// setting is always taking over."
+test("a click on another rail item leaves Settings and shows that view", async ({ page }) => {
+  const settings = page.getByTestId("settings-page")
+  await page.getByTestId("settings-button").click()
+  await expect(settings).toBeVisible()
+  await page.getByTestId("recents-button").click()
+  await expect(settings).toHaveCount(0)
+  await expect(page.getByTestId("start-pane")).toBeVisible()
+
+  // Back to the graph, then a command: Refresh leaves Settings too.
+  await page.getByTestId("recents-button").click()
+  await expect(page.getByTestId("start-pane")).toHaveCount(0)
+  await page.getByTestId("settings-button").click()
+  await expect(settings).toBeVisible()
+  await page.getByTestId("refresh-button").click()
+  await expect(settings).toHaveCount(0)
+  await expect(page.getByTestId("grid-row").first()).toBeVisible()
+
+  // The rail's own expand toggle is not a view: Settings stays.
+  await page.getByTestId("settings-button").click()
+  await page.getByTestId("rail-toggle").click()
+  await expect(settings).toBeVisible()
+  await page.getByTestId("rail-toggle").click()
+})
+
 test("typing fetch leaves the background-fetch setting", async ({ page }) => {
   await page.keyboard.press("Control+Comma")
   const rows = page.locator('[data-testid^="settings-row-"]')

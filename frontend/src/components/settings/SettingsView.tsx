@@ -23,8 +23,8 @@ import { paneSx } from "../../theme/panels"
 // arrow, the gear and Escape return there. A header with the search box,
 // a contents column on the left and one long list of sections on the
 // right. Nothing is a draft: every row writes its store or its Git key as
-// it is changed, and a row that differs from its default says so with a
-// bar and a Reset. The search hides every row it does not match, the
+// it is changed (v0.21.6: without a banner saying so), and a row that
+// differs from its default says so with a bar and a Reset. The search hides every row it does not match, the
 // sections that end up empty, and their contents entries.
 
 type Props = { onClose: () => void }
@@ -83,7 +83,7 @@ export function SettingsView({ onClose }: Props) {
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search settings  (fetch, editor, force…)"
+          placeholder="Search settings"
           slotProps={{
             htmlInput: { "aria-label": "Search settings", "data-testid": "settings-search" },
             input: {
@@ -110,12 +110,6 @@ export function SettingsView({ onClose }: Props) {
             "& .MuiInputBase-root.Mui-focused": { bgcolor: "background.paper" },
           }}
         />
-        <Box
-          sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary", fontSize: 12 }}
-        >
-          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "var(--pg-status-ok)" }} />
-          Changes apply as you make them
-        </Box>
       </Box>
       <SettingsToc visible={visible}>
         <AppearanceSection visible={visible} />

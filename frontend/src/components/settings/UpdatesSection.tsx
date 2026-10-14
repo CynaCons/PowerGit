@@ -14,7 +14,7 @@ import { SettingsSection } from "./SettingsSection"
 import { isShown, type SettingId } from "./settingsCatalog"
 
 // Updates (v0.14.0; its own section since v0.18.0). The version is the
-// row's title, so "PowerGit v1.2.3" reads as one line above the check.
+// row's title, "Version 1.2.3", beside the check.
 
 export function UpdatesSection({ visible }: { visible: Set<SettingId> | null }) {
   const engine = useEngine()
@@ -39,7 +39,7 @@ export function UpdatesSection({ visible }: { visible: Set<SettingId> | null }) 
     <SettingsSection id="updates" visible={visible}>
       <SettingRow
         id="updates.check"
-        title={version ? `PowerGit v${version}` : "PowerGit"}
+        title={version ? `Version ${version}` : "Version"}
         hidden={!isShown(visible, "updates.check")}
       >
         <UpdateControls updater={updater} />
@@ -54,14 +54,15 @@ export function UpdatesSection({ visible }: { visible: Set<SettingId> | null }) 
 }
 
 // Manual updates (v0.14.0): nothing is fetched until "Check for updates",
-// nothing installed until "Download and restart". Outside the desktop app
-// (browser, Pages demo) the row only says where updates come from.
+// nothing installed until "Download and restart" (which closes, installs
+// and reopens). Outside the desktop app (browser, Pages demo) the row only
+// links the releases.
 function UpdateControls({ updater }: { updater: ReturnType<typeof useUpdater> }) {
   const { state, kind, checkNow, install } = updater
   if (kind === "none") {
     return (
       <Typography variant="body2" color="text.secondary" data-testid="updates-none">
-        Updates come with the desktop app. Downloads:{" "}
+        Desktop app only. Releases:{" "}
         <Link href="https://github.com/CynaCons/PowerGit/releases" target="_blank" rel="noreferrer">
           github.com/CynaCons/PowerGit/releases
         </Link>
@@ -88,21 +89,18 @@ function UpdateControls({ updater }: { updater: ReturnType<typeof useUpdater> })
         )}
         {state.phase === "upToDate" && (
           <Typography variant="body2" color="text.secondary" data-testid="update-uptodate">
-            You are up to date.
+            Up to date.
           </Typography>
         )}
       </Box>
       {update && (
         <Typography variant="body2" data-testid="update-available">
-          PowerGit v{update.version} is available.
+          v{update.version} available.
           {update.notes ? ` ${update.notes}` : ""}
         </Typography>
       )}
       {state.phase === "available" && (
         <>
-          <Typography variant="caption" color="text.secondary">
-            PowerGit closes, installs v{state.update.version} and reopens.
-          </Typography>
           <Button
             variant="contained"
             size="small"
@@ -127,7 +125,7 @@ function UpdateControls({ updater }: { updater: ReturnType<typeof useUpdater> })
       )}
       {state.phase === "ready" && (
         <Typography variant="body2" color="text.secondary" data-testid="update-ready">
-          Downloaded. PowerGit is restarting…
+          Restarting…
         </Typography>
       )}
       {state.phase === "error" && (

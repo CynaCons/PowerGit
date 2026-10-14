@@ -1,10 +1,12 @@
 // The settings page's table of contents (v0.18.0). Every row the page
-// shows is declared here once — its title, its one-line description and
-// the words the search box should also find it by — and the sections,
-// the contents column and the search all read this list. Adding a setting
-// is one entry here and one <SettingRow id="…"> in its section; the
-// texts are the ones the owner approved in the prototype
-// (docs/prototypes/settings-layouts.html, layout A).
+// shows is declared here once — its title, the Git key it writes or a
+// short line when the title alone does not say what it does, and the words
+// the search box should also find it by — and the sections, the contents
+// column and the search all read this list. Adding a setting is one entry
+// here and one <SettingRow id="…"> in its section. v0.21.6 (owner: "more of
+// an engineering settings … we don't need opinions, we don't need lengthy
+// text"): labels are short, Git rows show their key, and a description is
+// there only when it adds a fact.
 
 /** "<section>.<row>", e.g. "behaviour.autoFetch". */
 export type SettingId = string
@@ -12,7 +14,10 @@ export type SettingId = string
 export type SettingMeta = {
   id: SettingId
   title: string
-  description: string
+  /** The Git config key the row writes, shown under the title. */
+  gitKey?: string
+  /** One short line, only when the title and control do not say it. */
+  description?: string
   /** Words the search also matches, beyond the title and description. */
   keywords?: string[]
   /** When set, the row gets its own sub-entry in the contents column. */
@@ -28,11 +33,11 @@ export type SectionMeta = {
 }
 
 const CONFIRM_LABELS = [
-  "Force-pushing a branch",
-  "Deleting a branch or tag",
-  "Resetting hard (discards changes)",
-  "Checking out with uncommitted changes",
-  "Aborting a merge or rebase",
+  "Force push",
+  "Delete a branch or tag",
+  "Hard reset",
+  "Checkout with uncommitted changes",
+  "Abort a merge or rebase",
 ]
 
 export const SETTINGS_CATALOG: SectionMeta[] = [
@@ -44,25 +49,23 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
       {
         id: "appearance.theme",
         title: "Theme",
-        description: "Follow the system, or force light or dark.",
         keywords: ["appearance", "dark", "light", "system", "colour", "color"],
       },
       {
         id: "appearance.commandBar",
         title: "Command bar",
-        description: "Where Commit, Pull, Push and the other commands live.",
-        keywords: ["rail", "title bar", "toolbar", "layout"],
+        keywords: ["rail", "title bar", "toolbar", "layout", "commit", "pull", "push"],
       },
       {
         id: "appearance.zoom",
         title: "Zoom",
-        description: "Scale of the whole window. Ctrl + and Ctrl − change it too.",
+        description: "Ctrl + / Ctrl −",
         keywords: ["scale", "size", "percent", "font"],
       },
       {
         id: "appearance.authorDiscs",
         title: "Author discs",
-        description: "An initials disc before each author in the graph, and a ring on the selected commit's author.",
+        description: "Initials before each author in the graph.",
         keywords: ["author", "initials", "avatar", "graph", "ring", "highlight", "mark"],
       },
     ],
@@ -74,20 +77,20 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
     rows: [
       {
         id: "git.userName",
-        title: "User name",
-        description: "user.name — who the commits are by.",
-        keywords: ["identity", "author", "committer"],
+        title: "Name",
+        gitKey: "user.name",
+        keywords: ["identity", "author", "committer", "user name"],
       },
       {
         id: "git.userEmail",
         title: "Email",
-        description: "user.email",
+        gitKey: "user.email",
         keywords: ["identity", "author", "committer", "mail"],
       },
       {
         id: "git.autoCrlf",
         title: "Line endings",
-        description: "core.autocrlf — what happens to CRLF on the way in and out.",
+        gitKey: "core.autocrlf",
         keywords: ["crlf", "lf", "eol", "newline", "windows"],
       },
     ],
@@ -100,25 +103,25 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
       {
         id: "tools.diffTool",
         title: "Diff tool",
-        description: "diff.tool — what “Open in diff tool” launches.",
+        gitKey: "diff.tool",
         keywords: ["difftool", "vscode", "vs code", "beyond compare", "kdiff3", "compare"],
       },
       {
         id: "tools.mergeTool",
         title: "Merge tool",
-        description: "merge.tool — what “Resolve conflicts” opens for a file.",
+        gitKey: "merge.tool",
         keywords: ["mergetool", "conflicts", "vscode", "vs code", "beyond compare", "kdiff3"],
       },
       {
         id: "tools.editor",
         title: "Editor",
-        description: "core.editor — for commit messages and interactive rebases.",
+        gitKey: "core.editor",
         keywords: ["vscode", "vs code", "vim", "notepad", "commit message"],
       },
       {
         id: "tools.vsCode",
         title: "VS Code",
-        description: "One click sets it as editor, diff and merge tool.",
+        description: "Sets editor, diff tool and merge tool.",
         keywords: ["vscode", "code", "editor", "diff", "merge"],
       },
     ],
@@ -130,35 +133,40 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
     rows: [
       {
         id: "behaviour.openLast",
-        title: "Open the last repository on start",
-        description: "Reopens the repository you had open when the app starts; off shows the empty Browse.",
-        keywords: ["startup", "launch", "recent", "repository", "empty", "browse"],
+        title: "On start",
+        keywords: ["startup", "launch", "recent", "repository", "last", "empty", "browse"],
       },
       {
         id: "behaviour.confirmations",
-        title: "Ask before",
-        description: "A confirmation dialog before these; turn one off knowingly.",
-        keywords: ["confirm", "confirmation", "force push", "delete", "reset", "checkout", "abort", ...CONFIRM_LABELS],
+        title: "Confirm",
+        keywords: [
+          "confirm",
+          "confirmation",
+          "ask",
+          "force push",
+          "delete",
+          "reset",
+          "checkout",
+          "abort",
+          ...CONFIRM_LABELS,
+        ],
         anchor: "Confirmations",
       },
       {
         id: "behaviour.autoFetch",
-        title: "Fetch in the background",
-        description: "Keeps the remote branches fresh without asking.",
-        keywords: ["auto fetch", "autofetch", "remote", "interval", "minutes", "background"],
+        title: "Background fetch",
+        keywords: ["auto fetch", "autofetch", "remote", "interval", "minutes"],
         anchor: "Background fetch",
       },
       {
         id: "behaviour.mergeFf",
-        title: "Merges by default",
-        description: "What the Merge dialog starts with.",
-        keywords: ["fast-forward", "fast forward", "ff", "merge commit", "no-ff"],
+        title: "Merge default",
+        keywords: ["fast-forward", "fast forward", "ff", "merge commit", "no-ff", "ff-only", "dialog"],
       },
       {
         id: "behaviour.rebaseDefaults",
-        title: "Rebase defaults",
-        description: "What the Rebase dialog starts with.",
-        keywords: ["autostash", "autosquash", "stash", "fixup", "squash", "interactive"],
+        title: "Rebase default",
+        keywords: ["autostash", "autosquash", "stash", "fixup", "squash", "interactive", "dialog"],
       },
     ],
   },
@@ -170,22 +178,19 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
       {
         id: "diagnostics.logs",
         title: "Logs",
-        description: "The app log needs no inspector; the developer tools may be unavailable on Ubuntu.",
         keywords: ["app log", "developer tools", "devtools", "inspector", "logs folder", "console", "debug"],
       },
       {
         id: "diagnostics.scrollBenchmark",
-        title: "Measure graph scrolling",
-        description:
-          "Closes Settings and scrolls the graph by itself for about 40 seconds, several ways, then writes the frame rates to the app log. Take a diagnostic snapshot afterwards to send them.",
-        keywords: ["benchmark", "fps", "frame rate", "smooth", "scroll", "performance", "slow", "linux"],
+        title: "Scroll benchmark",
+        description: "Scrolls the graph for about 40 s, then writes frame rates to the app log.",
+        keywords: ["benchmark", "fps", "frame rate", "smooth", "scroll", "performance", "slow", "linux", "measure"],
       },
       {
         id: "diagnostics.recovery",
-        title: "Recovery experiments",
-        description:
-          "For a frozen picture while the app still reacts: press the hotkey, wait a few seconds, note whether the window repaints. Every press is written to engine.log.",
-        keywords: ["freeze", "frozen", "ladder", "repaint", "hotkey", "ubuntu"],
+        title: "Recovery ladder",
+        description: "Window recovery steps for a frozen picture. Each press is logged to engine.log.",
+        keywords: ["freeze", "frozen", "ladder", "repaint", "hotkey", "ubuntu", "experiments"],
         anchor: "Recovery ladder",
       },
     ],
@@ -197,16 +202,12 @@ export const SETTINGS_CATALOG: SectionMeta[] = [
     rows: [
       {
         id: "updates.check",
-        title: "PowerGit",
-        // The prototype said "fetched" here; the word is kept out so a search
-        // for "fetch" lands on the background fetch alone.
-        description: "Nothing is checked until you ask, nothing installed until you say so.",
+        title: "Version",
         keywords: ["update", "version", "check for updates", "download", "release", "restart"],
       },
       {
         id: "updates.location",
-        title: "Install",
-        description: "Where this PowerGit runs from.",
+        title: "Install folder",
         keywords: ["app location", "folder", "appimage", "install", "path"],
       },
     ],
@@ -233,7 +234,7 @@ export function sectionOf(id: string): SectionMeta {
 }
 
 function haystack(meta: SettingMeta): string {
-  return [meta.title, meta.description, ...(meta.keywords ?? [])].join("\n").toLowerCase()
+  return [meta.title, meta.gitKey ?? "", meta.description ?? "", ...(meta.keywords ?? [])].join("\n").toLowerCase()
 }
 
 /**

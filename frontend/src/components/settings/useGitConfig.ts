@@ -103,3 +103,8 @@ export function useGitConfig(engine: EngineClient, scope: GitScope): GitConfigAp
 
   return { cfg, patch, status, reload }
 }
+
+/** The file a Git section writes at a scope. */
+export function scopeTarget(which: GitScope): string {
+  return which === "global" ? "~/.gitconfig" : ".git/config"
+}

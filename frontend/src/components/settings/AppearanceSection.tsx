@@ -54,8 +54,8 @@ export function AppearanceSection({ visible }: { visible: Set<SettingId> | null 
           label="Command bar"
           testid="settings-bar-layout"
         >
-          <option value="rail">In the left rail</option>
-          <option value="top">In the title bar</option>
+          <option value="rail">Left rail</option>
+          <option value="top">Title bar</option>
         </SettingSelect>
       </SettingRow>
       <SettingRow
@@ -106,12 +106,7 @@ export function AppearanceSection({ visible }: { visible: Set<SettingId> | null 
         changed={!discs}
         onReset={() => setAuthorDiscs(true)}
       >
-        <SettingCheck
-          label="Show author discs"
-          checked={discs}
-          testid="settings-author-discs"
-          onChange={setAuthorDiscs}
-        />
+        <SettingCheck label="Show" checked={discs} testid="settings-author-discs" onChange={setAuthorDiscs} />
       </SettingRow>
     </SettingsSection>
   )

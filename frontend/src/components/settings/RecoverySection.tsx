@@ -12,12 +12,12 @@ import { isTauriShell } from "../../shell"
 // try while the picture is frozen. The hotkeys are the real trigger (a
 // frozen window cannot show this page); the list is where the owner reads
 // what they do. The row's title and description come from the catalog;
-// this is the control under them.
+// this is the control beside them. Outside the desktop app the buttons are
+// disabled, which says enough.
 
 export function RecoverySection() {
   const shell = isTauriShell()
   const [note, setNote] = useState<string | null>(null)
-  const tryFirst = RECOVERY_TRY_FIRST.join(", ")
 
   const run = (step: number) => {
     setNote(null)
@@ -28,10 +28,6 @@ export function RecoverySection() {
 
   return (
     <Box data-testid="recovery-experiments" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-      <Typography variant="caption" color="text.secondary" data-testid="recovery-experiments-help">
-        Try {tryFirst} first. Every press is written to engine.log
-        {shell ? "." : " (desktop app only; the buttons do nothing in a browser)."}
-      </Typography>
       <Box component="ul" sx={{ m: 0, pl: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 0.25 }}>
         {RECOVERY_STEPS.map((s) => (
           <Box

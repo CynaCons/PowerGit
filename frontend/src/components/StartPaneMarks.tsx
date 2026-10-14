@@ -12,10 +12,12 @@ export function Branch({ text, range }: { text?: string; range: MatchRange | nul
   return text ? (
     <Box
       component="span"
-      className="ref"
       data-testid="start-branch"
       title={text}
       sx={{
+        display: "inline-flex",
+        alignItems: "flex-start",
+        gap: "4px",
         minWidth: 0,
         maxWidth: "100%",
         // The chip grows instead of cutting the name off (owner, 2026-09-22:
@@ -25,16 +27,23 @@ export function Branch({ text, range }: { text?: string; range: MatchRange | nul
         // of the list down a screen. Three, not two: CI's font metrics put
         // a 54-character branch on a third line where this machine's fit it
         // on two, and a clipped name is the thing the owner reported.
-        height: "auto",
-        minHeight: 18,
-        alignItems: "flex-start",
+        // v0.21.6 (owner: "the branch highlighting and the repository
+        // highlighting are the same"): an outlined tag in the text colours,
+        // not the local-branch fill the selected row shares a blue with.
+        px: "6px",
         py: "1px",
         lineHeight: "16px",
-        borderRadius: "9px",
-        fontSize: 11,
+        borderRadius: "4px",
+        border: "1px solid var(--pg-border-strong)",
+        color: "text.primary",
+        fontSize: 11.5,
+        fontWeight: 500,
       }}
     >
-      <CallSplitIcon sx={{ mt: "2px" }} />
+      {/* 12 px on a 16 px line: the glyph sits on the first line of the
+          name and adds nothing under it (owner: an empty space under the
+          text was part of the highlight). */}
+      <CallSplitIcon sx={{ fontSize: 12, mt: "2px", flexShrink: 0, color: "text.secondary" }} />
       <Box
         component="span"
         sx={{

@@ -125,7 +125,7 @@ test.describe("settings", () => {
     // Every option is a tool git knows by name; the ones this machine does
     // not have are offered but disabled, so the list explains itself.
     const options = page.getByTestId("settings-mergetool").locator("option")
-    await expect(options.filter({ hasText: "Not set" })).toHaveCount(1)
+    await expect(options.filter({ hasText: "Unset" })).toHaveCount(1)
     await expect(options.filter({ hasText: "Custom command" })).toHaveCount(1)
     await expect(options.filter({ hasText: "VS Code" })).toHaveCount(1)
 
@@ -147,10 +147,10 @@ test.describe("settings", () => {
     await expect(page.getByTestId("grid-row").first()).toBeVisible()
     await page.getByTestId("settings-button").click()
 
-    await expect(page.getByTestId("settings-row-diagnostics.recovery")).toContainText("Recovery experiments")
+    await expect(page.getByTestId("settings-row-diagnostics.recovery")).toContainText("Recovery ladder")
+    await expect(page.getByTestId("settings-row-diagnostics.recovery")).toContainText("engine.log")
     await expect(page.getByTestId("recovery-experiments")).toBeVisible()
-    await expect(page.getByTestId("recovery-experiments-help")).toContainText("Try 3, 6, 8 first")
-    await expect(page.getByTestId("recovery-experiments-help")).toContainText("engine.log")
+    for (const n of [3, 6, 8]) await expect(page.getByTestId(`recovery-step-${n}`)).toContainText("try first")
 
     const keys = [
       "queue_draw",
