@@ -1059,6 +1059,14 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] CI: owner 2026-10-14 "minimize the amount of CI … just release deployment": ci.yml manual only; testing local, scoped by impact analysis (AGENTS.md How we verify, release skill, memory).
 - [x] Release gate (impact since v0.20.10: agent reviews engine/MCP/UI, review key, App rail, tokens, SQLite dep): engine 248, vitest 516, lint; e2e agent-review-rounds, agent-reviews, start-pane, settings-page, desk, shell, review-*; real-agent two rounds; smoke clean; full CI green on f4fa12ee6.
 
+### v0.21.5 — Dark mode — more contrast, reworked colours (PLANNED)
+**Goal:** Owner 2026-10-14: "slightly improve the contrast of the application in dark mode … rework a bit the colors that we are using in the dark mode … submit to me the visuals before." Proposals rendered on the real app, his pick, then the tokens; released after v0.21.4.
+- [ ] Capture the dark theme as it is (graph + bottom panel, start pane, Settings, agent review) and measure its contrast.
+- [ ] Proposals from a design-focused agent: dark token sets, each rendered on the real app next to today's; contrast ratios listed.
+- [ ] Owner picks a proposal.
+- [ ] Apply the pick to the dark tokens; contrast.test and the visual @themes subset updated; looked at in dark at 100 % and 150 %.
+- [ ] Release after v0.21.4; owner tick: dark mode reads better.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content

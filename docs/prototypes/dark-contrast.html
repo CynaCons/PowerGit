@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dark mode proposals</title>
+<style>
+  :root { --bg: #0b0d10; --panel: #15181d; --text: #e8eaee; --meta: #9aa3ae; --line: #2a2f37; --accent: #5b94f7; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  h1 { font-size: 17px; margin: 0 14px 0 0; }
+  .group { display: flex; gap: 4px; flex-wrap: wrap; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; font: inherit; cursor: pointer; }
+  button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #0b1220; font-weight: 600; }
+  .note { color: var(--meta); padding: 0 16px 10px; max-width: 1100px; }
+  main { padding: 0 16px 24px; }
+  .flip img { width: 100%; max-width: 1440px; display: block; border: 1px solid var(--line); border-radius: 6px; }
+  .label { font-weight: 600; margin: 6px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid img { width: 100%; border: 1px solid var(--line); border-radius: 6px; cursor: zoom-in; display: block; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 16px 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .card h2 { font-size: 14px; margin: 0 0 4px; }
+  .card p { margin: 0 0 6px; color: var(--meta); font-size: 13px; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  td { padding: 1px 0; } td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .up { color: #5ee38a; }
+  .zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 9; cursor: zoom-out; }
+  .zoom img { max-width: 98vw; max-height: 96vh; }
+  @media (max-width: 900px) { .cards, .grid { grid-template-columns: 1fr; } }
+</style>
+<header>
+  <h1>Dark mode — three proposals</h1>
+  <div class="group" id="screens"></div>
+  <div class="group" id="modes"></div>
+  <div class="group" id="variants"></div>
+</header>
+<p class="note">Captured on the real app (v0.21.4, 1440 × 900) with each proposal's colours. Light mode is not touched. <b>Flip</b> shows one screen at a time — press <b>1 2 3 4</b> (Today, A, B, C) to switch in place; small differences show best that way. <b>Grid</b> puts the four side by side; click one to see it full size.</p>
+<section class="cards" id="cards"></section>
+<main id="main"></main>
+<div class="zoom" id="zoom"><img alt="" /></div>
+<script>
+const SCREENS = [["main", "History + commit"], ["review", "Agent review"], ["start", "Recent repositories"], ["settings", "Settings"]];
+const VARIANTS = [
+  ["current", "Today", "The dark theme as shipped in v0.21.4.", { border: 1.29, sel: 1.17, sec: 8.61, meta: 6.49, primary: 4.28 }],
+  ["A", "A · Same, crisper", "Today's blue-slate surfaces and desk kept exactly; hairlines that show, a selection one clear step above hover, brighter secondary text, livelier branch and tag badges, a softer primary blue.", { border: 1.64, sel: 1.54, sec: 10.18, meta: 8.45, primary: 5.5 }],
+  ["B", "B · Cool slate", "A cooler, slightly lifted blue-grey (in the family of GitHub dark and VS Code Dark Modern), steel hairlines, a clean sky-blue accent with dark text on buttons.", { border: 1.61, sel: 1.43, sec: 9.72, meta: 7.76, primary: 6.03 }],
+  ["C", "C · Neutral graphite", "The blue cast taken out of the greys, warm off-white text; blue only where it means something — the accent, the selection, local-branch badges.", { border: 1.6, sel: 1.32, sec: 9.57, meta: 7.47, primary: 5.08 }],
+];
+const state = { screen: "main", mode: "flip", variant: "current" };
+const base = VARIANTS[0][3];
+document.getElementById("cards").innerHTML = VARIANTS.map(([k, name, why, r]) => `
+  <div class="card"><h2>${name}</h2><p>${why}</p><table>
+    ${[["Hairline vs pane", "border"], ["Selected vs hovered row", "sel"], ["Secondary text", "sec"], ["Meta text (dates, SHAs)", "meta"], ["Blue accent on pane", "primary"]]
+      .map(([l, f]) => `<tr><td>${l}</td><td class="${k !== "current" && r[f] > base[f] ? "up" : ""}">${r[f].toFixed(2)} : 1</td></tr>`).join("")}
+  </table></div>`).join("")
+function render() {
+  const btn = (group, list, key) => (document.getElementById(group).innerHTML = list.map(([k, l]) => `<button data-${key}="${k}" aria-pressed="${state[key] === k}">${l}</button>`).join(""))
+  btn("screens", SCREENS, "screen")
+  btn("modes", [["flip", "Flip"], ["grid", "Grid"]], "mode")
+  document.getElementById("variants").style.display = state.mode === "flip" ? "flex" : "none"
+  btn("variants", VARIANTS.map(([k, n], i) => [k, `${i + 1} · ${n.split(" · ")[0]}`]), "variant")
+  const src = (v) => `dark-contrast/${v}-${state.screen}.webp`
+  const main = document.getElementById("main")
+  if (state.mode === "flip") {
+    const v = VARIANTS.find(([k]) => k === state.variant)
+    main.innerHTML = `<div class="flip"><div class="label">${v[1]}</div><img src="${src(state.variant)}" alt="${v[1]}" /></div>`
+  } else {
+    main.innerHTML = `<div class="grid">${VARIANTS.map(([k, n]) => `<div><div class="label">${n}</div><img src="${src(k)}" data-zoom="${src(k)}" alt="${n}" /></div>`).join("")}</div>`
+  }
+}
+// Preload every image so flipping is instant.
+for (const [s] of SCREENS) for (const [v] of VARIANTS) new Image().src = `dark-contrast/${v}-${s}.webp`
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-screen],[data-mode],[data-variant],[data-zoom],#zoom")
+  if (!t) return
+  if (t.id === "zoom") return (t.style.display = "none")
+  if (t.dataset.zoom) { const z = document.getElementById("zoom"); z.querySelector("img").src = t.dataset.zoom; z.style.display = "flex"; return }
+  Object.assign(state, Object.fromEntries(Object.entries(t.dataset)))
+  render()
+})
+document.addEventListener("keydown", (e) => {
+  const i = "1234".indexOf(e.key)
+  if (i >= 0) { state.mode = "flip"; state.variant = VARIANTS[i][0]; render() }
+  if (e.key === "Escape") document.getElementById("zoom").style.display = "none"
+})
+render()
+</script>
