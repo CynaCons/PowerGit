@@ -1059,12 +1059,12 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] CI: owner 2026-10-14 "minimize the amount of CI … just release deployment": ci.yml manual only; testing local, scoped by impact analysis (AGENTS.md How we verify, release skill, memory).
 - [x] Release gate (impact since v0.20.10: agent reviews engine/MCP/UI, review key, App rail, tokens, SQLite dep): engine 248, vitest 516, lint; e2e agent-review-rounds, agent-reviews, start-pane, settings-page, desk, shell, review-*; real-agent two rounds; smoke clean; full CI green on f4fa12ee6.
 
-### v0.21.5 — Dark mode — more contrast, reworked colours (PLANNED)
+### v0.21.5 — Dark mode — more contrast, reworked colours (PLANNED) (2026-10-14) (COMPLETE)
 **Goal:** Owner 2026-10-14: "slightly improve the contrast of the application in dark mode … rework a bit the colors that we are using in the dark mode … submit to me the visuals before." Proposals rendered on the real app, his pick, then the tokens; released after v0.21.4.
-- [ ] Capture the dark theme as it is (graph + bottom panel, start pane, Settings, agent review) and measure its contrast.
-- [ ] Proposals from a design-focused agent: dark token sets, each rendered on the real app next to today's; contrast ratios listed.
-- [ ] Owner picks a proposal.
-- [ ] Apply the pick to the dark tokens; contrast.test and the visual @themes subset updated; looked at in dark at 100 % and 150 %.
+- [x] Capture the dark theme as it is (graph + bottom panel, start pane, Settings, agent review) and measure its contrast.
+- [x] Proposals from a design-focused agent: dark token sets, each rendered on the real app next to today's; contrast ratios listed.
+- [x] Owner picks a proposal: A, "Same, crisper" (2026-10-14: "ok for a").
+- [x] Apply A to the dark tokens; vitest 516 with the contrast checks, lint; e2e dark-sensitive specs + shell 51 green; the dark visual baseline refreshed and looked at; dark at 100 % and 150 % looked at.
 - [ ] Release after v0.21.4; owner tick: dark mode reads better.
 
 ## Backlog
