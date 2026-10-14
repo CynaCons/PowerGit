@@ -1064,7 +1064,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Apply A to the dark tokens; vitest 516 with the contrast checks, lint; e2e dark-sensitive specs + shell 51 green; the dark visual baseline refreshed and looked at; dark at 100 % and 150 % looked at.
 - [ ] Release after v0.21.4; owner tick: dark mode reads better.
 
-### v0.21.6 — Settings — lean and plain, and the rail always wins over Settings (current) (ACTIVE)
+### v0.21.6 — Settings — lean and plain, and the rail always wins over Settings ((2026-10-14)) (COMPLETE)
 **Goal:** Owner 2026-10-14: "the settings view has a bit too much AI slop in it. I want it to be more of an engineering settings. Clean, straight, we don't need opinions, we don't need lengthy text everywhere … make it leaner and cleaner." Carries v0.20.11 (renumbered so the updater offers it after v0.21.5).
 - [x] Lean rows: label left, control right, the Git key (user.name, diff.tool…) instead of a sentence; no header slogan, no scope pill, no lengthy helper lines. [agent: claude]
 - [x] Copy: every remaining line says what the control does, or nothing; a unit test lists the removed phrases. [agent: claude]
