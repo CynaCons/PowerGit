@@ -16,8 +16,13 @@ having approved the content that goes into them.
   the changelog source for the release notes.
 - `dotnet test src/engine/PowerGit.Engine.sln` (use the user-local dotnet:
   `%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe`; see docs/agents/memories/engine-exe-lock.md)
-- `cd frontend && npm run test:e2e` (needs a live engine on :7733)
-- `npm run test:resolution`
+- Impact analysis (AGENTS.md "How we verify"): `git diff --stat <last tag>..HEAD`,
+  map the changed areas to features; run `npm run test:unit` and `npm run lint`
+  in full, and the e2e specs of those features plus `tests/e2e/shell.spec.ts`
+  (a private harness: `frontend/scripts/e2e-harness.ps1` + `PW_PORT`). The full
+  e2e suite and `npm run test:resolution` only when the change is wide (shell,
+  layout, session, engine client) or the owner asks. GitHub CI does not test
+  on push (owner 2026-10-14); `ci.yml` is manual.
 - Visual subset for whatever changed since the last tag (`npm run test:visual
   -- --grep @grid` etc.; see AGENTS.md "How we verify"). Not the full suite.
 - Look at it: start the app (`npm run tauri dev` or the packaged zip in step

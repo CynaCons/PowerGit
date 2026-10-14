@@ -1056,6 +1056,8 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Linux: the linux-x64 single-file engine passes scripts/board-interop.py in WSL Ubuntu and finds $XDG_DATA_HOME/powerboard/board.db; the AppImage on a real Ubuntu desktop is the owner's check (and the release matrix).
 - [x] Gate: a real Claude Code agent (claude -p, powergit mcp + powerboard) did two rounds against PowerGit: answered a board question in 6 s, revised the rejected change with a reply, committed only after Approved. It surfaced "1 of 2 accepted" on approve; fixed: approve accepts what is undecided. Done 0429bb2b3.
 - [ ] Owner tick: a real agent review, two rounds, on his machine.
+- [x] CI: owner 2026-10-14 "minimize the amount of CI … just release deployment": ci.yml manual only; testing local, scoped by impact analysis (AGENTS.md How we verify, release skill, memory).
+- [x] Release gate (impact since v0.20.10: agent reviews engine/MCP/UI, review key, App rail, tokens, SQLite dep): engine 248, vitest 516, lint; e2e agent-review-rounds, agent-reviews, start-pane, settings-page, desk, shell, review-*; real-agent two rounds; smoke clean; full CI green on f4fa12ee6.
 
 ## Backlog
 - Drop leftover 2021 origin branches

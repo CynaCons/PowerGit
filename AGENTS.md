@@ -71,11 +71,22 @@ npm run tauri dev         # native window (needs engine running for health)
 
 ## How we verify (token budget)
 
-Proof is **what the owner sees**, asserted by a test. Since v0.13.7
-`.github/workflows/ci.yml` runs the suites on every push and PR (engine xunit
-on Windows + Linux, tsc/lint/format/vitest/e2e on both, cargo tests, version +
-plan guards); a red CI is the gate, not a local "it works". CI does **not**
-run the visual suite; that is on demand (below).
+Proof is **what the owner sees**, asserted by a test. Testing is local and
+scoped to the change (owner 2026-10-14: "we don't have to rerun the full test
+suite on every release … run an impact analysis of what we have changed and
+what features are impacted, and run partial tests to cover the changes").
+GitHub Actions does not test on push: `ci.yml` (every suite, Windows + Linux)
+runs only when started by hand; `release.yml` builds, checks the AppImage in
+the Ubuntu matrix and publishes on a tag; `pages.yml` deploys the site.
+
+Impact analysis, before closing an iteration and before every release:
+`git diff --stat <last tag>..HEAD`, then map each changed area to its
+features and specs. Always run the engine suite (`dotnet test`, ~2 min) and
+`npm run test:unit` + `npm run lint` (~1 min) in full; run the e2e specs of
+the touched features plus `tests/e2e/shell.spec.ts`; run the visual subset
+when CSS, tokens or graph drawing changed. Write what ran into the plan's
+gate task. The full e2e suite (~45 min here) only when a change is wide
+(the shell, the session, the engine client) or the owner asks.
 
 - Run `npm run test:e2e` **once** after a UI change. If it fails, do not run it again. Read the first error, fix, then run once.
 - Where layers compose (the graph canvas under the DOM rows, dialogs over

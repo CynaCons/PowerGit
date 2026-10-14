@@ -1,12 +1,12 @@
 name: ci
 
-# Every push and PR runs the three suites (engine xunit, frontend vitest +
-# Playwright e2e, Rust shell tests) plus the static guards. Until v0.13.7
-# nothing ran on push at all; release.yml only builds on tags.
+# The full suites (engine xunit, frontend vitest + Playwright e2e, Rust shell
+# tests, static guards), on demand only. Owner 2026-10-14: "we should minimize
+# the amount of CI … The CI should be like a much simpler, just release
+# deployment flow." Testing is local and scoped to what changed (AGENTS.md
+# "How we verify"); release.yml builds on tags, pages.yml deploys the site.
+# Run this by hand (Actions → ci → Run workflow) when a wide check is wanted.
 on:
-  push:
-    branches: [powergit]
-  pull_request:
   workflow_dispatch:
 
 concurrency:
