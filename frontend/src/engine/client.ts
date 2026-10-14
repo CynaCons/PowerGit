@@ -88,6 +88,7 @@ export function filterParams(filter: RevisionFilter | undefined): string {
     if (filter.refs.length === 0) qs += "&ref="
     for (const ref of [...filter.refs].sort()) qs += `&ref=${encodeURIComponent(ref)}`
   }
+  if (filter.branchFirst) qs += "&branchFirst=true"
   return qs
 }
 
@@ -415,6 +416,7 @@ export class EngineClient {
             exact: filter.exact,
             full: filter.full,
             simplify: filter.simplify,
+            branchFirst: filter.branchFirst,
           },
           { signal, timeoutMs: 120_000 },
         ),

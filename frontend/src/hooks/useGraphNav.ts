@@ -30,7 +30,7 @@ export type GraphNavDeps = {
   refs: RefTree | null
   repo: Pick<RepoInfo, "branch"> | null
   /** The ref filter (v0.18.5) on: a miss is "Not in the filtered graph". */
-  graphFilter: Pick<GraphRefFilter, "filter">
+  graphFilter: Pick<GraphRefFilter, "graphRefs">
   /** A repository switch (a new repoId) forgets both memories. */
   client: Pick<EngineClient, "repoId">
   /** The chords are gated like any browse layer: off under a modal dialog
@@ -55,7 +55,7 @@ export function useGraphNav({
 }: GraphNavDeps) {
   const { setSelectedSha, jumpToCommit, loadingTarget } = history
   const enabled = dialogs.hotkeysEnabled && !fileHistory.target
-  const filtered = graphFilter.filter !== undefined
+  const filtered = graphFilter.graphRefs.mode
   const branch = repo?.branch ?? null
   const selection = useRef(new NavHistory())
   const memory = useRef(new ParentChildMemory())

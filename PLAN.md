@@ -1074,6 +1074,13 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Recent repositories: the branch chip no longer looks like the selected repository's highlight, and its icon sits on the text line (no gap under the name). [agent: claude]
 - [x] Recent repositories: clearer outside borders, and the worktree cards stand apart from the panel behind them. [agent: claude]
 
+### v0.21.7 — Graph — my branch first (current) (ACTIVE)
+**Goal:** Owner 2026-10-14: the commits of the checked-out branch since its base show first, one under the other, then the rest of the history by date as now. A toggle in the graph view settings; on by default.
+- [x] Engine: with branch-first on, the commits of HEAD since its base (merge-base with the default branch) come first, one under the other; the rest follows by date as before.
+- [x] Graph options bar: a "Branch first" toggle, on by default, remembered.
+- [ ] Tests: engine order test, vitest, e2e red first on a fixture where another branch's commits interleave by date; graph lanes look right.
+- [ ] Release; owner tick: my branch's commits read as one block at the top.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content

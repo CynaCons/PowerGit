@@ -41,6 +41,19 @@ newest-first) and `layout.test.ts`'s "merge occupies a second lane" test
 covers exactly this interleaving -- so switching `/revisions` off
 `--topo-order` needed no frontend change.
 
+## Branch first (v0.21.7)
+`branchFirst=true` (on by default from the graph options bar) lists the
+checked-out branch's commits since its base first. Base = `merge-base HEAD`
+with origin's HEAD, else origin/main, origin/master, main, master. Only the
+head region -- the `--date-order` stream down to the branch's last row -- is
+re-ordered, in three groups that each keep the stream's order: commits built
+on the branch (a branch started from it, a stash), the branch, the rest. A
+commit's children are always in its group or an earlier one, so the layout
+invariant holds. Past the region, rows and pages are the plain stream's. The
+region is capped at 2500 rows (`BranchFirstMax`), below the client's 3000-row
+page, so a refreshed first page holds the whole region and `mergeReload`
+splices onto an unchanged tail; past the cap, the order is plain.
+
 ## Untracked file diffs: `git diff` vs `git diff --no-index`
 `git diff -- <path>` (no `--cached`) only compares the working tree to the
 index. For a path git has never seen -- not even `git add`ed -- there is

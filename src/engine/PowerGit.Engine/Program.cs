@@ -260,15 +260,17 @@ repo.AddEndpointFilter(async (ctx, next) =>
 // v0.18.5: repeated `ref=<full name>` values limit the stream to those refs'
 // history plus HEAD (a bare `ref=` is HEAD alone); an unknown name answers
 // 400 naming it.
-repo.MapGet("/revisions", (GitHost git, int? max, int? skip, string? path, bool? follow, bool? exact, bool? full, bool? simplify, HttpContext ctx) =>
+// v0.21.7: `branchFirst=true` lists the checked-out branch's commits since
+// its base first, then the rest by date.
+repo.MapGet("/revisions", (GitHost git, int? max, int? skip, string? path, bool? follow, bool? exact, bool? full, bool? simplify, bool? branchFirst, HttpContext ctx) =>
 {
     try
     {
         bool filtered = ctx.Request.Query.ContainsKey("ref");
         string[] refs = [.. ctx.Request.Query["ref"].Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r!)];
-        RevisionFilter? filter = string.IsNullOrWhiteSpace(path) && !filtered
+        RevisionFilter? filter = string.IsNullOrWhiteSpace(path) && !filtered && branchFirst != true
             ? null
-            : new RevisionFilter(path, follow ?? true, exact ?? false, full ?? false, simplify ?? false, filtered ? refs : null);
+            : new RevisionFilter(path, follow ?? true, exact ?? false, full ?? false, simplify ?? false, filtered ? refs : null, branchFirst ?? false);
         return Results.Ok(git.ListRevisions(max ?? 800, skip ?? 0, ctx.RequestAborted, filter));
     }
     catch (OperationCanceledException)
@@ -285,7 +287,7 @@ repo.MapPost("/revisions", (RevisionRequest body, GitHost git, HttpContext ctx) 
 {
     try
     {
-        RevisionFilter filter = new(body.Path, body.Follow ?? true, body.Exact ?? false, body.Full ?? false, body.Simplify ?? false, body.Refs ?? []);
+        RevisionFilter filter = new(body.Path, body.Follow ?? true, body.Exact ?? false, body.Full ?? false, body.Simplify ?? false, body.Refs ?? [], body.BranchFirst ?? false);
         return Results.Ok(git.ListRevisions(body.Max ?? 800, body.Skip ?? 0, ctx.RequestAborted, filter));
     }
     catch (OperationCanceledException) { return Results.StatusCode(499); }

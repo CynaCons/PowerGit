@@ -224,6 +224,36 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(5, (await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?max=10"))!.Length);
     }
 
+    // v0.21.7: branchFirst travels as a query flag on GET and in the body of
+    // the POST the ref filter uses.
+    [Fact]
+    public async Task Revisions_route_puts_the_branch_first_when_asked()
+    {
+        HttpClient client = _factory.CreateAuthedClient();
+        using TempRepo repo = new();
+        repo.Run("checkout", "-q", "-b", "topic");
+        repo.Write("t.txt", "t\n");
+        repo.StageAndCommit("topic-1");
+        repo.Run("checkout", "-q", "main");
+        for (int i = 0; i < 3; i++)
+        {
+            repo.Write("m.txt", $"{i}\n");
+            repo.StageAndCommit($"main-{i}");
+        }
+
+        repo.Run("checkout", "-q", "topic");
+        string sid = await client.OpenSessionAsync(repo.Dir);
+
+        RevisionDto[] first = (await client.GetFromJsonAsync<RevisionDto[]>($"/repos/{sid}/revisions?branchFirst=true"))!;
+        Assert.Equal("topic-1", first[0].Subject);
+        Assert.Equal(6, first.Length);
+
+        HttpResponseMessage posted = await client.PostAsJsonAsync($"/repos/{sid}/revisions", new { refs = new[] { "refs/heads/main" }, branchFirst = true });
+        posted.EnsureSuccessStatusCode();
+        RevisionDto[] filtered = (await posted.Content.ReadFromJsonAsync<RevisionDto[]>())!;
+        Assert.Equal("topic-1", filtered[0].Subject);
+    }
+
     [Fact]
     public async Task Session_responses_carry_the_request_start_change_version()
     {

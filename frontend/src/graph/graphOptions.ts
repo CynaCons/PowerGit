@@ -10,10 +10,25 @@ import type { HighlightScope } from "./ancestry"
 //   dim    everything outside the history in the non-relative grey
 //   authorMark  (v0.18.1) ring the selected author's discs and bold the
 //          name on every loaded row by that author; off keeps the discs
+//   branchFirst  (v0.21.7) the checked-out branch's commits since its base
+//          on top, one under the other, then the rest by date; this one
+//          changes what the engine lists (useGraphRefFilter)
 
-export type GraphOptions = { scope: HighlightScope; ring: boolean; dim: boolean; authorMark: boolean }
+export type GraphOptions = {
+  scope: HighlightScope
+  ring: boolean
+  dim: boolean
+  authorMark: boolean
+  branchFirst: boolean
+}
 export const GRAPH_OPTIONS_KEY = "pg.graph"
-export const DEFAULT_GRAPH_OPTIONS: GraphOptions = { scope: "all", ring: true, dim: true, authorMark: true }
+export const DEFAULT_GRAPH_OPTIONS: GraphOptions = {
+  scope: "all",
+  ring: true,
+  dim: true,
+  authorMark: true,
+  branchFirst: true,
+}
 
 export function parseGraphOptions(raw: string | null): GraphOptions {
   if (!raw) return DEFAULT_GRAPH_OPTIONS
@@ -24,6 +39,7 @@ export function parseGraphOptions(raw: string | null): GraphOptions {
       ring: typeof o.ring === "boolean" ? o.ring : DEFAULT_GRAPH_OPTIONS.ring,
       dim: typeof o.dim === "boolean" ? o.dim : DEFAULT_GRAPH_OPTIONS.dim,
       authorMark: typeof o.authorMark === "boolean" ? o.authorMark : DEFAULT_GRAPH_OPTIONS.authorMark,
+      branchFirst: typeof o.branchFirst === "boolean" ? o.branchFirst : DEFAULT_GRAPH_OPTIONS.branchFirst,
     }
   } catch {
     return DEFAULT_GRAPH_OPTIONS
@@ -51,7 +67,8 @@ export function setGraphOptions(patch: Partial<GraphOptions>) {
     next.scope === options.scope &&
     next.ring === options.ring &&
     next.dim === options.dim &&
-    next.authorMark === options.authorMark
+    next.authorMark === options.authorMark &&
+    next.branchFirst === options.branchFirst
   )
     return
   options = next

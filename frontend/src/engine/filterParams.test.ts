@@ -29,6 +29,11 @@ describe("filterParams", () => {
     expect(b).toBe(a)
   })
 
+  it("asks for the branch first only when on (v0.21.7)", () => {
+    expect(filterParams({ branchFirst: true })).toBe("&branchFirst=true")
+    expect(filterParams({ branchFirst: false })).toBe("")
+  })
+
   it("combines a path and a ref filter", () => {
     expect(filterParams({ path: "doc.txt", refs: ["refs/heads/a"] })).toBe("&path=doc.txt&ref=refs%2Fheads%2Fa")
   })

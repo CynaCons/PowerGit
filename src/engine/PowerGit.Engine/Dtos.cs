@@ -34,7 +34,9 @@ public sealed record RevisionDto(
 /// limits it to the history of the given full ref names (<c>refs/heads/x</c>,
 /// <c>refs/remotes/origin/x</c>, <c>refs/tags/x</c>) plus HEAD — an empty
 /// list is HEAD alone; null is every ref. Both filters are optional and may
-/// combine.
+/// combine. <paramref name="BranchFirst"/> (v0.21.7) lists the checked-out
+/// branch's commits since its base first, then the rest by date; ignored
+/// with a path filter.
 /// </summary>
 public sealed record RevisionFilter(
     string? Path = null,
@@ -42,11 +44,13 @@ public sealed record RevisionFilter(
     bool ExactRenames = false,
     bool FullHistory = false,
     bool SimplifyMerges = false,
-    IReadOnlyList<string>? Refs = null);
+    IReadOnlyList<string>? Refs = null,
+    bool BranchFirst = false);
 
 /// <summary>POST /revisions avoids request-line limits for a large ref filter.</summary>
 public sealed record RevisionRequest(string[]? Refs = null, int? Skip = null, int? Max = null,
-    string? Path = null, bool? Follow = null, bool? Exact = null, bool? Full = null, bool? Simplify = null);
+    string? Path = null, bool? Follow = null, bool? Exact = null, bool? Full = null, bool? Simplify = null,
+    bool? BranchFirst = null);
 
 public sealed record CommitDetailDto(
     string Id,

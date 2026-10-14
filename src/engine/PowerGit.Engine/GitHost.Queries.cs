@@ -115,54 +115,90 @@ public sealed partial class GitHost
             logArgs.Add("--stdin");
         }
 
-        logArgs.Add($"-n{Math.Clamp(max, 1, 5000)}");
-        if (skip > 0)
-        {
-            logArgs.Add($"--skip={Math.Clamp(skip, 0, 1_000_000)}");
-        }
-
+        // Everything but the page window and the format: the branch-first
+        // order below reads the same stream twice, as hashes and as rows.
+        List<string> tailArgs = [];
         if (filterPath is not null)
         {
-            logArgs.Add("--parents");
+            tailArgs.Add("--parents");
             if (filter!.FullHistory)
             {
-                logArgs.Add("--full-history");
+                tailArgs.Add("--full-history");
                 if (filter.SimplifyMerges)
                 {
-                    logArgs.Add("--simplify-merges");
+                    tailArgs.Add("--simplify-merges");
                 }
             }
         }
 
-        logArgs.Add($"--pretty=format:%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}");
-        logArgs.Add("HEAD");
+        List<string> revArgs = ["HEAD"];
         if (hasStash)
         {
-            logArgs.Add("refs/stash");
+            revArgs.Add("refs/stash");
         }
 
         if (pathspec.Count > 0)
         {
-            logArgs.Add("--");
-            logArgs.AddRange(pathspec);
+            revArgs.Add("--");
+            revArgs.AddRange(pathspec);
         }
 
-        CommandResult log = stdinRefs is null
-            ? RunTimed(root, 120_000, ct, [.. logArgs])
-            : RunTimedWithStdin(root, 120_000, ct, stdinRefs, [.. logArgs]);
-
-        if (log.ExitCode != 0)
+        string RunLog(int n, int from, string format)
         {
-            throw new InvalidOperationException(log.StdErr.Trim());
+            List<string> args = [.. logArgs, $"-n{n}"];
+            if (from > 0)
+            {
+                args.Add($"--skip={Math.Clamp(from, 0, 1_000_000)}");
+            }
+
+            args.AddRange(tailArgs);
+            args.Add($"--pretty=format:{format}");
+            args.AddRange(revArgs);
+            CommandResult log = stdinRefs is null
+                ? RunTimed(root, 120_000, ct, [.. args])
+                : RunTimedWithStdin(root, 120_000, ct, stdinRefs, [.. args]);
+            if (log.ExitCode != 0)
+            {
+                throw new InvalidOperationException(log.StdErr.Trim());
+            }
+
+            return log.StdOut;
         }
 
+        string rowFormat = $"%H{Field}%P{Field}%an{Field}%ae{Field}%cn{Field}%ce{Field}%aI{Field}%s{Field}%D{Field}%b{Record}";
+        int take = Math.Clamp(max, 1, 5000);
+
+        // v0.21.7, owner: "I want to see my branch, all the commits of my
+        // branch first, in a contiguous series of rows ... since the base of
+        // the branch." Only the rows down to the branch's oldest commit (the
+        // head region) are re-ordered; every row after it is where
+        // --date-order puts it, so pages past the region are the plain ones.
+        if (filter is { BranchFirst: true } && filterPath is null
+            && BranchFirstRegion(root, head, skip, n => RunLog(n, 0, "%H"), ct) is { } region)
+        {
+            List<RevisionDto> ordered = BranchFirstOrder(ParseRevisionRows(RunLog(region.Length, 0, rowFormat), head, null, null), region.Block);
+            List<RevisionDto> page = [.. ordered.Skip(skip).Take(take)];
+            int more = take - page.Count;
+            if (more > 0)
+            {
+                page.AddRange(ParseRevisionRows(RunLog(more, region.Length, rowFormat), head, null, null));
+            }
+
+            return page;
+        }
+
+        return ParseRevisionRows(RunLog(take, skip, rowFormat), head, nameByCommit, filterPath);
+    }
+
+    private List<RevisionDto> ParseRevisionRows(string stdOut, string head, Dictionary<string, string>? nameByCommit, string? filterPath)
+    {
         List<RevisionDto> rows = [];
         // The name the file has at each row: the follow walk's answer where
         // it has one, else the name of the nearest newer row (a merge, or a
         // commit the HEAD-only walk did not visit, sits between commits that
         // agree on the name), else the requested path.
         string? nameHere = filterPath;
-        foreach (string rec in log.StdOut.Split(Record, StringSplitOptions.RemoveEmptyEntries))
+        foreach (string rec in stdOut.Split(Record, StringSplitOptions.RemoveEmptyEntries))
         {
             string[] f = rec.TrimStart('\n', '\r').Split(Field);
             if (f.Length < 9)
@@ -199,6 +235,126 @@ public sealed partial class GitHost
         }
 
         return rows;
+    }
+
+    /// <summary>Most commits a branch may have since its base for the
+    /// branch-first order, and the deepest the head region may reach. Below
+    /// the client's page (3000), so a refreshed first page always holds the
+    /// whole re-ordered region and its merge onto the loaded tail sees the
+    /// plain stream past it (historyMerge.ts).</summary>
+    internal const int BranchFirstMax = 2500;
+
+    private sealed record BranchFirstPlan(int Length, HashSet<string> Block);
+
+    /// <summary>
+    /// The branch's commits since its base — <c>git rev-list HEAD ^base</c>,
+    /// base being the merge-base of HEAD with the default branch — and the
+    /// length of the head region: the plain stream up to and including the
+    /// branch's last row. Null when there is nothing to move (HEAD is on or
+    /// behind the default branch, no default branch, no common history), when
+    /// the region is deeper than <see cref="BranchFirstMax"/>, or when the
+    /// page asked for starts past it.
+    /// </summary>
+    private BranchFirstPlan? BranchFirstRegion(string root, string head, int skip, Func<int, string> hashes, CancellationToken ct)
+    {
+        string? baseRef = DefaultBranchRef(root);
+        if (baseRef is null || string.IsNullOrEmpty(head))
+        {
+            return null;
+        }
+
+        CommandResult mb = RunTimed(root, 30_000, NoIsNotFailure, "merge-base", "HEAD", baseRef);
+        string mergeBase = mb.StdOut.Trim();
+        if (mb.ExitCode != 0 || mergeBase.Length == 0 || mergeBase == head)
+        {
+            return null;
+        }
+
+        CommandResult list = RunTimed(root, 60_000, ct, "rev-list", $"-n{BranchFirstMax + 1}", "HEAD", $"^{mergeBase}");
+        if (list.ExitCode != 0)
+        {
+            return null;
+        }
+
+        HashSet<string> block = new(list.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal);
+        if (block.Count == 0 || block.Count > BranchFirstMax)
+        {
+            return null;
+        }
+
+        // Every branch commit descends from the base, so --date-order lists
+        // them all before it: the region ends at the last one listed.
+        string[] order = hashes(BranchFirstMax).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        int seen = 0;
+        for (int i = 0; i < order.Length; i++)
+        {
+            if (block.Contains(order[i]) && ++seen == block.Count)
+            {
+                return skip > i ? null : new BranchFirstPlan(i + 1, block);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Exit 1 of merge-base is git's "no common ancestor", not a
+    /// failure for the git console to count.</summary>
+    private static bool NoIsNotFailure(int code) => code is 0 or 1;
+
+    /// <summary>The default branch the base is taken against: origin's HEAD,
+    /// else origin/main, origin/master, main, master — the first that exists.</summary>
+    private string? DefaultBranchRef(string root)
+    {
+        // One call: for-each-ref lists the ones that exist (sorted by name,
+        // so the preference is applied here) and origin/HEAD's target.
+        string[] candidates = ["refs/remotes/origin/HEAD", "refs/remotes/origin/main", "refs/remotes/origin/master", "refs/heads/main", "refs/heads/master"];
+        CommandResult found = Run(root, ["for-each-ref", "--format=%(refname) %(symref)", .. candidates]);
+        if (found.ExitCode != 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string> exists = new(StringComparer.Ordinal);
+        foreach (string line in found.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] parts = line.Split(' ', 2);
+            exists[parts[0]] = parts.Length > 1 ? parts[1].Trim() : "";
+        }
+
+        if (exists.TryGetValue(candidates[0], out string? target) && target.Length > 0)
+        {
+            return target;
+        }
+
+        return candidates.Skip(1).FirstOrDefault(exists.ContainsKey);
+    }
+
+    /// <summary>
+    /// The head region re-ordered: commits built on the branch (a branch
+    /// started from it, a stash on it) first, then the branch's own commits,
+    /// then the rest — each group in the stream's order. Every child of a
+    /// commit is in the commit's group or an earlier one, so no parent is
+    /// listed before a child, which the lane layout needs (layout.ts).
+    /// </summary>
+    internal static List<RevisionDto> BranchFirstOrder(IReadOnlyList<RevisionDto> region, HashSet<string> block)
+    {
+        HashSet<string> above = new(StringComparer.Ordinal);
+        // Reversed, the stream lists parents before children.
+        for (int i = region.Count - 1; i >= 0; i--)
+        {
+            RevisionDto r = region[i];
+            if (!block.Contains(r.Id) && r.Parents.Any(p => block.Contains(p) || above.Contains(p)))
+            {
+                above.Add(r.Id);
+            }
+        }
+
+        return
+        [
+            .. region.Where(r => above.Contains(r.Id)),
+            .. region.Where(r => block.Contains(r.Id)),
+            .. region.Where(r => !above.Contains(r.Id) && !block.Contains(r.Id)),
+        ];
     }
 
     /// <summary>

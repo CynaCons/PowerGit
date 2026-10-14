@@ -164,6 +164,18 @@ export const GraphOptionsBar = memo(function GraphOptionsBar({
         >
           Dim others
         </ToggleButton>
+        <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center" }} />
+        <ToggleButton
+          size="small"
+          value="branch-first"
+          selected={options.branchFirst}
+          onChange={() => setGraphOptions({ branchFirst: !options.branchFirst })}
+          data-testid="graph-branch-first"
+          title="The checked-out branch's commits since its base, on top"
+          sx={TOGGLE_SX}
+        >
+          Branch first
+        </ToggleButton>
         {temporary && (
           <>
             <Divider orientation="vertical" flexItem sx={{ height: 18, alignSelf: "center" }} />

@@ -91,6 +91,8 @@ export type RevisionFilter = {
   simplify?: boolean
   /** Full ref names (`refs/heads/x`, `refs/remotes/origin/x`, `refs/tags/x`). */
   refs?: string[]
+  /** v0.21.7: the checked-out branch's commits since its base first. */
+  branchFirst?: boolean
 }
 
 export type CommitDetail = {

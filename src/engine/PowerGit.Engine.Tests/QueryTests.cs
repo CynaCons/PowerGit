@@ -673,6 +673,86 @@ public sealed class QueryTests
         Assert.Empty(host.ListRevisions(1, 1, filter: combined));
     }
 
+    [Fact]
+    public void ListRevisions_branch_first_lists_the_branch_since_its_base_as_one_block()
+    {
+        // v0.21.7, owner: "I want to see my branch, all the commits of my
+        // branch first, in a contiguous series of rows ... and then the rest
+        // of the history based on dates." feature forks after m2 and its
+        // commits interleave by date with main's; "stacked" starts on f2.
+        string dir = Directory.CreateTempSubdirectory("powergit-branch-first-").FullName;
+        try
+        {
+            RunGit(dir, "init", "-q", "-b", "main");
+            RunGit(dir, "config", "user.email", "test@example.com");
+            RunGit(dir, "config", "user.name", "test");
+            const long T = 1_700_000_000;
+            for (int i = 0; i < 3; i++)
+            {
+                CommitAt(dir, $"m{i}", T + i);
+            }
+
+            RunGit(dir, "checkout", "-q", "-b", "feature");
+            CommitAt(dir, "f1", T + 100);
+            CommitAt(dir, "f2", T + 300);
+            RunGit(dir, "checkout", "-q", "-b", "stacked");
+            CommitAt(dir, "s1", T + 450);
+            RunGit(dir, "checkout", "-q", "feature");
+            CommitAt(dir, "f3", T + 500);
+            RunGit(dir, "checkout", "-q", "main");
+            CommitAt(dir, "m3", T + 200);
+            CommitAt(dir, "m4", T + 400);
+            CommitAt(dir, "m5", T + 600);
+            RunGit(dir, "checkout", "-q", "feature");
+
+            GitHost host = new();
+            host.Open(dir);
+            RevisionFilter first = new(BranchFirst: true);
+            Assert.Equal(
+                ["m5", "f3", "s1", "m4", "f2", "m3", "f1", "m2", "m1", "m0"],
+                host.ListRevisions().Select(r => r.Subject));
+            IReadOnlyList<RevisionDto> all = host.ListRevisions(filter: first);
+            Assert.Equal(
+                ["s1", "f3", "f2", "f1", "m5", "m4", "m3", "m2", "m1", "m0"],
+                all.Select(r => r.Subject));
+
+            // No parent before its child: the lane layout depends on it.
+            for (int i = 0; i < all.Count; i++)
+            {
+                foreach (string p in all[i].Parents)
+                {
+                    Assert.True(all.Take(i).All(r => r.Id != p), $"{all[i].Subject}'s parent listed above it");
+                }
+            }
+
+            // Pages agree with the whole list, inside and past the region.
+            List<RevisionDto> paged = [];
+            for (int skip = 0; skip < 12; skip += 3)
+            {
+                paged.AddRange(host.ListRevisions(3, skip, filter: first));
+            }
+
+            Assert.Equal(all.Select(r => r.Id), paged.Select(r => r.Id));
+
+            // On the default branch itself there is nothing to move.
+            RunGit(dir, "checkout", "-q", "main");
+            Assert.Equal(
+                host.ListRevisions().Select(r => r.Id),
+                host.ListRevisions(filter: first).Select(r => r.Id));
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+            catch
+            {
+                // best effort; a lingering repo watcher handle should not fail the test
+            }
+        }
+    }
+
     private static void CommitAt(string dir, string message, long unixSeconds)
     {
         string date = $"{unixSeconds} +0000";

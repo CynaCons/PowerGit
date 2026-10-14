@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import { DEFAULT_GRAPH_OPTIONS, parseGraphOptions } from "./graphOptions"
 
 describe("parseGraphOptions", () => {
-  it("defaults to all ancestors, ring, dim and the author mark", () => {
-    expect(parseGraphOptions(null)).toEqual({ scope: "all", ring: true, dim: true, authorMark: true })
+  it("defaults to all ancestors, ring, dim, the author mark and branch first", () => {
+    expect(parseGraphOptions(null)).toEqual({ scope: "all", ring: true, dim: true, authorMark: true, branchFirst: true })
     expect(DEFAULT_GRAPH_OPTIONS.dim).toBe(true)
   })
 
@@ -13,9 +13,13 @@ describe("parseGraphOptions", () => {
       ring: true,
       dim: false,
       authorMark: true,
+      branchFirst: true,
     })
     // v0.18.1: a pre-authorMark store keeps its choices and gets the default.
     expect(parseGraphOptions('{"authorMark":false}')).toEqual({ ...DEFAULT_GRAPH_OPTIONS, authorMark: false })
+    // v0.21.7: a store from before branchFirst gets it on; off is kept.
+    expect(parseGraphOptions('{"dim":true}').branchFirst).toBe(true)
+    expect(parseGraphOptions('{"branchFirst":false}').branchFirst).toBe(false)
   })
 
   it("ignores garbage", () => {

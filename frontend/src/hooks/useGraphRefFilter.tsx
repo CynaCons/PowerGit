@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { GraphFilterChip } from "../components/GraphFilterChip"
 import type { EngineClient, RefTree, RevisionFilter } from "../engine"
+import { useGraphOptions } from "../graph/graphOptions"
 import { graphRefCounts, setGraphRefs, useGraphRefs, type GraphRefs } from "../graph/graphRefs"
 import type { History } from "./useHistory"
 
@@ -20,10 +21,14 @@ export function useGraphRefFilter(repoId: string | null): GraphRefFilter {
   // Keyed by content so an equal set is the same object: useHistory's
   // fetchPage (and through it reloadHistory) is memoised on the filter.
   const key = graphRefs.mode ? [...new Set(graphRefs.refs)].sort().join("\n") : null
-  const filter = useMemo<RevisionFilter | undefined>(
-    () => (key === null ? undefined : { refs: key ? key.split("\n") : [] }),
-    [key],
-  )
+  // v0.21.7: "my branch first" changes the list too, so it rides along and
+  // a toggle reloads the history like a filter change.
+  const { branchFirst } = useGraphOptions()
+  const filter = useMemo<RevisionFilter | undefined>(() => {
+    const refs = key === null ? undefined : key ? key.split("\n") : []
+    if (!refs && !branchFirst) return undefined
+    return { ...(refs && { refs }), ...(branchFirst && { branchFirst }) }
+  }, [key, branchFirst])
   return { graphRefs, filter }
 }
 
