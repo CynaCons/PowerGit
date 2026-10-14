@@ -1049,7 +1049,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: tsc, lint, prettier, vitest 516; e2e agent reviews, start pane, settings page, desk, shell and review specs green on a private harness; looked at in light, dark and 150 % (below 900 px the files become a strip over the diff). Done 36350d4b1.
 - [ ] Owner tick: a review reads like the prototype and the rail always responds.
 
-### v0.21.4 — Agent review rounds — presence in powerboard, the agent convention, a real two-round review (PLANNED) (current) (ACTIVE)
+### v0.21.4 — Agent review rounds — presence in powerboard, the agent convention, a real two-round review (PLANNED) (2026-10-14) (COMPLETE)
 **Goal:** Close the loop with a real agent. powerboard records a read only when it returns, so a long wait looks like an old read (design §4.4): a small powerboard change (its own repository) makes "the agent is reading" true. The agent convention goes into docs/agents/mcp-agent-review.md (§5). Gate: a real Claude Code session with powerboard does two rounds against PowerGit, and the owner ticks it.
 - [x] powerboard 0.3.0 (its own repository, f3f92fe, pushed and installed for the owner): while read waits, seen.updated refreshes every 5 s; PowerGit shows "reading this channel" under 15 s, else "last read … ago" (design §4.4).
 - [x] docs/agents/mcp-agent-review.md: rounds, the round payload, the board and the agent's loop (open → read → get/revise → approved), the cN: reply prefix, the powerboard name equal to agent; README's Agent review section. Done 0429bb2b3.
