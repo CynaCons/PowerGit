@@ -18,6 +18,9 @@ type Props =
       onChange: (options: DiffOptions) => void
       /** The agent review screen (v0.21.8): its patch is captured, so whitespace cannot be ignored. */
       noWhitespace?: boolean
+      /** The agent review screen (v0.21.9) keeps its own Wrap lines; others share codeWrap.ts. */
+      wrap?: boolean
+      onWrapChange?: (wrap: boolean) => void
     }
   | {
       /** The blob pane (v0.18.8): the same pill reduced to Wrap lines; there are no diff options for a file. */
@@ -25,6 +28,8 @@ type Props =
       options?: undefined
       onChange?: undefined
       noWhitespace?: undefined
+      wrap?: undefined
+      onWrapChange?: undefined
     }
 
 const CONTEXT_CHOICES = [0, 3, 6, 10, 25]
@@ -40,10 +45,12 @@ const TOGGLE_SX = { py: 0.25, px: 1, fontSize: 12, textTransform: "none", whiteS
 // file history get it through this component and the blob pane mounts it
 // with `wrapOnly`. Wrapping is presentation: it is not a DiffOptions field
 // and never re-requests the diff.
-export function DiffOptionsBar({ options, onChange, wrapOnly, noWhitespace }: Props) {
+export function DiffOptionsBar({ options, onChange, wrapOnly, noWhitespace, ...own }: Props) {
   const bar = useFloatingBar()
   const { expanded } = bar
-  const wrap = useCodeWrap()
+  const shared = useCodeWrap()
+  const wrap = own.wrap ?? shared
+  const setWrap = own.onWrapChange ?? setCodeWrap
 
   return (
     <Box
@@ -122,7 +129,7 @@ export function DiffOptionsBar({ options, onChange, wrapOnly, noWhitespace }: Pr
           size="small"
           value="wrap"
           selected={wrap}
-          onChange={() => setCodeWrap(!wrap)}
+          onChange={() => setWrap(!wrap)}
           data-testid="diff-wrap-toggle"
           sx={TOGGLE_SX}
         >

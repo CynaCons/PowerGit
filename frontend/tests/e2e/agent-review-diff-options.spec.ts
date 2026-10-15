@@ -109,6 +109,85 @@ test.describe("agent review diff options", () => {
       .poll(async () => (await longRow.boundingBox())!.x + (await longRow.boundingBox())!.width)
       .toBeLessThanOrEqual(await paneRight())
     expect((await longRow.boundingBox())!.height).toBeGreaterThan(18 * 1.5)
+
+    // v0.21.9, owner: "I don't like the fact that the settings for the line
+    // wrap is shared with the other view." The review keeps its own switch
+    // and context, remembered across a reload; the other views' wrap stays.
+    const stored = () =>
+      page.evaluate(() => ({
+        shared: window.localStorage.getItem("pg.diffWrap"),
+        review: JSON.parse(window.localStorage.getItem("pg.reviewDiff") ?? "null"),
+      }))
+    const sharedBefore = (await stored()).shared
+    expect(await stored()).toEqual({ shared: sharedBefore, review: { context: 0, full: true, wrap: true } })
+    await page.reload()
+    await page.getByTestId("agent-reviews-button").click()
+    await page.getByTestId("agent-review-row").filter({ hasText: "Options review" }).click()
+    await expect(diff).toHaveAttribute("data-wrap", "true")
+    await expect(page.getByTestId("round-gap")).toHaveCount(2)
+    await page.getByTestId("diff-options-bar").hover()
     await wrapToggle.click()
+    await expect(diff).not.toHaveAttribute("data-wrap", "true")
+    expect(await stored()).toEqual({ shared: sharedBefore, review: { context: 0, full: true, wrap: false } })
+  })
+
+  test("the review's wrap does not follow the other views' switch", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("pg.diffWrap", "1")
+      window.localStorage.removeItem("pg.reviewDiff")
+    })
+    await page.goto("/")
+    await expect(page.getByTestId("status-branch")).not.toBeEmpty({ timeout: 30_000 })
+    const dir = makeRepo("pg-review-wrap-")
+    write(dir, "t.ts", file(false))
+    commit(dir, "forty lines")
+    write(dir, "t.ts", file(true))
+    const { id: repoId } = await api<{ id: string }>("/repos/open", {
+      method: "POST",
+      body: JSON.stringify({ path: dir }),
+    })
+    await api(`/repos/${repoId}/agent-reviews`, {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "notify",
+        title: "Wrap review",
+        why: "",
+        agent: "options-test",
+        worktree: true,
+        files: [{ path: "t.ts", status: "M" }],
+      }),
+    })
+    await page.goto(`/?repo=${repoId}`)
+    await page.getByTestId("agent-reviews-button").click()
+    await page.getByTestId("agent-review-row").filter({ hasText: "Wrap review" }).click()
+    const diff = page.getByTestId("round-diff")
+    // On by default here, and turning it off leaves the shared switch on.
+    await expect(diff).toHaveAttribute("data-wrap", "true")
+    await page.getByTestId("diff-options-bar").hover()
+    await page.getByTestId("diff-wrap-toggle").click()
+    await expect(diff).not.toHaveAttribute("data-wrap", "true")
+    expect(await page.evaluate(() => window.localStorage.getItem("pg.diffWrap"))).toBe("1")
+
+    // v0.21.9, owner: "line by line check marks, either approve or discard,
+    // just like the normal human review in the diff". Every changed line
+    // shows the human review's mark; a click accepts, rejects, clears.
+    const row = diff.locator('[data-testid="round-line"][data-key="+5"]')
+    const ring = () =>
+      row
+        .locator(".diff-row-mark")
+        .evaluate((el) => getComputedStyle(el, "::before").borderTopStyle + " " + getComputedStyle(el, "::after").content)
+    await expect(row).toHaveClass(/diff-row-review-todo/)
+    expect(await ring()).toBe("solid none")
+    await expect(diff.locator('[data-testid="round-line"][data-key="+6"]')).not.toHaveClass(/diff-row-review/)
+    const mark = row.getByTestId("round-mark")
+    await mark.click()
+    await expect(row).toHaveAttribute("data-mark", "ok")
+    await expect(row).toHaveClass(/diff-row-review-ok/)
+    await mark.click()
+    await expect(row).toHaveAttribute("data-mark", "rejected")
+    expect(await ring()).toBe('solid "×"')
+    await mark.click()
+    await expect(row).toHaveAttribute("data-mark", "")
+    await expect(row).toHaveClass(/diff-row-review-todo/)
   })
 })

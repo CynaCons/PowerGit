@@ -4,9 +4,8 @@ import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { describeThrown, type AgentReview, type DiffOptions, type EngineClient } from "../../engine"
+import { describeThrown, type AgentReview, type EngineClient } from "../../engine"
 import { askAgentReview, resolveAgentReview, sendAgentReviewRound } from "../../engine/agentReviews"
-import { DEFAULT_DIFF_OPTIONS } from "../../engine/commitCache"
 import { useAgentReviewBoard } from "../../hooks/useAgentReviewBoard"
 import { useReview } from "../../hooks/useReview"
 import { useRoundSource } from "../../hooks/useRoundSource"
@@ -18,6 +17,7 @@ import { BoardColumn } from "./BoardColumn"
 import type { RoundActions } from "./RoundBox"
 import { Chip } from "./reviewChips"
 import { RoundDiff } from "./RoundDiff"
+import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
 import type { CommentKind } from "./RoundThread"
 import { hunksOf, latestRound, liveVerdict, roundCounts, roundKey, turnLabel } from "./roundModel"
 
@@ -62,7 +62,7 @@ export function ReviewScreen({
   const counts = roundCounts(round, doc, threads)
   const previous = session.rounds?.find((r) => r.n === round.n - 1)?.changes ?? []
   // v0.21.8: the bottom diff's options; whitespace stays as captured.
-  const [diffOptions, setDiffOptions] = useState<DiffOptions>(DEFAULT_DIFF_OPTIONS)
+  const diffView = useReviewDiff()
   const source = useRoundSource(
     engine,
     session,
@@ -364,7 +364,8 @@ export function ReviewScreen({
               onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
               onComment={comment}
               onCursor={setCursor}
-              options={diffOptions}
+              options={diffView.options}
+              wrap={diffView.wrap}
               sourceText={source.text}
               sourceSettled={source.settled}
             />
@@ -375,7 +376,13 @@ export function ReviewScreen({
               </Typography>
             )}
           </Box>
-          <DiffOptionsBar options={diffOptions} onChange={setDiffOptions} noWhitespace />
+          <DiffOptionsBar
+            options={diffView.options}
+            onChange={(options) => setReviewDiff({ options })}
+            wrap={diffView.wrap}
+            onWrapChange={(wrap) => setReviewDiff({ wrap })}
+            noWhitespace
+          />
         </Box>
         <Box sx={{ ...paneSx, minHeight: 0, minWidth: 0, gridArea: "board" }}>
           <BoardColumn

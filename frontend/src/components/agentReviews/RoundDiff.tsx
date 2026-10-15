@@ -10,7 +10,6 @@ import type {
   DiffOptions,
 } from "../../engine"
 import type { Token } from "../../highlight"
-import { useCodeWrap } from "../codeWrap"
 import type { LineState, ReviewDoc } from "../../review/reviewModel"
 import { cycle } from "../../review/reviewModel"
 import { Chip, VerdictButton } from "./reviewChips"
@@ -46,19 +45,26 @@ export type RoundDiffProps = {
   onComment: (key: string, text: string, kind: CommentKind) => void
   onCursor: (changeId: string) => void
   options: DiffOptions
+  /** Wrap lines, the review screen's own switch (reviewDiffView.ts). */
+  wrap: boolean
   /** The file's new side for extra context; null while unknown or unavailable. */
   sourceText: string | null
   /** The source was asked for and came back (or failed): the note may show. */
   sourceSettled: boolean
 }
 
-type LineProps = RoundDiffProps & { tokens: Map<HunkRow, Token[]> | null; wrap: boolean }
+type LineProps = RoundDiffProps & { tokens: Map<HunkRow, Token[]> | null }
 
 const VERDICT_COLOR: Record<AgentReviewVerdict, string> = {
   accept: "var(--pg-review-accept)",
   reject: "var(--pg-review-rejected)",
   mixed: "var(--pg-review-todo)",
   undecided: "divider",
+}
+/** The human review's stripe on the code (app.css .diff-row-review-*). */
+const STRIPE: Partial<Record<string, string>> = {
+  todo: "inset 3px 0 0 var(--pg-review-todo-stripe, #d99a2b)",
+  rejected: "inset 3px 0 0 var(--pg-review-rejected)",
 }
 const VERDICT_BG: Record<AgentReviewVerdict, string> = {
   accept: "var(--pg-review-accept-bg)",
@@ -88,7 +94,7 @@ export function RoundDiff(props: RoundDiffProps) {
     [blocks],
   )
   const tokens = useRowTokens(rows, path)
-  const wrap = useCodeWrap()
+  const { wrap } = props
   const digits = String(Math.max(1, ...rows.map((r) => Math.max(r.oldNum ?? 0, r.newNum ?? 0)))).length
   if (!file) return null
   const fromFile = sourceFor(sourceText, hunks) !== null
@@ -113,13 +119,12 @@ export function RoundDiff(props: RoundDiffProps) {
       )}
       {blocks.map((block) =>
         block.kind === "gap" ? (
-          <GapRows key={`gap${block.rows[0].key}`} rows={block.rows} tokens={tokens} wrap={wrap} {...props} />
+          <GapRows key={`gap${block.rows[0].key}`} rows={block.rows} tokens={tokens} {...props} />
         ) : (
           <HunkCard
             key={`${block.hunk.oldStart}:${block.hunk.newStart}`}
             block={block}
             tokens={tokens}
-            wrap={wrap}
             {...props}
           />
         ),
@@ -319,6 +324,12 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
   const fg =
     row.kind === "add" ? "var(--pg-diff-added)" : row.kind === "remove" ? "var(--pg-diff-removed)" : "text.primary"
   const tokens = p.tokens?.get(row)
+  // v0.21.9, owner: "line by line check marks, approve or discard, just like
+  // the normal human review in the diff": the human review's mark (app.css
+  // .diff-row-mark) on every changed line; amber until marked, only while
+  // the round can still change.
+  const markable = p.editable && row.kind !== "context"
+  const shown = row.kind === "context" ? undefined : (state ?? (p.editable ? "todo" : undefined))
   const num = {
     color: "var(--pg-diff-gutter)",
     textAlign: "right",
@@ -339,6 +350,7 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
         data-key={row.key}
         data-kind={row.kind}
         data-mark={state ?? ""}
+        className={shown ? `diff-row-review-${shown}` : undefined}
         sx={{ boxShadow: picked ? "inset 3px 0 0 var(--pg-grid-sel-border, #2563eb)" : "none" }}
       >
         <Box component="td" sx={num} onClick={() => p.editable && p.onPick(row.key)} title="Comment on this line">
@@ -350,16 +362,19 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
         <Box
           component="td"
           data-testid="round-mark"
-          onClick={() => p.editable && row.kind !== "context" && p.onMark(row.key, cycle(state))}
+          onClick={() => markable && p.onMark(row.key, cycle(state))}
+          title={markable ? "Accept, reject or clear this line" : undefined}
           sx={{
-            width: 16,
-            textAlign: "center",
-            cursor: p.editable && row.kind !== "context" ? "pointer" : "default",
-            color: state === "rejected" ? "var(--pg-review-rejected)" : "var(--pg-review-accept)",
+            width: 20,
+            minWidth: 20,
+            p: 0,
+            verticalAlign: "top",
+            cursor: markable ? "pointer" : "default",
             bgcolor: bg,
+            "& .diff-row-mark": { height: 18, cursor: "inherit" },
           }}
         >
-          {state === "ok" ? "✓" : state === "rejected" ? "✗" : ""}
+          <span className="diff-row-mark" />
         </Box>
         <Box
           component="td"
@@ -369,7 +384,9 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
             overflowWrap: p.wrap ? "anywhere" : "normal",
             bgcolor: bg,
             color: fg,
+            pl: "6px",
             pr: 1,
+            boxShadow: (shown && STRIPE[shown]) ?? "none",
           }}
         >
           {row.kind === "add" ? "+" : row.kind === "remove" ? "-" : " "}
