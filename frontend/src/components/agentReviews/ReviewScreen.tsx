@@ -4,13 +4,16 @@ import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { describeThrown, type AgentReview, type EngineClient } from "../../engine"
+import { describeThrown, type AgentReview, type DiffOptions, type EngineClient } from "../../engine"
 import { askAgentReview, resolveAgentReview, sendAgentReviewRound } from "../../engine/agentReviews"
+import { DEFAULT_DIFF_OPTIONS } from "../../engine/commitCache"
 import { useAgentReviewBoard } from "../../hooks/useAgentReviewBoard"
 import { useReview } from "../../hooks/useReview"
+import { useRoundSource } from "../../hooks/useRoundSource"
 import { updateReviewDoc, useReviewDoc } from "../../review/reviewState"
 import { withComment, withLine, type LineState } from "../../review/reviewModel"
 import { deskGap, paneSx } from "../../theme/panels"
+import { DiffOptionsBar } from "../DiffOptionsBar"
 import { BoardColumn } from "./BoardColumn"
 import type { RoundActions } from "./RoundBox"
 import { Chip } from "./reviewChips"
@@ -58,6 +61,14 @@ export function ReviewScreen({
   const filePath = round.files.some((f) => f.path === path) ? path! : (round.files[0]?.path ?? "")
   const counts = roundCounts(round, doc, threads)
   const previous = session.rounds?.find((r) => r.n === round.n - 1)?.changes ?? []
+  // v0.21.8: the bottom diff's options; whitespace stays as captured.
+  const [diffOptions, setDiffOptions] = useState<DiffOptions>(DEFAULT_DIFF_OPTIONS)
+  const source = useRoundSource(
+    engine,
+    session,
+    round.files.find((f) => f.path === filePath),
+    round.n,
+  )
 
   // Every change of the round in reading order, for J / K and the cursor.
   const order = useMemo(
@@ -336,29 +347,35 @@ export function ReviewScreen({
             )
           })}
         </Box>
-        <Box sx={{ ...paneSx, overflow: "auto", p: 1.25, gridArea: "diff" }}>
-          <RoundDiff
-            round={round}
-            path={filePath}
-            doc={doc}
-            threads={threads}
-            editable={editable}
-            canAsk={canAsk}
-            previous={previous}
-            cursor={cursor}
-            picked={picked}
-            onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
-            onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
-            onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
-            onComment={comment}
-            onCursor={setCursor}
-          />
-          {editable && (
-            <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}>
-              A accept · R reject · C comment · J / K next / previous change · a click on a line number comments on that
-              line · Ctrl+Enter sends the round
-            </Typography>
-          )}
+        <Box sx={{ ...paneSx, position: "relative", minHeight: 0, minWidth: 0, display: "flex", gridArea: "diff" }}>
+          <Box data-testid="round-diff-scroll" sx={{ flex: 1, minWidth: 0, overflow: "auto", p: 1.25, pb: 6 }}>
+            <RoundDiff
+              round={round}
+              path={filePath}
+              doc={doc}
+              threads={threads}
+              editable={editable}
+              canAsk={canAsk}
+              previous={previous}
+              cursor={cursor}
+              picked={picked}
+              onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
+              onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
+              onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
+              onComment={comment}
+              onCursor={setCursor}
+              options={diffOptions}
+              sourceText={source.text}
+              sourceSettled={source.settled}
+            />
+            {editable && (
+              <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}>
+                A accept · R reject · C comment · J / K next / previous change · a click on a line number comments on
+                that line · Ctrl+Enter sends the round
+              </Typography>
+            )}
+          </Box>
+          <DiffOptionsBar options={diffOptions} onChange={setDiffOptions} noWhitespace />
         </Box>
         <Box sx={{ ...paneSx, minHeight: 0, minWidth: 0, gridArea: "board" }}>
           <BoardColumn
