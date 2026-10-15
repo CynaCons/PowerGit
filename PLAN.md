@@ -1081,7 +1081,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Tests: engine 250, vitest 519, lint, graph-branch-first e2e red first; the wider e2e set was cut by low memory twice (crashed workers, no assertion failures), owner: release anyway.
 - [ ] Release; owner tick: my branch's commits read as one block at the top.
 
-### v0.21.8 — Agent review diff — context, full file, colours, wrap (current) (ACTIVE)
+### v0.21.8 — Agent review diff — context, full file, colours, wrap ((2026-10-15)) (COMPLETE)
 **Goal:** Owner 2026-10-15: the agent review screen's diff gets the bottom diff's options — context lines, full file, syntax colours and Wrap lines (long lines ran past the pane).
 - [x] Review screen: the diff options pill (context lines, Full file, Wrap lines); extra lines come from the round's file and the change cards stay the same.
 - [x] Review screen: syntax colours, and number columns that line up across cards and gaps.
