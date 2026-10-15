@@ -1088,7 +1088,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Tests: vitest 527, lint, agent-review-diff-options e2e plus the review, shell and wrap specs (28).
 - [ ] Release; owner tick: the review diff wraps long lines, shows more context or the full file, and has colours. [agent: claude]
 
-### v0.21.9 — Agent review — own diff settings, line marks (current) (ACTIVE)
+### v0.21.9 — Agent review — own diff settings, line marks (COMPLETE)
 **Goal:** The review screen keeps its own Context and Wrap lines, and each changed line can be accepted or rejected as in the human review.
 - [x] Review diff settings are its own (pg.reviewDiff): Context, Full file, Wrap lines (on by default), remembered; the other views' Wrap stays apart.
 - [x] Every changed line in the review diff shows the human review's mark: a click accepts, rejects, clears.
