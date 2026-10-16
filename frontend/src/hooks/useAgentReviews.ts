@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { AgentReviewSummary, EngineClient } from "../engine"
-import { listAgentReviews } from "../engine/agentReviews"
+import type { AgentReviewEverywhere, AgentReviewEverywhereItem, EngineClient } from "../engine"
+import { listAllAgentReviews } from "../engine/agentReviews"
 
 // The agent-review inbox (v0.20.0): the list behind the rail badge, polled
-// every 5 s while the app runs. A poll that brings the same list sets no
-// state: App must not re-render every 5 s for nothing (v0.18.18's
-// reactivity review counted every App render as ~60 row renders before
-// the amplifier was fixed; a poll is exactly the kind of tick that was
-// meant to stay silent).
+// every 5 s while the app runs. Since v0.21.10 the poll asks the engine-level
+// every-repo list with the repo-less `base` client, so the inbox and the
+// badge cover every open repository and keep working when this window has
+// none open. A poll that brings the same list sets no state: App must not
+// re-render every 5 s for nothing (v0.18.18's reactivity review counted every
+// App render as ~60 row renders before the amplifier was fixed; a poll is
+// exactly the kind of tick that was meant to stay silent).
 
 export function useAgentReviews({ engine }: { engine: EngineClient }) {
-  const [sessions, setSessions] = useState<AgentReviewSummary[]>([])
+  const [sessions, setSessions] = useState<AgentReviewEverywhereItem[]>([])
   const [badge, setBadge] = useState(0)
   const [loading, setLoading] = useState(true)
   const ctrl = useRef<AbortController | null>(null)
@@ -20,7 +22,7 @@ export function useAgentReviews({ engine }: { engine: EngineClient }) {
     const next = new AbortController()
     ctrl.current = next
     try {
-      const value = await listAgentReviews(engine, next.signal)
+      const value: AgentReviewEverywhere = await listAllAgentReviews(engine, next.signal)
       if (!next.signal.aborted) {
         const key = JSON.stringify(value.sessions)
         if (key !== seen.current) {

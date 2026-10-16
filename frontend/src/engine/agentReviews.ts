@@ -1,5 +1,13 @@
 import { describeThrown, EngineClient, EngineError } from "./client"
-import type { AgentReview, AgentReviewBoard, AgentReviewList, AgentReviewThread, BoardMessage, DiffDto } from "./types"
+import type {
+  AgentReview,
+  AgentReviewBoard,
+  AgentReviewEverywhere,
+  AgentReviewList,
+  AgentReviewThread,
+  BoardMessage,
+  DiffDto,
+} from "./types"
 
 async function json<T>(res: Response): Promise<T> {
   const text = await res.text().catch((e: unknown) => {
@@ -18,6 +26,11 @@ async function json<T>(res: Response): Promise<T> {
 const root = (engine: EngineClient) => `${engine.repoPath()}/agent-reviews`
 export const listAgentReviews = (engine: EngineClient, signal?: AbortSignal) =>
   engine.request(root(engine), {}, { signal }).then(json<AgentReviewList>)
+/** v0.21.10: the reviews of every open repository. Engine-level path on
+ *  purpose (no repoPath()): it is asked with the repo-less `base` client so
+ *  the rail badge and the inbox work before anything is open in the window. */
+export const listAllAgentReviews = (engine: EngineClient, signal?: AbortSignal) =>
+  engine.request("/agent-reviews", {}, { signal }).then(json<AgentReviewEverywhere>)
 export const getAgentReview = (engine: EngineClient, id: string, signal?: AbortSignal) =>
   engine.request(`${root(engine)}/${encodeURIComponent(id)}`, {}, { signal }).then(json<AgentReview>)
 export const agentReviewDiff = (engine: EngineClient, id: string, path: string, signal?: AbortSignal, round?: number) =>

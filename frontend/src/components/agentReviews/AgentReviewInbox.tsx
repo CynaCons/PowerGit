@@ -5,7 +5,7 @@ import RefreshIcon from "@mui/icons-material/Refresh"
 import CloseIcon from "@mui/icons-material/Close"
 import Typography from "@mui/material/Typography"
 import { useState } from "react"
-import type { AgentReviewSummary } from "../../engine"
+import type { AgentReviewEverywhereItem } from "../../engine"
 import { paneSx, deskGap } from "../../theme/panels"
 import { ageOf } from "./agentReviewModel"
 import { Chip } from "./reviewChips"
@@ -14,22 +14,31 @@ import { filterReviews, onBoard, turnLabel, waitingForYou, type InboxFilter } fr
 // The agent reviews, full view (v0.21.3, tab "Inbox" of
 // docs/prototypes/agent-review-v3.html): one row per review — title, mode,
 // agent, branch, files, whether the agent is on the board, whose turn it is,
-// age. The filter starts on what waits for the owner.
+// age. The filter starts on what waits for the owner. Since v0.21.10 the
+// inbox holds every open repository's reviews, and each row names the
+// repository it lives in (`data-testid="agent-review-repo"`, plain words).
 
 export function AgentReviewInbox({
   sessions,
+  openError,
   onOpen,
+  onDismissError,
   onRefresh,
   onClose,
 }: {
-  sessions: AgentReviewSummary[]
-  onOpen: (id: string) => void
+  sessions: AgentReviewEverywhereItem[]
+  openError: string | null
+  onOpen: (item: AgentReviewEverywhereItem) => void
+  onDismissError?: () => void
   onRefresh: () => void
   onClose: () => void
 }) {
-  const waiting = sessions.filter(waitingForYou).length
+  const summaries = sessions.map((i) => i.session)
+  const waiting = summaries.filter(waitingForYou).length
   const [filter, setFilter] = useState<InboxFilter>(waiting > 0 ? "waiting" : "open")
-  const shown = filterReviews(sessions, filter)
+  // The engine orders the rows newest first; the filter only drops some.
+  const keptIds = new Set(filterReviews(summaries, filter).map((s) => s.id))
+  const shown = sessions.filter((i) => keptIds.has(i.session.id))
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: deskGap }}>
       <Box sx={{ ...paneSx, px: 1.5, py: 1, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
@@ -61,6 +70,22 @@ export function AgentReviewInbox({
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
+      {openError && (
+        <Box
+          data-testid="agent-review-open-error"
+          sx={{ ...paneSx, px: 1.5, py: 1, display: "flex", alignItems: "center", gap: 1 }}
+        >
+          <Chip tone="reject">Could not open the repository</Chip>
+          <Typography noWrap sx={{ fontSize: 12, color: "text.secondary", flex: 1, minWidth: 0 }}>
+            {openError}
+          </Typography>
+          {onDismissError && (
+            <IconButton size="small" aria-label="Dismiss the error" onClick={onDismissError}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
+      )}
       <Box sx={{ ...paneSx, flex: 1, minHeight: 0, overflow: "auto" }}>
         {shown.length === 0 && (
           <Typography color="text.secondary" sx={{ p: 3 }}>
@@ -71,7 +96,8 @@ export function AgentReviewInbox({
                 : "No open reviews."}
           </Typography>
         )}
-        {shown.map((s) => {
+        {shown.map((item) => {
+          const s = item.session
           const turn = turnLabel(s)
           const live = s.status === "pending" && onBoard(s)
           return (
@@ -82,7 +108,7 @@ export function AgentReviewInbox({
               data-status={s.status}
               data-mode={s.mode}
               data-turn={s.turn ?? ""}
-              onClick={() => onOpen(s.id)}
+              onClick={() => onOpen(item)}
               sx={{
                 width: "100%",
                 border: 0,
@@ -107,6 +133,23 @@ export function AgentReviewInbox({
                     {s.title}
                   </Typography>
                   <Chip tone={s.mode === "wait" ? "wait" : "info"}>{s.mode === "wait" ? "Wait" : "Notify"}</Chip>
+                  <Box
+                    component="span"
+                    data-testid="agent-review-repo"
+                    sx={{
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 2.5,
+                      px: 0.9,
+                      fontSize: 11,
+                      lineHeight: "18px",
+                      whiteSpace: "nowrap",
+                      color: "text.secondary",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.repo.name}
+                  </Box>
                 </Box>
                 <Typography noWrap sx={{ fontSize: 12, color: "text.secondary" }}>
                   {[s.agent ?? "unknown agent", s.branch, `${s.fileCount} file${s.fileCount === 1 ? "" : "s"}`]
