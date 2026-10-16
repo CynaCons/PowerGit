@@ -139,6 +139,26 @@ test.describe("agent review rounds", () => {
         timeout: 15_000,
       })
 
+      // v0.21.11, owner: "agents should be encouraged to structure their
+      // text, maybe with markdown format. Now it's just a blob of text." An
+      // agent post in Markdown reads as a list, bold and a code block.
+      db!
+        .prepare("INSERT INTO messages (channel, author, text, created) VALUES (?, ?, ?, ?)")
+        .run(
+          session.board,
+          "auth-fix",
+          "Plan for round 2:\n\n- keep **line 25** as it was\n- add a test for the timer\n\n```ts\nconst delay = 250\n```",
+          Date.now() / 1000,
+        )
+      const markdownPost = page.getByTestId("board-post").filter({ hasText: "Plan for round 2" })
+      await expect(markdownPost.locator("li").filter({ hasText: "add a test for the timer" })).toBeVisible({
+        timeout: 15_000,
+      })
+      await expect(markdownPost.locator("strong").filter({ hasText: "line 25" })).toBeVisible()
+      await expect(markdownPost.locator("pre")).toContainText("const delay = 250")
+      await expect(markdownPost).not.toContainText("**")
+      await expect(markdownPost).not.toContainText("```")
+
       // A comment that goes with the round, on line 25.
       await second.locator('[data-testid="round-line"][data-key="+25"] td').nth(1).click()
       await page.getByTestId("comment-draft").fill("Keep line 25 as it was.")
