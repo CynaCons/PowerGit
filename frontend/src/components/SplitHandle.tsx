@@ -3,6 +3,7 @@ import { useRef, useState } from "react"
 import { getZoom } from "../theme/zoom"
 
 type Props = {
+  edge?: "left" | "right"
   testid: string
   value: number
   defaultValue: number
@@ -18,6 +19,7 @@ type Props = {
 // call sites (e.g. the Files and File Tree tabs) can share one source of
 // truth for the width.
 export function SplitHandle({
+  edge = "left",
   testid,
   value,
   defaultValue,
@@ -31,7 +33,7 @@ export function SplitHandle({
   // Mirrors `value` synchronously so release() can commit the latest width
   // even if the browser fires it before React re-renders with new props.
   const widthRef = useRef(value)
-  widthRef.current = value
+  if (!drag.current) widthRef.current = value
   const [dragging, setDragging] = useState(false)
 
   const clamp = (width: number) => {
@@ -59,7 +61,8 @@ export function SplitHandle({
     // 150 % (v0.18.18, docs/perf/reactivity-review-2026-09-17.md second
     // pass finding 3). getZoom() rather than useZoom(): no hook for a value
     // only read mid-drag.
-    const next = clamp(drag.current.startWidth + (e.clientX - drag.current.startX) / getZoom())
+    const delta = ((e.clientX - drag.current.startX) / getZoom()) * (edge === "right" ? -1 : 1)
+    const next = clamp(drag.current.startWidth + delta)
     widthRef.current = next
     onChange(next)
   }
@@ -85,6 +88,20 @@ export function SplitHandle({
   return (
     <Box
       data-testid={testid}
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={value}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home") return
+        e.preventDefault()
+        e.stopPropagation()
+        const delta = (e.key === "ArrowRight" ? 16 : -16) * (edge === "right" ? -1 : 1)
+        const next = clamp(e.key === "Home" ? defaultValue : widthRef.current + delta)
+        widthRef.current = next
+        onChange(next)
+        onCommit(next)
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={release}
@@ -93,6 +110,8 @@ export function SplitHandle({
       onDoubleClick={onDoubleClick}
       sx={{
         width: 8,
+        touchAction: "none",
+        "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 },
         flexShrink: 0,
         cursor: "col-resize",
         // Belt and braces with the preventDefault above: Chromium does not

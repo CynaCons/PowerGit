@@ -13,6 +13,7 @@ import { updateReviewDoc, useReviewDoc } from "../../review/reviewState"
 import { withComment, withLine, type LineState } from "../../review/reviewModel"
 import { deskGap, paneSx } from "../../theme/panels"
 import { DiffOptionsBar } from "../DiffOptionsBar"
+import { useReviewGrid } from "./reviewLayout"
 import { BoardColumn } from "./BoardColumn"
 import type { RoundActions } from "./RoundBox"
 import { Chip } from "./reviewChips"
@@ -42,6 +43,7 @@ export function ReviewScreen({
   /** The inbox list re-reads after a send, approve or cancel. */
   onChanged: () => void
 }) {
+  const grid = useReviewGrid()
   const latest = latestRound(session)!
   const [viewRound, setViewRound] = useState<number | null>(null)
   const round = session.rounds?.find((r) => r.n === viewRound) ?? latest
@@ -263,11 +265,14 @@ export function ReviewScreen({
         )}
       </Box>
       <Box
+        ref={grid.ref}
+        style={grid.style}
         sx={{
+          position: "relative",
           flex: 1,
           minHeight: 0,
           display: "grid",
-          gridTemplateColumns: "minmax(140px, 0.7fr) minmax(300px, 2.6fr) minmax(260px, 1.15fr)",
+          gridTemplateColumns: "var(--rv-files, 220px) minmax(300px, 1fr) var(--rv-board, 340px)",
           gridTemplateRows: "minmax(0, 1fr)",
           gridTemplateAreas: '"files diff board"',
           gap: deskGap,
@@ -279,8 +284,10 @@ export function ReviewScreen({
           },
         }}
       >
+        {grid.handles}
         <Box
-          sx={{ ...paneSx, overflow: "auto", gridArea: "files", "@container (max-width: 900px)": { maxHeight: 112 } }}
+          data-testid="review-files-pane"
+          sx={{ ...paneSx, minWidth: 0, overflow: "auto", gridArea: "files", "@container (max-width: 900px)": { maxHeight: 112 } }}
         >
           <Typography sx={{ fontSize: 12, color: "text.secondary", px: 1.25, py: 1 }}>
             Files · round {round.n}
@@ -384,7 +391,7 @@ export function ReviewScreen({
             noWhitespace
           />
         </Box>
-        <Box sx={{ ...paneSx, minHeight: 0, minWidth: 0, gridArea: "board" }}>
+        <Box data-testid="review-board-pane" sx={{ ...paneSx, minHeight: 0, minWidth: 0, gridArea: "board" }}>
           <BoardColumn
             session={session}
             round={round}
