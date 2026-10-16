@@ -132,7 +132,7 @@ public sealed record AgentReviewReviseRequest(
 public sealed record AgentReviewSendRequest(string? Note);
 public sealed record AgentReviewAskRequest(int Round, string Path, string Line, string Body);
 public sealed record BoardMessageDto(long Id, string Author, string Text, string At);
-/// <summary>v0.21.2: a review's powerboard channel. Reading is true while the
+/// <summary>v0.21.2: a review's PowerChannel channel. Reading is true while the
 ///  agent's last read of the channel is under 15 s old.</summary>
 public sealed record AgentReviewBoardDto(
     bool Available, string? Channel, string? Reason, IReadOnlyList<BoardMessageDto> Messages,

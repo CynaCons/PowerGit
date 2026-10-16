@@ -205,7 +205,7 @@ same binaries under `/usr`. Both need the distro's WebKitGTK stack
 
 With PowerGit running, connect Claude Code in one line:
 `claude mcp add powergit -- "C:\Users\<you>\AppData\Local\PowerGit\powergit.exe" mcp`.
-An agent opens a review; you accept or reject each change, comment on lines and send the round back, and the agent revises until you approve. With [powerboard](https://github.com/CynaCons/powerboard) installed, each review gets a channel where you and the agent talk between rounds.
+An agent opens a review; you accept or reject each change, comment on lines and send the round back, and the agent revises until you approve. With [PowerChannel](https://github.com/CynaCons/PowerChannel) installed, each review gets a channel where you and the agent talk between rounds.
 Codex, Linux/AppImage, tool schemas, and the Silent / Notify / Wait workflow are documented in [Agent review over MCP](docs/agents/mcp-agent-review.md).
 
 Supported Ubuntu versions: **22.04, 24.04 and 26.04**. Every release

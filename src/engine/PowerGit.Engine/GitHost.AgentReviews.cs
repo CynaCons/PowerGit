@@ -81,7 +81,7 @@ public sealed partial class GitHost
         return session;
     }
 
-    /// <summary>The board channel for a new session (v0.21.2); unchanged without powerboard.</summary>
+    /// <summary>The board channel for a new session (v0.21.2); unchanged without a channel.</summary>
     private AgentReviewDto AttachBoard(AgentReviewDto session, string? requested)
     {
         string? board = null;
@@ -137,7 +137,7 @@ public sealed partial class GitHost
         }
         sessions.Sort((a, b) => string.CompareOrdinal(b.CreatedAt, a.CreatedAt));
         AgentReviewSummaryDto[] summaries = [.. sessions.Select(ToSummary)];
-        WithLastReads(summaries, sessions, boardPath ?? PowerBoard.DefaultPath());
+        WithLastReads(summaries, sessions, boardPath ?? PowerChannel.DefaultPath());
         // A Wait review counts while it is the owner's turn; a Notify one while unread.
         int badge = sessions.Count(s => (s.Mode == "wait" && s.Status == "pending" && TurnOf(s) != "agent") || (s.Mode == "notify" && s.Unread && s.Status == "pending"));
         return new AgentReviewListDto(summaries, badge);
@@ -152,7 +152,7 @@ public sealed partial class GitHost
     /// </summary>
     public static AgentReviewEverywhereDto ListAgentReviewsEverywhere(IEnumerable<string> roots, string? boardPath = null)
     {
-        string board = boardPath ?? PowerBoard.DefaultPath();
+        string board = boardPath ?? PowerChannel.DefaultPath();
         List<AgentReviewEverywhereItemDto> items = [];
         HashSet<string> seen = [];
         int badge = 0;

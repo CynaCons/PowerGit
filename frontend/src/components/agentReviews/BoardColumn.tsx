@@ -8,10 +8,10 @@ import { RoundBox, type RoundActions } from "./RoundBox"
 import { clock, commentRef, presenceLabel, type RoundCounts } from "./roundModel"
 
 // The right column of the review (v0.21.3, layout A of
-// docs/prototypes/agent-review-v3.html): the review's powerboard channel —
+// docs/prototypes/agent-review-v3.html): the review's powerchannel channel —
 // the feed, the agent's presence, a box that posts at once — and under it the
 // round box (the counts, a note, Send round n / Approve all / Cancel). With no
-// powerboard the column is the list of rounds and the agent waits in
+// powerchannel the column is the list of rounds and the agent waits in
 // agent_review_wait (design decision 3).
 
 export function BoardColumn({
@@ -62,7 +62,7 @@ export function BoardColumn({
               >
                 {session.board}
               </Typography>
-              <Typography sx={{ fontSize: 11, color: "text.secondary" }}>powerboard</Typography>
+              <Typography sx={{ fontSize: 11, color: "text.secondary" }}>powerchannel</Typography>
             </Box>
             <Box sx={{ display: "flex", gap: 0.75, alignItems: "center", mt: 0.25 }}>
               <Box
@@ -88,7 +88,7 @@ export function BoardColumn({
           <>
             <Typography sx={{ fontWeight: 600, fontSize: 13 }}>Rounds</Typography>
             <Typography data-testid="board-unavailable" sx={{ fontSize: 12, color: "text.secondary" }}>
-              {session.board ? (board.reason ?? "powerboard not available") : "powerboard not found"}
+              {session.board ? (board.reason ?? "powerchannel not available") : "powerchannel not found"}
               {session.mode === "wait" ? " · the agent waits in agent_review_wait" : ""}
             </Typography>
           </>
@@ -120,7 +120,7 @@ export function BoardColumn({
             ))}
         {!withBoard && (
           <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-            Questions between rounds need powerboard. Comments go with the round.
+            Questions between rounds need powerchannel. Comments go with the round.
           </Typography>
         )}
       </Box>

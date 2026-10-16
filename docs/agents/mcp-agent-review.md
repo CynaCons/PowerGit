@@ -48,28 +48,28 @@ Since v0.21 (docs/design/agent-review-rounds.md) a review has rounds. The payloa
 
 A `tools/call` response is `{ content: [{ type: "text", text: <payload JSON> }], structuredContent: <payload> }`; a failure sets `isError: true` and puts the message in the text item. The protocol is JSON-RPC 2.0 over newline-delimited JSON. `initialize` negotiates protocol version `2025-06-18`; `serverInfo.name` is `powergit`.
 
-## The board (powerboard)
+## The board (PowerChannel)
 
-When [powerboard](https://github.com/CynaCons/powerboard) is installed (its `board.db` exists), a review gets a channel, returned as `board` (`review-<repo>-<id4>`, or the name passed in `board`). PowerGit posts there: `Round n opened` (as `powergit`), the owner's questions (`c3 · path:line` + text), the round sent back (`Round n sent · …`, one line per rejected, mixed or undecided change with its comments, then `details: agent_review_get review_id=… round=n`), `Approved · …` or `Cancelled · …` (as `human`). The owner can also post on the channel from PowerGit at any time.
+When [PowerChannel](https://github.com/CynaCons/PowerChannel) is installed (its `channels.db` exists, or the legacy `board.db`), a review gets a channel, returned as `board` (`review-<repo>-<id4>`, or the name passed in `board`). PowerGit posts there: `Round n opened` (as `powergit`), the owner's questions (`c3 · path:line` + text), the round sent back (`Round n sent · …`, one line per rejected, mixed or undecided change with its comments, then `details: agent_review_get review_id=… round=n`), `Approved · …` or `Cancelled · …` (as `human`). The owner can also post on the channel from PowerGit at any time.
 
-The agent's loop, with its powerboard name equal to the `agent` it passed to open:
+The agent's loop, with its PowerChannel name equal to the `agent` it passed to open:
 
 ```text
 open = powergit.agent_review_open(mode="wait", title, why, agent=<me>, worktree=true | base_sha/head_sha)
 if open.board:
   loop:
-    msgs = powerboard.read(me=<me>, channel=open.board, wait_seconds=3600)
+    msgs = powerchannel.read(me=<me>, channel=open.board, wait_seconds=3600)
     "Round n sent"   → powergit.agent_review_get(review_id, round=n); fix what was rejected
                        or commented; powergit.agent_review_revise(review_id, note, replies=[{comment, body}])
     "Approved"       → commit; stop
     "Cancelled"      → stop
-    "cN · path:line" → answer on the board: powerboard.post(me, open.board, "cN: <answer>")
-    anything else from human → answer with powerboard.post
+    "cN · path:line" → answer on the board: powerchannel.post(me, open.board, "cN: <answer>")
+    anything else from human → answer with powerchannel.post
 else:
   powergit.agent_review_wait(...) in a loop, as above without the questions
 ```
 
-An answer that starts with `cN:` lands under that comment's line in PowerGit. powerboard 0.3.0 and later keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older powerboard it shows when the agent last read it.
+An answer that starts with `cN:` lands under that comment's line in PowerGit. PowerChannel 0.4.0 and later (formerly powerboard 0.3.0+) keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older PowerChannel it shows when the agent last read it.
 
 ## Agent convention
 

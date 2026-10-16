@@ -217,7 +217,7 @@ export type AgentReview = Omit<AgentReviewSummary, "fileCount" | "round" | "turn
   comments?: AgentReviewThread[] | null
 }
 export type BoardMessage = { id: number; author: string; text: string; at: string }
-/** v0.21.2: a review's powerboard channel; `reading` while the agent's last read is under 15 s old. */
+/** v0.21.2: a review's powerchannel channel; `reading` while the agent's last read is under 15 s old. */
 export type AgentReviewBoard = {
   available: boolean
   channel: string | null

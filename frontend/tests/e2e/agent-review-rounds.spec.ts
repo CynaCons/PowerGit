@@ -7,10 +7,10 @@ import { commit, currentRepoPath, makeRepo, openRepoOnEngine, removeRepo, write 
 
 // v0.21.3 (owner 2026-10-13, layout A of docs/prototypes/agent-review-v3.html):
 // an agent's review opens in full view; the owner accepts and rejects changes,
-// asks on the review's powerboard channel and sees the agent's answer under
+// asks on the review's powerchannel channel and sees the agent's answer under
 // the line, sends the round, sees round 2 with the unchanged change still
 // accepted, and approves. The engine's board is a temporary board.db created
-// here with powerboard's schema; a run whose engine points at a board outside
+// here with powerchannel's schema; a run whose engine points at a board outside
 // the temp folder (the user's real one) skips the board test.
 
 type Db = { exec(sql: string): void; prepare(sql: string): { run(...args: unknown[]): unknown }; close(): void }
@@ -195,7 +195,7 @@ test.describe("agent review rounds", () => {
     }
   })
 
-  test("without powerboard the column lists the rounds and the round still goes back", async ({ page }) => {
+  test("without powerchannel the column lists the rounds and the round still goes back", async ({ page }) => {
     test.setTimeout(60_000)
     const dir = makeRepo("pg-review-noboard-")
     try {
@@ -215,7 +215,7 @@ test.describe("agent review rounds", () => {
       await page.getByTestId("agent-reviews-button").click()
       await page.getByTestId("agent-review-row").filter({ hasText: "No board here" }).click()
       await expect(page.getByTestId("board-column")).toHaveAttribute("data-board", "off")
-      await expect(page.getByTestId("board-unavailable")).toContainText("powerboard not found")
+      await expect(page.getByTestId("board-unavailable")).toContainText("powerchannel not found")
       await page.getByTestId("verdict-reject").click()
       await page.getByTestId("round-send").click()
       await expect(page.getByTestId("round-box")).toHaveAttribute("data-state", "sent")

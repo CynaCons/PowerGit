@@ -23,9 +23,9 @@ internal static class TestDataDir
         // others (and a running PowerGit) for it; McpHostTests build their
         // own host on a unique endpoint.
         Environment.SetEnvironmentVariable("POWERGIT_MCP", "0");
-        // v0.21.2: no test posts on the user's real powerboard; the board
+        // v0.21.2: no test posts on the user's real channel store; the board
         // tests point a host at their own temporary board.db.
-        Environment.SetEnvironmentVariable("POWERBOARD_DB", System.IO.Path.Combine(Path, "no-powerboard", "board.db"));
+        Environment.SetEnvironmentVariable("POWERCHANNEL_DB", System.IO.Path.Combine(Path, "no-powerchannel", "board.db"));
     }
 }
 

@@ -4,8 +4,8 @@ using System.Text.RegularExpressions;
 namespace PowerGit.Engine;
 
 /// <summary>
-///  The review's powerboard channel (v0.21.2, docs/design/agent-review-rounds.md
-///  §4): a session opened while powerboard is installed gets a channel; every
+///  The review's PowerChannel channel (v0.21.2, docs/design/agent-review-rounds.md
+///  §4): a session opened while PowerChannel is installed gets a channel; every
 ///  round, question and close is posted there (events as <c>powergit</c>, what
 ///  the owner does as <c>human</c>), and an agent's post that starts with
 ///  <c>c&lt;n&gt;:</c> becomes a reply on that comment. A board that fails never
@@ -17,12 +17,12 @@ public sealed partial class GitHost
     public const string BoardEvents = "powergit";
     public const string BoardHuman = "human";
 
-    /// <summary>powerboard's file; tests point it at a temporary one.</summary>
-    public string BoardPath { get; set; } = PowerBoard.DefaultPath();
+    /// <summary>PowerChannel's file; tests point it at a temporary one.</summary>
+    public string BoardPath { get; set; } = PowerChannel.DefaultPath();
 
-    private PowerBoard? Board() => PowerBoard.Open(BoardPath).Board;
+    private PowerChannel? Board() => PowerChannel.Open(BoardPath).Board;
 
-    public PowerBoard.Status BoardStatus() => PowerBoard.Open(BoardPath).Status;
+    public PowerChannel.Status BoardStatus() => PowerChannel.Open(BoardPath).Status;
 
     private static string Short(string id) => id[..8];
 
@@ -30,9 +30,9 @@ public sealed partial class GitHost
     {
         if (Board() is null) return;
         string? name = requested?.Trim().ToLowerInvariant();
-        if (PowerBoard.IsName(name)) { board = name; return; }
+        if (PowerChannel.IsName(name)) { board = name; return; }
         string repo = Path.GetFileName(RequireRoot().TrimEnd('/', '\\'));
-        board = $"review-{PowerBoard.Slug(repo, 40)}-{session.Id[..4]}";
+        board = $"review-{PowerChannel.Slug(repo, 40)}-{session.Id[..4]}";
     }
 
     private void PostToBoard(AgentReviewDto session, string author, string text)
@@ -120,13 +120,13 @@ public sealed partial class GitHost
     private static void WithLastReads(AgentReviewSummaryDto[] summaries, List<AgentReviewDto> sessions, string boardPath)
     {
         if (!sessions.Any(s => s.Board is not null && s.Status == "pending")) return;
-        PowerBoard? board = PowerBoard.Open(boardPath).Board;
+        PowerChannel? board = PowerChannel.Open(boardPath).Board;
         if (board is null) return;
         for (int i = 0; i < summaries.Length; i++)
         {
             AgentReviewDto s = sessions[i];
             string? agent = s.Agent?.Trim().ToLowerInvariant();
-            if (s.Board is null || s.Status != "pending" || !PowerBoard.IsName(agent)) continue;
+            if (s.Board is null || s.Status != "pending" || !PowerChannel.IsName(agent)) continue;
             try { if (board.LastRead(agent!, s.Board) is { } t) summaries[i] = summaries[i] with { LastRead = Iso(t) }; }
             catch (Microsoft.Data.Sqlite.SqliteException) { return; }
         }
@@ -140,11 +140,11 @@ public sealed partial class GitHost
     public AgentReviewBoardDto GetAgentReviewBoard(string id, long after)
     {
         AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
-        (PowerBoard? board, PowerBoard.Status status) = PowerBoard.Open(BoardPath);
+        (PowerChannel? board, PowerChannel.Status status) = PowerChannel.Open(BoardPath);
         if (session.Board is null || board is null)
             return new(false, session.Board, session.Board is null ? "this review has no board channel" : status.Reason, [], session.Agent, null, false);
-        List<PowerBoard.Message> messages = board.Read(session.Board, after);
-        foreach (PowerBoard.Message message in messages)
+        List<PowerChannel.Message> messages = board.Read(session.Board, after);
+        foreach (PowerChannel.Message message in messages)
         {
             if (message.Author is BoardHuman or BoardEvents || message.Id <= session.BoardCursor) continue;
             if (ReplyPattern.Match(message.Text) is { Success: true } m)
@@ -158,7 +158,7 @@ public sealed partial class GitHost
                 if (messages[^1].Id > latest.BoardCursor) WriteAgentReview(latest with { BoardCursor = messages[^1].Id }, bump: false);
             }
         }
-        string? agent = session.Agent is { } a && PowerBoard.IsName(a.Trim().ToLowerInvariant()) ? a.Trim().ToLowerInvariant() : null;
+        string? agent = session.Agent is { } a && PowerChannel.IsName(a.Trim().ToLowerInvariant()) ? a.Trim().ToLowerInvariant() : null;
         double? lastRead = agent is null ? null : board.LastRead(agent, session.Board);
         double now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
         return new(true, session.Board, null,
@@ -170,8 +170,8 @@ public sealed partial class GitHost
     {
         AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
         if (session.Board is null) throw new InvalidOperationException("this review has no board channel");
-        PowerBoard board = Board() ?? throw new InvalidOperationException(BoardStatus().Reason ?? "powerboard not available");
-        PowerBoard.Message posted = board.Post(BoardHuman, session.Board, text);
+        PowerChannel board = Board() ?? throw new InvalidOperationException(BoardStatus().Reason ?? "powerchannel not available");
+        PowerChannel.Message posted = board.Post(BoardHuman, session.Board, text);
         return new(posted.Id, posted.Author, posted.Text, Iso(posted.Created));
     }
 

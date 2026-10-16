@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { AgentReviewBoard, BoardMessage, EngineClient } from "../engine"
 import { agentReviewBoard, postAgentReviewBoard } from "../engine/agentReviews"
 
-// The review's powerboard channel (v0.21.3, docs/design/agent-review-rounds.md
+// The review's powerchannel channel (v0.21.3, docs/design/agent-review-rounds.md
 // §4): read every 1.5 s after the last message seen, so a long channel is
 // fetched once. A new message from the agent calls `onAgentMessage` (the
 // session re-reads: the engine copied a reply onto its thread).

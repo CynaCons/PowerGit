@@ -3,10 +3,10 @@ using Xunit;
 
 namespace PowerGit.Engine.Tests;
 
-/// <summary>v0.21.2: the review's powerboard channel (docs/design/agent-review-rounds.md §4).</summary>
+/// <summary>v0.21.2: the review's PowerChannel channel (docs/design/agent-review-rounds.md §4).</summary>
 public sealed class AgentReviewBoardTests
 {
-    // powerboard's own schema (powerboard/store.py _SCHEMA).
+    // PowerChannel's own schema (formerly powerboard/store.py _SCHEMA; unchanged).
     private const string Schema = """
         CREATE TABLE IF NOT EXISTS messages (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +67,7 @@ public sealed class AgentReviewBoardTests
             [new("f.txt", "M", "@@ -1,2 +1,2 @@\n a\n-b\n+c\n")], board);
 
     [Fact]
-    public void Without_powerboard_a_review_has_no_channel_and_still_works()
+    public void Without_powerchannel_a_review_has_no_channel_and_still_works()
     {
         using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
         host.BoardPath = Path.Combine(Path.GetTempPath(), $"pg-none-{Guid.NewGuid():N}", "board.db");
@@ -83,9 +83,9 @@ public sealed class AgentReviewBoardTests
     public void An_unknown_schema_is_unavailable()
     {
         using TempBoard board = new("CREATE TABLE messages (id INTEGER PRIMARY KEY, body TEXT);");
-        (PowerBoard? opened, PowerBoard.Status status) = PowerBoard.Open(board.Path);
+        (PowerChannel? opened, PowerChannel.Status status) = PowerChannel.Open(board.Path);
         Assert.Null(opened);
-        Assert.Equal("unknown powerboard schema", status.Reason);
+        Assert.Equal("unknown powerchannel schema", status.Reason);
     }
 
     [Fact]
@@ -109,15 +109,15 @@ public sealed class AgentReviewBoardTests
         Assert.Equal(("human", "c1 · f.txt:2\nwhy c?"), (feed.Messages[0].Author, feed.Messages[0].Text));
 
         // The agent answers on the board; the reply lands on the comment once.
-        PowerBoard.Open(board.Path).Board!.Post("auth-fix", session.Board!, "c1: because b was wrong");
-        PowerBoard.Open(board.Path).Board!.Post("auth-fix", session.Board!, "working on it");
+        PowerChannel.Open(board.Path).Board!.Post("auth-fix", session.Board!, "c1: because b was wrong");
+        PowerChannel.Open(board.Path).Board!.Post("auth-fix", session.Board!, "working on it");
         host.GetAgentReviewBoard(session.Id, 0);
         host.GetAgentReviewBoard(session.Id, 0);
         AgentReviewReplyDto reply = Assert.Single(host.GetAgentReview(session.Id)!.Comments!.Single(c => c.Id == asked.Id).Replies);
         Assert.Equal(("auth-fix", "because b was wrong"), (reply.Author, reply.Body));
         Assert.Equal(0, board.Count("seen"));
 
-        // Presence: powerboard's seen.updated of the agent's name.
+        // Presence: PowerChannel's seen.updated of the agent's name.
         double now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
         board.Exec("INSERT INTO seen (reader, channel, last_id, updated) VALUES ($r, $c, 1, $u)", ("$r", "auth-fix"), ("$c", session.Board!), ("$u", now));
         feed = host.GetAgentReviewBoard(session.Id, 0);
