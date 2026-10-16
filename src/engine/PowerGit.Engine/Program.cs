@@ -148,6 +148,18 @@ app.MapGet("/repos/current", (RepoRegistry repos) =>
 
 app.MapGet("/repos/recents", () => Results.Ok(RecentsStore.List()));
 
+// v0.21.10: every repository's agent reviews in one list, for the review
+// panel. Roots are the index of repositories a review was opened in, the
+// open sessions and the recents; the route never opens a repository, moves
+// /repos/current or writes recents.
+app.MapGet("/agent-reviews", (RepoRegistry repos) =>
+{
+    IEnumerable<string> roots = AgentReviewRepos.List()
+        .Concat(repos.List().Select(r => r.Root))
+        .Concat(RecentsStore.List().Select(r => r.Root));
+    return Results.Ok(GitHost.ListAgentReviewsEverywhere(roots));
+});
+
 // The recents as repositories with their worktrees (v0.20.10, the start
 // pane's repository cards): one `git worktree list` per repository.
 app.MapGet("/repos/workspaces", async (Workspaces workspaces, HttpContext ctx) =>
