@@ -47,8 +47,7 @@ import { useStartPane } from "./hooks/useStartPane"
 import { useDiagnosticSnapshot } from "./hooks/useDiagnosticSnapshot"
 import { useHeartbeat } from "./hooks/useHeartbeat"
 import { AgentReviewsView } from "./components/agentReviews/AgentReviewsView"
-import { useAgentReviews } from "./hooks/useAgentReviews"
-import { useAgentReviewsPage } from "./hooks/useAgentReviewsPage"
+import { useAgentReviewsChrome } from "./hooks/useAgentReviewsChrome"
 
 // Composition only: the hooks own the state, the components own the pixels,
 // and this file wires them together (the browse-scope hotkey map is
@@ -57,7 +56,7 @@ import { useAgentReviewsPage } from "./hooks/useAgentReviewsPage"
 // session derives the repo-bound one every component reads via useEngine().
 export default function App({ base }: { base: EngineClient }) {
   const session = useEngineSession(base)
-  const { view, state, client, engineError, setEngineError, demo } = session
+  const { view, state, client, repoId, engineError, setEngineError, demo } = session
   const { live, offline, repo } = view
   // The recent repositories are a pane now, not a dialog (v0.20.3).
   const startPane = useStartPane(state.phase !== "no-repository", repo?.root ?? null)
@@ -112,10 +111,17 @@ export default function App({ base }: { base: EngineClient }) {
   // Git Extensions' FormFileHistory, shown in place of the graph and panel
   // (v0.16.0); the main history's state stays here while it is open.
   const fileHistory = useFileHistory()
-  const agentReviewsPage = useAgentReviewsPage()
-  const agentReviews = useAgentReviews({ engine: client })
   // Settings is a page over the same area (v0.18.0); the gear toggles it.
   const settings = useSettingsPage()
+  // The agent reviews keep the whole window except the rail (v0.21.10): the
+  // list covers every open repository, and a row in another one opens that
+  // repository first. The page outranks the start pane (Settings does too).
+  const agentReviews = useAgentReviewsChrome({
+    base,
+    openRepo: session.openRepo,
+    windowRepoId: repoId,
+    closeOthers: () => (fileHistory.close(), settings.close(), startPane.close()),
+  })
   // useGitActions rebuilds its closures every render; hand memoised children
   // stable identities so a row click re-renders only the grid and, deferred,
   // the bottom panel (owner report: "clicking commits feels laggy").
@@ -173,7 +179,7 @@ export default function App({ base }: { base: EngineClient }) {
     openRepo: () => void openFolder(),
     // From Settings, Recent repositories shows the pane rather than
     // toggling one that may already be open under the page.
-    openRecents: () => (agentReviewsPage.close(), settings.open ? startPane.show() : startPane.toggle()),
+    openRecents: () => (agentReviews.page.close(), settings.open ? startPane.show() : startPane.toggle()),
     openSettings: settings.toggle,
     openSnapshot: () => void takeDiagnosticSnapshot(),
     recover: () => setRecoveryOpen(true),
@@ -194,16 +200,8 @@ export default function App({ base }: { base: EngineClient }) {
       fileHistory.close()
       focusGrid()
     },
-    openAgentReviews: () => {
-      fileHistory.close()
-      settings.close()
-      startPane.close()
-      agentReviewsPage.openList()
-    },
-    closeAgentReviews: () => {
-      agentReviewsPage.close()
-      focusGrid()
-    },
+    openAgentReviews: agentReviews.openList,
+    closeAgentReviews: agentReviews.close,
   })
   // Row and ref-chip menus, shared by the main grid and the file history's.
   const menus = useGridMenus(open, repo?.branch)
@@ -296,7 +294,7 @@ export default function App({ base }: { base: EngineClient }) {
                 refresh={chrome.refresh}
                 openStash={chrome.openStash}
                 onAgentReviews={chrome.openAgentReviews}
-                agentReviewsOpen={agentReviewsPage.open}
+                agentReviewsOpen={agentReviews.page.open}
                 agentReviewsBadge={agentReviews.badge}
               />
             ) : (
@@ -308,7 +306,7 @@ export default function App({ base }: { base: EngineClient }) {
                 settingsOpen={settings.open}
                 onSnapshot={chrome.openSnapshot}
                 onAgentReviews={chrome.openAgentReviews}
-                agentReviewsOpen={agentReviewsPage.open}
+                agentReviewsOpen={agentReviews.page.open}
                 agentReviewsBadge={agentReviews.badge}
               />
             )}
@@ -318,11 +316,11 @@ export default function App({ base }: { base: EngineClient }) {
             <Box ref={contentRef} className="pg-desk-row" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
               {settings.open ? (
                 <SettingsView onClose={settings.close} />
-              ) : agentReviewsPage.open && !startPane.open ? (
+              ) : agentReviews.page.open ? (
                 <AgentReviewsView
                   engine={client}
-                  page={agentReviewsPage}
-                  inbox={agentReviews}
+                  page={agentReviews.page}
+                  inbox={agentReviews.inbox}
                   onClose={chrome.closeAgentReviews}
                 />
               ) : leftOpen ? (
@@ -343,7 +341,7 @@ export default function App({ base }: { base: EngineClient }) {
               ) : (
                 <CollapsedLeftPanel onExpand={chrome.expandLeft} />
               )}
-              {!settings.open && !(agentReviewsPage.open && !startPane.open) && (
+              {!settings.open && !agentReviews.page.open && (
                 <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
                   {startPane.open ? (
                     <StartPaneView session={session} repoState={repoState} onClose={startPane.close} />

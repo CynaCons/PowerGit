@@ -228,6 +228,14 @@ export type AgentReviewBoard = {
   reading: boolean
 }
 export type AgentReviewList = { sessions: AgentReviewSummary[]; badge: number }
+/** v0.21.10: the repository a review lives in, from the engine-level every-repo list. */
+export type AgentReviewRepo = { id: string; root: string; name: string }
+export type AgentReviewEverywhereItem = { repo: AgentReviewRepo; session: AgentReviewSummary }
+/** v0.21.10: `GET /agent-reviews` — every open repository's agent reviews,
+ *  newest first; `badge` already sums every repository. Answered at engine
+ *  level (not under /repos/{id}) so the inbox also works with no repository
+ *  open in this window. */
+export type AgentReviewEverywhere = { sessions: AgentReviewEverywhereItem[]; badge: number }
 /** v0.16.0: the two index bits Git Extensions shows as check marks. A file git
  *  hides from `status` because of them arrives through `RepoStatus.hidden` (or
  *  `GET /files/hidden`) with git's own `ls-files -v` letter as `status`: "S"

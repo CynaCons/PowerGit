@@ -1,8 +1,9 @@
 import Box from "@mui/material/Box"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
-import type { AgentReviewSummary, EngineClient } from "../../engine"
+import type { EngineClient } from "../../engine"
 import { useAgentReviewSession } from "../../hooks/useAgentReviewSession"
+import type { AgentReviewsInbox } from "../../hooks/useAgentReviewsChrome"
 import { paneSx } from "../../theme/panels"
 import { AgentReviewInbox } from "./AgentReviewInbox"
 import { AgentReviewSession } from "./AgentReviewSession"
@@ -21,17 +22,24 @@ export function AgentReviewsView({
 }: {
   engine: EngineClient
   page: { sessionId: string | null; openSession: (id: string) => void; openList: () => void }
-  inbox: { sessions: AgentReviewSummary[]; refresh: () => Promise<void> }
+  inbox: AgentReviewsInbox
   onClose: () => void
 }) {
-  const { sessionId, openSession: onOpen, openList: onList } = page
+  const { sessionId, openList: onList } = page
   const { sessions, refresh } = inbox
   const { session, reload } = useAgentReviewSession(engine, sessionId)
   const changed = () => void refresh()
   return (
     <Box data-testid="agent-reviews-view" sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex" }}>
       {!sessionId ? (
-        <AgentReviewInbox sessions={sessions} onOpen={onOpen} onRefresh={() => void refresh()} onClose={onClose} />
+        <AgentReviewInbox
+          sessions={sessions}
+          openError={inbox.openError}
+          onOpen={(item) => inbox.openReview(item)}
+          onDismissError={inbox.clearError}
+          onRefresh={() => void refresh()}
+          onClose={onClose}
+        />
       ) : !session ? (
         <Paper sx={{ ...paneSx, flex: 1, p: 3 }}>
           <Typography color="text.secondary">Loading the review…</Typography>
