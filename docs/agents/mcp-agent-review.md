@@ -71,9 +71,34 @@ else:
 
 An answer that starts with `cN:` lands under that comment's line in PowerGit. PowerChannel 0.4.0 and later (formerly powerboard 0.3.0+) keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older PowerChannel it shows when the agent last read it.
 
+## Writing for the owner
+
+Markdown is rendered in `why`, round `note`s, reply `body`s and board posts,
+including GitHub-flavoured lists, tables and links. Lead with one sentence
+explaining what changed and why, then a `-` list of useful details. Put code
+in backticks or fenced blocks with a language. Keep each post focused on one point.
+
+Example `why`:
+
+```markdown
+Cancel superseded refreshes so older results cannot replace the latest selection.
+
+- Pass the cancellation token to `GitProcess`.
+- Cover overlapping refreshes with an engine test.
+```
+
+Example board reply:
+
+```markdown
+c3: Kept the previous result visible so refreshing does not clear the selection.
+
+- Replace it only when the latest request completes.
+- Ignore cancelled requests.
+```
+
 ## Agent convention
 
-Use Silent, or Notify when a paper trail is useful, for large refactors and generated noise. Use Wait for engine, release, authentication, or IPC changes. Always give a one-line `why` and either base/head SHAs, `worktree: true`, or patches so the UI can anchor the diff.
+Use Silent, or Notify when a paper trail is useful, for large refactors and generated noise. Use Wait for engine, release, authentication, or IPC changes. Always give a focused `why` and either base/head SHAs, `worktree: true`, or patches so the UI can anchor the diff.
 
 Wait calls run in bounded slices. If the payload has `timed_out: true`, call `agent_review_wait` again; timeout never means approval. If PowerGit quits during a wait, the review expires with the `host_gone` reason. Approval is the owner's alone; the agent commits after `Approved`, and only then.
 
