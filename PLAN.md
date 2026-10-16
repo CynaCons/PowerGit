@@ -1061,7 +1061,6 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Board: Markdown rendered (react-markdown + remark-gfm, no raw HTML, http links only, highlighted code), posts grouped by author, PowerGit's round posts as event rows with verdict colours, long posts fold.
 - [x] Agents asked for Markdown: MCP tool descriptions, the board's opening post, docs/agents/mcp-agent-review.md; engine test.
 - [x] Gate: engine tests, vitest, lint, agent-review + split-handle + bottom-split + shell e2e; look at the screen light/dark, wide and narrow.
-- [ ] Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown.
 - [x] Release v0.21.11 (owner 2026-10-16: "yes, we should release the version 21.11"). [agent: claude]
 
 ### v0.21.12 — Agent review — deletable comments, a calmer board column (ACTIVE)
@@ -1174,3 +1173,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: the review's Wrap no longer changes the main diff's, and line marks work like the human review. (deferred from v0.21.9: open when the plan view moved to v0.21.11 (2026-10-16))
 - Owner ticks: a review an agent opens in another repo shows in the panel and opens in its repo. (deferred from v0.21.10: open when the plan view moved to v0.21.11 (2026-10-16))
 - Graph search in the top bar, find or filter (owner 2026-09-08; was the v0.15.1 shell, design first)
+- Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown. (deferred from v0.21.11: owner tick pending; plan view moved to v0.21.12 (2026-10-16))
