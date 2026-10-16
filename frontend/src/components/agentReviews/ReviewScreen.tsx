@@ -5,12 +5,12 @@ import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { describeThrown, type AgentReview, type EngineClient } from "../../engine"
-import { askAgentReview, resolveAgentReview, sendAgentReviewRound } from "../../engine/agentReviews"
+import { resolveAgentReview, sendAgentReviewRound } from "../../engine/agentReviews"
 import { useAgentReviewBoard } from "../../hooks/useAgentReviewBoard"
 import { useReview } from "../../hooks/useReview"
 import { useRoundSource } from "../../hooks/useRoundSource"
 import { updateReviewDoc, useReviewDoc } from "../../review/reviewState"
-import { withComment, withLine, type LineState } from "../../review/reviewModel"
+import { withLine, type LineState } from "../../review/reviewModel"
 import { deskGap, paneSx } from "../../theme/panels"
 import { DiffOptionsBar } from "../DiffOptionsBar"
 import { useReviewGrid } from "./reviewLayout"
@@ -20,7 +20,7 @@ import { Chip } from "./reviewChips"
 import { ReviewIntro } from "./ReviewIntro"
 import { RoundDiff } from "./RoundDiff"
 import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
-import type { CommentKind } from "./RoundThread"
+import { useRoundComments } from "./useRoundComments"
 import { hunksOf, latestRound, liveVerdict, roundCounts, roundKey, turnLabel } from "./roundModel"
 
 // One agent review in full view (v0.21.3, layout A of
@@ -51,7 +51,8 @@ export function ReviewScreen({
   const key = roundKey(session.id, round.n)
   const { finish } = useReview({ engine, key })
   const doc = useReviewDoc(key)
-  const threads = useMemo(() => session.comments ?? [], [session.comments])
+  // v0.21.12: a withdrawn question is gone from the screen; the engine keeps it so ids never repeat.
+  const threads = useMemo(() => (session.comments ?? []).filter((t) => t.kind !== "withdrawn"), [session.comments])
   const { board, post } = useAgentReviewBoard(engine, session.board ? session.id : null, () => void reload())
   const [path, setPath] = useState<string | null>(round.files[0]?.path ?? null)
   const [picked, setPicked] = useState<{ path: string; key: string } | null>(null)
@@ -120,15 +121,16 @@ export function ReviewScreen({
       updateReviewDoc(key, (d) => keys.reduce((acc, k) => withLine(acc, forPath, k, state), d)),
     [key],
   )
-  const comment = (lineKey: string, text: string, kind: CommentKind) => {
-    updateReviewDoc(key, (d) => withComment(d, filePath, lineKey, text))
-    setPicked(null)
-    if (kind === "ask")
-      void run(async () => {
-        await finish()
-        await askAgentReview(engine, session.id, { round: round.n, path: filePath, line: lineKey, body: text })
-      })
-  }
+  const comments = useRoundComments({
+    engine,
+    sessionId: session.id,
+    round: round.n,
+    reviewKey: key,
+    path: filePath,
+    run,
+    finish,
+    onSaved: () => setPicked(null),
+  })
   const jump = (commentId: string) => {
     const thread = threads.find((t) => t.id === commentId)
     if (!thread) return
@@ -371,7 +373,8 @@ export function ReviewScreen({
               onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
               onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
               onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
-              onComment={comment}
+              onComment={comments.add}
+              edits={comments.edits}
               onCursor={setCursor}
               options={diffView.options}
               wrap={diffView.wrap}

@@ -258,6 +258,29 @@ public sealed partial class GitHost
         }
     }
 
+    /// <summary>
+    ///  v0.21.12: the owner takes back a question asked on the board while its round is
+    ///  still open. The thread stays, as kind "withdrawn", so its id is never reused.
+    /// </summary>
+    public AgentReviewThreadDto WithdrawAgentReviewComment(string id, string comment)
+    {
+        lock (_agentReviewWriteGate)
+        {
+            AgentReviewDto session = RequireV2Pending(id);
+            List<AgentReviewThreadDto> threads = [.. session.Comments ?? []];
+            int at = threads.FindIndex(t => t.Id == comment);
+            if (at < 0) throw new KeyNotFoundException($"no comment {comment}");
+            AgentReviewRoundDto? round = session.Rounds!.FirstOrDefault(r => r.N == threads[at].Round);
+            if (threads[at].Kind != "ask" || round is null || round.N != LatestRound(session)!.N || round.SentAt is not null)
+                throw new AgentReviewStateException($"{comment} can no longer be withdrawn");
+            threads[at] = threads[at] with { Kind = "withdrawn" };
+            AgentReviewDto updated = session with { Comments = threads, UpdatedAt = Timestamp() };
+            WriteAgentReview(updated);
+            AfterWithdraw(updated, threads[at]);
+            return threads[at];
+        }
+    }
+
     /// <summary>A reply from the agent on a thread (from the board, v0.21.2).</summary>
     public AgentReviewDto? ReplyAgentReview(string id, string comment, string author, string body, long? boardId)
     {
@@ -290,5 +313,6 @@ public sealed partial class GitHost
     partial void AfterRoundOpened(AgentReviewDto session, AgentReviewRoundDto round);
     partial void AfterRoundSent(AgentReviewDto session, AgentReviewRoundDto round);
     partial void AfterAsk(AgentReviewDto session, AgentReviewThreadDto thread);
+    partial void AfterWithdraw(AgentReviewDto session, AgentReviewThreadDto thread);
     partial void AfterClosed(AgentReviewDto session);
 }

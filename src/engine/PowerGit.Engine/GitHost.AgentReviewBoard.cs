@@ -101,6 +101,9 @@ public sealed partial class GitHost
     partial void AfterAsk(AgentReviewDto session, AgentReviewThreadDto thread) =>
         PostToBoard(session, BoardHuman, $"{thread.Id} · {thread.Path}:{thread.Line[1..]}\n{thread.Body}");
 
+    partial void AfterWithdraw(AgentReviewDto session, AgentReviewThreadDto thread) =>
+        PostToBoard(session, BoardHuman, $"{thread.Id} withdrawn");
+
     partial void AfterClosed(AgentReviewDto session)
     {
         AgentReviewRoundDto? round = LatestRound(session);

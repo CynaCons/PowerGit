@@ -748,6 +748,9 @@ repo.MapPost("/agent-reviews/{sid}/revise", (string sid, AgentReviewReviseReques
 repo.MapPost("/agent-reviews/{sid}/ask", (string sid, AgentReviewAskRequest body, GitHost git) =>
     AgentReviewCall(() => git.AskAgentReview(sid, body)));
 
+repo.MapDelete("/agent-reviews/{sid}/comments/{cid}", (string sid, string cid, GitHost git) =>
+    AgentReviewCall(() => git.WithdrawAgentReviewComment(sid, cid)));
+
 // v0.21.2: the review's PowerChannel channel (design §4).
 repo.MapGet("/agent-reviews/{sid}/board", (string sid, long? after, GitHost git) =>
     AgentReviewCall(() => git.GetAgentReviewBoard(sid, after ?? 0)));

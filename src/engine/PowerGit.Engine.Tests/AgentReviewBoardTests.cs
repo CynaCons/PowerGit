@@ -143,6 +143,32 @@ public sealed class AgentReviewBoardTests
         Assert.StartsWith($"Approved · review {session.Id[..8]} · round 2", host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text);
     }
 
+    // v0.21.12, owner: "when I'm dropping a comment in the review panel, it is
+    // not deletable." A question already asked on the board is withdrawn: the
+    // thread stays as "withdrawn" (ids are never reused), the board says so,
+    // and the round does not carry it.
+    [Fact]
+    public void An_asked_comment_can_be_withdrawn()
+    {
+        using TempBoard board = new();
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        host.BoardPath = board.Path;
+        AgentReviewDto session = host.CreateAgentReview(Request());
+        AgentReviewThreadDto asked = host.AskAgentReview(session.Id, new(1, "f.txt", "+2", "why c?"));
+
+        AgentReviewThreadDto gone = host.WithdrawAgentReviewComment(session.Id, asked.Id);
+        Assert.Equal(("c1", "withdrawn"), (gone.Id, gone.Kind));
+        Assert.Equal(("human", "c1 withdrawn"), (host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Author, host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text));
+        Assert.Throws<AgentReviewStateException>(() => host.WithdrawAgentReviewComment(session.Id, asked.Id));
+        Assert.Throws<KeyNotFoundException>(() => host.WithdrawAgentReviewComment(session.Id, "c9"));
+
+        Assert.Equal("c2", host.AskAgentReview(session.Id, new(1, "f.txt", "+2", "and this?")).Id);
+        AgentReviewDto sent = host.SendAgentReviewRound(session.Id, null);
+        Assert.DoesNotContain("why c?", host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text);
+        Assert.Equal("withdrawn", sent.Comments!.Single(c => c.Id == "c1").Kind);
+        Assert.Throws<AgentReviewStateException>(() => host.WithdrawAgentReviewComment(session.Id, "c2"));
+    }
+
     [Fact]
     public void An_agent_can_name_the_channel()
     {

@@ -14,7 +14,8 @@ import type { LineState, ReviewDoc } from "../../review/reviewModel"
 import { cycle } from "../../review/reviewModel"
 import { Chip, VerdictButton } from "./reviewChips"
 import { earlierThreads, hunksOf, liveVerdict, threadFor, type HunkRow, type RoundHunk } from "./roundModel"
-import { Draft, Thread, ThreadItems, type CommentKind } from "./RoundThread"
+import { Draft, Thread, ThreadItems, type CommentKind, type ThreadActions } from "./RoundThread"
+import type { CommentEdits } from "./useRoundComments"
 import { roundBlocks, sourceFor, type RoundBlock } from "./roundContext"
 import { useRowTokens } from "./useRowTokens"
 
@@ -43,6 +44,8 @@ export type RoundDiffProps = {
   onVerdict: (keys: string[], state: LineState | undefined) => void
   onMark: (key: string, state: LineState | undefined) => void
   onComment: (key: string, text: string, kind: CommentKind) => void
+  /** v0.21.12: edit, delete or withdraw the owner's comments while the round is open. */
+  edits?: CommentEdits
   onCursor: (changeId: string) => void
   options: DiffOptions
   /** Wrap lines, the review screen's own switch (reviewDiffView.ts). */
@@ -308,6 +311,21 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
   )
 }
 
+/** A comment not sent yet is edited or deleted; a question already asked is withdrawn. */
+function commentActions(
+  p: RoundDiffProps,
+  line: string,
+  thread: AgentReviewThread | null,
+  index: number | null,
+): ThreadActions | null {
+  const edits = p.edits
+  if (!p.editable || !edits) return null
+  if (thread === null && index !== null)
+    return { edit: (text) => edits.edit(line, index, text), remove: () => edits.remove(line, index) }
+  if (thread?.kind === "ask") return { withdraw: () => edits.withdraw(thread, index) }
+  return null
+}
+
 function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
   const state = row.kind === "context" ? undefined : p.doc?.files[p.path]?.lines[row.key]
   const comments = p.doc?.files[p.path]?.comments.filter((c) => c.line === row.key) ?? []
@@ -412,11 +430,19 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
                     text={c.text}
                     kind={thread?.kind ?? "round"}
                     line={row.key}
+                    actions={commentActions(p, row.key, thread, i)}
                   />
                 )
               })}
               {loose.map((t) => (
-                <ThreadItems key={t.id} thread={t} text={t.body} kind={t.kind} line={row.key} />
+                <ThreadItems
+                  key={t.id}
+                  thread={t}
+                  text={t.body}
+                  kind={t.kind}
+                  line={row.key}
+                  actions={commentActions(p, row.key, t, null)}
+                />
               ))}
               {picked && (
                 <Draft

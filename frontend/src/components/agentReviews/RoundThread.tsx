@@ -31,17 +31,42 @@ export function Thread({ title, children }: { title?: string; children: React.Re
   )
 }
 
+/** v0.21.12: what the owner can still do with a comment (none once the round is sent). */
+export type ThreadActions = {
+  edit?: (text: string) => void
+  remove?: () => void
+  withdraw?: () => void
+}
+
+const actionSx = {
+  border: 0,
+  bgcolor: "transparent",
+  color: "text.secondary",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  fontSize: 12,
+  px: 0.5,
+  py: 0,
+  borderRadius: 0.5,
+  "&:hover": { color: "text.primary", bgcolor: "action.hover" },
+  "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main" },
+} as const
+const dangerSx = { ...actionSx, "&:hover": { color: "error.main", bgcolor: "action.hover" } } as const
+
 export function ThreadItems({
   thread,
   text,
   kind,
   line,
+  actions,
 }: {
   thread: AgentReviewThread | null
   text: string
-  kind: CommentKind
+  kind: CommentKind | "withdrawn"
   line: string
+  actions?: ThreadActions | null
 }) {
+  const [editing, setEditing] = useState(false)
   return (
     <>
       <Box sx={{ px: 1.25, py: 0.75, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0 } }}>
@@ -57,10 +82,46 @@ export function ThreadItems({
           ) : (
             <Chip tone="wait">goes with the round</Chip>
           )}
+          {actions && !editing && (
+            <Box sx={{ ml: "auto", display: "flex", gap: 0.25 }}>
+              {actions.edit && (
+                <Box component="button" data-testid="comment-edit" onClick={() => setEditing(true)} sx={actionSx}>
+                  Edit
+                </Box>
+              )}
+              {actions.remove && (
+                <Box component="button" data-testid="comment-delete" onClick={actions.remove} sx={dangerSx}>
+                  Delete
+                </Box>
+              )}
+              {actions.withdraw && (
+                <Box
+                  component="button"
+                  data-testid="comment-withdraw"
+                  onClick={actions.withdraw}
+                  title="Take the question back; the board says it was withdrawn"
+                  sx={dangerSx}
+                >
+                  Withdraw
+                </Box>
+              )}
+            </Box>
+          )}
         </Box>
-        <Box data-testid="thread-body">
-          <Markdown text={text} />
-        </Box>
+        {editing && actions?.edit ? (
+          <EditBox
+            text={text}
+            onCancel={() => setEditing(false)}
+            onSave={(value) => {
+              actions.edit?.(value)
+              setEditing(false)
+            }}
+          />
+        ) : (
+          <Box data-testid="thread-body">
+            <Markdown text={text} />
+          </Box>
+        )}
       </Box>
       {thread?.replies.map((r, i) => (
         <Box key={i} data-testid="thread-reply" sx={{ px: 1.25, py: 0.75, borderTop: 1, borderColor: "divider" }}>
@@ -69,6 +130,54 @@ export function ThreadItems({
         </Box>
       ))}
     </>
+  )
+}
+
+const fieldSx = {
+  width: "100%",
+  fontFamily: "inherit",
+  fontSize: 13,
+  color: "text.primary",
+  bgcolor: "background.paper",
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 1,
+  p: 0.75,
+  resize: "vertical",
+} as const
+
+function EditBox({ text, onCancel, onSave }: { text: string; onCancel: () => void; onSave: (text: string) => void }) {
+  const [value, setValue] = useState(text)
+  const save = () => value.trim() && onSave(value.trim())
+  return (
+    <Box sx={{ mt: 0.5 }}>
+      <Box
+        component="textarea"
+        data-testid="comment-edit-text"
+        autoFocus
+        value={value}
+        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setValue(e.target.value)}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === "Escape") onCancel()
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save()
+        }}
+        sx={{ ...fieldSx, minHeight: 52 }}
+      />
+      <Box sx={{ display: "flex", gap: 0.75, mt: 0.5 }}>
+        <Button
+          size="small"
+          variant="contained"
+          data-testid="comment-edit-save"
+          onClick={save}
+          sx={{ textTransform: "none", py: 0 }}
+        >
+          Save
+        </Button>
+        <Button size="small" onClick={onCancel} sx={{ textTransform: "none", py: 0 }}>
+          Cancel
+        </Button>
+      </Box>
+    </Box>
   )
 }
 
@@ -99,19 +208,7 @@ export function Draft({
           if (e.key === "Escape") onCancel()
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save("round")
         }}
-        sx={{
-          width: "100%",
-          minHeight: 52,
-          fontFamily: "inherit",
-          fontSize: 13,
-          color: "text.primary",
-          bgcolor: "background.paper",
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          p: 0.75,
-          resize: "vertical",
-        }}
+        sx={{ ...fieldSx, minHeight: 52 }}
       />
       <Box sx={{ display: "flex", gap: 0.75, alignItems: "center", mt: 0.5, flexWrap: "wrap" }}>
         <Button

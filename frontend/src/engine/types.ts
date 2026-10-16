@@ -193,7 +193,8 @@ export type AgentReviewThread = {
   path: string
   line: string
   body: string
-  kind: "round" | "ask"
+  /** v0.21.12: "withdrawn" is an asked question the owner took back. */
+  kind: "round" | "ask" | "withdrawn"
   postedAt: string
   replies: AgentReviewReply[]
 }
