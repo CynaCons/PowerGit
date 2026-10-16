@@ -17,6 +17,7 @@ import { useReviewGrid } from "./reviewLayout"
 import { BoardColumn } from "./BoardColumn"
 import type { RoundActions } from "./RoundBox"
 import { Chip } from "./reviewChips"
+import { ReviewIntro } from "./ReviewIntro"
 import { RoundDiff } from "./RoundDiff"
 import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
 import type { CommentKind } from "./RoundThread"
@@ -252,12 +253,7 @@ export function ReviewScreen({
         <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>
           {[session.agent, session.branch, where].filter(Boolean).join(" · ")}
         </Typography>
-        {session.why && <Typography sx={{ fontSize: 13, mt: 0.25 }}>{session.why}</Typography>}
-        {round.note && round.n > 1 && (
-          <Typography sx={{ fontSize: 13, mt: 0.25, color: "var(--pg-agent)" }}>
-            {session.agent ?? "Agent"}: {round.note}
-          </Typography>
-        )}
+        <ReviewIntro why={session.why} note={round.n > 1 ? round.note : null} agent={session.agent} />
         {error && (
           <Typography data-testid="agent-review-error" color="error" sx={{ fontSize: 12, mt: 0.5 }}>
             {error}
@@ -287,7 +283,13 @@ export function ReviewScreen({
         {grid.handles}
         <Box
           data-testid="review-files-pane"
-          sx={{ ...paneSx, minWidth: 0, overflow: "auto", gridArea: "files", "@container (max-width: 900px)": { maxHeight: 112 } }}
+          sx={{
+            ...paneSx,
+            minWidth: 0,
+            overflow: "auto",
+            gridArea: "files",
+            "@container (max-width: 900px)": { maxHeight: 112 },
+          }}
         >
           <Typography sx={{ fontSize: 12, color: "text.secondary", px: 1.25, py: 1 }}>
             Files · round {round.n}

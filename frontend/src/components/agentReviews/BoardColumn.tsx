@@ -49,7 +49,16 @@ export function BoardColumn({
     <Box
       data-testid="board-column"
       data-board={withBoard ? "on" : "off"}
-      sx={{ display: "grid", gridTemplateRows: "auto minmax(0, 1fr) auto auto", minHeight: 0, height: "100%" }}
+      // One shrinkable track: a long channel name or the compose row wraps inside
+      // the pane instead of widening it (the 300 px board of the narrow layout).
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr)",
+        gridTemplateRows: "auto minmax(0, 1fr) auto auto",
+        minHeight: 0,
+        minWidth: 0,
+        height: "100%",
+      }}
     >
       <Box sx={{ px: 1.25, py: 1, borderBottom: 1, borderColor: "divider" }}>
         {withBoard ? (

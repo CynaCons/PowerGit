@@ -201,7 +201,7 @@ export function Markdown({ text, fold }: { text: string; fold?: boolean }) {
         "& h1": { fontSize: 15 },
         "& h2": { fontSize: 14 },
         "& h3, & h4, & h5, & h6": { fontSize: 13 },
-        "& ul, & ol": { pl: 18, m: "0.25em 0" },
+        "& ul, & ol": { pl: "18px", m: "0.25em 0" },
         "& .task-list-item": { listStyle: "none" },
         "& .task-list-item input": { mr: 0.5 },
         "& blockquote": {
@@ -232,20 +232,13 @@ export function Markdown({ text, fold }: { text: string; fold?: boolean }) {
         "& pre code": { bgcolor: "transparent", p: 0, fontSize: "inherit" },
       }}
     >
-      <Box
-        ref={contentRef}
-        sx={clipped && !expanded ? { maxHeight: FOLD_HEIGHT, overflow: "hidden" } : undefined}
-      >
+      <Box ref={contentRef} sx={clipped && !expanded ? { maxHeight: FOLD_HEIGHT, overflow: "hidden" } : undefined}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
           {text}
         </ReactMarkdown>
       </Box>
       {clipped && (
-        <Button
-          size="small"
-          sx={{ textTransform: "none", mt: 0.25 }}
-          onClick={() => setExpanded((v) => !v)}
-        >
+        <Button size="small" sx={{ textTransform: "none", mt: 0.25 }} onClick={() => setExpanded((v) => !v)}>
           {expanded ? "Show less" : "Show more"}
         </Button>
       )}
