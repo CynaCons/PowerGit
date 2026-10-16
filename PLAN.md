@@ -1070,6 +1070,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Board column redesign (frontend-design plan): header, feed, compose, round dock; light/dark, wide/narrow looked at. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e + shell. [agent: claude]
 - [ ] Owner ticks: a comment can be removed; the right panel reads well.
+- [ ] Release v0.21.12 (owner 2026-10-16: "Yes, go ahead with that release").
 
 ## Backlog
 - Drop leftover 2021 origin branches
