@@ -27,12 +27,29 @@ public sealed partial class GitHost
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
-    private readonly object _agentReviewsLock = new();
-    private long _agentReviewsVersion;
-    private TaskCompletionSource _agentReviewsChanged = NewAgentReviewsSignal();
+    // v0.21.10: the wake signal is shared per repository root, not held by one
+    // GitHost instance. A waiter on one instance of a folder (WaitAgentReview)
+    // and a resolve on another instance of the same folder (the UI closed and
+    // reopened the repo) must share it, or the resolve wakes the wrong signal
+    // and the waiter sleeps to its deadline.
+    private static readonly object AgentReviewsSignalsLock = new();
+    private static readonly Dictionary<string, TaskCompletionSource> AgentReviewsSignals = [];
 
     private static TaskCompletionSource NewAgentReviewsSignal() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>The current signal for a root, creating it on first use. Call under <see cref="AgentReviewsSignalsLock"/>.</summary>
+    private static TaskCompletionSource AgentReviewsSignalUnlocked(string root)
+    {
+        string id = IdFor(root);
+        if (!AgentReviewsSignals.TryGetValue(id, out TaskCompletionSource? signal))
+        {
+            signal = NewAgentReviewsSignal();
+            AgentReviewsSignals[id] = signal;
+        }
+
+        return signal;
+    }
 
     private string AgentReviewPath(string id)
     {
@@ -57,6 +74,9 @@ public sealed partial class GitHost
             now, now, null, null, null, Rounds: [round], Comments: []);
         session = AttachBoard(session, clean.Board);
         lock (_agentReviewWriteGate) WriteAgentReview(session);
+        // The review panel finds this repository through the per-user index
+        // (v0.21.10); a failing index never fails the review.
+        AgentReviewRepos.Remember(RequireRoot());
         AfterRoundOpened(session, round);
         return session;
     }
@@ -89,9 +109,18 @@ public sealed partial class GitHost
         return updated;
     }
 
-    public AgentReviewListDto ListAgentReviews()
+    public AgentReviewListDto ListAgentReviews() => ListAgentReviews(RequireRoot(), BoardPath);
+
+    /// <summary>
+    ///  The sessions of one repository read straight from its folder
+    ///  (v0.21.10): the review panel lists every repository's reviews without
+    ///  opening any of them, so this takes a root instead of reading the
+    ///  instance's <see cref="Current"/>. Same filters, summary and per-repo
+    ///  badge as the instance list.
+    /// </summary>
+    public static AgentReviewListDto ListAgentReviews(string root, string? boardPath = null)
     {
-        string directory = ResolveInRoot(RequireRoot(), AgentReviewsDirectory);
+        string directory = ResolveInRoot(root, AgentReviewsDirectory);
         List<AgentReviewDto> sessions = [];
         if (Directory.Exists(directory))
         {
@@ -108,10 +137,53 @@ public sealed partial class GitHost
         }
         sessions.Sort((a, b) => string.CompareOrdinal(b.CreatedAt, a.CreatedAt));
         AgentReviewSummaryDto[] summaries = [.. sessions.Select(ToSummary)];
-        WithLastReads(summaries, sessions);
+        WithLastReads(summaries, sessions, boardPath ?? PowerBoard.DefaultPath());
         // A Wait review counts while it is the owner's turn; a Notify one while unread.
         int badge = sessions.Count(s => (s.Mode == "wait" && s.Status == "pending" && TurnOf(s) != "agent") || (s.Mode == "notify" && s.Unread && s.Status == "pending"));
         return new AgentReviewListDto(summaries, badge);
+    }
+
+    /// <summary>
+    ///  Every repository's reviews in one list (v0.21.10): the review panel
+    ///  holds all of them, and opening one opens its repository. Roots are
+    ///  deduplicated by id and a root without a session folder is skipped;
+    ///  sessions are ordered by <c>createdAt</c> descending across repos, and
+    ///  the badge is the sum of every repo's badge.
+    /// </summary>
+    public static AgentReviewEverywhereDto ListAgentReviewsEverywhere(IEnumerable<string> roots, string? boardPath = null)
+    {
+        string board = boardPath ?? PowerBoard.DefaultPath();
+        List<AgentReviewEverywhereItemDto> items = [];
+        HashSet<string> seen = [];
+        int badge = 0;
+        foreach (string root in roots)
+        {
+            if (string.IsNullOrWhiteSpace(root)) continue;
+            string full;
+            string id;
+            try
+            {
+                full = Path.GetFullPath(root);
+                id = IdFor(full);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                continue;
+            }
+
+            if (!seen.Add(id)) continue;
+            if (!Directory.Exists(Path.Combine(full, AgentReviewsDirectory.Replace('/', Path.DirectorySeparatorChar)))) continue;
+            AgentReviewRepoDto repo = new(id, full, Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, '/')));
+            AgentReviewListDto list = ListAgentReviews(full, board);
+            badge += list.Badge;
+            foreach (AgentReviewSummaryDto session in list.Sessions)
+            {
+                items.Add(new(repo, session));
+            }
+        }
+
+        items.Sort((a, b) => string.CompareOrdinal(b.Session.CreatedAt, a.Session.CreatedAt));
+        return new(items, badge);
     }
 
     public AgentReviewDto? GetAgentReview(string id)
@@ -178,9 +250,10 @@ public sealed partial class GitHost
         {
             // The signal is taken before the read: a resolve that lands
             // between the two completes this signal, not a later one, so
-            // the wait can never sleep through it.
+            // the wait can never sleep through it. The signal is shared by
+            // every host instance of this root (v0.21.10).
             Task signal;
-            lock (_agentReviewsLock) signal = _agentReviewsChanged.Task;
+            lock (AgentReviewsSignalsLock) signal = AgentReviewsSignalUnlocked(RequireRoot()).Task;
             AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
             // With rounds the wait also ends when the round comes back to the agent.
             if (session.Status != "pending" || TurnOf(session) == "agent") return new(session, false);
@@ -255,12 +328,13 @@ public sealed partial class GitHost
     private void BumpAgentReviews()
     {
         TaskCompletionSource signal;
-        lock (_agentReviewsLock)
+        lock (AgentReviewsSignalsLock)
         {
-            _agentReviewsVersion++;
-            signal = _agentReviewsChanged;
-            _agentReviewsChanged = NewAgentReviewsSignal();
+            string root = RequireRoot();
+            signal = AgentReviewsSignalUnlocked(root);
+            AgentReviewsSignals[IdFor(root)] = NewAgentReviewsSignal();
         }
+
         signal.TrySetResult();
     }
 

@@ -115,11 +115,12 @@ public sealed partial class GitHost
 
     private static string S(int n) => n == 1 ? "" : "s";
 
-    /// <summary>The inbox's presence dot: each open review's agent's last read of its channel.</summary>
-    private void WithLastReads(AgentReviewSummaryDto[] summaries, List<AgentReviewDto> sessions)
+    /// <summary>The inbox's presence dot: each open review's agent's last read of its channel.
+    ///  Static (v0.21.10) so the cross-repository list reads the same data without a host.</summary>
+    private static void WithLastReads(AgentReviewSummaryDto[] summaries, List<AgentReviewDto> sessions, string boardPath)
     {
         if (!sessions.Any(s => s.Board is not null && s.Status == "pending")) return;
-        PowerBoard? board = Board();
+        PowerBoard? board = PowerBoard.Open(boardPath).Board;
         if (board is null) return;
         for (int i = 0; i < summaries.Length; i++)
         {

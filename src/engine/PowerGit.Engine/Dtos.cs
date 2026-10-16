@@ -141,6 +141,12 @@ public sealed record BoardPostRequest(string Text);
 public sealed record AgentReviewResolveRequest(string Action, string? Summary, string? Reason);
 public sealed record AgentReviewWaitDto(AgentReviewDto Session, bool TimedOut);
 public sealed record AgentReviewListDto(IReadOnlyList<AgentReviewSummaryDto> Sessions, int Badge);
+/// <summary>v0.21.10: a repository in the cross-repository review panel, named by its folder.</summary>
+public sealed record AgentReviewRepoDto(string Id, string Root, string Name);
+/// <summary>One session together with the repository it belongs to.</summary>
+public sealed record AgentReviewEverywhereItemDto(AgentReviewRepoDto Repo, AgentReviewSummaryDto Session);
+/// <summary>Every repository's sessions, newest first, with the summed badge.</summary>
+public sealed record AgentReviewEverywhereDto(IReadOnlyList<AgentReviewEverywhereItemDto> Sessions, int Badge);
 
 /// <summary>
 /// v0.13.14: the changed files of a commit and the diff of the first one in a
