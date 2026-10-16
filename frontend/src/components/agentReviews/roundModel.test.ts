@@ -135,7 +135,7 @@ describe("labels", () => {
 
   it("says when the agent last read the channel", () => {
     const now = Date.parse("2026-10-13T10:00:30Z")
-    expect(presenceLabel("2026-10-13T10:00:27Z", true, now)).toBe("reading this channel · 3 s ago")
+    expect(presenceLabel("2026-10-13T10:00:27Z", true, now)).toBe("reading now")
     expect(presenceLabel("2026-10-13T09:58:30Z", false, now)).toBe("last read 2 min ago")
     expect(presenceLabel(null, false, now)).toBe("has not read the channel")
   })

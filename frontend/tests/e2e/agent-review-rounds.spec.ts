@@ -131,7 +131,7 @@ test.describe("agent review rounds", () => {
       await first.locator('[data-testid="round-line"][data-key="+3"] td').nth(1).click()
       await page.getByTestId("comment-draft").fill("Why this line?")
       await page.getByTestId("comment-ask").click()
-      await expect(page.getByTestId("board-post").filter({ hasText: "c1 · t.txt:3" })).toBeVisible()
+      await expect(page.getByTestId("board-post").filter({ hasText: "Why this line?" })).toContainText("t.txt:3")
       db!
         .prepare("INSERT INTO messages (channel, author, text, created) VALUES (?, ?, ?, ?)")
         .run(session.board, "auth-fix", "c1: the old line raced with the timer", Date.now() / 1000)
@@ -163,7 +163,7 @@ test.describe("agent review rounds", () => {
       await second.locator('[data-testid="round-line"][data-key="+25"] td').nth(1).click()
       await page.getByTestId("comment-draft").fill("Keep line 25 as it was.")
       await page.getByTestId("comment-add").click()
-      await expect(page.getByTestId("round-box")).toContainText("1 comment for the round")
+      await expect(page.getByTestId("round-box")).toContainText("1 comment")
       await page.getByTestId("round-note").fill("One thing.")
       await page.getByTestId("round-send").click()
       await expect(page.getByTestId("round-box")).toHaveAttribute("data-state", "sent")

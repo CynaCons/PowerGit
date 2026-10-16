@@ -13,8 +13,9 @@ import type { Token } from "../../highlight"
 import type { LineState, ReviewDoc } from "../../review/reviewModel"
 import { cycle } from "../../review/reviewModel"
 import { Chip, VerdictButton } from "./reviewChips"
-import { earlierThreads, hunksOf, liveVerdict, threadFor, type HunkRow, type RoundHunk } from "./roundModel"
-import { Draft, Thread, ThreadItems, type CommentKind, type ThreadActions } from "./RoundThread"
+import { LineThreads } from "./LineThreads"
+import { earlierThreads, hunksOf, liveVerdict, type HunkRow, type RoundHunk } from "./roundModel"
+import { Thread, ThreadItems, type CommentKind } from "./RoundThread"
 import type { CommentEdits } from "./useRoundComments"
 import { roundBlocks, sourceFor, type RoundBlock } from "./roundContext"
 import { useRowTokens } from "./useRowTokens"
@@ -311,21 +312,6 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
   )
 }
 
-/** A comment not sent yet is edited or deleted; a question already asked is withdrawn. */
-function commentActions(
-  p: RoundDiffProps,
-  line: string,
-  thread: AgentReviewThread | null,
-  index: number | null,
-): ThreadActions | null {
-  const edits = p.edits
-  if (!p.editable || !edits) return null
-  if (thread === null && index !== null)
-    return { edit: (text) => edits.edit(line, index, text), remove: () => edits.remove(line, index) }
-  if (thread?.kind === "ask") return { withdraw: () => edits.withdraw(thread, index) }
-  return null
-}
-
 function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
   const state = row.kind === "context" ? undefined : p.doc?.files[p.path]?.lines[row.key]
   const comments = p.doc?.files[p.path]?.comments.filter((c) => c.line === row.key) ?? []
@@ -418,43 +404,7 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
         </Box>
       </Box>
       {(comments.length > 0 || loose.length > 0 || picked) && (
-        <tr>
-          <td colSpan={4}>
-            <Thread>
-              {comments.map((c, i) => {
-                const thread = threadFor(p.threads, p.round.n, p.path, row.key, c.text)
-                return (
-                  <ThreadItems
-                    key={`c${i}`}
-                    thread={thread}
-                    text={c.text}
-                    kind={thread?.kind ?? "round"}
-                    line={row.key}
-                    actions={commentActions(p, row.key, thread, i)}
-                  />
-                )
-              })}
-              {loose.map((t) => (
-                <ThreadItems
-                  key={t.id}
-                  thread={t}
-                  text={t.body}
-                  kind={t.kind}
-                  line={row.key}
-                  actions={commentActions(p, row.key, t, null)}
-                />
-              ))}
-              {picked && (
-                <Draft
-                  canAsk={p.canAsk}
-                  line={row.key}
-                  onCancel={() => p.onPick(null)}
-                  onSave={(text, kind) => p.onComment(row.key, text, kind)}
-                />
-              )}
-            </Thread>
-          </td>
-        </tr>
+        <LineThreads p={p} line={row.key} comments={comments} loose={loose} picked={picked} />
       )}
     </>
   )

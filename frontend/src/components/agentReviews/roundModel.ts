@@ -176,7 +176,7 @@ export function presenceLabel(lastRead: string | null | undefined, reading: bool
   if (!lastRead) return "has not read the channel"
   const at = Date.parse(lastRead)
   const seconds = Math.max(0, Math.round((now - at) / 1000))
-  if (reading) return `reading this channel · ${seconds} s ago`
+  if (reading) return "reading now"
   if (seconds < 60) return `last read ${seconds} s ago`
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `last read ${minutes} min ago`

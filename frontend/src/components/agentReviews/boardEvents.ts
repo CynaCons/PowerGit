@@ -1,11 +1,15 @@
-// PowerGit's own board posts (round opened/sent, approved, cancelled,
-// closed — engine GitHost.AgentReviewBoard.cs) parsed for the event row
-// (v0.21.11): the first line becomes the one-line event ("Round 2 sent ·
-// 3 accepted · 1 rejected", the engine's " · review <id>" dropped), the
-// ✗/~/?/✓ verdict lines keep their marks with the two-space indented
-// lines under their parent, "details:" lines are quoted, review_id= is
-// dropped, and everything else (the round title, the agent's why/note,
-// "cN answered:") is Markdown.
+// How the board reads PowerGit's own posts and the comment references in the
+// others (v0.21.11; v0.21.12 lane design).
+//
+// Round events (engine GitHost.AgentReviewBoard.cs) are recognised by their
+// first line, whoever posted them: "Round 2 sent" and "Approved" go out under
+// the owner's name so the agent sees them as the owner's. The first line
+// splits into a title ("Round 2 sent") and its facts ("0 accepted, 1
+// rejected, …", the engine's "review <id>" dropped); the ✗/~/?/✓ verdict
+// lines keep their marks with the two-space indented lines under their
+// parent; "details:" lines are quoted; review_id= and the agent-facing
+// "Reply with `cN: …`" hint are dropped; everything else (the round title,
+// the agent's why or note, "cN answered:") is Markdown.
 
 export type VerdictLine = {
   mark: string
@@ -13,19 +17,36 @@ export type VerdictLine = {
   children: string[]
 }
 
+export type EventKind = "opened" | "sent" | "approved" | "cancelled" | "closed"
+
 export type PowerGitEvent = {
-  event: string
+  kind: EventKind
+  title: string
+  facts: string
   markdown: string
   verdicts: VerdictLine[]
   details: string
 }
 
+const EVENT: [RegExp, EventKind][] = [
+  [/^Round \d+ opened\b/, "opened"],
+  [/^Round \d+ sent\b/, "sent"],
+  [/^Approved\b/, "approved"],
+  [/^Cancelled\b/, "cancelled"],
+  [/^Review closed\b/, "closed"],
+]
 const VERDICT = /^[✗~?✓] /
 const INDENTED = /^ {2}\S/
 const DETAILS = /^details: /
+const AGENT_HINT = /^Reply with `cN/
+
+export function eventKind(text: string): EventKind | null {
+  const first = text.split("\n", 1)[0]
+  return EVENT.find(([re]) => re.test(first))?.[1] ?? null
+}
 
 export function parsePowerGitEvent(text: string): PowerGitEvent {
-  const lines = text.split("\n").filter((l) => !l.startsWith("review_id="))
+  const lines = text.split("\n").filter((l) => !l.startsWith("review_id=") && !AGENT_HINT.test(l))
   const markdown: string[] = []
   const verdicts: VerdictLine[] = []
   let details = ""
@@ -40,10 +61,42 @@ export function parsePowerGitEvent(text: string): PowerGitEvent {
       markdown.push(line)
     }
   }
+  const parts = (lines[0] ?? "").split(" · ").filter((p) => !/^review \w+$/.test(p))
   return {
-    event: (lines[0] ?? "").replace(/ · review \w+/, ""),
+    kind: eventKind(text) ?? "closed",
+    title: parts[0] ?? "",
+    facts: parts.slice(1).join(", "),
     markdown: markdown.join("\n").trim(),
     verdicts,
     details,
   }
+}
+
+export type CommentPost = {
+  /** The comment the post is about (c3), or null. */
+  ref: string | null
+  /** Where the comment sits ("src/a.ts:12"), for the owner's asked questions. */
+  where: string | null
+  /** The text without the reference prefix. */
+  body: string
+}
+
+/**
+ * "c3 · src/a.ts:12\nWhy?" (an asked question) and "c3: because" (the
+ * agent's answer) carry their reference up front; the board shows it as a
+ * link and the rest as the post.
+ */
+export function commentPost(text: string): CommentPost {
+  const asked = /^(c\d+) · (\S.*)\n/.exec(text)
+  if (asked) return { ref: asked[1], where: asked[2], body: text.slice(asked[0].length) }
+  const answer = /^\s*(c\d+)\s*:\s*/.exec(text)
+  if (answer) return { ref: answer[1], where: null, body: text.slice(answer[0].length) }
+  return { ref: null, where: null, body: text }
+}
+
+/** "auth-fix" → "AF", "claude" → "CL". */
+export function initialsOf(name: string): string {
+  const parts = name.split(/[\s._-]+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return (parts[0] ?? "?").slice(0, 2).toUpperCase()
 }

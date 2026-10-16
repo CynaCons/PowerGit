@@ -64,6 +64,7 @@ if open.board:
     "Approved"       → commit; stop
     "Cancelled"      → stop
     "cN · path:line" → answer on the board: powerchannel.post(me, open.board, "cN: <answer>")
+    "cN withdrawn"   → the owner took question cN back; drop it, no answer
     anything else from human → answer with powerchannel.post
 else:
   powergit.agent_review_wait(...) in a loop, as above without the questions

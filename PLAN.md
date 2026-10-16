@@ -1064,6 +1064,14 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [ ] Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown.
 - [x] Release v0.21.11 (owner 2026-10-16: "yes, we should release the version 21.11"). [agent: claude]
 
+### v0.21.12 — Agent review — deletable comments, a calmer board column (ACTIVE)
+**Goal:** Owner (2026-10-16): "when I'm dropping a comment in the review panel, it is not deletable" and "make the right panel looking a bit better. Right now it's looking rough… Please use the front end design skill."
+- [x] Owner's sentences as red e2e: a comment for the round can be deleted and edited; an asked comment can be withdrawn. [agent: claude]
+- [x] Comments: Edit and Delete on unsent comments (review file); Withdraw on an asked one (engine route, board post). [agent: claude]
+- [x] Board column redesign (frontend-design plan): header, feed, compose, round dock; light/dark, wide/narrow looked at. [agent: claude]
+- [x] Gate: engine tests, vitest, lint, agent-review e2e + shell. [agent: claude]
+- [ ] Owner ticks: a comment can be removed; the right panel reads well.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
