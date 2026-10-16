@@ -1105,11 +1105,11 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 
 ### v0.21.11 — Agent review screen — resizable side panes, readable board, Markdown (current) (ACTIVE)
 **Goal:** Owner (2026-10-16): "on the right side, the board can be resized, same for the left side panel. Also right side panel shall have a better format, and agents should be encouraged to structure their text, maybe with markdown format. Now it's just a blob of text." Plan: ~/.claude/plans/flickering-bubbling-phoenix.md. Coded by OpenCode agents with PowerScroll cards.
-- [ ] Owner's sentences as red e2e: drag the board and files handles, widths kept after reload, double-click resets; an agent's Markdown post shows a list and a code block.
-- [ ] Layout: SplitHandle gains a right edge, separator role and arrow keys; files list and board widths are dragged, remembered (pg.reviewFilesWidth / pg.reviewBoardWidth) and reset by double-click.
-- [ ] Board: Markdown rendered (react-markdown + remark-gfm, no raw HTML, http links only, highlighted code), posts grouped by author, PowerGit's round posts as event rows with verdict colours, long posts fold.
-- [ ] Agents asked for Markdown: MCP tool descriptions, the board's opening post, docs/agents/mcp-agent-review.md; engine test.
-- [ ] Gate: engine tests, vitest, lint, agent-review + split-handle + bottom-split + shell e2e; look at the screen light/dark, wide and narrow.
+- [x] Owner's sentences as red e2e: drag the board and files handles, widths kept after reload, double-click resets; an agent's Markdown post shows a list and a code block.
+- [x] Layout: SplitHandle gains a right edge, separator role and arrow keys; files list and board widths are dragged, remembered (pg.reviewFilesWidth / pg.reviewBoardWidth) and reset by double-click.
+- [x] Board: Markdown rendered (react-markdown + remark-gfm, no raw HTML, http links only, highlighted code), posts grouped by author, PowerGit's round posts as event rows with verdict colours, long posts fold.
+- [x] Agents asked for Markdown: MCP tool descriptions, the board's opening post, docs/agents/mcp-agent-review.md; engine test.
+- [x] Gate: engine tests, vitest, lint, agent-review + split-handle + bottom-split + shell e2e; look at the screen light/dark, wide and narrow.
 - [ ] Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown.
 
 ## Backlog
