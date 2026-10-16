@@ -1054,7 +1054,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] App: the panel and badge cover every repo; each row names its repo; a click on another repo's review opens that repo, then the review.
 - [x] Gate: engine tests, vitest, lint, agent-review e2e + shell; look at the panel in light and dark.
 
-### v0.21.11 — Agent review screen — resizable side panes, readable board, Markdown (current) (ACTIVE)
+### v0.21.11 — Agent review screen — resizable side panes, readable board, Markdown (COMPLETE)
 **Goal:** Owner (2026-10-16): "on the right side, the board can be resized, same for the left side panel. Also right side panel shall have a better format, and agents should be encouraged to structure their text, maybe with markdown format. Now it's just a blob of text." Plan: ~/.claude/plans/flickering-bubbling-phoenix.md. Coded by OpenCode agents with PowerScroll cards.
 - [x] Owner's sentences as red e2e: drag the board and files handles, widths kept after reload, double-click resets; an agent's Markdown post shows a list and a code block.
 - [x] Layout: SplitHandle gains a right edge, separator role and arrow keys; files list and board widths are dragged, remembered (pg.reviewFilesWidth / pg.reviewBoardWidth) and reset by double-click.
@@ -1062,7 +1062,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Agents asked for Markdown: MCP tool descriptions, the board's opening post, docs/agents/mcp-agent-review.md; engine test.
 - [x] Gate: engine tests, vitest, lint, agent-review + split-handle + bottom-split + shell e2e; look at the screen light/dark, wide and narrow.
 - [ ] Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown.
-- [ ] Release v0.21.11 (owner 2026-10-16: "yes, we should release the version 21.11").
+- [x] Release v0.21.11 (owner 2026-10-16: "yes, we should release the version 21.11"). [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
