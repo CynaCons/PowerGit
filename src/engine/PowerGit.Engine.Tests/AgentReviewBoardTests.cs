@@ -102,7 +102,7 @@ public sealed class AgentReviewBoardTests
         BoardMessageDto opened = Assert.Single(feed.Messages);
         Assert.Equal("powergit", opened.Author);
         Assert.StartsWith($"Round 1 opened · review {session.Id[..8]} · 1 file, 1 change\nFix the race", opened.Text);
-        Assert.Contains($"review_id={session.Id}", opened.Text);
+        Assert.EndsWith($"\nReply with `cN: <answer>`; Markdown is shown.\nreview_id={session.Id}", opened.Text);
 
         AgentReviewThreadDto asked = host.AskAgentReview(session.Id, new(1, "f.txt", "+2", "why c?"));
         feed = host.GetAgentReviewBoard(session.Id, opened.Id);
@@ -134,6 +134,8 @@ public sealed class AgentReviewBoardTests
         string second = host.GetAgentReviewBoard(session.Id, 0).Messages.Last(m => m.Author == "powergit").Text;
         Assert.StartsWith("Round 2 opened", second);
         Assert.Contains("c2 answered: restored", second);
+        Assert.DoesNotContain("Reply with", second);
+        Assert.EndsWith($"\nreview_id={session.Id}", second);
 
         BoardMessageDto said = host.PostAgentReviewBoard(session.Id, "looks better");
         Assert.Equal("human", said.Author);

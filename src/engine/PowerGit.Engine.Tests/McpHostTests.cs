@@ -32,6 +32,13 @@ public sealed class McpHostTests
         Assert.Equal("powergit", init.GetProperty("serverInfo").GetProperty("name").GetString());
         JsonElement tools = await c.Call("tools/list", new { });
         Assert.Equal(McpTools.Names.Order(), tools.GetProperty("tools").EnumerateArray().Select(x => x.GetProperty("name").GetString()).Order());
+        // Owner: "agents should be encouraged to structure their text, maybe with markdown format. Now it's just a blob of text."
+        JsonElement open = tools.GetProperty("tools").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "agent_review_open");
+        JsonElement revise = tools.GetProperty("tools").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "agent_review_revise");
+        Assert.Contains("why: Markdown", open.GetProperty("description").GetString());
+        Assert.Contains("note and each reply body: Markdown", revise.GetProperty("description").GetString());
+        Assert.Contains("Markdown", open.GetProperty("inputSchema").GetProperty("properties").GetProperty("why").GetProperty("description").GetString());
+        Assert.Contains("Markdown", revise.GetProperty("inputSchema").GetProperty("properties").GetProperty("note").GetProperty("description").GetString());
     }
 
     [Fact]
