@@ -1097,8 +1097,8 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 ### v0.21.10 — Agent reviews from every repository (current) (ACTIVE)
 **Goal:** Owner (2026-10-16): "the review panel only shows the review for the currently open repository … I want the review panel to hold the review for all the repositories … open the proper review and it opens the proper repository as well." Coding by OpenCode free agents through powerspawn; the coordinator plans, reviews and verifies.
 - [ ] Owner's sentence as an e2e that fails first: window on repo A, a review opened in repo B shows in the panel with B's name, the badge counts it, a click opens B and the review.
-- [ ] Engine: GET /agent-reviews lists every known repo's reviews (review index in DataDir, open repos, recents) with repo name/path/id and one badge; reads files, never opens a repo.
-- [ ] Engine: the wait signal is per repo folder, so a repo switch never delays an agent's answer.
+- [x] Engine: GET /agent-reviews lists every known repo's reviews (review index in DataDir, open repos, recents) with repo name/path/id and one badge; reads files, never opens a repo.
+- [x] Engine: the wait signal is per repo folder, so a repo switch never delays an agent's answer.
 - [ ] App: the panel and badge cover every repo; each row names its repo; a click on another repo's review opens that repo, then the review.
 - [ ] Gate: engine tests, vitest, lint, agent-review e2e + shell; look at the panel in light and dark.
 - [ ] Owner ticks: a review an agent opens in another repo shows in the panel and opens in its repo.
