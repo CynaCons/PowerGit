@@ -62,9 +62,10 @@ test.describe("agent reviews from every repository", () => {
     })
 
     // The badge and the panel count it while the window is still on A.
-    await expect(page.getByTestId("agent-reviews-badge")).toHaveText(/[1-9]/, { timeout: 15_000 })
+    // (The wide rail draws the count inside the button; the narrow one as a badge.)
+    await expect(page.getByTestId("agent-reviews-button")).toContainText(/[1-9]/, { timeout: 15_000 })
     await page.getByTestId("agent-reviews-button").click()
-    const row = page.getByTestId("agent-review-row").filter({ hasText: "Review in B" })
+    const row = page.getByTestId("agent-review-row").filter({ hasText: "Review in B" }).filter({ hasText: basename(b) })
     await expect(row).toBeVisible({ timeout: 15_000 })
     await expect(row.getByTestId("agent-review-repo")).toHaveText(basename(b))
     await expect(page.getByTestId("title-strip")).toContainText(basename(a))

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 import { existsSync, mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, resolve } from "node:path"
+import { basename, dirname, resolve } from "node:path"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { commit, currentRepoPath, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
 
@@ -100,10 +100,17 @@ test.describe("agent review rounds", () => {
         .run("auth-fix", session.board, Date.now() / 1000)
 
       await page.getByTestId("agent-reviews-button").click()
-      await expect(page.getByTestId("agent-review-row").filter({ hasText: "Fix the refresh race" })).toContainText(
-        "round 1 · your turn",
-      )
-      await page.getByTestId("agent-review-row").filter({ hasText: "Fix the refresh race" }).click()
+      await expect(
+        page
+          .getByTestId("agent-review-row")
+          .filter({ hasText: "Fix the refresh race" })
+          .filter({ hasText: basename(dir) }),
+      ).toContainText("round 1 · your turn")
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Fix the refresh race" })
+        .filter({ hasText: basename(dir) })
+        .click()
 
       // Full view: the repository tree is gone, the review has the row.
       const screen = page.getByTestId("agent-review-screen")
@@ -178,9 +185,12 @@ test.describe("agent review rounds", () => {
       await page.getByTestId("agent-reviews-button").click()
       await expect(page.getByTestId("agent-reviews-view")).toBeVisible()
       await page.getByTestId("inbox-filter-all").click()
-      await expect(page.getByTestId("agent-review-row").filter({ hasText: "Fix the refresh race" })).toContainText(
-        "approved · round 2",
-      )
+      await expect(
+        page
+          .getByTestId("agent-review-row")
+          .filter({ hasText: "Fix the refresh race" })
+          .filter({ hasText: basename(dir) }),
+      ).toContainText("approved · round 2")
     } finally {
       db?.close()
       // Best effort: the engine may still hold the file for a moment.
@@ -213,7 +223,11 @@ test.describe("agent review rounds", () => {
       })
       expect(session.board).toBeNull()
       await page.getByTestId("agent-reviews-button").click()
-      await page.getByTestId("agent-review-row").filter({ hasText: "No board here" }).click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "No board here" })
+        .filter({ hasText: basename(dir) })
+        .click()
       await expect(page.getByTestId("board-column")).toHaveAttribute("data-board", "off")
       await expect(page.getByTestId("board-unavailable")).toContainText("powerchannel not found")
       await page.getByTestId("verdict-reject").click()

@@ -1,3 +1,4 @@
+import { basename } from "node:path"
 import { expect, test, type Page } from "@playwright/test"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { commit, currentRepoPath, makeRepo, openRepoOnEngine, write } from "../repoFixture"
@@ -67,7 +68,11 @@ test.describe("agent review diff options", () => {
     await page.goto(`/?repo=${repoId}`)
     await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
     await page.getByTestId("agent-reviews-button").click()
-    await page.getByTestId("agent-review-row").filter({ hasText: "Options review" }).click()
+    await page
+      .getByTestId("agent-review-row")
+      .filter({ hasText: "Options review" })
+      .filter({ hasText: basename(dir) })
+      .click()
 
     const diff = page.getByTestId("round-diff")
     const line = (key: string) => diff.locator(`[data-testid="round-line"][data-key="${key}"]`)
@@ -122,7 +127,11 @@ test.describe("agent review diff options", () => {
     expect(await stored()).toEqual({ shared: sharedBefore, review: { context: 0, full: true, wrap: true } })
     await page.reload()
     await page.getByTestId("agent-reviews-button").click()
-    await page.getByTestId("agent-review-row").filter({ hasText: "Options review" }).click()
+    await page
+      .getByTestId("agent-review-row")
+      .filter({ hasText: "Options review" })
+      .filter({ hasText: basename(dir) })
+      .click()
     await expect(diff).toHaveAttribute("data-wrap", "true")
     await expect(page.getByTestId("round-gap")).toHaveCount(2)
     await page.getByTestId("diff-options-bar").hover()
@@ -159,7 +168,11 @@ test.describe("agent review diff options", () => {
     })
     await page.goto(`/?repo=${repoId}`)
     await page.getByTestId("agent-reviews-button").click()
-    await page.getByTestId("agent-review-row").filter({ hasText: "Wrap review" }).click()
+    await page
+      .getByTestId("agent-review-row")
+      .filter({ hasText: "Wrap review" })
+      .filter({ hasText: basename(dir) })
+      .click()
     const diff = page.getByTestId("round-diff")
     // On by default here, and turning it off leaves the shared switch on.
     await expect(diff).toHaveAttribute("data-wrap", "true")
@@ -175,7 +188,9 @@ test.describe("agent review diff options", () => {
     const ring = () =>
       row
         .locator(".diff-row-mark")
-        .evaluate((el) => getComputedStyle(el, "::before").borderTopStyle + " " + getComputedStyle(el, "::after").content)
+        .evaluate(
+          (el) => getComputedStyle(el, "::before").borderTopStyle + " " + getComputedStyle(el, "::after").content,
+        )
     await expect(row).toHaveClass(/diff-row-review-todo/)
     expect(await ring()).toBe("solid none")
     await expect(diff.locator('[data-testid="round-line"][data-key="+6"]')).not.toHaveClass(/diff-row-review/)

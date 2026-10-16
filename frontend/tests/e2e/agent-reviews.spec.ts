@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { randomBytes } from "node:crypto"
 import { ENGINE_URL, engineHeaders } from "../engine"
 import { commit, currentRepoPath, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
@@ -83,10 +83,31 @@ test.describe("agent reviews", () => {
     try {
       await openInApp(page, dir)
       // The count sits on the rail entry: NavRail's Badge or the command
-      // rail's pill (the default layout), each with its own testid.
-      await expect(page.getByTestId(/^agent-reviews-(badge|button-count)$/)).toHaveText("1", { timeout: 10_000 })
+      // rail's pill (the default layout), each with its own testid. Since
+      // v0.21.10 it counts every repository's reviews: it equals the
+      // engine's every-repo badge, and this review is in that list.
+      const everywhere = async () =>
+        (await (await fetch(`${ENGINE_URL}/agent-reviews`, { headers: engineHeaders() })).json()) as {
+          sessions: { session: { id: string } }[]
+          badge: number
+        }
+      await expect
+        .poll(async () => (await everywhere()).sessions.some((s) => s.session.id === changeId), { timeout: 10_000 })
+        .toBe(true)
+      await expect
+        .poll(
+          async () =>
+            Number(await page.getByTestId(/^agent-reviews-(badge|button-count)$/).textContent()) ===
+            (await everywhere()).badge,
+          { timeout: 10_000 },
+        )
+        .toBe(true)
       await page.getByTestId("agent-reviews-button").click()
-      await page.getByTestId("agent-review-row").filter({ hasText: "Guard the parser" }).click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Guard the parser" })
+        .filter({ hasText: basename(dir) })
+        .click()
       await expect(page.getByTestId("agent-review-why")).toContainText("critical")
       const row = diffRow(page, "+first")
       await expect(row).toBeVisible()
@@ -107,6 +128,7 @@ test.describe("agent reviews", () => {
         page
           .getByTestId("agent-review-row")
           .filter({ hasText: "Guard the parser" })
+          .filter({ hasText: basename(dir) })
           .getByTestId("agent-review-turn-label"),
       ).toHaveText("changes requested")
       const changed = JSON.parse(readFileSync(join(folder, `${changeId}.json`), "utf8"))
@@ -121,14 +143,22 @@ test.describe("agent reviews", () => {
       ] as const) {
         const id = make("wait", title)
         await page.getByLabel("Refresh agent reviews").click()
-        await page.getByTestId("agent-review-row").filter({ hasText: title }).click()
+        await page
+          .getByTestId("agent-review-row")
+          .filter({ hasText: title })
+          .filter({ hasText: basename(dir) })
+          .click()
         await page.getByTestId(action).click()
         if (action.includes("cancel")) await page.getByTestId("agent-review-cancel-confirm-confirm").click()
         await expect.poll(() => JSON.parse(readFileSync(join(folder, `${id}.json`), "utf8")).status).toBe(status)
       }
       const notify = make("notify", "Read this")
       await page.getByLabel("Refresh agent reviews").click()
-      await page.getByTestId("agent-review-row").filter({ hasText: "Read this" }).click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Read this" })
+        .filter({ hasText: basename(dir) })
+        .click()
       await page.getByTestId("agent-review-ack").click()
       await expect.poll(() => JSON.parse(readFileSync(join(folder, `${notify}.json`), "utf8")).unread).toBe(false)
     } finally {
