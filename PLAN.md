@@ -1094,7 +1094,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Every changed line in the review diff shows the human review's mark: a click accepts, rejects, clears.
 - [ ] Owner ticks: the review's Wrap no longer changes the main diff's, and line marks work like the human review.
 
-### v0.21.10 — Agent reviews from every repository (current) (ACTIVE)
+### v0.21.10 — Agent reviews from every repository (COMPLETE)
 **Goal:** Owner (2026-10-16): "the review panel only shows the review for the currently open repository … I want the review panel to hold the review for all the repositories … open the proper review and it opens the proper repository as well." Coding by OpenCode free agents through powerspawn; the coordinator plans, reviews and verifies.
 - [x] Owner's sentence as an e2e that fails first: window on repo A, a review opened in repo B shows in the panel with B's name, the badge counts it, a click opens B and the review.
 - [x] Engine: GET /agent-reviews lists every known repo's reviews (review index in DataDir, open repos, recents) with repo name/path/id and one badge; reads files, never opens a repo.
