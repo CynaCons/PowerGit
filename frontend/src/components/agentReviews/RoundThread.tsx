@@ -3,6 +3,7 @@ import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
 import { useState } from "react"
 import type { AgentReviewThread } from "../../engine"
+import { Markdown } from "../Markdown"
 import { Chip } from "./reviewChips"
 
 // A comment thread under a line of the agent review diff (v0.21.3): the
@@ -57,14 +58,14 @@ export function ThreadItems({
             <Chip tone="wait">goes with the round</Chip>
           )}
         </Box>
-        <Typography data-testid="thread-body" sx={{ fontSize: 13, fontWeight: 400, whiteSpace: "pre-wrap" }}>
-          {text}
-        </Typography>
+        <Box data-testid="thread-body">
+          <Markdown text={text} />
+        </Box>
       </Box>
       {thread?.replies.map((r, i) => (
         <Box key={i} data-testid="thread-reply" sx={{ px: 1.25, py: 0.75, borderTop: 1, borderColor: "divider" }}>
           <Typography sx={{ fontWeight: 600, fontSize: 12, color: "var(--pg-agent)" }}>{r.author}</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 400, whiteSpace: "pre-wrap" }}>{r.body}</Typography>
+          <Markdown text={r.body} />
         </Box>
       ))}
     </>
