@@ -37,7 +37,10 @@ export type OperationDeps = {
 /** After anything that can move HEAD or the refs. */
 const FULL = { revisions: true, refs: true, status: true } as const
 
-async function openExternal(url: string): Promise<void> {
+// Exported for the board's Markdown links (v0.21.11): Tauri's opener in the
+// shell, window.open in a browser — a plain href would navigate the webview
+// away from the app.
+export async function openExternal(url: string): Promise<void> {
   if (isTauriShell()) {
     const { openUrl } = await import("@tauri-apps/plugin-opener")
     await openUrl(url)
