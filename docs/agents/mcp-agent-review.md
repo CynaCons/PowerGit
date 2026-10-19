@@ -70,7 +70,7 @@ else:
   powergit.agent_review_wait(...) in a loop, as above without the questions
 ```
 
-An answer that starts with `cN:` lands under that comment's line in PowerGit. PowerChannel 0.4.0 and later (formerly powerboard 0.3.0+) keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older PowerChannel it shows when the agent last read it.
+An answer that starts with `cN:` lands under that comment's line in PowerGit. The owner can reply in a comment's conversation; the reply comes as another `cN · path:line` post, a follow-up in that conversation: answer it the same way. PowerChannel 0.4.0 and later (formerly powerboard 0.3.0+) keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older PowerChannel it shows when the agent last read it.
 
 ## Writing for the owner
 

@@ -20,8 +20,9 @@ import { Chip } from "./reviewChips"
 import { ReviewIntro } from "./ReviewIntro"
 import { RoundDiff } from "./RoundDiff"
 import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
+import { ReviewFiles } from "./ReviewFiles"
 import { useRoundComments } from "./useRoundComments"
-import { hunksOf, latestRound, liveVerdict, roundCounts, roundKey, turnLabel } from "./roundModel"
+import { filesLeft, hunksOf, latestRound, liveVerdict, placeThreads, roundCounts, roundKey, turnLabel } from "./roundModel"
 
 // One agent review in full view (v0.21.3, layout A of
 // docs/prototypes/agent-review-v3.html, picked by the owner on 2026-10-13:
@@ -62,7 +63,15 @@ export function ReviewScreen({
   const open = session.status === "pending"
   const editable = open && round.n === latest.n && round.sentAt === null
   const canAsk = open && round.n === latest.n && board.available && Boolean(session.board)
-  const filePath = round.files.some((f) => f.path === path) ? path! : (round.files[0]?.path ?? "")
+  // v0.21.13: earlier rounds' conversations, placed in this round; a file that
+  // left the round but holds some stays selectable.
+  const earlier = useMemo(() => placeThreads(session.rounds ?? [], threads, round.n), [session.rounds, threads, round.n])
+  const left = filesLeft(earlier, round)
+  const filePath =
+    round.files.some((f) => f.path === path) || (path !== null && left.includes(path))
+      ? path!
+      : (round.files[0]?.path ?? "")
+  const replyOff = !open ? null : board.available && session.board ? null : "Replies need powerchannel."
   const counts = roundCounts(round, doc, threads)
   const previous = session.rounds?.find((r) => r.n === round.n - 1)?.changes ?? []
   // v0.21.8: the bottom diff's options; whitespace stays as captured.
@@ -293,70 +302,14 @@ export function ReviewScreen({
             "@container (max-width: 900px)": { maxHeight: 112 },
           }}
         >
-          <Typography sx={{ fontSize: 12, color: "text.secondary", px: 1.25, py: 1 }}>
-            Files · round {round.n}
-          </Typography>
-          {round.files.map((f) => {
-            const hunks = hunksOf(
-              f.patch,
-              round.changes.filter((c) => c.path === f.path),
-            )
-            const verdicts = hunks.map((h) => liveVerdict(round, h, f.path, doc))
-            const ok = verdicts.filter((v) => v === "accept").length
-            const no = verdicts.filter((v) => v === "reject" || v === "mixed").length
-            const pct = (n: number) => (hunks.length ? (100 * n) / hunks.length : 0)
-            return (
-              <Box
-                key={f.path}
-                component="button"
-                data-testid="round-file"
-                data-path={f.path}
-                aria-current={f.path === filePath}
-                onClick={() => setPath(f.path)}
-                sx={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  border: 0,
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  bgcolor: f.path === filePath ? "var(--pg-grid-sel)" : "transparent",
-                  color: "text.primary",
-                  px: 1.25,
-                  py: 0.75,
-                  cursor: "pointer",
-                }}
-              >
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <Typography
-                    noWrap
-                    sx={{ fontFamily: "var(--pg-font-mono, monospace)", fontSize: 12, flex: 1, minWidth: 0 }}
-                  >
-                    {f.path.split("/").pop()}
-                  </Typography>
-                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                    {ok + no}/{hunks.length}
-                  </Typography>
-                </Box>
-                <Typography noWrap sx={{ fontSize: 11, color: "text.secondary" }}>
-                  {f.path}
-                </Typography>
-                <Box
-                  sx={{
-                    height: 5,
-                    borderRadius: 3,
-                    bgcolor: "action.hover",
-                    display: "flex",
-                    overflow: "hidden",
-                    mt: 0.5,
-                  }}
-                >
-                  <Box sx={{ width: `${pct(ok)}%`, bgcolor: "var(--pg-review-accept)" }} />
-                  <Box sx={{ width: `${pct(no)}%`, bgcolor: "var(--pg-review-rejected)" }} />
-                </Box>
-              </Box>
-            )
-          })}
+          <ReviewFiles
+            round={round}
+            doc={doc}
+            current={filePath}
+            onPick={setPath}
+            left={left}
+            earlier={earlier}
+          />
         </Box>
         <Box sx={{ ...paneSx, position: "relative", minHeight: 0, minWidth: 0, display: "flex", gridArea: "diff" }}>
           <Box data-testid="round-diff-scroll" sx={{ flex: 1, minWidth: 0, overflow: "auto", p: 1.25, pb: 6 }}>
@@ -375,6 +328,10 @@ export function ReviewScreen({
               onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
               onComment={comments.add}
               edits={comments.edits}
+              rounds={session.rounds ?? []}
+              earlier={earlier}
+              onReply={open && !replyOff ? comments.reply : undefined}
+              replyOff={replyOff}
               onCursor={setCursor}
               options={diffView.options}
               wrap={diffView.wrap}

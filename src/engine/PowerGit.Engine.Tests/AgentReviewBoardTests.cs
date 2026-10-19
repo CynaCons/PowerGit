@@ -169,6 +169,36 @@ public sealed class AgentReviewBoardTests
         Assert.Throws<AgentReviewStateException>(() => host.WithdrawAgentReviewComment(session.Id, "c2"));
     }
 
+    // v0.21.13, owner: "when the agent answers, it should be displayed in a
+    // conversation, like in Bitbucket" — and he replies in it. The reply is
+    // the thread's, by "human", and goes to the board in the asked-question
+    // shape so the agent's answer lands under it.
+    [Fact]
+    public void The_owner_replies_in_a_conversation_and_the_answer_follows()
+    {
+        using TempBoard board = new();
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        host.BoardPath = board.Path;
+        AgentReviewDto session = host.CreateAgentReview(Request());
+        AgentReviewThreadDto asked = host.AskAgentReview(session.Id, new(1, "f.txt", "+2", "why c?"));
+        PowerChannel.Open(board.Path).Board!.Post("auth-fix", session.Board!, "c1: because b was wrong");
+        host.GetAgentReviewBoard(session.Id, 0);
+
+        AgentReviewThreadDto replied = host.ReplyAgentReviewAsOwner(session.Id, asked.Id, " then say so in the name ");
+        Assert.Equal([("auth-fix", "because b was wrong"), ("human", "then say so in the name")], replied.Replies.Select(r => (r.Author, r.Body)));
+        BoardMessageDto posted = host.GetAgentReviewBoard(session.Id, 0).Messages[^1];
+        Assert.Equal(("human", "c1 · f.txt:2\nthen say so in the name"), (posted.Author, posted.Text));
+
+        PowerChannel.Open(board.Path).Board!.Post("auth-fix", session.Board!, "c1: renamed");
+        host.GetAgentReviewBoard(session.Id, 0);
+        Assert.Equal(["auth-fix", "human", "auth-fix"], host.GetAgentReview(session.Id)!.Comments!.Single().Replies.Select(r => r.Author));
+
+        Assert.Throws<InvalidOperationException>(() => host.ReplyAgentReviewAsOwner(session.Id, asked.Id, "  "));
+        Assert.Throws<KeyNotFoundException>(() => host.ReplyAgentReviewAsOwner(session.Id, "c9", "hm"));
+        host.WithdrawAgentReviewComment(session.Id, asked.Id);
+        Assert.Throws<AgentReviewStateException>(() => host.ReplyAgentReviewAsOwner(session.Id, asked.Id, "hm"));
+    }
+
     [Fact]
     public void An_agent_can_name_the_channel()
     {

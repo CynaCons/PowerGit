@@ -3,9 +3,11 @@ import type { AgentReviewChange, AgentReviewRound, AgentReviewThread } from "../
 import { emptyDoc, withComment, withLine } from "../../review/reviewModel"
 import {
   commentRef,
-  earlierThreads,
+  filesLeft,
   hunksOf,
+  placeThreads,
   presenceLabel,
+  quotedLine,
   roundComments,
   roundCounts,
   turnLabel,
@@ -146,22 +148,63 @@ describe("labels", () => {
     expect(commentRef("Round 1 sent")).toBeNull()
   })
 
-  it("carries earlier threads onto the change that kept or revised their id", () => {
-    const t = (id: string, r: number, changeId: string): AgentReviewThread => ({
+  // v0.21.13, owner: "if I drop a comment on round one, when the agent comes
+  // with round two, I lose the comments."
+  describe("placeThreads", () => {
+    const t = (id: string, r: number, changeId: string | null, path = "t.cs"): AgentReviewThread => ({
       id,
       round: r,
       change: changeId,
-      path: "t.cs",
+      path,
       line: "+3",
-      body: "",
+      body: id,
       kind: "round",
       postedAt: "",
       replies: [],
     })
-    const threads = [t("c1", 1, "h1"), t("c2", 1, "h2"), t("c3", 2, "h3")]
-    expect(earlierThreads(threads, 2, change("h3", 1, 1, { origin: "revised", from: "h2" })).map((x) => x.id)).toEqual([
-      "c2",
-    ])
-    expect(earlierThreads(threads, 2, change("h1", 1, 1, { origin: "carried" })).map((x) => x.id)).toEqual(["c1"])
+    const r1 = round({ n: 1, changes: [change("h1", 2, 2), change("h2", 20, 21)] })
+    const r2 = round({
+      n: 2,
+      changes: [change("h1", 2, 2, { origin: "carried" }), change("h3", 20, 21, { origin: "revised", from: "h2" })],
+    })
+    const r3 = round({ n: 3, changes: [change("h4", 2, 2, { origin: "revised", from: "h1" })], removed: ["h3"] })
+    const r4 = round({ n: 4, files: [], changes: [], removed: ["h4"] })
+    const rounds = [r1, r2, r3, r4]
+    const ids = (ts: AgentReviewThread[] | undefined) => (ts ?? []).map((x) => x.id)
+
+    it("follows a change carried and revised over any number of rounds", () => {
+      const threads = [t("c1", 1, "h1"), t("c2", 1, "h2"), t("c3", 2, "h3"), t("c4", 3, "h4")]
+      const two = placeThreads(rounds, threads, 2)
+      expect(ids(two.byChange.get("h1"))).toEqual(["c1"])
+      expect(ids(two.byChange.get("h3"))).toEqual(["c2"])
+      const three = placeThreads(rounds, threads, 3)
+      expect(ids(three.byChange.get("h4"))).toEqual(["c1"])
+      expect(three.removed.map((e) => [e.change.id, e.round, ids(e.threads)])).toEqual([["h3", 3, ["c2", "c3"]]])
+      expect(three.byChange.has("h3")).toBe(false)
+    })
+
+    it("keeps a removed change's conversations in later rounds and names the files that left", () => {
+      const threads = [t("c1", 1, "h1"), t("c2", 1, "h2"), t("c5", 1, null, "gone.cs")]
+      const four = placeThreads(rounds, threads, 4)
+      expect(four.removed.map((e) => [e.change.id, e.round])).toEqual([
+        ["h4", 4],
+        ["h3", 3],
+      ])
+      expect(ids(four.byFile.get("gone.cs"))).toEqual(["c5"])
+      expect(filesLeft(four, r4)).toEqual(["gone.cs", "t.cs"])
+      expect(filesLeft(placeThreads(rounds, threads, 2), r2)).toEqual(["gone.cs"])
+    })
+
+    it("leaves the viewed round's own threads and withdrawn ones alone", () => {
+      const threads = [t("c1", 2, "h1"), { ...t("c2", 1, "h1"), kind: "withdrawn" as const }]
+      const two = placeThreads(rounds, threads, 2)
+      expect(two.byChange.size + two.removed.length + two.byFile.size).toBe(0)
+    })
+
+    it("quotes the commented line as it read in its own round", () => {
+      expect(quotedLine(rounds, t("c1", 1, "h1"))).toEqual({ kind: "add", text: "B" })
+      expect(quotedLine(rounds, { ...t("c1", 1, "h1"), line: "-3" })).toEqual({ kind: "remove", text: "b" })
+      expect(quotedLine(rounds, t("c9", 7, "h1"))).toBeNull()
+    })
   })
 })

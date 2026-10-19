@@ -67,6 +67,12 @@ export const withdrawAgentReviewComment = (engine: EngineClient, id: string, com
     .request(`${root(engine)}/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}`, { method: "DELETE" })
     .then(json<AgentReviewThread>)
 
+/** v0.21.13: the owner's reply in a comment's conversation (posted on the board). */
+export const replyAgentReviewComment = (engine: EngineClient, id: string, comment: string, body: string) =>
+  engine
+    .request(`${root(engine)}/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}/replies`, post({ body }))
+    .then(json<AgentReviewThread>)
+
 /** v0.21.2: the review's board channel after a message id. */
 export const agentReviewBoard = (engine: EngineClient, id: string, after: number, signal?: AbortSignal) =>
   engine

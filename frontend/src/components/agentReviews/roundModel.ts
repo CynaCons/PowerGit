@@ -141,12 +141,84 @@ export function threadFor(
   return threads.find((t) => t.round === round && t.path === path && t.line === line && t.body === text) ?? null
 }
 
-/** Earlier rounds' threads that belong to this change (it kept the id, or revised it). */
-export function earlierThreads(threads: AgentReviewThread[], round: number, change: AgentReviewChange | null) {
-  if (!change) return []
-  return threads.filter(
-    (t) => t.round < round && t.change !== null && (t.change === change.id || t.change === change.from),
-  )
+/**
+ * Where earlier rounds' conversations sit in the round being viewed (v0.21.13,
+ * owner: "if I drop a comment on round one, when the agent comes with round
+ * two, I lose the comments"). Each thread's change is followed forward round
+ * by round — the same id (carried) or a change that names it as `from`
+ * (revised), any number of hops — until the viewed round (`byChange`), or
+ * until the round that removed it (`removed`, with the change as it last was).
+ * A thread with no change stays with its file (`byFile`).
+ */
+export type EarlierThreads = {
+  byChange: Map<string, AgentReviewThread[]>
+  removed: { change: AgentReviewChange; round: number; threads: AgentReviewThread[] }[]
+  byFile: Map<string, AgentReviewThread[]>
+}
+
+export function placeThreads(
+  rounds: AgentReviewRound[],
+  threads: AgentReviewThread[],
+  viewed: number,
+): EarlierThreads {
+  const out: EarlierThreads = { byChange: new Map(), removed: [], byFile: new Map() }
+  const push = <K>(map: Map<K, AgentReviewThread[]>, key: K, t: AgentReviewThread) =>
+    map.set(key, [...(map.get(key) ?? []), t])
+  const ordered = [...rounds].sort((a, b) => a.n - b.n)
+  for (const t of threads) {
+    if (t.round >= viewed || t.kind === "withdrawn") continue
+    if (t.change === null) {
+      push(out.byFile, t.path, t)
+      continue
+    }
+    let current = t.change
+    let last = ordered.find((r) => r.n === t.round)?.changes.find((c) => c.id === current) ?? null
+    let gone: number | null = null
+    for (const r of ordered) {
+      if (r.n <= t.round || r.n > viewed) continue
+      const next = r.changes.find((c) => c.id === current || c.from === current)
+      if (next) {
+        current = next.id
+        last = next
+      } else {
+        gone = r.n
+        break
+      }
+    }
+    if (gone === null) push(out.byChange, current, t)
+    else if (last === null) push(out.byFile, t.path, t)
+    else {
+      const entry = out.removed.find((e) => e.change.id === last!.id)
+      if (entry) entry.threads.push(t)
+      else out.removed.push({ change: last, round: gone, threads: [t] })
+    }
+  }
+  return out
+}
+
+/** The files that hold earlier conversations but are not in the round (they left it). */
+export function filesLeft(earlier: EarlierThreads, round: AgentReviewRound): string[] {
+  const inRound = new Set(round.files.map((f) => f.path))
+  const paths = [...earlier.removed.map((e) => e.change.path), ...earlier.byFile.keys()]
+  return [...new Set(paths)].filter((p) => !inRound.has(p)).sort()
+}
+
+/** The commented line as it read in the thread's own round, for a conversation that moved on. */
+export function quotedLine(
+  rounds: AgentReviewRound[],
+  t: AgentReviewThread,
+): { kind: "add" | "remove" | "context"; text: string } | null {
+  const round = rounds.find((r) => r.n === t.round)
+  const file = round?.files.find((f) => f.path === t.path)
+  if (!round || !file) return null
+  for (const hunk of hunksOf(
+    file.patch,
+    round.changes.filter((c) => c.path === t.path),
+  )) {
+    const row = hunk.rows.find((r) => r.key === t.line)
+    if (row) return { kind: row.kind, text: row.text }
+  }
+  return null
 }
 
 export const latestRound = (session: AgentReview): AgentReviewRound | null =>

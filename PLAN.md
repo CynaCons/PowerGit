@@ -1069,8 +1069,17 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Comments: Edit and Delete on unsent comments (review file); Withdraw on an asked one (engine route, board post). [agent: claude]
 - [x] Board column redesign (frontend-design plan): header, feed, compose, round dock; light/dark, wide/narrow looked at. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e + shell. [agent: claude]
-- [ ] Owner ticks: a comment can be removed; the right panel reads well.
 - [x] Release v0.21.12 (owner 2026-10-16: "Yes, go ahead with that release"). [agent: claude]
+
+### v0.21.13 — Agent review — earlier rounds' comments stay, as conversations (ACTIVE)
+**Goal:** Owner (2026-10-19): "if I drop a comment on round one, when the agent comes with round two, I lose the comments… when the agent answers, it should be displayed in a conversation, like in Bitbucket." Owner picks: he can reply; no Resolve for now; a gone change keeps its comments under the removed card. Plan: ~/.claude/plans/flickering-bubbling-phoenix.md.
+- [x] Owner's sentence as red e2e: round-1 comments (revised, removed, asked + answered) all visible in round 2 and 3; a reply reaches the board and the answer lands under it. [agent: claude]
+- [x] Model: placeThreads follows a thread's change through every later round (carried, revised, removed, file gone); unit tests. [agent: claude]
+- [x] View: earlier conversations under their change, under the removed card, and on a greyed file that left the round (ReviewFiles.tsx). [agent: claude]
+- [x] Conversations like Bitbucket: discs, author, time, indented replies, Reply box (needs powerchannel). [agent: claude]
+- [x] Engine: POST /agent-reviews/{sid}/comments/{cid}/replies (author human, board post cN · path:line); tests; docs. [agent: claude]
+- [x] Gate: engine tests, vitest, lint, agent-review e2e + shell; look at light/dark, wide/narrow; screenshots to the owner. [agent: claude]
+- [ ] Owner ticks: earlier comments stay visible in later rounds; answers read as a conversation.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1175,3 +1184,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: a review an agent opens in another repo shows in the panel and opens in its repo. (deferred from v0.21.10: open when the plan view moved to v0.21.11 (2026-10-16))
 - Graph search in the top bar, find or filter (owner 2026-09-08; was the v0.15.1 shell, design first)
 - Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown. (deferred from v0.21.11: owner tick pending; plan view moved to v0.21.12 (2026-10-16))
+- Owner ticks: a comment can be removed; the right panel reads well. (deferred from v0.21.12: owner tick pending; plan view moved to v0.21.13 (2026-10-19))

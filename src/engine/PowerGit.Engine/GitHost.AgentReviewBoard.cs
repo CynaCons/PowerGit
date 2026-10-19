@@ -179,6 +179,30 @@ public sealed partial class GitHost
         return new(posted.Id, posted.Author, posted.Text, Iso(posted.Created));
     }
 
+    /// <summary>
+    ///  v0.21.13: the owner's reply in a conversation. Kept on the thread as a reply by
+    ///  "human" and posted on the board as "cN · path:line", the shape of an asked question,
+    ///  so the agent's loop answers it with "cN: …", which lands as the next reply.
+    /// </summary>
+    public AgentReviewThreadDto ReplyAgentReviewAsOwner(string id, string comment, string? body)
+    {
+        string text = Clean(body) ?? throw new InvalidOperationException("body is required");
+        lock (_agentReviewWriteGate)
+        {
+            AgentReviewDto session = RequireV2Pending(id);
+            if (session.Board is null) throw new InvalidOperationException("this review has no board channel");
+            List<AgentReviewThreadDto> threads = [.. session.Comments ?? []];
+            int at = threads.FindIndex(t => t.Id == comment);
+            if (at < 0) throw new KeyNotFoundException($"no comment {comment}");
+            if (threads[at].Kind == "withdrawn") throw new AgentReviewStateException($"{comment} was withdrawn");
+            PowerChannel board = Board() ?? throw new InvalidOperationException(BoardStatus().Reason ?? "powerchannel not available");
+            PowerChannel.Message posted = board.Post(BoardHuman, session.Board, $"{comment} · {threads[at].Path}:{threads[at].Line[1..]}\n{text}");
+            threads[at] = threads[at] with { Replies = [.. threads[at].Replies, new(BoardHuman, text, Timestamp(), posted.Id)] };
+            WriteAgentReview(session with { Comments = threads, UpdatedAt = Timestamp() });
+            return threads[at];
+        }
+    }
+
     private static string Iso(double unixSeconds) =>
         DateTimeOffset.FromUnixTimeMilliseconds((long)(unixSeconds * 1000)).UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture);
 }

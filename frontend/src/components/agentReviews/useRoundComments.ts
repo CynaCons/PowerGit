@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import type { AgentReviewThread, EngineClient } from "../../engine"
-import { askAgentReview, withdrawAgentReviewComment } from "../../engine/agentReviews"
+import { askAgentReview, replyAgentReviewComment, withdrawAgentReviewComment } from "../../engine/agentReviews"
 import { updateReviewDoc } from "../../review/reviewState"
 import { withComment, withCommentText, withoutComment } from "../../review/reviewModel"
 import type { CommentKind } from "./RoundThread"
@@ -65,5 +65,8 @@ export function useRoundComments({
       },
     }
   }, [engine, finish, path, reviewKey, run, sessionId])
-  return { add, edits }
+  // v0.21.13: a reply in a conversation goes on the board; the agent answers it there.
+  const reply = (thread: AgentReviewThread, body: string) =>
+    void run(() => replyAgentReviewComment(engine, sessionId, thread.id, body))
+  return { add, edits, reply }
 }

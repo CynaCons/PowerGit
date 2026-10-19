@@ -12,10 +12,13 @@ import type {
 import type { Token } from "../../highlight"
 import type { LineState, ReviewDoc } from "../../review/reviewModel"
 import { cycle } from "../../review/reviewModel"
+import { Conversation } from "./Conversation"
+import { EarlierCards } from "./EarlierCards"
 import { Chip, VerdictButton } from "./reviewChips"
 import { LineThreads } from "./LineThreads"
-import { earlierThreads, hunksOf, liveVerdict, type HunkRow, type RoundHunk } from "./roundModel"
-import { Thread, ThreadItems, type CommentKind } from "./RoundThread"
+import { hunksOf, liveVerdict, quotedLine, type EarlierThreads, type HunkRow, type RoundHunk } from "./roundModel"
+import { Thread, type CommentKind } from "./RoundThread"
+import { replyProps } from "./threadActions"
 import type { CommentEdits } from "./useRoundComments"
 import { roundBlocks, sourceFor, type RoundBlock } from "./roundContext"
 import { useRowTokens } from "./useRowTokens"
@@ -47,6 +50,14 @@ export type RoundDiffProps = {
   onComment: (key: string, text: string, kind: CommentKind) => void
   /** v0.21.12: edit, delete or withdraw the owner's comments while the round is open. */
   edits?: CommentEdits
+  /** v0.21.13: every round, for earlier conversations' own lines. */
+  rounds: AgentReviewRound[]
+  /** v0.21.13: where earlier rounds' conversations sit in this round (roundModel.placeThreads). */
+  earlier: EarlierThreads
+  /** v0.21.13: a reply in a conversation, posted on the board; absent when replies are off. */
+  onReply?: (thread: AgentReviewThread, body: string) => void
+  /** Why replies are off, when they are. */
+  replyOff?: string | null
   onCursor: (changeId: string) => void
   options: DiffOptions
   /** Wrap lines, the review screen's own switch (reviewDiffView.ts). */
@@ -84,7 +95,6 @@ export function RoundDiff(props: RoundDiffProps) {
     file?.patch ?? null,
     round.changes.filter((c) => c.path === path),
   )
-  const removed = props.previous.filter((c) => c.path === path && round.removed.includes(c.id))
   const { options, sourceText } = props
   const blocks = useMemo(() => {
     const hunks = hunksOf(
@@ -100,7 +110,7 @@ export function RoundDiff(props: RoundDiffProps) {
   const tokens = useRowTokens(rows, path)
   const { wrap } = props
   const digits = String(Math.max(1, ...rows.map((r) => Math.max(r.oldNum ?? 0, r.newNum ?? 0)))).length
-  if (!file) return null
+  if (!file) return <EarlierCards {...props} gone />
   const fromFile = sourceFor(sourceText, hunks) !== null
   const wantsMore = options.full || options.context > 3
   return (
@@ -133,30 +143,7 @@ export function RoundDiff(props: RoundDiffProps) {
           />
         ),
       )}
-      {removed.map((c) => (
-        <Box
-          key={c.id}
-          data-testid="round-removed"
-          sx={{
-            border: 1,
-            borderColor: "divider",
-            borderRadius: 1.5,
-            px: 1,
-            py: 0.75,
-            opacity: 0.7,
-            display: "flex",
-            gap: 1,
-            alignItems: "center",
-          }}
-        >
-          <Chip tone={c.verdict === "reject" ? "accept" : "muted"}>
-            {c.verdict === "reject" ? "removed after your rejection" : "removed"}
-          </Chip>
-          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-            {c.id} · line {c.newLines > 0 ? c.newStart : c.oldStart}
-          </Typography>
-        </Box>
-      ))}
+      <EarlierCards {...props} />
     </Box>
   )
 }
@@ -211,7 +198,7 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
   const focused = change !== null && p.cursor === change.id
   const set = (target: "accept" | "reject") =>
     p.onVerdict(hunk.keys, verdict === target ? undefined : target === "accept" ? "ok" : "rejected")
-  const older = earlierThreads(p.threads, p.round.n, change)
+  const older = change ? (p.earlier.byChange.get(change.id) ?? []) : []
   return (
     <Box
       data-testid="round-change"
@@ -296,17 +283,23 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
         {[...block.before, ...block.core, ...block.after].map((row) => (
           <LineRow key={row.key + row.kind} row={row} {...p} />
         ))}
-        {older.length > 0 && (
-          <tr>
+        {older.map((t) => (
+          <tr key={t.id}>
             <td colSpan={4}>
-              <Thread title={`From round ${older[0].round}`}>
-                {older.map((t) => (
-                  <ThreadItems key={t.id} thread={t} text={t.body} kind={t.kind} line={t.line} />
-                ))}
+              <Thread>
+                <Conversation
+                  thread={t}
+                  text={t.body}
+                  kind={t.kind}
+                  line={t.line}
+                  label={`Round ${t.round}, line ${t.line.slice(1)}`}
+                  quote={quotedLine(p.rounds, t)}
+                  {...replyProps(p, t)}
+                />
               </Thread>
             </td>
           </tr>
-        )}
+        ))}
       </RowsTable>
     </Box>
   )

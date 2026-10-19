@@ -131,6 +131,8 @@ public sealed record AgentReviewReviseRequest(
     IReadOnlyList<AgentReviewFileDto>? Files);
 public sealed record AgentReviewSendRequest(string? Note);
 public sealed record AgentReviewAskRequest(int Round, string Path, string Line, string Body);
+/// <summary>v0.21.13: the owner's reply in a comment's conversation.</summary>
+public sealed record AgentReviewOwnerReplyRequest(string? Body);
 public sealed record BoardMessageDto(long Id, string Author, string Text, string At);
 /// <summary>v0.21.2: a review's PowerChannel channel. Reading is true while the
 ///  agent's last read of the channel is under 15 s old.</summary>
