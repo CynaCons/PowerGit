@@ -1072,7 +1072,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Release v0.21.12 (owner 2026-10-16: "Yes, go ahead with that release"). [agent: claude]
 
 ### v0.21.13 — Agent review — earlier rounds' comments stay, as conversations (ACTIVE)
-**Goal:** Owner (2026-10-19): "if I drop a comment on round one, when the agent comes with round two, I lose the comments… when the agent answers, it should be displayed in a conversation, like in Bitbucket." Owner picks: he can reply; no Resolve for now; a gone change keeps its comments under the removed card. Plan: ~/.claude/plans/flickering-bubbling-phoenix.md.
+**Goal:** Owner (2026-10-19): "if I drop a comment on round one, when the agent comes with round two, I lose the comments… when the agent answers, it should be displayed in a conversation, like in Bitbucket." Owner's picks: the owner can reply; no Resolve for now; a gone change keeps its comments under the removed card. Plan: ~/.claude/plans/flickering-bubbling-phoenix.md.
 - [x] Owner's sentence as red e2e: round-1 comments (revised, removed, asked + answered) all visible in round 2 and 3; a reply reaches the board and the answer lands under it. [agent: claude]
 - [x] Model: placeThreads follows a thread's change through every later round (carried, revised, removed, file gone); unit tests. [agent: claude]
 - [x] View: earlier conversations under their change, under the removed card, and on a greyed file that left the round (ReviewFiles.tsx). [agent: claude]
