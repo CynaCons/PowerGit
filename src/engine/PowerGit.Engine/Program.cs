@@ -754,6 +754,12 @@ repo.MapDelete("/agent-reviews/{sid}/comments/{cid}", (string sid, string cid, G
 repo.MapPost("/agent-reviews/{sid}/comments/{cid}/replies", (string sid, string cid, AgentReviewOwnerReplyRequest body, GitHost git) =>
     AgentReviewCall(() => git.ReplyAgentReviewAsOwner(sid, cid, body.Body)));
 
+// v0.21.14: a reviewer agent's comment on the open round, or its reply on comment replyTo.
+repo.MapPost("/agent-reviews/{sid}/reviewer-comments", (string sid, AgentReviewReviewerRequest body, GitHost git) =>
+    AgentReviewCall(() => body.ReplyTo is { Length: > 0 } replyTo
+        ? git.ReplyAgentReviewAsReviewer(sid, body.Reviewer, replyTo, body.Body)
+        : git.CommentAgentReviewAsReviewer(sid, body.Reviewer, body.Path, body.Line, body.Body)));
+
 // v0.21.2: the review's PowerChannel channel (design §4).
 repo.MapGet("/agent-reviews/{sid}/board", (string sid, long? after, GitHost git) =>
     AgentReviewCall(() => git.GetAgentReviewBoard(sid, after ?? 0)));

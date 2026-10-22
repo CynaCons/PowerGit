@@ -112,7 +112,10 @@ export function roundCounts(round: AgentReviewRound, doc: ReviewDoc | null, thre
       counts[liveVerdict(round, hunk, file.path, doc)] += 1
       counts.total += 1
     }
-  counts.comments = roundComments(round, doc, threads).length
+  // v0.21.14: reviewer agents' comments go with the round too.
+  counts.comments =
+    roundComments(round, doc, threads).length +
+    threads.filter((t) => t.round === round.n && t.author && t.kind === "round").length
   return counts
 }
 

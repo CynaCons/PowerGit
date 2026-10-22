@@ -36,6 +36,8 @@ export type ThreadActions = {
   edit?: (text: string) => void
   remove?: () => void
   withdraw?: () => void
+  /** v0.21.14: take a reviewer agent's comment off the round before it is sent. */
+  dismiss?: () => void
 }
 
 

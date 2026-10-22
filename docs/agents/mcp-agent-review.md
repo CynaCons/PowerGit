@@ -39,12 +39,13 @@ The release Windows binary uses the GUI subsystem, but child-process pipe handle
 
 - `agent_review_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, branch?, base_sha?, head_sha?, worktree?, files?: [{ path, status?, patch? }], board? }` — opens round 1; its patch is captured now.
 - `agent_review_wait` `{ repo_path, review_id, timeout_ms? }` (clamped 1–120 s) — returns when the owner sends the round back or closes the review.
-- `agent_review_get` `{ repo_path, review_id, round? }` — a round (the latest by default).
+- `agent_review_get` `{ repo_path, review_id, round?, patches? }` — a round (the latest by default); `patches: true` adds `files: [{ file, status, patch }]`.
 - `agent_review_revise` `{ repo_path, review_id, note?, replies?: [{ comment: "c1", body }], head_sha?, files? }` — opens the next round from the worktree as it is now (or `head_sha`, or the given patches).
 - `agent_review_list` `{ repo_path }`
 - `agent_review_cancel` `{ repo_path, review_id, reason? }`
+- `agent_review_comment` `{ repo_path, review_id, reviewer, body, file?, line?, reply_to? }` — a reviewer agent's comment on a line of the round, or with `reply_to: "c3"` its reply in that conversation (see [Reviewing beside the owner](#reviewing-beside-the-owner)).
 
-Since v0.21 (docs/design/agent-review-rounds.md) a review has rounds. The payload of open, wait, get and revise is `{ review_id, status: pending|approved|cancelled|expired, mode, title, round, rounds, turn: "user"|"agent"|null, board, timed_out, note, sent_at, changes: [{ id: "h1", file, origin: new|carried|revised, from, old_lines: [start, end], new_lines: [start, end], verdict: accept|reject|mixed|undecided, rejected_lines }], removed: ["h2"], comments: [{ id: "c1", round, change, file, line: "+12"|"-7", body, kind: round|ask, replies: [{ author, body, at }] }], session_file, review_file, export_markdown }`. `turn` is `"user"` while the owner reviews and `"agent"` once a round is sent back. A change keeps its id while its patch text is unchanged (`carried`, with its verdict); a change at an overlapping place is `revised`, `from` the old id. `mixed` means some lines were rejected: `rejected_lines` lists them. Reviews opened before v0.21 return the v0.20 payload (`summary_note`, `comments: [{ path, line, side, body }]`).
+Since v0.21 (docs/design/agent-review-rounds.md) a review has rounds. The payload of open, wait, get and revise is `{ review_id, status: pending|approved|cancelled|expired, mode, title, round, rounds, turn: "user"|"agent"|null, board, timed_out, note, sent_at, changes: [{ id: "h1", file, origin: new|carried|revised, from, old_lines: [start, end], new_lines: [start, end], verdict: accept|reject|mixed|undecided, rejected_lines }], removed: ["h2"], comments: [{ id: "c1", round, change, file, line: "+12"|"-7", body, kind: round|ask|withdrawn, author, replies: [{ author, body, at }] }], session_file, review_file, export_markdown }`. A comment's `author` is `human` for the owner's, or the reviewer agent's name. `turn` is `"user"` while the owner reviews and `"agent"` once a round is sent back. A change keeps its id while its patch text is unchanged (`carried`, with its verdict); a change at an overlapping place is `revised`, `from` the old id. `mixed` means some lines were rejected: `rejected_lines` lists them. Reviews opened before v0.21 return the v0.20 payload (`summary_note`, `comments: [{ path, line, side, body }]`).
 
 A `tools/call` response is `{ content: [{ type: "text", text: <payload JSON> }], structuredContent: <payload> }`; a failure sets `isError: true` and puts the message in the text item. The protocol is JSON-RPC 2.0 over newline-delimited JSON. `initialize` negotiates protocol version `2025-06-18`; `serverInfo.name` is `powergit`.
 
@@ -65,6 +66,8 @@ if open.board:
     "Cancelled"      → stop
     "cN · path:line" → answer on the board: powerchannel.post(me, open.board, "cN: <answer>")
     "cN withdrawn"   → the owner took question cN back; drop it, no answer
+    "cN · path:line" from a reviewer agent → a reviewer's comment; it comes again
+                       with the round; you may answer it now with "cN: <answer>"
     anything else from human → answer with powerchannel.post
 else:
   powergit.agent_review_wait(...) in a loop, as above without the questions
@@ -72,9 +75,20 @@ else:
 
 An answer that starts with `cN:` lands under that comment's line in PowerGit. The owner can reply in a comment's conversation; the reply comes as another `cN · path:line` post, a follow-up in that conversation: answer it the same way. PowerChannel 0.4.0 and later (formerly powerboard 0.3.0+) keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older PowerChannel it shows when the agent last read it.
 
+## Reviewing beside the owner
+
+Since v0.21.14 other agents can review a round alongside the owner, so a review mixes agents and the owner on the same changes. A reviewer agent:
+
+1. Finds the review: `agent_review_list { repo_path }`, then `agent_review_get { repo_path, review_id, patches: true }` for the round's patches, its changes and every comment so far.
+2. Comments on a line while the owner reviews the round: `agent_review_comment { repo_path, review_id, reviewer: <its name>, file, line: "+12"|"-7", body }`. The reply is the comment (`c4`, `author: <its name>`).
+3. Replies in any conversation, at any time while the review is open: `agent_review_comment { …, reviewer, reply_to: "c3", body }`.
+4. Reads the board, if the review has one (`board` in the payload), to follow the rounds and answers. A `c3: …` post from any agent also lands as its reply.
+
+The reviewer's comment shows under its line in PowerGit with its name, and on the board under its name as `c4 · path:line` + text. It goes to the author with the round when the owner sends it, named in the round's text (`c4 (codex-review)`), unless the owner dismisses it first; the board then says `c4 dismissed`. Once the round is with the author, a new comment is refused until the next round opens; replies are not. Verdicts, sending a round and approval stay the owner's. The reviewer's name is a PowerChannel name (letters, digits, `.`, `_`, `-`), lower-cased, and never `human` or `powergit`.
+
 ## Writing for the owner
 
-Markdown is rendered in `why`, round `note`s, reply `body`s and board posts,
+Markdown is rendered in `why`, round `note`s, reply and comment `body`s and board posts,
 including GitHub-flavoured lists, tables and links. Lead with one sentence
 explaining what changed and why, then a `-` list of useful details. Put code
 in backticks or fenced blocks with a language. Keep each post focused on one point.

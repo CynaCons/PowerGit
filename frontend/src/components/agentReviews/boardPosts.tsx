@@ -3,7 +3,8 @@
 // time on the right); round events stand alone as square nodes. A post that
 // is about a comment (an asked question, the agent's "c1: …" answer) shows
 // the reference as a link to the line instead of the raw prefix. Bodies go
-// through Markdown, folded past ~14 lines.
+// through Markdown, folded past ~14 lines. An agent other than the review's
+// author is labelled a reviewer (v0.21.14).
 import Box from "@mui/material/Box"
 import Typography from "@mui/material/Typography"
 import type { BoardMessage } from "../../engine"
@@ -101,7 +102,7 @@ function PostGroup({
         </Typography>
         {!human && first.author !== agent && (
           <Typography noWrap sx={{ fontSize: 11, color: "text.secondary" }}>
-            on the channel
+            reviewer
           </Typography>
         )}
         <Typography sx={timeSx}>{clock(first.at)}</Typography>

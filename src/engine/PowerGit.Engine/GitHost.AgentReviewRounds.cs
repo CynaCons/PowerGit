@@ -261,6 +261,8 @@ public sealed partial class GitHost
     /// <summary>
     ///  v0.21.12: the owner takes back a question asked on the board while its round is
     ///  still open. The thread stays, as kind "withdrawn", so its id is never reused.
+    ///  v0.21.14: the same for a reviewer agent's comment the owner dismisses before
+    ///  the round goes to the author.
     /// </summary>
     public AgentReviewThreadDto WithdrawAgentReviewComment(string id, string comment)
     {
@@ -271,7 +273,8 @@ public sealed partial class GitHost
             int at = threads.FindIndex(t => t.Id == comment);
             if (at < 0) throw new KeyNotFoundException($"no comment {comment}");
             AgentReviewRoundDto? round = session.Rounds!.FirstOrDefault(r => r.N == threads[at].Round);
-            if (threads[at].Kind != "ask" || round is null || round.N != LatestRound(session)!.N || round.SentAt is not null)
+            bool reviewer = threads[at].Author is not null && threads[at].Kind == "round";
+            if ((threads[at].Kind != "ask" && !reviewer) || round is null || round.N != LatestRound(session)!.N || round.SentAt is not null)
                 throw new AgentReviewStateException($"{comment} can no longer be withdrawn");
             threads[at] = threads[at] with { Kind = "withdrawn" };
             AgentReviewDto updated = session with { Comments = threads, UpdatedAt = Timestamp() };

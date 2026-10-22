@@ -197,6 +197,8 @@ export type AgentReviewThread = {
   kind: "round" | "ask" | "withdrawn"
   postedAt: string
   replies: AgentReviewReply[]
+  /** v0.21.14: the reviewer agent that wrote it; absent or null for the owner. */
+  author?: string | null
 }
 export type AgentReview = Omit<AgentReviewSummary, "fileCount" | "round" | "turn" | "lastRead"> & {
   version: 1 | 2

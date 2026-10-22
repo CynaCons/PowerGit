@@ -97,6 +97,25 @@ public sealed class McpHostTests
         Assert.Equal(1, first.GetProperty("round").GetInt32());
     }
 
+    // v0.21.14: a second agent reviews the round beside the owner.
+    [Fact]
+    public async Task A_reviewer_reads_the_patches_comments_and_replies()
+    {
+        await using Harness h = await Harness.Start(); await using Client c = await h.Connect();
+        JsonElement opened = await c.Tool("agent_review_open", new { repo_path = h.Repo.Dir, mode = "wait", title = "Guard", agent = "auth-fix", files = new[] { new { path = "f.txt", patch = "@@ -1 +1,2 @@\n a\n+b\n" } } });
+        string id = opened.GetProperty("review_id").GetString()!;
+        Assert.Equal(JsonValueKind.Null, opened.GetProperty("files").ValueKind);
+        JsonElement read = await c.Tool("agent_review_get", new { repo_path = h.Repo.Dir, review_id = id, patches = true });
+        Assert.Contains("+b", read.GetProperty("files")[0].GetProperty("patch").GetString());
+
+        JsonElement said = await c.Tool("agent_review_comment", new { repo_path = h.Repo.Dir, review_id = id, reviewer = "codex-review", file = "f.txt", line = "+2", body = "why b?" });
+        Assert.Equal(("c1", "codex-review"), (said.GetProperty("id").GetString(), said.GetProperty("author").GetString()));
+        JsonElement replied = await c.Tool("agent_review_comment", new { repo_path = h.Repo.Dir, review_id = id, reviewer = "gemini", reply_to = "c1", body = "agreed" });
+        Assert.Equal("gemini", replied.GetProperty("replies")[0].GetProperty("author").GetString());
+        JsonElement all = await c.Tool("agent_review_get", new { repo_path = h.Repo.Dir, review_id = id });
+        Assert.Equal("codex-review", all.GetProperty("comments")[0].GetProperty("author").GetString());
+    }
+
     [Fact]
     public async Task Unknown_method_is_minus_32601_and_second_connection_pings_while_first_waits()
     {

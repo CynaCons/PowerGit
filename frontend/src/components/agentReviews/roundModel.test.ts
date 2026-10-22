@@ -114,6 +114,24 @@ describe("roundCounts", () => {
     expect(roundComments(round(), doc, [asked])).toEqual([{ path: "t.cs", line: "-21", text: "keep y" }])
   })
 
+  it("counts a reviewer agent's comments with the owner's (v0.21.14)", () => {
+    const doc = withComment(emptyDoc("k"), "t.cs", "-21", "keep y")
+    const reviewer = (id: string, kind: AgentReviewThread["kind"], r = 1): AgentReviewThread => ({
+      id,
+      round: r,
+      change: "h1",
+      path: "t.cs",
+      line: "+3",
+      body: `note ${id}`,
+      kind,
+      postedAt: "",
+      replies: [],
+      author: "codex-review",
+    })
+    const threads = [reviewer("c1", "round"), reviewer("c2", "withdrawn"), reviewer("c3", "round", 2)]
+    expect(roundCounts(round(), doc, threads).comments).toBe(2)
+  })
+
   it("reads the stamped verdicts once the round is sent", () => {
     const sent = round({
       sentAt: "x",

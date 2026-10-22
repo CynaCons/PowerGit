@@ -50,6 +50,7 @@ export function LineThreads({
               text={t.body}
               kind={t.kind}
               line={line}
+              waiting={!p.round.sentAt}
               actions={commentActions(p, line, t, null)}
               {...replyProps(p, t)}
             />

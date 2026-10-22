@@ -185,6 +185,7 @@ so a long wait looks like an old read. Two steps:
 | `agent_review_get` | changed | optional `round`; returns the round's changes with verdicts and line ranges, and its comments with ids, path, line, body and replies |
 | `agent_review_wait` | kept | blocks until the round is sent or the review closes; returns the same payload as `get` for that round |
 | `agent_review_list`, `agent_review_cancel` | kept | — |
+| `agent_review_comment` | new in v0.21.14 | `review_id`, `reviewer`, `body`, `file` + `line` or `reply_to`; a reviewer agent's comment on the open round (a `round` thread with `author`), or its reply in a conversation; see docs/agents/mcp-agent-review.md |
 
 Agent convention (goes into `docs/agents/mcp-agent-review.md`):
 
@@ -214,6 +215,7 @@ In the repository group of `Program.cs`, next to today's `/agent-reviews` routes
 - `POST /agent-reviews/{id}/ask` — `{round, path, line, body}`; a thread of kind `ask`, posted on the board at once.
 - `POST /agent-reviews/{id}/send` — `{note}`; stamps the verdicts and `sentAt`, turns the review file's comments into threads, wakes `wait`, posts the round.
 - `POST /agent-reviews/{id}/revise` — what `agent_review_revise` does, for tests and scripts.
+- `POST /agent-reviews/{id}/reviewer-comments` — `{reviewer, path, line, body}` or `{reviewer, replyTo, body}`; what `agent_review_comment` does (v0.21.14).
 - `POST /agent-reviews/{id}/resolve` — approve / cancel / ack as before; `request_changes` on a session with rounds is a send.
 - `GET  /agent-reviews/{id}/board?after=` and `POST /agent-reviews/{id}/board`, `GET /board/status` — v0.21.2.
 

@@ -87,11 +87,11 @@ public sealed partial class GitHost
             int line = change.NewLines > 0 ? change.NewStart : change.OldStart;
             List<AgentReviewThreadDto> on = [.. comments.Where(c => c.Change == change.Id)];
             if (on.Count == 0) text.Append($"\n{mark} {change.Id}  {change.Path}:{line}");
-            foreach (AgentReviewThreadDto c in on) text.Append($"\n{mark} {change.Id}  {c.Path}:{c.Line[1..]}  {c.Id}  {c.Body}");
+            foreach (AgentReviewThreadDto c in on) text.Append($"\n{mark} {change.Id}  {c.Path}:{c.Line[1..]}  {c.Id}{By(c)}  {c.Body}");
             if (change.RejectedLines is { Count: > 0 } rejected) text.Append($"\n  rejected lines: {string.Join(' ', rejected)}");
         }
         foreach (AgentReviewThreadDto c in comments.Where(c => c.Change is null || changes.Any(x => x.Id == c.Change && x.Verdict == "accept")))
-            text.Append($"\n  {c.Id}  {c.Path}:{c.Line[1..]}  {c.Body}");
+            text.Append($"\n  {c.Id}{By(c)}  {c.Path}:{c.Line[1..]}  {c.Body}");
         List<string> accepted = [.. changes.Where(c => c.Verdict == "accept").Select(c => c.Id)];
         if (accepted.Count > 0) text.Append("\n✓ ").Append(string.Join(' ', accepted));
         text.Append($"\ndetails: agent_review_get review_id={session.Id} round={round.N}");
@@ -102,7 +102,7 @@ public sealed partial class GitHost
         PostToBoard(session, BoardHuman, $"{thread.Id} · {thread.Path}:{thread.Line[1..]}\n{thread.Body}");
 
     partial void AfterWithdraw(AgentReviewDto session, AgentReviewThreadDto thread) =>
-        PostToBoard(session, BoardHuman, $"{thread.Id} withdrawn");
+        PostToBoard(session, BoardHuman, thread.Author is null ? $"{thread.Id} withdrawn" : $"{thread.Id} dismissed");
 
     partial void AfterClosed(AgentReviewDto session)
     {
@@ -118,6 +118,9 @@ public sealed partial class GitHost
     }
 
     private static string S(int n) => n == 1 ? "" : "s";
+
+    /// <summary>v0.21.14: a reviewer agent's comment names it in the round's text.</summary>
+    private static string By(AgentReviewThreadDto c) => c.Author is null ? "" : $" ({c.Author})";
 
     /// <summary>The inbox's presence dot: each open review's agent's last read of its channel.
     ///  Static (v0.21.10) so the cross-repository list reads the same data without a host.</summary>

@@ -113,10 +113,11 @@ public sealed record AgentReviewRoundDto(
     IReadOnlyList<string> Removed);
 public sealed record AgentReviewReplyDto(string Author, string Body, string At, long? BoardId);
 /// <summary>A comment with its id (c1, c2 …), the line key it sits on and the
-///  agent's replies. Kind: round (sent with the round) or ask (posted at once).</summary>
+///  agent's replies. Kind: round (sent with the round) or ask (posted at once).
+///  Author (v0.21.14): the reviewer agent that wrote it; null for the owner.</summary>
 public sealed record AgentReviewThreadDto(
     string Id, int Round, string? Change, string Path, string Line, string Body,
-    string Kind, string PostedAt, IReadOnlyList<AgentReviewReplyDto> Replies);
+    string Kind, string PostedAt, IReadOnlyList<AgentReviewReplyDto> Replies, string? Author = null);
 public sealed record AgentReviewSummaryDto(
     string Id, string Mode, string Title, string? Agent, string? Branch,
     int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt,
@@ -133,6 +134,8 @@ public sealed record AgentReviewSendRequest(string? Note);
 public sealed record AgentReviewAskRequest(int Round, string Path, string Line, string Body);
 /// <summary>v0.21.13: the owner's reply in a comment's conversation.</summary>
 public sealed record AgentReviewOwnerReplyRequest(string? Body);
+/// <summary>v0.21.14: a reviewer agent's comment on a line of the open round, or its reply on comment ReplyTo.</summary>
+public sealed record AgentReviewReviewerRequest(string? Reviewer, string? Path, string? Line, string? Body, string? ReplyTo);
 public sealed record BoardMessageDto(long Id, string Author, string Text, string At);
 /// <summary>v0.21.2: a review's PowerChannel channel. Reading is true while the
 ///  agent's last read of the channel is under 15 s old.</summary>

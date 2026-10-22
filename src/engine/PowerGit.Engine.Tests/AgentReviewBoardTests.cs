@@ -170,7 +170,7 @@ public sealed class AgentReviewBoardTests
     }
 
     // v0.21.13, owner: "when the agent answers, it should be displayed in a
-    // conversation, like in Bitbucket" — and he replies in it. The reply is
+    // conversation, like in Bitbucket" — and they reply in it. The reply is
     // the thread's, by "human", and goes to the board in the asked-question
     // shape so the agent's answer lands under it.
     [Fact]
@@ -197,6 +197,50 @@ public sealed class AgentReviewBoardTests
         Assert.Throws<KeyNotFoundException>(() => host.ReplyAgentReviewAsOwner(session.Id, "c9", "hm"));
         host.WithdrawAgentReviewComment(session.Id, asked.Id);
         Assert.Throws<AgentReviewStateException>(() => host.ReplyAgentReviewAsOwner(session.Id, asked.Id, "hm"));
+    }
+
+    // v0.21.14, owner: "other agents to plug into a review and drop comments …
+    // reviews mixing both agents and humans together on the same review." A
+    // reviewer's comment is a round thread with its name, posted on the board
+    // under that name; it goes to the author with the round (named), unless
+    // the owner dismisses it; once the round is with the author, comments wait
+    // for the next round, but replies do not.
+    [Fact]
+    public void A_reviewer_agent_comments_beside_the_owner()
+    {
+        using TempBoard board = new();
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        host.BoardPath = board.Path;
+        AgentReviewDto session = host.CreateAgentReview(Request());
+
+        AgentReviewThreadDto said = host.CommentAgentReviewAsReviewer(session.Id, " Codex-Review ", "f.txt", "+2", "check c");
+        Assert.Equal(("c1", "round", "codex-review", 1), (said.Id, said.Kind, said.Author, said.Round));
+        Assert.NotNull(said.Change);
+        BoardMessageDto posted = host.GetAgentReviewBoard(session.Id, 0).Messages[^1];
+        Assert.Equal(("codex-review", "c1 · f.txt:2\ncheck c"), (posted.Author, posted.Text));
+        // The board's intake does not read the reviewer's own comment as a reply.
+        Assert.Empty(host.GetAgentReview(session.Id)!.Comments!.Single().Replies);
+
+        AgentReviewThreadDto noise = host.CommentAgentReviewAsReviewer(session.Id, "codex-review", "f.txt", "+2", "nit");
+        Assert.Equal("withdrawn", host.WithdrawAgentReviewComment(session.Id, noise.Id).Kind);
+        Assert.Equal(("human", "c2 dismissed"), (host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Author, host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text));
+
+        Assert.Throws<InvalidOperationException>(() => host.CommentAgentReviewAsReviewer(session.Id, "human", "f.txt", "+2", "x"));
+        Assert.Throws<InvalidOperationException>(() => host.CommentAgentReviewAsReviewer(session.Id, "not a name", "f.txt", "+2", "x"));
+        Assert.Throws<InvalidOperationException>(() => host.CommentAgentReviewAsReviewer(session.Id, "codex-review", "nope.txt", "+2", "x"));
+        Assert.Throws<InvalidOperationException>(() => host.CommentAgentReviewAsReviewer(session.Id, "codex-review", "f.txt", "2", "x"));
+
+        host.SendAgentReviewRound(session.Id, null);
+        string sent = host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text;
+        Assert.Contains("c1 (codex-review)", sent);
+        Assert.DoesNotContain("nit", sent);
+        Assert.Throws<AgentReviewStateException>(() => host.CommentAgentReviewAsReviewer(session.Id, "codex-review", "f.txt", "+2", "late"));
+
+        AgentReviewThreadDto replied = host.ReplyAgentReviewAsReviewer(session.Id, "codex-review", "c1", "still check c");
+        Assert.Equal(("codex-review", "still check c"), (replied.Replies[^1].Author, replied.Replies[^1].Body));
+        Assert.Equal("c1: still check c", host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text);
+        Assert.Single(host.GetAgentReview(session.Id)!.Comments!.Single(c => c.Id == "c1").Replies);
+        Assert.Throws<AgentReviewStateException>(() => host.ReplyAgentReviewAsReviewer(session.Id, "codex-review", noise.Id, "hm"));
     }
 
     [Fact]

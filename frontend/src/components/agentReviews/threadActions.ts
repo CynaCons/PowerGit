@@ -4,7 +4,8 @@ import type { ThreadActions } from "./RoundThread"
 
 // What the owner can do with a comment's conversation in the round being
 // viewed: v0.21.12 edit / delete / withdraw while the round is open, v0.21.13
-// reply on the board while the review is open.
+// reply on the board while the review is open, v0.21.14 dismiss a reviewer
+// agent's comment before the round goes to the author.
 
 /** A comment not sent yet is edited or deleted; a question already asked is withdrawn. */
 export function commentActions(
@@ -18,6 +19,8 @@ export function commentActions(
   if (thread === null && index !== null)
     return { edit: (text) => edits.edit(line, index, text), remove: () => edits.remove(line, index) }
   if (thread?.kind === "ask") return { withdraw: () => edits.withdraw(thread, index) }
+  if (thread?.author && thread.kind === "round" && thread.round === p.round.n)
+    return { dismiss: () => edits.withdraw(thread, null) }
   return null
 }
 

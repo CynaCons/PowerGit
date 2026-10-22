@@ -54,6 +54,8 @@ export function ReviewScreen({
   const doc = useReviewDoc(key)
   // v0.21.12: a withdrawn question is gone from the screen; the engine keeps it so ids never repeat.
   const threads = useMemo(() => (session.comments ?? []).filter((t) => t.kind !== "withdrawn"), [session.comments])
+  // v0.21.14: the agents reviewing beside the owner.
+  const reviewers = [...new Set(threads.flatMap((t) => (t.author ? [t.author] : [])))]
   const { board, post } = useAgentReviewBoard(engine, session.board ? session.id : null, () => void reload())
   const [path, setPath] = useState<string | null>(round.files[0]?.path ?? null)
   const [picked, setPicked] = useState<{ path: string; key: string } | null>(null)
@@ -262,7 +264,9 @@ export function ReviewScreen({
             ))}
         </Box>
         <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>
-          {[session.agent, session.branch, where].filter(Boolean).join(" · ")}
+          {[session.agent, reviewers.length > 0 ? `reviewers: ${reviewers.join(", ")}` : null, session.branch, where]
+            .filter(Boolean)
+            .join(" · ")}
         </Typography>
         <ReviewIntro why={session.why} note={round.n > 1 ? round.note : null} agent={session.agent} />
         {error && (

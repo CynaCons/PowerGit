@@ -4,7 +4,7 @@ namespace PowerGit.Engine.Mcp;
 
 public sealed class McpTools(RepoRegistry registry)
 {
-    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise"];
+    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise", "agent_review_comment"];
 
     public object Open(JsonElement args, CancellationToken ct)
     {
@@ -38,7 +38,26 @@ public sealed class McpTools(RepoRegistry registry)
         GitHost host = Host(args, out _);
         AgentReviewDto session = host.GetAgentReview(Required(args, "review_id")) ?? throw new KeyNotFoundException("agent review session not found");
         int? round = args.TryGetProperty("round", out JsonElement value) && value.TryGetInt32(out int parsed) ? parsed : null;
-        return Payload(host, session, false, ct, round);
+        return Payload(host, session, false, ct, round, Bool(args, "patches"));
+    }
+
+    /// <summary>
+    ///  v0.21.14: a reviewer agent's comment on a line of the round the owner is
+    ///  reviewing, or with reply_to its reply in a comment's conversation.
+    /// </summary>
+    public object Comment(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        string id = Required(args, "review_id");
+        AgentReviewThreadDto thread = String(args, "reply_to") is { Length: > 0 } replyTo
+            ? host.ReplyAgentReviewAsReviewer(id, Required(args, "reviewer"), replyTo, Required(args, "body"))
+            : host.CommentAgentReviewAsReviewer(id, Required(args, "reviewer"), Required(args, "file"), Required(args, "line"), Required(args, "body"));
+        return new
+        {
+            thread.Id, thread.Round, change = thread.Change, file = thread.Path, thread.Line, thread.Body, thread.Kind,
+            author = thread.Author ?? GitHost.BoardHuman,
+            replies = thread.Replies.Select(r => new { r.Author, r.Body, r.At }),
+        };
     }
 
     /// <summary>v0.21.1: the agent's next round, with a reply per comment it answers.</summary>
@@ -89,9 +108,9 @@ public sealed class McpTools(RepoRegistry registry)
         }
     }
 
-    private static object Payload(GitHost host, AgentReviewDto session, bool timedOut, CancellationToken ct, int? roundNumber = null)
+    private static object Payload(GitHost host, AgentReviewDto session, bool timedOut, CancellationToken ct, int? roundNumber = null, bool patches = false)
     {
-        if (session.Rounds is { Count: > 0 }) return RoundPayload(host, session, timedOut, roundNumber);
+        if (session.Rounds is { Count: > 0 }) return RoundPayload(host, session, timedOut, roundNumber, patches);
         Dictionary<string, string> diffs = [];
         foreach (AgentReviewFileDto file in session.Files)
         {
@@ -119,7 +138,7 @@ public sealed class McpTools(RepoRegistry registry)
     ///  asked for), whose turn it is, each change with its verdict and line
     ///  ranges, the changes the round removed, and every comment thread.
     /// </summary>
-    private static object RoundPayload(GitHost host, AgentReviewDto session, bool timedOut, int? roundNumber)
+    private static object RoundPayload(GitHost host, AgentReviewDto session, bool timedOut, int? roundNumber, bool patches)
     {
         AgentReviewRoundDto round = roundNumber is null ? session.Rounds![^1]
             : session.Rounds!.FirstOrDefault(r => r.N == roundNumber) ?? throw new InvalidOperationException($"no round {roundNumber}");
@@ -144,9 +163,12 @@ public sealed class McpTools(RepoRegistry registry)
                 c.Verdict, rejected_lines = c.RejectedLines,
             }),
             removed = round.Removed,
+            // v0.21.14: a reviewer reads the round's patches to comment on its lines.
+            files = patches ? round.Files.Select(f => new { file = f.Path, f.Status, f.Patch }) : null,
             comments = (session.Comments ?? []).Select(t => new
             {
                 t.Id, t.Round, change = t.Change, file = t.Path, t.Line, t.Body, t.Kind,
+                author = t.Author ?? GitHost.BoardHuman,
                 replies = t.Replies.Select(r => new { r.Author, r.Body, r.At }),
             }),
             session_file = Path.Combine(root, GitHost.AgentReviewsDirectory, session.Id + ".json"),

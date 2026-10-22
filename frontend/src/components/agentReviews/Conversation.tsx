@@ -16,7 +16,8 @@ import { EditBox, type CommentKind, type ThreadActions } from "./RoundThread"
 // reply follows in time order on the same lane as the board (a disc, the
 // author, the time, the text as Markdown), and a Reply box ends it. A
 // conversation from an earlier round says which round and line it was on and
-// quotes that line, since the line may read differently now.
+// quotes that line, since the line may read differently now. v0.21.14: a
+// reviewer agent's comment opens with its disc and name.
 
 export type Quote = { kind: "add" | "remove" | "context"; text: string }
 
@@ -130,6 +131,7 @@ export function Conversation({
   actions,
   onReply,
   replyOff,
+  waiting,
 }: {
   thread: AgentReviewThread | null
   text: string
@@ -142,21 +144,27 @@ export function Conversation({
   /** Posts a reply; null when replies are off (then replyOff says why, if anything). */
   onReply?: ((body: string) => void) | null
   replyOff?: string | null
+  /** v0.21.14: a reviewer's comment whose round is not sent yet goes with it. */
+  waiting?: boolean
 }) {
   const [editing, setEditing] = useState(false)
+  const reviewer = thread?.author ?? null
   return (
     <Box sx={{ px: 1.25, pt: 1, pb: 0.75, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0 } }}>
       <Box>
-        <LaneItem node={<OwnerDisc />}>
+        <LaneItem node={reviewer ? <AgentDisc name={reviewer} /> : <OwnerDisc />}>
           <Box sx={{ display: "flex", gap: 0.75, alignItems: "baseline", flexWrap: "wrap", minWidth: 0 }}>
-            <Typography sx={nameSx}>You</Typography>
+            <Typography data-testid="thread-author" sx={{ ...nameSx, color: reviewer ? "var(--pg-agent)" : "text.primary" }}>
+              {reviewer ?? "You"}
+            </Typography>
+            {reviewer && <Chip tone="muted">reviewer</Chip>}
             <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
               {thread ? `${thread.id} · ` : ""}
               {label ?? `line ${line.slice(1)}`}
             </Typography>
             {kind === "ask" ? (
               <Chip tone="info">asked on the board</Chip>
-            ) : thread ? (
+            ) : thread && !waiting ? (
               <Chip tone="muted">sent with round {thread.round}</Chip>
             ) : (
               <Chip tone="wait">goes with the round</Chip>
@@ -182,6 +190,17 @@ export function Conversation({
                     sx={dangerSx}
                   >
                     Withdraw
+                  </Box>
+                )}
+                {actions.dismiss && (
+                  <Box
+                    component="button"
+                    data-testid="comment-dismiss"
+                    onClick={actions.dismiss}
+                    title="Take this comment off the round; it does not go to the author"
+                    sx={dangerSx}
+                  >
+                    Dismiss
                   </Box>
                 )}
               </Box>
