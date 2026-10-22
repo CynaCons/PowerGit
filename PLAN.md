@@ -1088,7 +1088,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] View: reviewer comments as conversations with the reviewer's name. [agent: claude]
 - [x] Docs: how a reviewer agent joins a review. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e + shell; look at it. [agent: claude]
-- [ ] Release v0.21.14.
+- [x] Release v0.21.14. [agent: claude]
 - [ ] Owner ticks: agents and the owner review the same round together.
 
 ## Backlog
