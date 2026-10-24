@@ -1139,8 +1139,9 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Without merge-tree --write-tree, say the check could not run. [agent: claude]
 - [x] Cherry-pick step: commits onto a branch, checked per commit. [agent: claude]
 - [x] Graph past 200 commits: fold older runs instead of cutting. [agent: claude]
-- [ ] Gate: engine tests, vitest, lint, branch-plans e2e; smoke.
+- [x] Gate: engine tests, vitest, lint, branch-plans e2e; smoke. [agent: claude]
 - [ ] Owner ticks: rebase checks exact, cherry-pick plans, long histories.
+- [ ] Release v0.22.1.
 
 ## Backlog
 - Drop leftover 2021 origin branches
