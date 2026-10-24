@@ -1162,6 +1162,16 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [ ] Release v0.22.4.
 - [ ] Owner ticks: the review's top panel resizes.
 
+### v0.22.5 — Branch plans: pull requests as labels with links, any host (PLANNED)
+**Goal:** Owner (2026-10-25): PRs shown on the plan as clickable labels, host-agnostic.
+- [ ] Owner's sentence as red e2e: PR labels link out on the plan.
+- [ ] Engine: agents attach PRs to a plan; a pr step; tests.
+- [ ] MCP: prs on open and revise, branch_plan_pr to update; docs.
+- [ ] View: PR chips beside branches, clickable, planned ones dashed.
+- [ ] Gate: engine tests, vitest, lint, plan e2e; zip smoke.
+- [ ] Release v0.22.5.
+- [ ] Owner ticks: PRs show on plans and open on click.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content

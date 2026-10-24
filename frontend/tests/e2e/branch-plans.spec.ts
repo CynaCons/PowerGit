@@ -125,6 +125,101 @@ test.describe("branch plans", () => {
     }
   })
 
+  // v0.22.5, owner: "Can we add labels in the branch plan, to have "PRs"
+  // represented and including a clickable link that would open the PR?",
+  // then "agents may be working with other sites. At work, we work with
+  // bitbucket. So keep it generic, agents should be able to fill their PR
+  // infos". The agent gives each PR's id, title, url and state; a planned PR
+  // is a step that ticks once the agent reports its url.
+  test("pull requests show as labels on their branches and link out, from any host", async ({ page }) => {
+    test.setTimeout(120_000)
+    const dir = makeRepo("pg-branch-plan-prs-")
+    git(dir, "checkout", "-q", "-b", "feature/auth")
+    write(dir, "auth.ts", "export const auth = 1\n")
+    commit(dir, "auth: login")
+    git(dir, "checkout", "-q", "-b", "feature/billing", "main")
+    write(dir, "billing.ts", "export const billing = 1\n")
+    commit(dir, "billing: plans")
+    git(dir, "checkout", "-q", "main")
+    const bitbucket = "https://bitbucket.example.com/projects/APP/repos/web/pull-requests/17"
+    try {
+      const { id: repoId } = await api<{ id: string }>("/repos/open", {
+        method: "POST",
+        body: JSON.stringify({ path: dir }),
+      })
+      await page.goto(`/?repo=${repoId}`)
+      await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
+      const plan = await api<{ id: string }>(`/repos/${repoId}/branch-plans`, {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "wait",
+          title: "Ship auth and billing through review",
+          agent: "auth-fix",
+          steps: [
+            { op: "merge", from: "feature/auth", into: "main" },
+            { op: "pr", from: "feature/billing", into: "main", title: "Billing plans" },
+          ],
+          prs: [
+            { branch: "feature/auth", id: "PR-17", title: "Auth login", url: bitbucket, state: "open", into: "main" },
+          ],
+        }),
+      })
+      await page.getByTestId("agent-reviews-button").click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Ship auth and billing" })
+        .filter({ hasText: basename(dir) })
+        .click()
+      await expect(page.getByTestId("plan-step").nth(1)).toContainText(
+        "Open a pull request from feature/billing into main",
+      )
+      await page.locator('[data-testid="plan-scrub"][data-at="0"]').click()
+
+      // An existing PR: a label beside its branch that opens the PR.
+      const pr = page.locator('[data-testid="plan-pr"][data-branch="feature/auth"]')
+      await expect(pr).toContainText("PR-17")
+      await expect(pr).toContainText("open")
+      await expect(pr).toHaveAttribute("href", bitbucket)
+      await expect(pr).toHaveAttribute("title", /Auth login/)
+
+      // A planned PR: dashed until the agent opens it.
+      await page.locator('[data-testid="plan-scrub"][data-at="2"]').click()
+      const planned = page.locator('[data-testid="plan-pr"][data-branch="feature/billing"]')
+      await expect(planned).toHaveAttribute("data-planned", "true")
+      await expect(planned).toContainText("PR → main")
+
+      // Approved, the agent opens it and reports it: the step ticks and the label links.
+      await page.getByTestId("plan-approve").click()
+      await expect(page.getByTestId("plan-progress")).toContainText("0 of 2")
+      const url = "https://git.example.org/team/web/-/merge_requests/9"
+      await api(`/repos/${repoId}/branch-plans/${plan.id}/prs`, {
+        method: "POST",
+        body: JSON.stringify({
+          branch: "feature/billing",
+          id: "!9",
+          title: "Billing plans",
+          url,
+          state: "open",
+          into: "main",
+        }),
+      })
+      await expect(page.getByTestId("plan-step").nth(1)).toHaveAttribute("data-done", "true", { timeout: 15_000 })
+      await expect(planned).not.toHaveAttribute("data-planned", "true")
+      await expect(planned).toHaveAttribute("href", url)
+      await expect(planned).toContainText("!9")
+
+      // Only web links are accepted.
+      const bad = await fetch(`${ENGINE_URL}/repos/${repoId}/branch-plans/${plan.id}/prs`, {
+        method: "POST",
+        headers: engineHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ branch: "feature/auth", id: "x", url: "javascript:alert(1)" }),
+      })
+      expect(bad.status).toBe(400)
+    } finally {
+      await removeRepo(dir)
+    }
+  })
+
   test("an agent's branch plan shows on the graph, is discussed and approved, and ticks as it runs", async ({
     page,
   }) => {
