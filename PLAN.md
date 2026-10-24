@@ -1122,15 +1122,15 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 
 ### v0.22.0 — Branch plans: agents propose, PowerGit checks and shows, the owner approves (current) (ACTIVE)
 **Goal:** Owner (2026-10-24): bake the branch plan prototype into PowerGit.
-- [ ] Owner's sentence as red e2e: a plan on the graph, approved.
-- [ ] Engine: plan steps simulated into a graph with lanes.
-- [ ] Engine: each step checked with git merge-tree and refs.
-- [ ] Engine: plan sessions on the agent review inbox and board.
-- [ ] Engine: progress from ref moves; stale check when inputs move.
-- [ ] MCP: branch_plan_preview, open, revise, get; docs.
-- [ ] View: plan screen with scrubber, steps, detail, board.
-- [ ] View: inbox rows and states for plans.
-- [ ] Gate: engine tests, vitest, lint, e2e; look at it; smoke.
+- [x] Owner's sentence as red e2e: a plan on the graph, approved. [agent: claude]
+- [x] Engine: plan steps simulated into a graph with lanes. [agent: claude]
+- [x] Engine: each step checked with git merge-tree and refs. [agent: claude]
+- [x] Engine: plan sessions on the agent review inbox and board. [agent: claude]
+- [x] Engine: progress from ref moves; stale check when inputs move. [agent: claude]
+- [x] MCP: branch_plan_preview, open, revise, get; docs. [agent: claude]
+- [x] View: plan screen with scrubber, steps, detail, board. [agent: claude]
+- [x] View: inbox rows and states for plans. [agent: claude]
+- [x] Gate: engine tests, vitest, lint, e2e; look at it; smoke. [agent: claude]
 - [ ] Release v0.22.0.
 - [ ] Owner ticks: agents plan branches; I approve them on the graph.
 
