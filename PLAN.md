@@ -1131,7 +1131,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] View: plan screen with scrubber, steps, detail, board. [agent: claude]
 - [x] View: inbox rows and states for plans. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, e2e; look at it; smoke. [agent: claude]
-- [ ] Release v0.22.0.
+- [x] Release v0.22.0. [agent: claude]
 - [ ] Owner ticks: agents plan branches; I approve them on the graph.
 
 ## Backlog
