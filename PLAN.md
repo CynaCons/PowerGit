@@ -1149,12 +1149,18 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: vitest, lint, branch-plans e2e with drags; zip smoke. [agent: claude]
 - [x] Release v0.22.2. [agent: claude]
 
-### v0.22.3 — Branch plans: resizable top panel (current) (ACTIVE)
+### v0.22.3 — Branch plans: resizable top panel
 **Goal:** Owner (2026-10-24): the plan's top panel resizes too.
 - [x] Top panel height set by a handle; long text scrolls. [agent: claude]
 - [x] Gate: tsc, lint, branch-plans e2e with drags; zip smoke. [agent: claude]
 - [x] Release v0.22.3. [agent: claude]
-- [ ] Owner ticks: every plan panel resizes.
+
+### v0.22.4 — Agent reviews: resizable top panel (current) (ACTIVE)
+**Goal:** Owner (2026-10-24): the review screen's top panel resizes too.
+- [x] Review top panel height set by a handle; long text scrolls. [agent: claude]
+- [x] Gate: tsc, lint, review layout e2e with the drag. [agent: claude]
+- [ ] Release v0.22.4.
+- [ ] Owner ticks: the review's top panel resizes.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1269,3 +1275,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: agents plan branches; I approve them on the graph. (deferred from v0.22.0: open when the plan view moved to v0.22.1; shipped in v0.22.0)
 - Owner ticks: rebase checks exact, cherry-pick plans, long histories. (deferred from v0.22.1: open when the plan view moved to v0.22.2; shipped in v0.22.1)
 - Owner ticks: the plan's panes resize. (deferred from v0.22.2: open when the plan view moved to v0.22.3; shipped in v0.22.2)
+- Owner ticks: every plan panel resizes. (deferred from v0.22.3: open when the plan view moved to v0.22.4; shipped in v0.22.3)

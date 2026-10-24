@@ -74,6 +74,7 @@ test.describe("agent review layout", () => {
         sessionStorage.setItem("pg-layout-test", "1")
         localStorage.removeItem("pg.reviewFilesWidth")
         localStorage.removeItem("pg.reviewBoardWidth")
+        localStorage.removeItem("pg.reviewHeaderHeight")
       }
     })
     await open()
@@ -93,8 +94,22 @@ test.describe("agent review layout", () => {
     const f1 = await width(files)
     const b1 = await width(board)
 
+    // v0.22.3, owner: "also in reviews, code review, top panel should be
+    // resizeable": the top panel follows its handle and keeps its height.
+    const top = page.getByTestId("agent-review-header")
+    const height = async () => (await top.boundingBox())!.height
+    const t0 = await height()
+    const handle = (await page.getByTestId("agent-review-header-splitter").boundingBox())!
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2 + 80, { steps: 5 })
+    await page.mouse.up()
+    await expect.poll(height).toBeGreaterThan(t0 + 60)
+    const t1 = await height()
+
     // Kept after a reload.
     await open()
+    await expect.poll(height).toBeCloseTo(t1, -1)
     await expect.poll(() => width(files)).toBeCloseTo(f1, -1)
     await expect.poll(() => width(board)).toBeCloseTo(b1, -1)
 

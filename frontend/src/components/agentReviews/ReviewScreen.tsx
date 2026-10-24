@@ -18,6 +18,7 @@ import { BoardColumn } from "./BoardColumn"
 import type { RoundActions } from "./RoundBox"
 import { Chip } from "./reviewChips"
 import { ReviewIntro } from "./ReviewIntro"
+import { ResizableTop } from "./ResizableTop"
 import { RoundDiff } from "./RoundDiff"
 import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
 import { ReviewFiles } from "./ReviewFiles"
@@ -244,7 +245,7 @@ export function ReviewScreen({
         containerType: "inline-size",
       }}
     >
-      <Box sx={{ ...paneSx, px: 1.5, py: 1 }}>
+      <ResizableTop storageKey="pg.reviewHeaderHeight" testid="agent-review-header" sx={{ ...paneSx, px: 1.5, py: 1 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <IconButton
             size="small"
@@ -286,7 +287,7 @@ export function ReviewScreen({
             {error}
           </Typography>
         )}
-      </Box>
+      </ResizableTop>
       <Box
         ref={grid.ref}
         style={grid.style}
