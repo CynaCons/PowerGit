@@ -243,6 +243,63 @@ public sealed class AgentReviewBoardTests
         Assert.Throws<AgentReviewStateException>(() => host.ReplyAgentReviewAsReviewer(session.Id, "codex-review", noise.Id, "hm"));
     }
 
+    // v0.21.17, owner: "When agents open the review, i want them to have the
+    // posibility to drop "explanatory comments" justifying the changes. These
+    // would then be commented by me and the agents further." An explanation is
+    // an "explain" thread by the author, given with its round: the owner and
+    // reviewers reply in it, it is never dismissed, and it is not one of the
+    // comments the round sends back.
+    [Fact]
+    public void The_author_explains_its_changes_and_everyone_discusses_them()
+    {
+        using TempBoard board = new();
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        host.BoardPath = board.Path;
+        AgentReviewDto session = host.CreateAgentReview(Request() with { Explanations = [new("f.txt", "+2", " c, because b broke the build ")] });
+        AgentReviewThreadDto explained = session.Comments!.Single();
+        Assert.Equal(("c1", "explain", "auth-fix", 1, "c, because b broke the build"),
+            (explained.Id, explained.Kind, explained.Author, explained.Round, explained.Body));
+        Assert.NotNull(explained.Change);
+        Assert.Contains("c1 explains f.txt:2: c, because b broke the build", host.GetAgentReviewBoard(session.Id, 0).Messages[0].Text);
+
+        host.ReplyAgentReviewAsOwner(session.Id, "c1", "why not keep b?");
+        host.ReplyAgentReviewAsReviewer(session.Id, "codex-review", "c1", "b was dead code");
+        Assert.Throws<AgentReviewStateException>(() => host.WithdrawAgentReviewComment(session.Id, "c1"));
+
+        host.SendAgentReviewRound(session.Id, null);
+        string sent = host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text;
+        Assert.Contains("0 comments", sent);
+        Assert.DoesNotContain("because b broke", sent);
+
+        AgentReviewDto next = host.ReviseAgentReview(session.Id, new("r2", [new("c1", "kept c")], null,
+            [new("f.txt", "M", "@@ -1,2 +1,2 @@\n a\n-b\n+d\n")], [new("f.txt", "+2", "d reads better")]), CancellationToken.None);
+        AgentReviewThreadDto second = next.Comments!.Single(c => c.Round == 2);
+        Assert.Equal(("c2", "explain", "auth-fix"), (second.Id, second.Kind, second.Author));
+        Assert.Equal(["human", "codex-review", "auth-fix"], next.Comments!.Single(c => c.Id == "c1").Replies.Select(r => r.Author));
+        Assert.Contains("c2 explains f.txt:2: d reads better", host.GetAgentReviewBoard(session.Id, 0).Messages[^1].Text);
+    }
+
+    [Fact]
+    public void An_explanation_off_the_diff_refuses_the_round()
+    {
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        host.BoardPath = Path.Combine(Path.GetTempPath(), $"pg-none-{Guid.NewGuid():N}", "board.db");
+        AgentReviewExplainRequest[][] bad =
+        [
+            [new("f.txt", "+9", "far away")], [new("nope.txt", "+2", "x")], [new("f.txt", "2", "x")], [new("f.txt", "+2", " ")],
+        ];
+        Assert.Contains("not in the diff", Assert.Throws<InvalidOperationException>(() => host.CreateAgentReview(Request() with { Explanations = bad[0] })).Message);
+        foreach (AgentReviewExplainRequest[] explanations in bad[1..])
+            Assert.Throws<InvalidOperationException>(() => host.CreateAgentReview(Request() with { Explanations = explanations }));
+        Assert.Empty(host.ListAgentReviews().Sessions);
+
+        AgentReviewDto session = host.CreateAgentReview(Request());
+        host.SendAgentReviewRound(session.Id, null);
+        Assert.Throws<InvalidOperationException>(() => host.ReviseAgentReview(session.Id,
+            new(null, null, null, [new("f.txt", "M", "@@ -1,2 +1,2 @@\n a\n-b\n+d\n")], [new("f.txt", "+7", "x")]), CancellationToken.None));
+        Assert.Single(host.GetAgentReview(session.Id)!.Rounds!);
+    }
+
     [Fact]
     public void An_agent_can_name_the_channel()
     {

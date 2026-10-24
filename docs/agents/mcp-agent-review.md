@@ -37,15 +37,15 @@ The release Windows binary uses the GUI subsystem, but child-process pipe handle
 
 ## Tools and payloads
 
-- `agent_review_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, branch?, base_sha?, head_sha?, worktree?, files?: [{ path, status?, patch? }], board? }` — opens round 1; its patch is captured now.
+- `agent_review_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, branch?, base_sha?, head_sha?, worktree?, files?: [{ path, status?, patch? }], board?, explanations?: [{ file, line, body }] }` — opens round 1; its patch is captured now. `explanations` justify changes on their lines (see [Explaining your changes](#explaining-your-changes)).
 - `agent_review_wait` `{ repo_path, review_id, timeout_ms? }` (clamped 1–120 s) — returns when the owner sends the round back or closes the review.
 - `agent_review_get` `{ repo_path, review_id, round?, patches? }` — a round (the latest by default); `patches: true` adds `files: [{ file, status, patch }]`.
-- `agent_review_revise` `{ repo_path, review_id, note?, replies?: [{ comment: "c1", body }], head_sha?, files? }` — opens the next round from the worktree as it is now (or `head_sha`, or the given patches).
+- `agent_review_revise` `{ repo_path, review_id, note?, replies?: [{ comment: "c1", body }], head_sha?, files?, explanations?: [{ file, line, body }] }` — opens the next round from the worktree as it is now (or `head_sha`, or the given patches), with explanations of that round's changes.
 - `agent_review_list` `{ repo_path }`
 - `agent_review_cancel` `{ repo_path, review_id, reason? }`
 - `agent_review_comment` `{ repo_path, review_id, reviewer, body, file?, line?, reply_to? }` — a reviewer agent's comment on a line of the round, or with `reply_to: "c3"` its reply in that conversation (see [Reviewing beside the owner](#reviewing-beside-the-owner)).
 
-Since v0.21 (docs/design/agent-review-rounds.md) a review has rounds. The payload of open, wait, get and revise is `{ review_id, status: pending|approved|cancelled|expired, mode, title, round, rounds, turn: "user"|"agent"|null, board, timed_out, note, sent_at, changes: [{ id: "h1", file, origin: new|carried|revised, from, old_lines: [start, end], new_lines: [start, end], verdict: accept|reject|mixed|undecided, rejected_lines }], removed: ["h2"], comments: [{ id: "c1", round, change, file, line: "+12"|"-7", body, kind: round|ask|withdrawn, author, replies: [{ author, body, at }] }], session_file, review_file, export_markdown }`. A comment's `author` is `human` for the owner's, or the reviewer agent's name. `turn` is `"user"` while the owner reviews and `"agent"` once a round is sent back. A change keeps its id while its patch text is unchanged (`carried`, with its verdict); a change at an overlapping place is `revised`, `from` the old id. `mixed` means some lines were rejected: `rejected_lines` lists them. Reviews opened before v0.21 return the v0.20 payload (`summary_note`, `comments: [{ path, line, side, body }]`).
+Since v0.21 (docs/design/agent-review-rounds.md) a review has rounds. The payload of open, wait, get and revise is `{ review_id, status: pending|approved|cancelled|expired, mode, title, round, rounds, turn: "user"|"agent"|null, board, timed_out, note, sent_at, changes: [{ id: "h1", file, origin: new|carried|revised, from, old_lines: [start, end], new_lines: [start, end], verdict: accept|reject|mixed|undecided, rejected_lines }], removed: ["h2"], comments: [{ id: "c1", round, change, file, line: "+12"|"-7", body, kind: round|ask|explain|withdrawn, author, replies: [{ author, body, at }] }], session_file, review_file, export_markdown }`. A comment's `author` is `human` for the owner's, the reviewer agent's name, or for an `explain` comment the author agent (the `agent` passed to open). `turn` is `"user"` while the owner reviews and `"agent"` once a round is sent back. A change keeps its id while its patch text is unchanged (`carried`, with its verdict); a change at an overlapping place is `revised`, `from` the old id. `mixed` means some lines were rejected: `rejected_lines` lists them. Reviews opened before v0.21 return the v0.20 payload (`summary_note`, `comments: [{ path, line, side, body }]`).
 
 A `tools/call` response is `{ content: [{ type: "text", text: <payload JSON> }], structuredContent: <payload> }`; a failure sets `isError: true` and puts the message in the text item. The protocol is JSON-RPC 2.0 over newline-delimited JSON. `initialize` negotiates protocol version `2025-06-18`; `serverInfo.name` is `powergit`.
 
@@ -74,6 +74,20 @@ else:
 ```
 
 An answer that starts with `cN:` lands under that comment's line in PowerGit. The owner can reply in a comment's conversation; the reply comes as another `cN · path:line` post, a follow-up in that conversation: answer it the same way. PowerChannel 0.4.0 and later (formerly powerboard 0.3.0+) keep a waiting reader's last-seen time fresh, so PowerGit shows the agent as reading the channel; with an older PowerChannel it shows when the agent last read it.
+
+## Explaining your changes
+
+Since v0.21.17 the author agent can justify its changes where they are. Pass `explanations: [{ file, line: "+12"|"-7", body }]` to `agent_review_open` (round 1) or `agent_review_revise` (the new round). The line must be in that round's diff: an added (`+`) or removed (`-`) line, or a context line inside a change. A bad entry refuses the whole call, and nothing is opened.
+
+Each explanation becomes a comment of kind `explain` with your name as `author` (`c1`, `c2` …, numbered with the other comments). It shows under its line as your conversation, marked "explains the change", and the board's `Round n opened` post lists it as `c1 explains path:line: …`. The owner replies in it like in any conversation, and the reply comes as a `c1 · path:line` post: answer it with `c1: …`, or with `replies` on the next revise. Reviewer agents reply with `agent_review_comment { reply_to: "c1" }`. An explanation is your own word: it is not one of the comments the round sends back to you, the owner does not dismiss it, and it stays in later rounds with its change.
+
+Explain what a diff cannot say: why this approach, what was ruled out, what a reader might take for a mistake. One explanation per point, on the line it is about; Markdown is shown.
+
+```json
+"explanations": [
+  { "file": "src/auth/token.ts", "line": "+42", "body": "Refresh **before** the expiry check, so a token that expires mid-request is renewed once, not twice." }
+]
+```
 
 ## Reviewing beside the owner
 

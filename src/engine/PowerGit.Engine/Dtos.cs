@@ -113,8 +113,10 @@ public sealed record AgentReviewRoundDto(
     IReadOnlyList<string> Removed);
 public sealed record AgentReviewReplyDto(string Author, string Body, string At, long? BoardId);
 /// <summary>A comment with its id (c1, c2 …), the line key it sits on and the
-///  agent's replies. Kind: round (sent with the round) or ask (posted at once).
-///  Author (v0.21.14): the reviewer agent that wrote it; null for the owner.</summary>
+///  agent's replies. Kind: round (sent with the round) or ask (posted at once);
+///  v0.21.17: explain, the author agent's explanation of a change, given with
+///  its round. Author (v0.21.14): the reviewer agent that wrote it, or for an
+///  explanation the author agent; null for the owner.</summary>
 public sealed record AgentReviewThreadDto(
     string Id, int Round, string? Change, string Path, string Line, string Body,
     string Kind, string PostedAt, IReadOnlyList<AgentReviewReplyDto> Replies, string? Author = null);
@@ -125,11 +127,13 @@ public sealed record AgentReviewSummaryDto(
 public sealed record AgentReviewRequest(
     string Mode, string Title, string? Why, string? Agent, string? Branch,
     string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files,
-    string? Board = null);
+    string? Board = null, IReadOnlyList<AgentReviewExplainRequest>? Explanations = null);
 public sealed record AgentReviewReplyRequest(string Comment, string Body);
 public sealed record AgentReviewReviseRequest(
     string? Note, IReadOnlyList<AgentReviewReplyRequest>? Replies, string? Head,
-    IReadOnlyList<AgentReviewFileDto>? Files);
+    IReadOnlyList<AgentReviewFileDto>? Files, IReadOnlyList<AgentReviewExplainRequest>? Explanations = null);
+/// <summary>v0.21.17: the author agent's explanation of a change, on a line of the round's diff.</summary>
+public sealed record AgentReviewExplainRequest(string? Path, string? Line, string? Body);
 public sealed record AgentReviewSendRequest(string? Note);
 public sealed record AgentReviewAskRequest(int Round, string Path, string Line, string Body);
 /// <summary>v0.21.13: the owner's reply in a comment's conversation.</summary>

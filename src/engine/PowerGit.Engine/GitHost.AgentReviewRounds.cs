@@ -206,6 +206,9 @@ public sealed partial class GitHost
             int nextId = NextChangeId(session);
             AgentReviewRoundDto round = OpenRound(previous.N + 1, session.Base, head, session.Worktree, files, before, ref nextId, ct);
             round = round with { Note = Clean(req.Note) };
+            // v0.21.17: the new round's explanations, checked before anything is
+            // written (GitHost.AgentReviewExplanations.cs).
+            List<AgentReviewThreadDto> threads = WithExplanations(session, round, req.Explanations);
 
             // The owner's marks on carried changes follow them into the new round.
             List<(AgentReviewHunks.Hunk, AgentReviewHunks.Hunk)> carried = [];
@@ -218,7 +221,6 @@ public sealed partial class GitHost
             }
             if (carried.Count > 0) WriteReview(RoundKey(id, round.N), AgentReviewHunks.CarryMarks(RoundKey(id, round.N), ReadReviewNode(RoundKey(id, previous.N)), carried));
 
-            List<AgentReviewThreadDto> threads = [.. session.Comments ?? []];
             foreach (AgentReviewReplyRequest reply in req.Replies ?? [])
             {
                 int at = threads.FindIndex(t => t.Id == reply.Comment);

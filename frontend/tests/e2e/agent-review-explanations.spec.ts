@@ -54,7 +54,10 @@ test.describe("agent review explanations", () => {
     let boardPath: string | null = null
     let db: Db | null = null
     try {
-      const { id: repoId } = await api<{ id: string }>("/repos/open", { method: "POST", body: JSON.stringify({ path: dir }) })
+      const { id: repoId } = await api<{ id: string }>("/repos/open", {
+        method: "POST",
+        body: JSON.stringify({ path: dir }),
+      })
       const status = await api<{ path: string }>(`/repos/${repoId}/board/status`)
       test.skip(!resolve(status.path).toLowerCase().startsWith(resolve(tmpdir()).toLowerCase()), "not a test board")
       boardPath = status.path
@@ -97,7 +100,11 @@ test.describe("agent review explanations", () => {
       expect(explained).toMatchObject({ line: "+3", author: "auth-fix", round: 1 })
 
       await page.getByTestId("agent-reviews-button").click()
-      await page.getByTestId("agent-review-row").filter({ hasText: "Explained review" }).filter({ hasText: basename(dir) }).click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Explained review" })
+        .filter({ hasText: basename(dir) })
+        .click()
 
       // Under its line, as the author's conversation.
       const talk = page.getByTestId("round-thread").filter({ hasText: "callers stop repeating it" })
@@ -114,9 +121,10 @@ test.describe("agent review explanations", () => {
       await talk.getByTestId("thread-reply-text").fill("Why not in the caller?")
       await talk.getByTestId("thread-reply-send").click()
       await expect(talk.getByTestId("thread-reply")).toHaveText([/Why not in the caller\?/])
-      await expect(
-        page.getByTestId("board-post").filter({ hasText: `${explained.id} · t.txt:3` }).filter({ hasText: "Why not in the caller?" }),
-      ).toBeVisible()
+      await expect(page.getByTestId("board-post").filter({ hasText: "Why not in the caller?" })).toHaveAttribute(
+        "data-author",
+        "human",
+      )
 
       // A reviewer agent joins the conversation.
       await api(`/repos/${repoId}/agent-reviews/${session.id}/reviewer-comments`, {

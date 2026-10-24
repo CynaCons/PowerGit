@@ -21,7 +21,8 @@ public sealed class McpTools(RepoRegistry registry)
         }
         AgentReviewDto session = host.CreateAgentReview(new(
             Required(args, "mode"), Required(args, "title"), String(args, "why"), String(args, "agent"),
-            String(args, "branch") ?? host.Current?.Branch, baseSha, headSha, worktree, files, String(args, "board")), ct);
+            String(args, "branch") ?? host.Current?.Branch, baseSha, headSha, worktree, files, String(args, "board"),
+            Explanations(args)), ct);
         return Payload(host, session, false, ct);
     }
 
@@ -71,7 +72,7 @@ public sealed class McpTools(RepoRegistry registry)
             foreach (JsonElement reply in list.EnumerateArray()) replies.Add(new(Required(reply, "comment"), Required(reply, "body")));
         }
         AgentReviewDto session = host.ReviseAgentReview(Required(args, "review_id"),
-            new(String(args, "note"), replies, String(args, "head_sha"), Files(args)), ct);
+            new(String(args, "note"), replies, String(args, "head_sha"), Files(args), Explanations(args)), ct);
         return Payload(host, session, false, ct);
     }
 
@@ -183,6 +184,15 @@ public sealed class McpTools(RepoRegistry registry)
         if (files.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("files must be an array");
         return [.. files.EnumerateArray().Select(file => new AgentReviewFileDto(
             Required(file, "path"), String(file, "status") ?? "M", String(file, "patch")))];
+    }
+
+    /// <summary>v0.21.17: <c>explanations: [{ file, line, body }]</c>, the author's word on its changes.</summary>
+    private static IReadOnlyList<AgentReviewExplainRequest>? Explanations(JsonElement args)
+    {
+        if (!args.TryGetProperty("explanations", out JsonElement list)) return null;
+        if (list.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("explanations must be an array");
+        return [.. list.EnumerateArray().Select(e => new AgentReviewExplainRequest(
+            String(e, "file") ?? String(e, "path"), Required(e, "line"), Required(e, "body")))];
     }
 
     private static string Required(JsonElement value, string name) => String(value, name) is { Length: > 0 } text ? text : throw new InvalidOperationException($"{name} is required");

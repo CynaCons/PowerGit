@@ -72,6 +72,7 @@ public sealed partial class GitHost
         AgentReviewDto session = new(2, id, clean.Mode, clean.Title, clean.Why!, clean.Agent,
             clean.Branch, clean.Base, clean.Head, clean.Worktree ?? false, round.Files, "pending", true,
             now, now, null, null, null, Rounds: [round], Comments: []);
+        session = session with { Comments = WithExplanations(session, round, clean.Explanations) };
         session = AttachBoard(session, clean.Board);
         lock (_agentReviewWriteGate) WriteAgentReview(session);
         // The review panel finds this repository through the per-user index

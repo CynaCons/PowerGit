@@ -63,6 +63,9 @@ public sealed partial class GitHost
                 if (thread.Replies.LastOrDefault() is { BoardId: null } reply && thread.Round == round.N - 1)
                     text.Append($"\n{thread.Id} answered: {reply.Body}");
         }
+        // v0.21.17: the author's explanations of this round, each a conversation.
+        foreach (AgentReviewThreadDto thread in (session.Comments ?? []).Where(t => t.Round == round.N && t.Kind == "explain"))
+            text.Append($"\n{thread.Id} explains {thread.Path}:{thread.Line[1..]}: {thread.Body}");
         if (round.N == 1) text.Append("\nReply with `cN: <answer>`; Markdown is shown.");
         text.Append($"\nreview_id={session.Id}");
         PostToBoard(session, BoardEvents, text.ToString());

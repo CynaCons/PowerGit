@@ -1110,11 +1110,11 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 
 ### v0.21.17 — Agent review: the author explains its changes on their lines (current) (ACTIVE)
 **Goal:** Owner (2026-10-24): agents justify changes in comments the owner and agents discuss.
-- [ ] Owner's sentence as red e2e: explanations open conversations.
-- [ ] Engine: explanations on open and revise, as threads; tests.
-- [ ] MCP: explanations on open and revise; docs.
-- [ ] View: an explanation reads as the author's conversation.
-- [ ] Gate: engine tests, vitest, lint, agent-review e2e; look at it; smoke.
+- [x] Owner's sentence as red e2e: explanations open conversations. [agent: claude]
+- [x] Engine: explanations on open and revise, as threads; tests. [agent: claude]
+- [x] MCP: explanations on open and revise; docs. [agent: claude]
+- [x] View: an explanation reads as the author's conversation. [agent: claude]
+- [x] Gate: engine tests, vitest, lint, agent-review e2e; look at it; smoke. [agent: claude]
 - [ ] Owner ticks: agents explain changes; owner and agents discuss them.
 
 ## Backlog

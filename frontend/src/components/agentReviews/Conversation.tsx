@@ -17,7 +17,9 @@ import { EditBox, type CommentKind, type ThreadActions } from "./RoundThread"
 // author, the time, the text as Markdown), and a Reply box ends it. A
 // conversation from an earlier round says which round and line it was on and
 // quotes that line, since the line may read differently now. v0.21.14: a
-// reviewer agent's comment opens with its disc and name.
+// reviewer agent's comment opens with its disc and name. v0.21.17 (owner:
+// agents "drop explanatory comments justifying the changes"): the author
+// agent's explanation opens with its disc and name, "explains the change".
 
 export type Quote = { kind: "add" | "remove" | "context"; text: string }
 
@@ -52,7 +54,12 @@ function QuoteLine({ quote }: { quote: Quote }) {
         py: 0.25,
         my: 0.5,
         borderRadius: 1,
-        color: quote.kind === "add" ? "var(--pg-diff-added)" : quote.kind === "remove" ? "var(--pg-diff-removed)" : "text.secondary",
+        color:
+          quote.kind === "add"
+            ? "var(--pg-diff-added)"
+            : quote.kind === "remove"
+              ? "var(--pg-diff-removed)"
+              : "text.secondary",
         bgcolor:
           quote.kind === "add"
             ? "var(--pg-diff-added-bg, rgba(24,145,0,.1))"
@@ -71,7 +78,9 @@ function ReplyBox({ onSend, off }: { onSend: ((body: string) => void) | null; of
   const [open, setOpen] = useState(false)
   const [text, setText] = useState("")
   if (!onSend)
-    return off ? <Typography sx={{ fontSize: 11.5, color: "text.secondary", pl: "28px", pb: 0.5 }}>{off}</Typography> : null
+    return off ? (
+      <Typography sx={{ fontSize: 11.5, color: "text.secondary", pl: "28px", pb: 0.5 }}>{off}</Typography>
+    ) : null
   const send = () => {
     if (!text.trim()) return
     onSend(text.trim())
@@ -135,7 +144,7 @@ export function Conversation({
 }: {
   thread: AgentReviewThread | null
   text: string
-  kind: CommentKind | "withdrawn"
+  kind: CommentKind | "explain" | "withdrawn"
   line: string
   /** "Round 1, line 3" for a conversation from an earlier round; "line 3" otherwise. */
   label?: string
@@ -148,21 +157,30 @@ export function Conversation({
   waiting?: boolean
 }) {
   const [editing, setEditing] = useState(false)
+  // An agent opened it: a reviewer, or the author explaining its change.
   const reviewer = thread?.author ?? null
+  const explains = kind === "explain"
   return (
     <Box sx={{ px: 1.25, pt: 1, pb: 0.75, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0 } }}>
       <Box>
         <LaneItem node={reviewer ? <AgentDisc name={reviewer} /> : <OwnerDisc />}>
           <Box sx={{ display: "flex", gap: 0.75, alignItems: "baseline", flexWrap: "wrap", minWidth: 0 }}>
-            <Typography data-testid="thread-author" sx={{ ...nameSx, color: reviewer ? "var(--pg-agent)" : "text.primary" }}>
+            <Typography
+              data-testid="thread-author"
+              sx={{ ...nameSx, color: reviewer ? "var(--pg-agent)" : "text.primary" }}
+            >
               {reviewer ?? "You"}
             </Typography>
-            {reviewer && <Chip tone="muted">reviewer</Chip>}
+            {reviewer && !explains && <Chip tone="muted">reviewer</Chip>}
             <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
               {thread ? `${thread.id} · ` : ""}
               {label ?? `line ${line.slice(1)}`}
             </Typography>
-            {kind === "ask" ? (
+            {explains ? (
+              <Box component="span" data-testid="thread-kind">
+                <Chip tone="info">explains the change</Chip>
+              </Box>
+            ) : kind === "ask" ? (
               <Chip tone="info">asked on the board</Chip>
             ) : thread && !waiting ? (
               <Chip tone="muted">sent with round {thread.round}</Chip>

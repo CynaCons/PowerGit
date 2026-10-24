@@ -22,7 +22,16 @@ import { RoundDiff } from "./RoundDiff"
 import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
 import { ReviewFiles } from "./ReviewFiles"
 import { useRoundComments } from "./useRoundComments"
-import { filesLeft, hunksOf, latestRound, liveVerdict, placeThreads, roundCounts, roundKey, turnLabel } from "./roundModel"
+import {
+  filesLeft,
+  hunksOf,
+  latestRound,
+  liveVerdict,
+  placeThreads,
+  roundCounts,
+  roundKey,
+  turnLabel,
+} from "./roundModel"
 
 // One agent review in full view (v0.21.3, layout A of
 // docs/prototypes/agent-review-v3.html, picked by the owner on 2026-10-13:
@@ -54,8 +63,8 @@ export function ReviewScreen({
   const doc = useReviewDoc(key)
   // v0.21.12: a withdrawn question is gone from the screen; the engine keeps it so ids never repeat.
   const threads = useMemo(() => (session.comments ?? []).filter((t) => t.kind !== "withdrawn"), [session.comments])
-  // v0.21.14: the agents reviewing beside the owner.
-  const reviewers = [...new Set(threads.flatMap((t) => (t.author ? [t.author] : [])))]
+  // v0.21.14: the agents reviewing beside the owner (an explanation is the author's own, v0.21.17).
+  const reviewers = [...new Set(threads.flatMap((t) => (t.author && t.kind !== "explain" ? [t.author] : [])))]
   const { board, post } = useAgentReviewBoard(engine, session.board ? session.id : null, () => void reload())
   const [path, setPath] = useState<string | null>(round.files[0]?.path ?? null)
   const [picked, setPicked] = useState<{ path: string; key: string } | null>(null)
@@ -67,7 +76,10 @@ export function ReviewScreen({
   const canAsk = open && round.n === latest.n && board.available && Boolean(session.board)
   // v0.21.13: earlier rounds' conversations, placed in this round; a file that
   // left the round but holds some stays selectable.
-  const earlier = useMemo(() => placeThreads(session.rounds ?? [], threads, round.n), [session.rounds, threads, round.n])
+  const earlier = useMemo(
+    () => placeThreads(session.rounds ?? [], threads, round.n),
+    [session.rounds, threads, round.n],
+  )
   const left = filesLeft(earlier, round)
   const filePath =
     round.files.some((f) => f.path === path) || (path !== null && left.includes(path))
@@ -306,14 +318,7 @@ export function ReviewScreen({
             "@container (max-width: 900px)": { maxHeight: 112 },
           }}
         >
-          <ReviewFiles
-            round={round}
-            doc={doc}
-            current={filePath}
-            onPick={setPath}
-            left={left}
-            earlier={earlier}
-          />
+          <ReviewFiles round={round} doc={doc} current={filePath} onPick={setPath} left={left} earlier={earlier} />
         </Box>
         <Box sx={{ ...paneSx, position: "relative", minHeight: 0, minWidth: 0, display: "flex", gridArea: "diff" }}>
           <Box data-testid="round-diff-scroll" sx={{ flex: 1, minWidth: 0, overflow: "auto", p: 1.25, pb: 6 }}>

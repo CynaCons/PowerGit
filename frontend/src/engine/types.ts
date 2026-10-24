@@ -193,11 +193,12 @@ export type AgentReviewThread = {
   path: string
   line: string
   body: string
-  /** v0.21.12: "withdrawn" is an asked question the owner took back. */
-  kind: "round" | "ask" | "withdrawn"
+  /** v0.21.12: "withdrawn" is an asked question the owner took back.
+   *  v0.21.17: "explain" is the author agent's explanation of a change. */
+  kind: "round" | "ask" | "explain" | "withdrawn"
   postedAt: string
   replies: AgentReviewReply[]
-  /** v0.21.14: the reviewer agent that wrote it; absent or null for the owner. */
+  /** v0.21.14: the reviewer agent that wrote it, or (explain) the author agent; absent or null for the owner. */
   author?: string | null
 }
 export type AgentReview = Omit<AgentReviewSummary, "fileCount" | "round" | "turn" | "lastRead"> & {
