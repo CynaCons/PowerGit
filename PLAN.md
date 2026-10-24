@@ -1099,12 +1099,12 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 
 ### v0.21.16 — Tags show whether they are on a remote; local tags can be pushed (current) (ACTIVE)
 **Goal:** Owner (2026-10-24): tell remote tags from local ones and push a local tag.
-- [ ] Owner's sentence as red e2e: tag cloud mark and Push tag.
-- [ ] Engine: record each remote's tags on fetch and tag push.
-- [ ] Engine: push one tag as a job; tests.
-- [ ] Chips and tree: cloud mark on tags a remote has.
-- [ ] Tag menu: Push tag to the remote that lacks it.
-- [ ] Create tag: option to push the new tag.
+- [x] Owner's sentence as red e2e: tag cloud mark and Push tag. [agent: claude]
+- [x] Engine: record each remote's tags on fetch and tag push. [agent: claude]
+- [x] Engine: push one tag as a job; tests. [agent: claude]
+- [x] Chips and tree: cloud mark on tags a remote has. [agent: claude]
+- [x] Tag menu: Push tag to the remote that lacks it. [agent: claude]
+- [x] Create tag: option to push the new tag. [agent: claude]
 - [ ] Gate: engine tests, vitest, lint, tag e2e; look at it; smoke.
 - [ ] Release v0.21.16.
 - [ ] Owner ticks: remote and local tags tell apart; local tags push.

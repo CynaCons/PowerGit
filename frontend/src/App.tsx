@@ -41,6 +41,7 @@ import { IncidentBanner } from "./components/IncidentBanner"
 import { SnapshotDialog } from "./components/SnapshotDialog"
 import { withArtificialRows } from "./graph/artificial"
 import { findRefTarget } from "./components/refChipsModel"
+import { TagPlacesContext, tagPlaces } from "./components/tagPlaces"
 import { useAutoFetch } from "./hooks/useAutoFetch"
 import { useBrowseHotkeys } from "./hooks/useBrowseHotkeys"
 import { useStartPane } from "./hooks/useStartPane"
@@ -95,6 +96,8 @@ export default function App({ base }: { base: EngineClient }) {
   // Tag chips on graph rows get a tag glyph (v0.14.0, owner: "tags should
   // be having a different little icon"); names come from the ref tree.
   const tagNames = useMemo(() => (refs?.tags ?? []).map((t) => t.name), [refs])
+  // v0.21.16: which remotes have each tag, for the chips, the tree and the menus.
+  const tagPlacesValue = useMemo(() => tagPlaces(refs, remoteNames), [refs, remoteNames])
   const jobs = useJobs({
     client,
     dispatch: session.dispatch,
@@ -230,217 +233,220 @@ export default function App({ base }: { base: EngineClient }) {
 
   return (
     <EngineProvider base={base} repo={client}>
-      <Box
-        data-testid="browse-shell"
-        sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}
-      >
-        {railBar && (
-          <TitleStrip
-            repoName={repo?.name}
-            booting={view.booting || (live && !demo && !loaded && !offline)}
-            busyLabel={busy ? jobLabel : null}
-          />
-        )}
-        {!railBar && (
-          <CommandBar
-            toolbarRef={layout.toolbarRef}
-            tier={layout.toolbarTier}
-            live={live}
-            dirty={dirty}
-            operation={status?.state ?? "none"}
-            stashCount={stashes.length}
-            hasCurrent={current !== undefined}
-            remoteNames={remoteNames}
-            defaultRemote={defaultRemote}
-            booting={view.booting || (live && !demo && !loaded && !offline)}
-            jobs={jobs}
-            actions={actions}
-            refresh={chrome.refresh}
-            openStash={chrome.openStash}
-          />
-        )}
-        <IncidentBanner />
-        {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
-        {/* A stopped merge/rebase is a state, not an error: its exits sit
+      <TagPlacesContext.Provider value={tagPlacesValue}>
+        <Box
+          data-testid="browse-shell"
+          sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}
+        >
+          {railBar && (
+            <TitleStrip
+              repoName={repo?.name}
+              booting={view.booting || (live && !demo && !loaded && !offline)}
+              busyLabel={busy ? jobLabel : null}
+            />
+          )}
+          {!railBar && (
+            <CommandBar
+              toolbarRef={layout.toolbarRef}
+              tier={layout.toolbarTier}
+              live={live}
+              dirty={dirty}
+              operation={status?.state ?? "none"}
+              stashCount={stashes.length}
+              hasCurrent={current !== undefined}
+              remoteNames={remoteNames}
+              defaultRemote={defaultRemote}
+              booting={view.booting || (live && !demo && !loaded && !offline)}
+              jobs={jobs}
+              actions={actions}
+              refresh={chrome.refresh}
+              openStash={chrome.openStash}
+            />
+          )}
+          <IncidentBanner />
+          {engineError && <ErrorBanner message={engineError} onDismiss={() => setEngineError(null)} />}
+          {/* A stopped merge/rebase is a state, not an error: its exits sit
             directly under the error banner, above the graph (v0.15.0). */}
-        <OperationBanner
-          status={status}
-          busy={busy}
-          onResolve={actions.openResolveConflicts}
-          onContinue={() => void actions.continueOperation()}
-          onSkip={() => void actions.skipOperation()}
-          onAbort={actions.abortOperation}
-        />
+          <OperationBanner
+            status={status}
+            busy={busy}
+            onResolve={actions.openResolveConflicts}
+            onContinue={() => void actions.continueOperation()}
+            onSkip={() => void actions.skipOperation()}
+            onAbort={actions.abortOperation}
+          />
 
-        <Box className="pg-desk" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-          <Box sx={{ display: "flex", flexShrink: 0 }} onClickCapture={settings.railClick}>
-            {railBar ? (
-              <CommandRail
-                repoName={repo?.name}
-                onOpenRepo={chrome.openRepo}
-                onRecents={chrome.openRecents}
-                onSettings={chrome.openSettings}
-                settingsOpen={settings.open}
-                onSnapshot={chrome.openSnapshot}
-                live={live}
-                dirty={dirty}
-                operation={status?.state ?? "none"}
-                stashCount={stashes.length}
-                hasCurrent={current !== undefined}
-                remoteNames={remoteNames}
-                defaultRemote={defaultRemote}
-                jobs={jobs}
-                actions={actions}
-                refresh={chrome.refresh}
-                openStash={chrome.openStash}
-                onAgentReviews={chrome.openAgentReviews}
-                agentReviewsOpen={agentReviews.page.open}
-                agentReviewsBadge={agentReviews.badge}
-              />
-            ) : (
-              <NavRail
-                repoName={repo?.name}
-                onOpenRepo={chrome.openRepo}
-                onRecents={chrome.openRecents}
-                onSettings={chrome.openSettings}
-                settingsOpen={settings.open}
-                onSnapshot={chrome.openSnapshot}
-                onAgentReviews={chrome.openAgentReviews}
-                agentReviewsOpen={agentReviews.page.open}
-                agentReviewsBadge={agentReviews.badge}
-              />
-            )}
-          </Box>
-
-          <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <Box ref={contentRef} className="pg-desk-row" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-              {settings.open ? (
-                <SettingsView onClose={settings.close} />
-              ) : agentReviews.page.open ? (
-                <AgentReviewsView
-                  engine={client}
-                  page={agentReviews.page}
-                  inbox={agentReviews.inbox}
-                  onClose={chrome.closeAgentReviews}
-                />
-              ) : leftOpen ? (
-                <RepoTree
-                  tree={refs}
-                  repoId={client.repoId}
-                  onSelectTarget={chrome.selectTarget}
-                  onCollapse={chrome.collapseLeft}
-                  onCheckoutRef={chrome.checkoutRef}
-                  onDeleteBranch={actions.removeBranch}
-                  onDeleteTag={actions.removeTag}
-                  onFetchRemote={actions.fetchRemote}
-                  onConfigureRemote={chrome.configureRemote}
-                  onOpenSubmodule={actions.openSubmodule}
-                  onMergeRef={chrome.mergeRef}
-                  onRebaseOnto={chrome.rebaseOnto}
+          <Box className="pg-desk" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+            <Box sx={{ display: "flex", flexShrink: 0 }} onClickCapture={settings.railClick}>
+              {railBar ? (
+                <CommandRail
+                  repoName={repo?.name}
+                  onOpenRepo={chrome.openRepo}
+                  onRecents={chrome.openRecents}
+                  onSettings={chrome.openSettings}
+                  settingsOpen={settings.open}
+                  onSnapshot={chrome.openSnapshot}
+                  live={live}
+                  dirty={dirty}
+                  operation={status?.state ?? "none"}
+                  stashCount={stashes.length}
+                  hasCurrent={current !== undefined}
+                  remoteNames={remoteNames}
+                  defaultRemote={defaultRemote}
+                  jobs={jobs}
+                  actions={actions}
+                  refresh={chrome.refresh}
+                  openStash={chrome.openStash}
+                  onAgentReviews={chrome.openAgentReviews}
+                  agentReviewsOpen={agentReviews.page.open}
+                  agentReviewsBadge={agentReviews.badge}
                 />
               ) : (
-                <CollapsedLeftPanel onExpand={chrome.expandLeft} />
-              )}
-              {!settings.open && !agentReviews.page.open && (
-                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
-                  {startPane.open ? (
-                    <StartPaneView session={session} repoState={repoState} onClose={startPane.close} />
-                  ) : fileHistory.target ? (
-                    <FileHistoryView
-                      target={fileHistory.target}
-                      session={session}
-                      repoState={repoState}
-                      layout={layout}
-                      menus={menus}
-                      remoteNames={remoteNames}
-                      tagNames={tagNames}
-                      headId={headId}
-                      onSavePatch={(row) => void actions.savePatch(row)}
-                      onClose={chrome.closeFileHistory}
-                    />
-                  ) : (
-                    <>
-                      <HistoryPane
-                        rows={rows}
-                        remoteNames={remoteNames}
-                        tagNames={tagNames}
-                        currentBranch={repo?.branch}
-                        highlightRoot={history.highlightRoot}
-                        onHighlightRoot={history.setHighlightRoot}
-                        selected={selected}
-                        loadingTail={loadingTail}
-                        loading={live && !demo && !loaded}
-                        engineError={engineError}
-                        view={view}
-                        headerExtra={filterChip}
-                        nav={nav}
-                        onSelect={chrome.selectRow}
-                        onNearEnd={history.onNearEnd}
-                        menus={menus}
-                        selectedSha={selectedSha}
-                        onRetry={chrome.refresh}
-                        onOpenRepo={chrome.openRepo}
-                        onRecover={chrome.recover}
-                      />
-                      <PanelSplitter testid="panel-splitter" splitter={splitter} />
-                      <BottomPanel
-                        current={deferredCurrent}
-                        status={status}
-                        headId={headId}
-                        onOpenCommit={actions.openCommit}
-                        height={bottomHeight}
-                        tab={bottomTab}
-                        onTab={setBottomTab}
-                        setStatus={repoState.setStatus}
-                        onFileHistory={fileHistory.open}
-                        onSelectedFile={fileHistory.setBrowseFile}
-                        tagNames={tagNames}
-                        remoteNames={remoteNames}
-                        onSelectRef={chrome.selectRef}
-                        menus={menus}
-                      />
-                    </>
-                  )}
-                </Box>
+                <NavRail
+                  repoName={repo?.name}
+                  onOpenRepo={chrome.openRepo}
+                  onRecents={chrome.openRecents}
+                  onSettings={chrome.openSettings}
+                  settingsOpen={settings.open}
+                  onSnapshot={chrome.openSnapshot}
+                  onAgentReviews={chrome.openAgentReviews}
+                  agentReviewsOpen={agentReviews.page.open}
+                  agentReviewsBadge={agentReviews.badge}
+                />
               )}
             </Box>
+
+            <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <Box ref={contentRef} className="pg-desk-row" sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+                {settings.open ? (
+                  <SettingsView onClose={settings.close} />
+                ) : agentReviews.page.open ? (
+                  <AgentReviewsView
+                    engine={client}
+                    page={agentReviews.page}
+                    inbox={agentReviews.inbox}
+                    onClose={chrome.closeAgentReviews}
+                  />
+                ) : leftOpen ? (
+                  <RepoTree
+                    tree={refs}
+                    repoId={client.repoId}
+                    onSelectTarget={chrome.selectTarget}
+                    onCollapse={chrome.collapseLeft}
+                    onCheckoutRef={chrome.checkoutRef}
+                    onDeleteBranch={actions.removeBranch}
+                    onDeleteTag={actions.removeTag}
+                    onFetchRemote={actions.fetchRemote}
+                    onConfigureRemote={chrome.configureRemote}
+                    onOpenSubmodule={actions.openSubmodule}
+                    onMergeRef={chrome.mergeRef}
+                    onRebaseOnto={chrome.rebaseOnto}
+                    onPushTag={actions.pushTag}
+                  />
+                ) : (
+                  <CollapsedLeftPanel onExpand={chrome.expandLeft} />
+                )}
+                {!settings.open && !agentReviews.page.open && (
+                  <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+                    {startPane.open ? (
+                      <StartPaneView session={session} repoState={repoState} onClose={startPane.close} />
+                    ) : fileHistory.target ? (
+                      <FileHistoryView
+                        target={fileHistory.target}
+                        session={session}
+                        repoState={repoState}
+                        layout={layout}
+                        menus={menus}
+                        remoteNames={remoteNames}
+                        tagNames={tagNames}
+                        headId={headId}
+                        onSavePatch={(row) => void actions.savePatch(row)}
+                        onClose={chrome.closeFileHistory}
+                      />
+                    ) : (
+                      <>
+                        <HistoryPane
+                          rows={rows}
+                          remoteNames={remoteNames}
+                          tagNames={tagNames}
+                          currentBranch={repo?.branch}
+                          highlightRoot={history.highlightRoot}
+                          onHighlightRoot={history.setHighlightRoot}
+                          selected={selected}
+                          loadingTail={loadingTail}
+                          loading={live && !demo && !loaded}
+                          engineError={engineError}
+                          view={view}
+                          headerExtra={filterChip}
+                          nav={nav}
+                          onSelect={chrome.selectRow}
+                          onNearEnd={history.onNearEnd}
+                          menus={menus}
+                          selectedSha={selectedSha}
+                          onRetry={chrome.refresh}
+                          onOpenRepo={chrome.openRepo}
+                          onRecover={chrome.recover}
+                        />
+                        <PanelSplitter testid="panel-splitter" splitter={splitter} />
+                        <BottomPanel
+                          current={deferredCurrent}
+                          status={status}
+                          headId={headId}
+                          onOpenCommit={actions.openCommit}
+                          height={bottomHeight}
+                          tab={bottomTab}
+                          onTab={setBottomTab}
+                          setStatus={repoState.setStatus}
+                          onFileHistory={fileHistory.open}
+                          onSelectedFile={fileHistory.setBrowseFile}
+                          tagNames={tagNames}
+                          remoteNames={remoteNames}
+                          onSelectRef={chrome.selectRef}
+                          menus={menus}
+                        />
+                      </>
+                    )}
+                  </Box>
+                )}
+              </Box>
+            </Box>
           </Box>
-        </Box>
-        <StatusBar
-          view={view}
-          status={status}
-          dirty={dirty}
-          refreshing={refreshing && loaded}
-          progressLabel={progressLabel}
-          note={notes.note}
-          onOpenJobs={chrome.openJobs}
-          onOpenRecovery={chrome.recover}
-        />
-        {/* Last row of the column: the panel shortens the graph instead of
+          <StatusBar
+            view={view}
+            status={status}
+            dirty={dirty}
+            refreshing={refreshing && loaded}
+            progressLabel={progressLabel}
+            note={notes.note}
+            onOpenJobs={chrome.openJobs}
+            onOpenRecovery={chrome.recover}
+          />
+          {/* Last row of the column: the panel shortens the graph instead of
             covering it, and neither it nor the dock line ever sits over the
             status bar. It mounts the failure card too (same buffer). */}
-        <GitConsole client={client} live={live} />
+          <GitConsole client={client} live={live} />
 
-        <AppDialogs
-          dialogs={dialogs}
-          actions={actions}
-          repo={repo}
-          repoState={repoState}
-          jobs={jobs}
-          onFileHistory={fileHistory.open}
-          rows={rows}
-        />
-        <JobPanel jobs={jobs} onClose={() => jobs.setPanelOpen(false)} />
-        <SnapshotDialog state={snapshot} onClose={closeSnapshot} />
-        <RecoveryPanel
-          open={recoveryOpen || (state.phase === "engine-failed" && !demo)}
-          phase={state}
-          view={view}
-          onClose={() => setRecoveryOpen(false)}
-          onRetry={() => (setRecoveryOpen(false), session.retry())}
-          onOpenRepository={() => (setRecoveryOpen(false), void openFolder())}
-        />
-      </Box>
+          <AppDialogs
+            dialogs={dialogs}
+            actions={actions}
+            repo={repo}
+            repoState={repoState}
+            jobs={jobs}
+            onFileHistory={fileHistory.open}
+            rows={rows}
+          />
+          <JobPanel jobs={jobs} onClose={() => jobs.setPanelOpen(false)} />
+          <SnapshotDialog state={snapshot} onClose={closeSnapshot} />
+          <RecoveryPanel
+            open={recoveryOpen || (state.phase === "engine-failed" && !demo)}
+            phase={state}
+            view={view}
+            onClose={() => setRecoveryOpen(false)}
+            onRetry={() => (setRecoveryOpen(false), session.retry())}
+            onOpenRepository={() => (setRecoveryOpen(false), void openFolder())}
+          />
+        </Box>
+      </TagPlacesContext.Provider>
     </EngineProvider>
   )
 }

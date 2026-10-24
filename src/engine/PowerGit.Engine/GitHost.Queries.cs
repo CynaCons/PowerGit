@@ -1237,6 +1237,7 @@ public sealed partial class GitHost
         List<RefItemDto> branches = [];
         List<RefItemDto> remotes = [];
         List<RefItemDto> tags = [];
+        Dictionary<string, Dictionary<string, string>> remoteTags = ReadRemoteTags(root);
         foreach ((string obj, string peeled, string full) in records)
         {
             // Annotated tags peel (%(*objectname)) to the commit they tag;
@@ -1256,13 +1257,17 @@ public sealed partial class GitHost
             }
             else
             {
-                tags.Add(item);
+                // The remote's id is the unpeeled one, like %(objectname): an
+                // annotated tag matches on its tag object.
+                string tagName = full[10..];
+                string[] on = [.. remoteTags.Where(r => r.Value.TryGetValue(tagName, out string? id) && id == obj).Select(r => r.Key).Order(StringComparer.Ordinal)];
+                tags.Add(item with { Remotes = on });
             }
         }
 
         List<SubmoduleDto> submodules = [];
         AddSubmodules(root, "", submodules, 0);
-        return new RefTreeDto([.. branches], [.. remotes], [.. tags], [.. submodules]);
+        return new RefTreeDto([.. branches], [.. remotes], [.. tags], [.. submodules], [.. remoteTags.Keys.Order(StringComparer.Ordinal)]);
     }
 
     /// <summary>

@@ -99,6 +99,7 @@ export function AppDialogs({
           onDelete: (name, kind) => (kind === "tag" ? actions.removeTag(name) : actions.removeBranch(name)),
           onFetchRemote: (name) => void actions.fetchRemote(name),
           onConfigureRemote: (name) => open({ kind: "remoteConfig", remote: name }),
+          onPushTag: (name, remote) => void actions.pushTag(name, remote),
         }}
       />
       {dialog.kind === "createRef" && (

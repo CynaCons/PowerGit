@@ -89,6 +89,14 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
         ),
       { refresh: moves ? FULL : { revisions: true } },
     )
+    // v0.21.16: Create tag's "Push to origin", once the tag exists; the job
+    // runs behind the top bar after the dialog has closed.
+    if (!branch && options.push) void pushTag(name, options.push)
+  }
+
+  /** v0.21.16: one tag to one remote, as a push job; its refresh brings the cloud. */
+  async function pushTag(name: string, remote: string) {
+    await runJob(`Pushing tag ${name} to ${remote}`, () => engine.startPushTag(name, remote))
   }
 
   // Two phases under withBusy (v0.18.9): the engine call resolves the
@@ -224,6 +232,7 @@ export function useGitActions({ session, history, repoState, jobs, dialogs, note
     deleteBranch,
     deleteTag,
     fetchRemote,
+    pushTag,
     openCreateBranch,
     openCreateTag,
     openCheckoutBranch,

@@ -882,6 +882,11 @@ export class EngineClient {
     return this.startJob("push", { forceWithLease })
   }
 
+  /** v0.21.16: `git push <remote> refs/tags/<name>`, a push job. */
+  async startPushTag(name: string, remote: string): Promise<JobStarted> {
+    return json<JobStarted>(await this.post(`${this.repoPath()}/tags/push`, { name, remote }))
+  }
+
   async job(id: string): Promise<GitJob> {
     return json<GitJob>(await this.get(`${this.repoPath()}/jobs/${encodeURIComponent(id)}`))
   }

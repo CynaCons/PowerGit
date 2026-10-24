@@ -367,13 +367,22 @@ export type ArchiveFormat = "zip" | "tar.gz"
 export type PatchScope = "worktree" | "index"
 /** A streamed patch as text, with the file name the engine put in Content-Disposition. */
 export type PatchText = { name: string; text: string }
-export type RefItem = { name: string; fullName: string; target: string; current: boolean }
+export type RefItem = {
+  name: string
+  fullName: string
+  target: string
+  current: boolean
+  /** v0.21.16, tags only: the remotes known to have the tag (same object). */
+  remotes?: string[] | null
+}
 export type Submodule = { name: string; path: string; head: string | null }
 export type RefTree = {
   branches: RefItem[]
   remotes: RefItem[]
   tags: RefItem[]
   submodules: Submodule[]
+  /** v0.21.16: the remotes whose tags were asked (fetch, tag push). */
+  remoteTagsKnown?: string[] | null
 }
 export type GitConfig = {
   userName: string | null

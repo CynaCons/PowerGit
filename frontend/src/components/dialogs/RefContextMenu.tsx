@@ -1,6 +1,7 @@
 import BuildIcon from "@mui/icons-material/Build"
 import CallMergeIcon from "@mui/icons-material/CallMerge"
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
+import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined"
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined"
 import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined"
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
@@ -10,12 +11,14 @@ import ListItemText from "@mui/material/ListItemText"
 import Menu from "@mui/material/Menu"
 import MenuItem from "@mui/material/MenuItem"
 import type { ReactNode } from "react"
+import { tagPushTarget, useTagPlaces } from "../tagPlaces"
 
 // One menu for every ref, wherever the user right-clicks it (v0.15.0): the
 // chips on a graph row and the rows of the repository tree. The entries are
 // Git Extensions' own (checkout, merge into current, rebase current onto,
 // delete / fetch), and the tree keeps its historic `tree-*` testids so the
-// specs that drive it still hold.
+// specs that drive it still hold. v0.21.16: a tag the push remote lacks
+// offers "Push tag to origin".
 
 export type RefMenuKind = "local" | "remote" | "tag" | "submodule"
 
@@ -37,15 +40,16 @@ export type RefMenuActions = {
   onFetchRemote: (remote: string) => void
   onConfigureRemote?: (remote: string) => void
   onOpenSubmodule?: (path: string) => void
+  onPushTag?: (name: string, remote: string) => void
 }
 
-type Action = "checkout" | "merge" | "rebase" | "delete" | "fetch" | "configure" | "open-submodule"
+type Action = "checkout" | "merge" | "rebase" | "delete" | "fetch" | "configure" | "open-submodule" | "push-tag"
 
 type Entry = { action: Action; label: string; icon: ReactNode; disabled?: boolean }
 
 const remoteOf = (name: string) => name.split("/")[0] ?? name
 
-function entries(target: RefMenuTarget, tree: boolean): Entry[] {
+function entries(target: RefMenuTarget, tree: boolean, pushTo: string | null): Entry[] {
   const checkout: Entry = {
     action: "checkout",
     label: target.kind === "tag" ? "Checkout tag" : "Checkout branch",
@@ -94,7 +98,19 @@ function entries(target: RefMenuTarget, tree: boolean): Entry[] {
           : []),
       ]
     case "tag":
-      return [checkout, { action: "delete", label: "Delete tag…", icon: <DeleteOutlineIcon fontSize="small" /> }]
+      return [
+        checkout,
+        ...(pushTo
+          ? [
+              {
+                action: "push-tag" as const,
+                label: `Push tag to ${pushTo}`,
+                icon: <CloudUploadOutlinedIcon fontSize="small" />,
+              },
+            ]
+          : []),
+        { action: "delete", label: "Delete tag…", icon: <DeleteOutlineIcon fontSize="small" /> },
+      ]
     case "submodule":
       return [{ action: "open-submodule", label: "Open submodule", icon: <FolderOutlinedIcon fontSize="small" /> }]
   }
@@ -132,6 +148,8 @@ export function RefContextMenu({
   onClose: () => void
 }) {
   const tree = variant === "tree"
+  const tags = useTagPlaces()
+  const pushTo = target?.kind === "tag" && actions.onPushTag ? tagPushTarget(target.name, tags) : null
   const run = (action: Action) => () => {
     onClose()
     if (!target) return
@@ -150,6 +168,8 @@ export function RefContextMenu({
         return actions.onConfigureRemote?.(remoteOf(target.name))
       case "open-submodule":
         return actions.onOpenSubmodule?.(target.name)
+      case "push-tag":
+        return pushTo ? actions.onPushTag?.(target.name, pushTo) : undefined
     }
   }
 
@@ -163,7 +183,7 @@ export function RefContextMenu({
       slotProps={{ paper: { id: "ref-context-menu", sx: { minWidth: 240 } } }}
       data-testid={tree ? "tree-context-menu" : "ref-context-menu"}
     >
-      {(target ? entries(target, tree) : []).map((entry) => (
+      {(target ? entries(target, tree, pushTo) : []).map((entry) => (
         <MenuItem
           key={entry.action}
           data-testid={testid(entry.action, target!.kind, tree)}

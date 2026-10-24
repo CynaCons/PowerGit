@@ -9,6 +9,7 @@ import { checkState, toggleNames } from "./repoTreeChecks"
 import { RepoTreeHeader } from "./RepoTreeHeader"
 import { ROW_HEIGHT, SECTION_HEIGHT, SectionHeader, TreeRow, type Item } from "./RepoTreeRows"
 import { paneSx } from "../theme/panels"
+import { placeOf, tagTitle, useTagPlaces } from "./tagPlaces"
 
 type Props = {
   tree: RefTree | null
@@ -25,6 +26,8 @@ type Props = {
   /** v0.15.0: the ref menu's merge/rebase entries. */
   onMergeRef?: (name: string) => void
   onRebaseOnto?: (name: string) => void
+  /** v0.21.16: a tag's "Push tag to origin". */
+  onPushTag?: (name: string, remote: string) => void
 }
 
 type TreeNode = {
@@ -106,6 +109,7 @@ function RepoTreeImpl({
   onOpenSubmodule,
   onMergeRef,
   onRebaseOnto,
+  onPushTag,
 }: Props) {
   const [ctx, setCtx] = useState<CtxMenu | null>(null)
   const [filter, setFilter] = useState("")
@@ -153,6 +157,7 @@ function RepoTreeImpl({
 
   const remoteTotal = tree?.remotes.length ?? 0
   const tagTotal = tree?.tags.length ?? 0
+  const tags = useTagPlaces()
 
   const items = useMemo(() => {
     const out: Item[] = []
@@ -193,6 +198,12 @@ function RepoTreeImpl({
         : {}
     const groupCheck = (names: string[]): Partial<Item> =>
       mode && names.length > 0 ? { checked: checkState(names, ticked, currentRef), onCheck: () => toggle(names) } : {}
+    // A tag leaf says where it is (v0.21.16): the cloud and the tooltip.
+    const leafTag = (icon: Item["icon"], full: string): Partial<Item> => {
+      if (icon !== "tag") return {}
+      const place = placeOf(full, tags)
+      return { tagWhere: place.where, title: tagTitle(full, place) }
+    }
 
     const leafCtx = (icon: Item["icon"], full: string): ((x: number, y: number) => void) | undefined => {
       switch (icon) {
@@ -248,6 +259,7 @@ function RepoTreeImpl({
             },
             onContext: node.current ? undefined : (leafCtx(icon, full) ?? dirCtx),
             ...leafCheck(node.refName, node.current),
+            ...leafTag(icon, full),
           })
         }
       }
@@ -270,6 +282,7 @@ function RepoTreeImpl({
             onClick: () => onSelectTarget?.(item.target),
             onContext: item.current ? undefined : leafCtx(icon, item.name),
             ...leafCheck(item.fullName, item.current),
+            ...leafTag(icon, item.name),
           })
         }
       }
@@ -340,6 +353,7 @@ function RepoTreeImpl({
     mode,
     ticked,
     currentRef,
+    tags,
   ])
 
   const virtualizer = useVirtualizer({
@@ -407,6 +421,7 @@ function RepoTreeImpl({
           onFetchRemote: (name) => onFetchRemote?.(name),
           onConfigureRemote: (name) => onConfigureRemote?.(name),
           onOpenSubmodule: (path) => onOpenSubmodule?.(path),
+          onPushTag: onPushTag ? (name, remote) => onPushTag(name, remote) : undefined,
         }}
       />
     </Paper>

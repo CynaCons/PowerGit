@@ -6,9 +6,11 @@ import { OptionRow } from "./OptionRow"
 import { RefChip } from "./QuotedRef"
 import { QuotedRow } from "./QuotedRow"
 import { refNameError } from "./refName"
+import { useTagPlaces } from "../tagPlaces"
 
-/** What the dialog hands back (v0.18.11): Git Extensions FormCreateBranch's two boxes, FormCreateTag's message. */
-export type CreateRefOptions = { checkout: boolean; orphan: boolean; message: string | null }
+/** What the dialog hands back (v0.18.11): Git Extensions FormCreateBranch's two boxes, FormCreateTag's message;
+ *  v0.21.16: the remote to push a new tag to, as GE's "Push tag to origin". */
+export type CreateRefOptions = { checkout: boolean; orphan: boolean; message: string | null; push?: string | null }
 
 // Create branch / Create tag on the A shell (v0.18.11, owner: "The overlay
 // popup for 'Create branch' on the main graph is rather bad visually"): the
@@ -42,6 +44,8 @@ export function CreateRefDialog({
   const [checkout, setCheckout] = useState(true)
   const [orphan, setOrphan] = useState(false)
   const [message, setMessage] = useState("")
+  const [push, setPush] = useState(false)
+  const { pushRemote } = useTagPlaces()
   const clean = name.trim()
   const reason = refNameError(clean, existingNames)
   const valid = reason === null
@@ -53,6 +57,7 @@ export function CreateRefDialog({
         checkout: kind === "branch" && (checkout || orphan),
         orphan: kind === "branch" && orphan,
         message: kind === "tag" && message.trim() ? message.trim() : null,
+        push: kind === "tag" && push ? pushRemote : null,
       }),
     onClose,
   })
@@ -63,6 +68,7 @@ export function CreateRefDialog({
     setCheckout(true)
     setOrphan(false)
     setMessage("")
+    setPush(false)
   }, [open])
 
   const label =
@@ -132,14 +138,26 @@ export function CreateRefDialog({
           />
         </>
       ) : (
-        <Field label="Message" caption="a message makes an annotated tag">
-          <TextArea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            aria-label="Tag message"
-            data-testid="create-ref-message"
-          />
-        </Field>
+        <>
+          <Field label="Message" caption="a message makes an annotated tag">
+            <TextArea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              aria-label="Tag message"
+              data-testid="create-ref-message"
+            />
+          </Field>
+          {pushRemote && (
+            <OptionRow
+              kind="checkbox"
+              checked={push}
+              onChange={setPush}
+              label={`Push to ${pushRemote}`}
+              explain="after the tag is created"
+              testid="create-ref-push"
+            />
+          )}
+        </>
       )}
       <OpError error={error} />
     </OpDialog>

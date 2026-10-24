@@ -246,6 +246,8 @@ public sealed partial class GitHost
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim());
         }
 
+        // v0.21.16: which tags the remote has (GitHost.RemoteTags.cs).
+        RecordRemoteTags(root, remote, ct);
         return string.IsNullOrWhiteSpace(result.StdErr) ? result.StdOut.Trim() : result.StdErr.Trim();
     }
 
@@ -283,6 +285,7 @@ public sealed partial class GitHost
             throw new InvalidOperationException(result.StdErr.Trim());
         }
 
+        if (exists) ForgetRemoteTags(root, name);
         return new RemoteInfoDto(name, url);
     }
 

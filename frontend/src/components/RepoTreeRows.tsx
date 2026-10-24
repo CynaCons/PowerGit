@@ -9,6 +9,7 @@ import Box from "@mui/material/Box"
 import Checkbox from "@mui/material/Checkbox"
 import Typography from "@mui/material/Typography"
 import type { ReactNode } from "react"
+import type { TagWhere } from "./tagPlaces"
 
 // Row primitives for RepoTree: one flat Item per visible line, drawn either
 // as a section header or a tree row. The tree model lives in RepoTree.tsx.
@@ -32,6 +33,9 @@ export type Item = {
   /** The checked-out branch: ticked, disabled, with a lock after the label. */
   locked?: boolean
   onCheck?: () => void
+  /** v0.21.16, tag leaves: where the tag is; "remote" draws a cloud after the name. */
+  tagWhere?: TagWhere
+  title?: string
 }
 
 // Uniform row geometry for every node in the tree:
@@ -93,6 +97,8 @@ export function TreeRow({ item, style }: { item: Item; style: React.CSSPropertie
       data-testid="tree-row"
       data-depth={item.depth}
       data-label={item.label}
+      data-tag-where={item.tagWhere}
+      title={item.title}
       onClick={item.onClick}
       onContextMenu={
         item.onContext
@@ -169,6 +175,9 @@ export function TreeRow({ item, style }: { item: Item; style: React.CSSPropertie
         {item.label}
         {item.count !== undefined ? ` (${item.count})` : ""}
       </Typography>
+      {item.tagWhere === "remote" && (
+        <CloudOutlinedIcon data-testid="tree-tag-cloud" sx={{ fontSize: 12, ml: 0.5, color: "text.secondary" }} />
+      )}
       {item.locked && (
         <Box
           component="span"

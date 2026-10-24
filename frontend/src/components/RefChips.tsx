@@ -2,7 +2,8 @@ import CallSplitIcon from "@mui/icons-material/CallSplit"
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined"
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined"
 import { memo, useMemo } from "react"
-import { chipWidth, foldRefs, kindOf, orderRefs, type RefKind } from "./refChipsModel"
+import { CHIP_GLYPH, chipWidth, foldRefs, kindOf, orderRefs, type RefKind } from "./refChipsModel"
+import { placeOf, tagTitle, useTagPlaces } from "./tagPlaces"
 
 export type { RefKind } from "./refChipsModel"
 export type RefMenuKind = "local" | "remote" | "tag"
@@ -53,11 +54,17 @@ export const RefChips = memo(function RefChips({
   onRefContextMenu,
 }: Props) {
   const ctx = useMemo(() => ({ current, tagSet, remoteNames }), [current, tagSet, remoteNames])
+  const tags = useTagPlaces()
   const ordered = useMemo(() => orderRefs(refs, ctx), [refs, ctx])
   const fold = useMemo(() => {
     if (expanded || budget === undefined) return { shown: ordered, hidden: [] as string[] }
-    return foldRefs(ordered, budget, (ref) => chipWidth(ref, kindOf(ref, ctx)))
-  }, [ordered, ctx, budget, expanded])
+    return foldRefs(ordered, budget, (ref) => {
+      const kind = kindOf(ref, ctx)
+      // A tag a remote has carries the cloud too (v0.21.16).
+      const cloud = kind === "tag" && placeOf(ref, tags).where === "remote" ? CHIP_GLYPH : 0
+      return chipWidth(ref, kind) + cloud
+    })
+  }, [ordered, ctx, budget, expanded, tags])
   // The group stays in the DOM when there are no refs: the message cell's
   // gap after it is what aligns the text of every row.
   return (
@@ -65,13 +72,15 @@ export const RefChips = memo(function RefChips({
       {fold.shown.map((ref) => {
         const kind = kindOf(ref, ctx)
         const menuKind = kind === "local" || kind === "remote" || kind === "tag" ? kind : null
+        const place = kind === "tag" ? placeOf(ref, tags) : null
         return (
           <span
             key={ref}
             className={`ref${kind === "local" ? "" : ` ${kind}`}${big ? " big" : ""}${onRefClick && menuKind ? " clickable" : ""}`}
             data-ref-kind={kind}
             data-ref={ref}
-            title={ref}
+            data-tag-where={place?.where}
+            title={place ? tagTitle(ref, place) : ref}
             onClick={
               onRefClick && menuKind
                 ? (e) => {
@@ -90,7 +99,7 @@ export const RefChips = memo(function RefChips({
                 : undefined
             }
           >
-            <Glyph kind={kind} />
+            <Glyph kind={kind} onRemote={place?.where === "remote"} />
             {ref}
           </span>
         )
@@ -115,12 +124,21 @@ export const RefChips = memo(function RefChips({
 })
 
 /** The kind's glyph, also on a single chip drawn outside a row (dialogs, v0.18.11). */
-export function Glyph({ kind }: { kind: RefKind }) {
+export function Glyph({ kind, onRemote }: { kind: RefKind; onRemote?: boolean }) {
   // v0.13.19, owner: "a little cloud icon on the left of the remote branches";
   // v0.14.0: "tags should be having a different little icon"; v0.18.3: "with
-  // the icon to differentiate the local and remote" — the fork on locals.
+  // the icon to differentiate the local and remote" — the fork on locals;
+  // v0.21.16: a tag a remote has gets the cloud beside its tag.
   if (kind === "local") return <CallSplitIcon className="ref-cloud" />
   if (kind === "remote") return <CloudOutlinedIcon className="ref-cloud" />
-  if (kind === "tag") return <SellOutlinedIcon className="ref-cloud" />
+  if (kind === "tag")
+    return onRemote ? (
+      <>
+        <SellOutlinedIcon className="ref-cloud" />
+        <CloudOutlinedIcon className="ref-cloud" data-testid="tag-cloud" />
+      </>
+    ) : (
+      <SellOutlinedIcon className="ref-cloud" />
+    )
   return null
 }

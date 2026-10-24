@@ -50,7 +50,8 @@ export function remoteHeadTarget(
   const tip = remotes.find((r) => r.name === ref)?.target
   if (!tip) return ref
   const same = remotes.filter((r) => r.name !== ref && r.name.startsWith(remote + "/") && r.target === tip)
-  const pick = same.find((r) => r.name === `${remote}/main`) ?? same.find((r) => r.name === `${remote}/master`) ?? same[0]
+  const pick =
+    same.find((r) => r.name === `${remote}/main`) ?? same.find((r) => r.name === `${remote}/master`) ?? same[0]
   return pick?.name ?? ref
 }
 

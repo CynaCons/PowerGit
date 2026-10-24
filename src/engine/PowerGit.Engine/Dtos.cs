@@ -223,15 +223,27 @@ public sealed record RepoStatusDto(
     // therefore leaves out of `status`; never counted in UnstagedCount.
     StatusFileDto[]? Hidden = null);
 
-public sealed record RefItemDto(string Name, string FullName, string Target, bool Current);
+/// <summary>
+/// <paramref name="Remotes"/> (v0.21.16, tags only): the remotes known to have
+/// the tag with the same object; null on branches.
+/// </summary>
+public sealed record RefItemDto(string Name, string FullName, string Target, bool Current, string[]? Remotes = null);
 
 public sealed record SubmoduleDto(string Name, string Path, string? Head);
 
+/// <summary>
+/// <paramref name="RemoteTagsKnown"/> (v0.21.16): the remotes whose tags were
+/// asked (on fetch or tag push); a tag missing from one of them is local.
+/// </summary>
 public sealed record RefTreeDto(
     RefItemDto[] Branches,
     RefItemDto[] Remotes,
     RefItemDto[] Tags,
-    SubmoduleDto[] Submodules);
+    SubmoduleDto[] Submodules,
+    string[]? RemoteTagsKnown = null);
+
+/// <summary>POST /tags/push (v0.21.16).</summary>
+public sealed record PushTagRequest(string Name, string Remote);
 
 public sealed record GitConfigDto(
     string? UserName,

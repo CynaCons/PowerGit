@@ -881,6 +881,30 @@ repo.MapPost("/branches/delete", (NameRequest body, GitHost git) =>
     }
 });
 
+// v0.21.16: push one tag. A network job like /push (the path ends in
+// "/push", so the filter above lets the job take the gate itself).
+repo.MapPost("/tags/push", (PushTagRequest body, GitHost git, string repo) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Name) || string.IsNullOrWhiteSpace(body.Remote))
+    {
+        return Results.BadRequest(new ErrorResponse("tag name and remote are required"));
+    }
+
+    try
+    {
+        string id = git.StartJob("push", ct => git.PushTag(body.Name, body.Remote, ct), $"git push {body.Remote} refs/tags/{body.Name}");
+        return Results.Accepted($"/repos/{repo}/jobs/{id}", new JobStartedDto(id, "push"));
+    }
+    catch (RepoBusyException busy)
+    {
+        return Results.Json(new BusyResponse(busy.Message, busy.Running), statusCode: StatusCodes.Status409Conflict);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new ErrorResponse(ex.Message), statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 repo.MapPost("/tags/delete", (NameRequest body, GitHost git) =>
 {
     try
