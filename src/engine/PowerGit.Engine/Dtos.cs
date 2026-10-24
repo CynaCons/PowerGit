@@ -101,7 +101,8 @@ public sealed record AgentReviewDto(
     AgentReviewResolutionDto? Resolution, string? Reason,
     string? Board = null, long BoardCursor = 0,
     IReadOnlyList<AgentReviewRoundDto>? Rounds = null,
-    IReadOnlyList<AgentReviewThreadDto>? Comments = null);
+    IReadOnlyList<AgentReviewThreadDto>? Comments = null,
+    string? Kind = null);
 /// <summary>One change (a diff hunk) of a round. Origin: new / carried / revised;
 ///  verdict: accept / reject / mixed / undecided, stamped when the round is sent.</summary>
 public sealed record AgentReviewChangeDto(
@@ -110,7 +111,7 @@ public sealed record AgentReviewChangeDto(
 public sealed record AgentReviewRoundDto(
     int N, string OpenedAt, string? SentAt, string? Note,
     IReadOnlyList<AgentReviewFileDto> Files, IReadOnlyList<AgentReviewChangeDto> Changes,
-    IReadOnlyList<string> Removed);
+    IReadOnlyList<string> Removed, BranchPlanPreviewDto? Plan = null);
 public sealed record AgentReviewReplyDto(string Author, string Body, string At, long? BoardId);
 /// <summary>A comment with its id (c1, c2 …), the line key it sits on and the
 ///  agent's replies. Kind: round (sent with the round) or ask (posted at once);
@@ -123,7 +124,7 @@ public sealed record AgentReviewThreadDto(
 public sealed record AgentReviewSummaryDto(
     string Id, string Mode, string Title, string? Agent, string? Branch,
     int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt,
-    int Round = 1, string? Turn = null, string? Board = null, string? LastRead = null);
+    int Round = 1, string? Turn = null, string? Board = null, string? LastRead = null, string? Kind = null);
 public sealed record AgentReviewRequest(
     string Mode, string Title, string? Why, string? Agent, string? Branch,
     string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files,

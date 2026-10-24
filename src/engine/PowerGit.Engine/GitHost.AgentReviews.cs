@@ -365,9 +365,10 @@ public sealed partial class GitHost
 
     private static int LineNumber(string line) => int.TryParse(line.AsSpan(1), out int value) ? value : int.MaxValue;
     private static string Timestamp() => DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture);
+    // v0.22.0: a branch plan counts its steps where a review counts files.
     private static AgentReviewSummaryDto ToSummary(AgentReviewDto s) =>
-        new(s.Id, s.Mode, s.Title, s.Agent, s.Branch, s.Files.Count, s.Status, s.Unread, s.CreatedAt, s.UpdatedAt,
-            LatestRound(s)?.N ?? 1, TurnOf(s), s.Board);
+        new(s.Id, s.Mode, s.Title, s.Agent, s.Branch, s.Kind == "plan" ? LatestRound(s)?.Plan?.Steps.Count ?? 0 : s.Files.Count,
+            s.Status, s.Unread, s.CreatedAt, s.UpdatedAt, LatestRound(s)?.N ?? 1, TurnOf(s), s.Board, Kind: s.Kind);
 }
 
 public sealed class AgentReviewStateException(string message) : InvalidOperationException(message);

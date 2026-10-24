@@ -4,7 +4,113 @@ namespace PowerGit.Engine.Mcp;
 
 public sealed class McpTools(RepoRegistry registry)
 {
-    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise", "agent_review_comment"];
+    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise", "agent_review_comment",
+        "branch_plan_preview", "branch_plan_open", "branch_plan_wait", "branch_plan_get", "branch_plan_revise", "branch_plan_cancel"];
+
+    private static readonly JsonSerializerOptions StepJson = new(JsonSerializerDefaults.Web);
+
+    // v0.22.0: branch plans (docs/agents/mcp-agent-review.md "Branch plans").
+    // A plan is an agent review of kind "plan"; these tools speak in steps.
+
+    public object PlanPreview(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        return PreviewPayload(host.PreviewBranchPlan(Steps(args)));
+    }
+
+    public object PlanOpen(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        AgentReviewDto session = host.CreateBranchPlan(new(Required(args, "mode"), Required(args, "title"), String(args, "why"),
+            String(args, "agent"), Steps(args), String(args, "board"), PlanExplanations(args)));
+        return PlanPayload(host, session, false);
+    }
+
+    public async Task<object> PlanWait(JsonElement args, CancellationToken ct)
+    {
+        GitHost host = Host(args, out _);
+        int timeout = args.TryGetProperty("timeout_ms", out JsonElement value) && value.TryGetInt32(out int parsed) ? parsed : 120_000;
+        AgentReviewWaitDto waited = await host.WaitAgentReview(Required(args, "plan_id"), timeout, ct);
+        return PlanPayload(host, waited.Session, waited.TimedOut);
+    }
+
+    public object PlanGet(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        AgentReviewDto session = host.GetAgentReview(Required(args, "plan_id")) ?? throw new KeyNotFoundException("branch plan not found");
+        return PlanPayload(host, session, false);
+    }
+
+    public object PlanRevise(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        List<AgentReviewReplyRequest> replies = [];
+        if (args.TryGetProperty("replies", out JsonElement list) && list.ValueKind == JsonValueKind.Array)
+            foreach (JsonElement reply in list.EnumerateArray()) replies.Add(new(Required(reply, "comment"), Required(reply, "body")));
+        IReadOnlyList<BranchPlanStepRequest>? steps = args.TryGetProperty("steps", out _) ? Steps(args) : null;
+        AgentReviewDto session = host.ReviseBranchPlan(Required(args, "plan_id"), new(String(args, "note"), steps, replies, PlanExplanations(args)));
+        return PlanPayload(host, session, false);
+    }
+
+    public object PlanCancel(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        AgentReviewDto session = host.ResolveAgentReview(Required(args, "plan_id"), new("cancel", null, String(args, "reason") ?? "agent"));
+        return PlanPayload(host, session, false);
+    }
+
+    private static IReadOnlyList<BranchPlanStepRequest> Steps(JsonElement args)
+    {
+        if (!args.TryGetProperty("steps", out JsonElement steps) || steps.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("steps must be an array");
+        return JsonSerializer.Deserialize<BranchPlanStepRequest[]>(steps.GetRawText(), StepJson) ?? [];
+    }
+
+    private static IReadOnlyList<BranchPlanExplainRequest>? PlanExplanations(JsonElement args)
+    {
+        if (!args.TryGetProperty("explanations", out JsonElement list)) return null;
+        if (list.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("explanations must be an array");
+        return [.. list.EnumerateArray().Select(e => new BranchPlanExplainRequest(
+            e.TryGetProperty("step", out JsonElement n) && n.TryGetInt32(out int step) ? step : 0, Required(e, "body")))];
+    }
+
+    private static object StepPayload(BranchPlanStepDto x) => new
+    {
+        x.N, x.Op, x.Text, x.Result, x.Because, x.Commands, x.Done,
+        conflicts = x.Conflicts?.Select(c => c.Path),
+    };
+
+    private static object PreviewPayload(BranchPlanPreviewDto plan) => new
+    {
+        steps = plan.Steps.Select(StepPayload),
+        branches_after = plan.Refs.Where(r => r.Kind is "local" or "tag").Select(r => new
+        {
+            name = r.Name, kind = r.Kind,
+            at = r.At[^1].Node is { } node ? plan.Nodes.FirstOrDefault(x => x.Id == node) is { } n ? n.Sha ?? $"planned: {n.Subject}" : node : null,
+        }),
+        truncated = plan.Truncated,
+    };
+
+    private static object PlanPayload(GitHost host, AgentReviewDto session, bool timedOut)
+    {
+        if (session.Kind != "plan") throw new InvalidOperationException("this agent review is not a branch plan; use agent_review_get");
+        AgentReviewDto state = host.WithBranchPlanState(session);
+        AgentReviewRoundDto round = state.Rounds![^1];
+        BranchPlanPreviewDto plan = round.Plan!;
+        return new
+        {
+            plan_id = state.Id, state.Status, state.Mode, state.Title,
+            round = round.N, rounds = state.Rounds!.Count, turn = GitHost.TurnOf(state), board = state.Board,
+            timed_out = timedOut, note = round.Note, sent_at = round.SentAt,
+            steps = plan.Steps.Select(StepPayload),
+            moved = plan.Moved,
+            comments = (state.Comments ?? []).Select(t => new
+            {
+                t.Id, t.Round, step = t.Path == "plan" && int.TryParse(t.Line.AsSpan(1), out int s) ? s : (int?)null, t.Body, t.Kind,
+                author = t.Author ?? GitHost.BoardHuman,
+                replies = t.Replies.Select(r => new { r.Author, r.Body, r.At }),
+            }),
+        };
+    }
 
     public object Open(JsonElement args, CancellationToken ct)
     {

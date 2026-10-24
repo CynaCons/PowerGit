@@ -47,6 +47,12 @@ public sealed partial class GitHost
 
     partial void AfterRoundOpened(AgentReviewDto session, AgentReviewRoundDto round)
     {
+        // v0.22.0: a branch plan's round says its steps and their risks.
+        if (session.Kind == "plan" && round.Plan is not null)
+        {
+            PostToBoard(session, BoardEvents, PlanOpenedText(session, round) + $"\nReply with `cN: <answer>`.\nplan_id={session.Id}");
+            return;
+        }
         StringBuilder text = new();
         int files = round.Files.Count, changes = round.Changes.Count;
         if (round.N == 1)
@@ -72,7 +78,7 @@ public sealed partial class GitHost
     }
 
     partial void AfterRoundSent(AgentReviewDto session, AgentReviewRoundDto round) =>
-        PostToBoard(session, BoardHuman, RoundText(session, round));
+        PostToBoard(session, BoardHuman, session.Kind == "plan" ? PlanSentText(session, round) : RoundText(session, round));
 
     /// <summary>The round as the agent reads it on the board (design §4.3).</summary>
     public static string RoundText(AgentReviewDto session, AgentReviewRoundDto round)
@@ -110,7 +116,13 @@ public sealed partial class GitHost
     partial void AfterClosed(AgentReviewDto session)
     {
         AgentReviewRoundDto? round = LatestRound(session);
-        if (session.Status == "approved")
+        if (session.Status == "approved" && session.Kind == "plan")
+        {
+            int steps = round?.Plan?.Steps.Count ?? 0;
+            PostToBoard(session, BoardHuman, $"Approved · plan {Short(session.Id)} · round {round?.N ?? 1} · run steps 1 to {steps}"
+                + (session.Resolution?.Summary is { Length: > 0 } planNote ? "\n" + planNote : ""));
+        }
+        else if (session.Status == "approved")
         {
             int accepted = round?.Changes.Count(c => c.Verdict == "accept") ?? 0, total = round?.Changes.Count ?? 0;
             PostToBoard(session, BoardHuman, $"Approved · review {Short(session.Id)} · round {round?.N ?? 1} · {accepted} of {total} changes accepted"
@@ -202,7 +214,8 @@ public sealed partial class GitHost
             if (at < 0) throw new KeyNotFoundException($"no comment {comment}");
             if (threads[at].Kind == "withdrawn") throw new AgentReviewStateException($"{comment} was withdrawn");
             PowerChannel board = Board() ?? throw new InvalidOperationException(BoardStatus().Reason ?? "powerchannel not available");
-            PowerChannel.Message posted = board.Post(BoardHuman, session.Board, $"{comment} · {threads[at].Path}:{threads[at].Line[1..]}\n{text}");
+            string where = threads[at].Path == "plan" ? $"step {threads[at].Line[1..]}" : $"{threads[at].Path}:{threads[at].Line[1..]}";
+            PowerChannel.Message posted = board.Post(BoardHuman, session.Board, $"{comment} · {where}\n{text}");
             threads[at] = threads[at] with { Replies = [.. threads[at].Replies, new(BoardHuman, text, Timestamp(), posted.Id)] };
             WriteAgentReview(session with { Comments = threads, UpdatedAt = Timestamp() });
             return threads[at];

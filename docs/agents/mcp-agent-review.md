@@ -89,6 +89,41 @@ Explain what a diff cannot say: why this approach, what was ruled out, what a re
 ]
 ```
 
+## Branch plans
+
+Since v0.22.0 an agent can plan branch work before doing it: rebases, new branches, commits, merges, tags and deletions. PowerGit plays the plan on the repository's graph and checks each step with git; the owner sees it on PowerGit's own graph, scrubs through it step by step, comments on steps, and approves or sends it back. Nothing moves until you run the steps yourself, after approval; PowerGit then ticks each step as the refs show it ran.
+
+- `branch_plan_preview` `{ repo_path, steps }` — checks without opening anything. Returns `steps: [{ n, op, text, result, because, commands, conflicts }]` and `branches_after`.
+- `branch_plan_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, steps, explanations?: [{ step, body }], board? }` — opens round 1. A step whose result is `invalid` refuses the call with its reason.
+- `branch_plan_wait` `{ repo_path, plan_id, timeout_ms? }` — returns when the owner sends the plan back, approves or cancels it; `timed_out: true` means call again.
+- `branch_plan_get` `{ repo_path, plan_id }` — the latest round: steps with checks, `done` per step once approved, `moved` (refs that moved since the check), and comments with their `step`.
+- `branch_plan_revise` `{ repo_path, plan_id, note?, steps?, replies?: [{ comment, body }], explanations? }` — the next round; without `steps` the same steps are checked again.
+- `branch_plan_cancel` `{ repo_path, plan_id, reason? }`.
+
+Steps, in order:
+
+```json
+[
+  { "op": "rebase", "branch": "feature/auth", "onto": "main" },
+  { "op": "branch", "name": "feature/billing", "from": "feature/auth" },
+  { "op": "commit", "on": "feature/billing", "subject": "billing: plan model", "files": ["src/billing/plan.ts"] },
+  { "op": "merge", "from": "feature/billing", "into": "feature/auth", "mode": "no-ff" },
+  { "op": "merge", "from": "feature/auth", "into": "main", "mode": "no-ff" },
+  { "op": "tag", "name": "v1.5", "at": "main" },
+  { "op": "delete", "branch": "feature/billing" }
+]
+```
+
+What each check means:
+
+- `ok`: git or the refs say it works (a merge into a branch the other side already contains, a clean `git merge-tree`, a free name).
+- `conflict`: `git merge-tree --write-tree` stops; `conflicts` names the files, and the owner sees both sides' change to each. A rebase is checked as the merge of its two tips.
+- `risk`: planned commits' declared `files` overlap the other side's changes, or a delete would lose commits.
+- `unknown`: planned commits nobody can check yet. Declare `files` on planned commits so merges after them can be checked for overlap.
+- `invalid`: it cannot run (a missing ref, a taken name, a fast-forward that is not one).
+
+The loop is the review's: comments on steps come on the board as `cN · step n` and with the round when it is sent (`Round n sent · plan …`, one line per comment); answer with `cN: …` or `replies` on revise. After `Approved · plan … · run steps 1 to N`, run the steps with git in order; `branch_plan_get` shows them `done` as the refs move. If the owner's repository moves while the plan waits (`moved` is not empty), PowerGit offers to check it again.
+
 ## Reviewing beside the owner
 
 Since v0.21.14 other agents can review a round alongside the owner, so a review mixes agents and the owner on the same changes. A reviewer agent:

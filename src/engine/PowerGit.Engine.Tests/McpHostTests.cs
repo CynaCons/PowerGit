@@ -116,6 +116,37 @@ public sealed class McpHostTests
         Assert.Equal("codex-review", all.GetProperty("comments")[0].GetProperty("author").GetString());
     }
 
+    // v0.22.0: a branch plan over MCP: previewed, opened, waited on and read back.
+    [Fact]
+    public async Task A_branch_plan_is_previewed_opened_and_read_back()
+    {
+        await using Harness h = await Harness.Start(); await using Client c = await h.Connect();
+        string branch = h.Repo.Output("branch", "--show-current").Trim();
+        var steps = new object[]
+        {
+            new { op = "branch", name = "topic", from = branch },
+            new { op = "commit", on = "topic", subject = "topic work", files = new[] { "t.txt" } },
+            new { op = "merge", from = "topic", into = branch },
+        };
+        JsonElement preview = await c.Tool("branch_plan_preview", new { repo_path = h.Repo.Dir, steps });
+        Assert.Equal(["ok", "unknown", "ok"], preview.GetProperty("steps").EnumerateArray().Select(s => s.GetProperty("result").GetString()));
+        Assert.Contains(preview.GetProperty("branches_after").EnumerateArray(), b => b.GetProperty("name").GetString() == "topic");
+
+        JsonElement opened = await c.Tool("branch_plan_open", new { repo_path = h.Repo.Dir, mode = "wait", title = "Topic", agent = "planner", steps, explanations = new[] { new { step = 2, body = "one commit" } } });
+        string id = opened.GetProperty("plan_id").GetString()!;
+        Assert.Equal((1, "user"), (opened.GetProperty("round").GetInt32(), opened.GetProperty("turn").GetString()));
+        Assert.Equal(2, opened.GetProperty("comments")[0].GetProperty("step").GetInt32());
+        JsonElement timed = await c.Tool("branch_plan_wait", new { repo_path = h.Repo.Dir, plan_id = id, timeout_ms = 1000 });
+        Assert.True(timed.GetProperty("timed_out").GetBoolean());
+        h.Host.ResolveAgentReview(id, new("approve", null, null));
+        JsonElement got = await c.Tool("branch_plan_get", new { repo_path = h.Repo.Dir, plan_id = id });
+        Assert.Equal("approved", got.GetProperty("status").GetString());
+        Assert.False(got.GetProperty("steps")[0].GetProperty("done").GetBoolean());
+        JsonElement bad = await c.Raw("tools/call", new { name = "branch_plan_open", arguments = new { repo_path = h.Repo.Dir, mode = "wait", title = "Bad", steps = new[] { new { op = "merge", from = "nope", into = branch } } } }, result: true);
+        Assert.True(bad.GetProperty("isError").GetBoolean());
+        Assert.Contains("step 1 cannot run", bad.GetProperty("content")[0].GetProperty("text").GetString());
+    }
+
     [Fact]
     public async Task Unknown_method_is_minus_32601_and_second_connection_pings_while_first_waits()
     {

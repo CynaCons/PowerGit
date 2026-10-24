@@ -243,7 +243,8 @@ repo.AddEndpointFilter(async (ctx, next) =>
     bool isReadPost = HttpMethods.IsPost(method) && path.EndsWith("/revisions", StringComparison.Ordinal);
     // Review and agent-session saves are files beside git and must never 409 while a pull holds the gate.
     bool isReview = path.Contains("/reviews/", StringComparison.Ordinal)
-        || path.Contains("/agent-reviews", StringComparison.Ordinal);
+        || path.Contains("/agent-reviews", StringComparison.Ordinal)
+        || path.Contains("/branch-plans", StringComparison.Ordinal);
     try
     {
         if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || isJob || isReadPost || isReview)
@@ -689,7 +690,8 @@ repo.MapGet("/agent-reviews/{sid}", (string sid, GitHost git) =>
     try
     {
         AgentReviewDto? session = git.GetAgentReview(sid);
-        return session is null ? Results.Json(new ErrorResponse("agent review session not found"), statusCode: 404) : Results.Ok(session);
+        // v0.22.0: a branch plan reads with what moved and what has run.
+        return session is null ? Results.Json(new ErrorResponse("agent review session not found"), statusCode: 404) : Results.Ok(git.WithBranchPlanState(session));
     }
     catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
 });
@@ -766,6 +768,26 @@ repo.MapGet("/agent-reviews/{sid}/board", (string sid, long? after, GitHost git)
 
 repo.MapPost("/agent-reviews/{sid}/board", (string sid, BoardPostRequest body, GitHost git) =>
     AgentReviewCall(() => git.PostAgentReviewBoard(sid, body.Text ?? "")));
+
+// v0.22.0: branch plans (GitHost.BranchPlans.cs). A plan is an agent review
+// of kind "plan": send, resolve, board and wait are the review's routes.
+repo.MapPost("/branch-plans/preview", (BranchPlanPreviewRequest body, GitHost git) =>
+    AgentReviewCall(() => git.PreviewBranchPlan(body.Steps)));
+
+repo.MapPost("/branch-plans", (BranchPlanRequest body, GitHost git) =>
+{
+    try { return Results.Json(git.CreateBranchPlan(body), statusCode: StatusCodes.Status201Created); }
+    catch (InvalidOperationException ex) { return Results.Json(new ErrorResponse(ex.Message), statusCode: 400); }
+});
+
+repo.MapPost("/branch-plans/{sid}/revise", (string sid, BranchPlanReviseRequest body, GitHost git) =>
+    AgentReviewCall(() => git.ReviseBranchPlan(sid, body)));
+
+repo.MapPost("/branch-plans/{sid}/comments", (string sid, BranchPlanCommentRequest body, GitHost git) =>
+    AgentReviewCall(() => git.CommentBranchPlanStep(sid, body)));
+
+repo.MapPost("/branch-plans/{sid}/recheck", (string sid, GitHost git) =>
+    AgentReviewCall(() => git.RecheckBranchPlan(sid)));
 
 repo.MapGet("/board/status", (GitHost git) => Results.Ok(git.BoardStatus()));
 
