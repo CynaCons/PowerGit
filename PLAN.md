@@ -1080,7 +1080,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Engine: POST /agent-reviews/{sid}/comments/{cid}/replies (author human, board post cN · path:line); tests; docs. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e + shell; look at light/dark, wide/narrow; screenshots to the owner. [agent: claude]
 
-### v0.21.14 — Agent review — other agents review alongside the owner (ACTIVE)
+### v0.21.14 — Agent review — other agents review alongside the owner
 **Goal:** Owner (2026-10-22): other agents plug into a review and drop comments, so agents and humans review together.
 - [x] Owner's sentence as red e2e: a reviewer agent's comments show beside the owner's. [agent: claude]
 - [x] Engine: reviewer comments and replies, attributed, through MCP and HTTP; tests. [agent: claude]
@@ -1089,7 +1089,14 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Docs: how a reviewer agent joins a review. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e + shell; look at it. [agent: claude]
 - [x] Release v0.21.14. [agent: claude]
-- [ ] Owner ticks: agents and the owner review the same round together.
+
+### v0.21.15 — Checkout from origin/HEAD suggests the default branch's name (current) (ACTIVE)
+**Goal:** Owner (2026-10-24): checking out a remote branch suggested "HEAD" as the local name.
+- [ ] Owner's sentence as red e2e: origin/HEAD checkout suggests "HEAD".
+- [ ] Dialog resolves origin/HEAD to the branch it points at.
+- [ ] Branch name check refuses "HEAD".
+- [ ] Gate: vitest, lint, checkout e2e; smoke-test the app.
+- [ ] Owner ticks: checking out a remote branch suggests its name.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1196,3 +1203,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: both side panes resize and stay; the board reads as formatted posts; agents write Markdown. (deferred from v0.21.11: owner tick pending; plan view moved to v0.21.12 (2026-10-16))
 - Owner ticks: a comment can be removed; the right panel reads well. (deferred from v0.21.12: owner tick pending; plan view moved to v0.21.13 (2026-10-19))
 - Owner ticks: earlier comments stay visible in later rounds; answers read as a conversation. (deferred from v0.21.13: owner tick open; v0.21.14 started)
+- Owner ticks: agents and the owner review the same round together. (deferred from v0.21.14: open when the plan view moved to v0.21.15)
