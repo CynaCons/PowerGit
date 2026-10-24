@@ -109,8 +109,12 @@ test.describe("branch plans", () => {
       })
 
       await page.getByTestId("agent-reviews-button").click()
-      const row = page.getByTestId("agent-review-row").filter({ hasText: "Rebase auth, stack billing" })
-      await expect(row.filter({ hasText: basename(dir) })).toContainText("Branch plan")
+      // The inbox lists every repository's reviews: this repository's row.
+      const row = page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Rebase auth, stack billing" })
+        .filter({ hasText: basename(dir) })
+      await expect(row).toContainText("Branch plan")
       await row.click()
 
       // The plan on the graph: steps with their checks, the scrubber, the rows.
