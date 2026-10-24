@@ -1167,7 +1167,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Engine: agents attach PRs to a plan; a pr step; tests. [agent: claude]
 - [x] MCP: prs on open and revise, branch_plan_pr to update; docs. [agent: claude]
 - [x] View: PR chips beside branches, clickable, planned ones dashed. [agent: claude]
-- [ ] Gate: engine tests, vitest, lint, plan e2e; zip smoke.
+- [x] Gate: engine tests, vitest, lint, plan e2e; zip smoke. [agent: claude]
 - [ ] Release v0.22.5.
 - [ ] Owner ticks: PRs show on plans and open on click.
 
