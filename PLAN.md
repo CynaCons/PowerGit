@@ -1106,7 +1106,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Tag menu: Push tag to the remote that lacks it. [agent: claude]
 - [x] Create tag: option to push the new tag. [agent: claude]
 - [ ] Gate: engine tests, vitest, lint, tag e2e; look at it; smoke.
-- [ ] Release v0.21.16.
+- [x] Release v0.21.16. [agent: claude]
 - [ ] Owner ticks: remote and local tags tell apart; local tags push.
 
 ## Backlog
