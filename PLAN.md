@@ -1153,7 +1153,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 **Goal:** Owner (2026-10-24): the plan's top panel resizes too.
 - [x] Top panel height set by a handle; long text scrolls. [agent: claude]
 - [x] Gate: tsc, lint, branch-plans e2e with drags; zip smoke. [agent: claude]
-- [ ] Release v0.22.3.
+- [x] Release v0.22.3. [agent: claude]
 - [ ] Owner ticks: every plan panel resizes.
 
 ## Backlog
