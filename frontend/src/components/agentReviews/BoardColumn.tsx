@@ -27,6 +27,7 @@ export function BoardColumn({
   onJump,
   actions,
   busy,
+  footer,
 }: {
   session: AgentReview
   round: AgentReviewRound
@@ -36,6 +37,8 @@ export function BoardColumn({
   onJump: (commentId: string) => void
   actions: RoundActions
   busy: boolean
+  /** v0.22.0: a branch plan's own box in place of the round box. */
+  footer?: React.ReactNode
 }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -139,8 +142,15 @@ export function BoardColumn({
                   Round {r.n} {r.sentAt ? "sent" : "opened"}
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: "text.secondary" }}>
-                  {r.files.length} file{r.files.length === 1 ? "" : "s"}, {r.changes.length} change
-                  {r.changes.length === 1 ? "" : "s"}
+                  {r.plan ? (
+                    // v0.22.0: a branch plan's round counts its steps.
+                    `${r.plan.steps.length} step${r.plan.steps.length === 1 ? "" : "s"}`
+                  ) : (
+                    <>
+                      {r.files.length} file{r.files.length === 1 ? "" : "s"}, {r.changes.length} change
+                      {r.changes.length === 1 ? "" : "s"}
+                    </>
+                  )}
                 </Typography>
               </LaneItem>
             ))}
@@ -151,7 +161,7 @@ export function BoardColumn({
         )}
       </Box>
       {withBoard && open ? <Compose agent={agent} onPost={onPost} /> : <Box />}
-      <RoundBox session={session} round={round} counts={counts} actions={actions} busy={busy} />
+      {footer ?? <RoundBox session={session} round={round} counts={counts} actions={actions} busy={busy} />}
     </Box>
   )
 }

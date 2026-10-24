@@ -159,6 +159,8 @@ export type AgentReviewSummary = {
   turn?: AgentReviewTurn
   board?: string | null
   lastRead?: string | null
+  /** v0.22.0: "plan" for a branch plan (fileCount is then its step count). */
+  kind?: "plan" | null
 }
 export type AgentReviewFile = { path: string; status: string; patch: string | null }
 export type AgentReviewVerdict = "accept" | "reject" | "mixed" | "undecided"
@@ -184,6 +186,67 @@ export type AgentReviewRound = {
   files: AgentReviewFile[]
   changes: AgentReviewChange[]
   removed: string[]
+  /** v0.22.0: a branch plan's round carries the checked plan instead of files. */
+  plan?: BranchPlan | null
+}
+/** v0.22.0: one step of a branch plan as the agent wrote it. */
+export type BranchPlanSpec = {
+  op: string
+  branch?: string | null
+  onto?: string | null
+  name?: string | null
+  from?: string | null
+  into?: string | null
+  on?: string | null
+  label?: string | null
+  subject?: string | null
+  files?: string[] | null
+  mode?: string | null
+  at?: string | null
+}
+export type BranchPlanResult = "ok" | "conflict" | "risk" | "unknown" | "invalid"
+export type BranchPlanSide = { label: string; commit: string | null; subject: string | null; patch: string }
+export type BranchPlanConflict = { path: string; sides: BranchPlanSide[] }
+export type BranchPlanStep = {
+  n: number
+  op: string
+  text: string
+  spec: BranchPlanSpec
+  result: BranchPlanResult
+  because: string
+  commands: string[]
+  conflicts?: BranchPlanConflict[] | null
+  nodes?: string[] | null
+  done: boolean
+}
+export type BranchPlanNode = {
+  id: string
+  sha: string | null
+  parents: string[]
+  lane: number
+  kind: "exists" | "planned" | "merge"
+  from: number
+  ghostAt: number | null
+  subject: string
+  author: string | null
+  copy: string | null
+}
+export type BranchPlanRef = {
+  name: string
+  kind: "local" | "remote" | "tag"
+  at: { step: number; node: string | null }[]
+}
+/** v0.22.0: the plan played on the graph and checked with git (GitHost.BranchPlans.cs). */
+export type BranchPlan = {
+  steps: BranchPlanStep[]
+  nodes: BranchPlanNode[]
+  lanes: string[]
+  refs: BranchPlanRef[]
+  inputs: Record<string, string>
+  checkedAt: string
+  truncated: boolean
+  /** On a read while the plan waits: the refs that moved since the check. */
+  moved?: string[] | null
 }
 export type AgentReviewReply = { author: string; body: string; at: string; boardId: number | null }
 export type AgentReviewThread = {

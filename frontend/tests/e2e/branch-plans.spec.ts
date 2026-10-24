@@ -23,7 +23,10 @@ CREATE TABLE IF NOT EXISTS seen (reader TEXT NOT NULL, channel TEXT NOT NULL, la
 `
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${ENGINE_URL}${path}`, { ...init, headers: engineHeaders({ "Content-Type": "application/json" }) })
+  const res = await fetch(`${ENGINE_URL}${path}`, {
+    ...init,
+    headers: engineHeaders({ "Content-Type": "application/json" }),
+  })
   if (!res.ok) throw new Error(`${path}: http ${res.status} ${await res.text()}`)
   const text = await res.text()
   return (text ? JSON.parse(text) : null) as T
@@ -70,7 +73,10 @@ test.describe("branch plans", () => {
     let boardPath: string | null = null
     let db: Db | null = null
     try {
-      const { id: repoId } = await api<{ id: string }>("/repos/open", { method: "POST", body: JSON.stringify({ path: dir }) })
+      const { id: repoId } = await api<{ id: string }>("/repos/open", {
+        method: "POST",
+        body: JSON.stringify({ path: dir }),
+      })
       const status = await api<{ path: string }>(`/repos/${repoId}/board/status`)
       test.skip(!resolve(status.path).toLowerCase().startsWith(resolve(tmpdir()).toLowerCase()), "not a test board")
       boardPath = status.path

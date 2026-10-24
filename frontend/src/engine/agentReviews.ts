@@ -70,7 +70,10 @@ export const withdrawAgentReviewComment = (engine: EngineClient, id: string, com
 /** v0.21.13: the owner's reply in a comment's conversation (posted on the board). */
 export const replyAgentReviewComment = (engine: EngineClient, id: string, comment: string, body: string) =>
   engine
-    .request(`${root(engine)}/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}/replies`, post({ body }))
+    .request(
+      `${root(engine)}/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}/replies`,
+      post({ body }),
+    )
     .then(json<AgentReviewThread>)
 
 /** v0.21.2: the review's board channel after a message id. */
@@ -93,4 +96,16 @@ export const resolveAgentReview = (
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, summary }) },
       { timeoutMs: 0 },
     )
+    .then(json<AgentReview>)
+
+/** v0.22.0: the owner's comment on a step of a branch plan (posted on the board). */
+export const commentBranchPlanStep = (engine: EngineClient, id: string, step: number, body: string) =>
+  engine
+    .request(`${engine.repoPath()}/branch-plans/${encodeURIComponent(id)}/comments`, post({ step, body }))
+    .then(json<AgentReviewThread>)
+
+/** v0.22.0: the plan's steps checked again against the repository as it is now. */
+export const recheckBranchPlan = (engine: EngineClient, id: string) =>
+  engine
+    .request(`${engine.repoPath()}/branch-plans/${encodeURIComponent(id)}/recheck`, post({}), { timeoutMs: 0 })
     .then(json<AgentReview>)

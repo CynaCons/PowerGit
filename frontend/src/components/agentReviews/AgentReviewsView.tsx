@@ -8,6 +8,7 @@ import { paneSx } from "../../theme/panels"
 import { AgentReviewInbox } from "./AgentReviewInbox"
 import { AgentReviewSession } from "./AgentReviewSession"
 import { ReviewScreen } from "./ReviewScreen"
+import { PlanScreen } from "./plan/PlanScreen"
 
 // The agent reviews take the whole window except the rail (v0.21.3, owner
 // 2026-10-13: "should we go full view instead of just the bottom panels?"):
@@ -44,6 +45,16 @@ export function AgentReviewsView({
         <Paper sx={{ ...paneSx, flex: 1, p: 3 }}>
           <Typography color="text.secondary">Loading the review…</Typography>
         </Paper>
+      ) : session.kind === "plan" && session.rounds?.at(-1)?.plan ? (
+        // v0.22.0: a branch plan has its own screen.
+        <PlanScreen
+          key={session.id}
+          engine={engine}
+          session={session}
+          reload={reload}
+          onBack={onList}
+          onChanged={changed}
+        />
       ) : session.rounds && session.rounds.length > 0 ? (
         <ReviewScreen
           key={session.id}

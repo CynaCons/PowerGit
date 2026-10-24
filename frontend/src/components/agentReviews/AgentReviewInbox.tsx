@@ -152,7 +152,15 @@ export function AgentReviewInbox({
                   </Box>
                 </Box>
                 <Typography noWrap sx={{ fontSize: 12, color: "text.secondary" }}>
-                  {[s.agent ?? "unknown agent", s.branch, `${s.fileCount} file${s.fileCount === 1 ? "" : "s"}`]
+                  {[
+                    // v0.22.0: a branch plan counts its steps.
+                    s.kind === "plan" ? "Branch plan" : null,
+                    s.agent ?? "unknown agent",
+                    s.branch,
+                    s.kind === "plan"
+                      ? `${s.fileCount} step${s.fileCount === 1 ? "" : "s"}`
+                      : `${s.fileCount} file${s.fileCount === 1 ? "" : "s"}`,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </Typography>
