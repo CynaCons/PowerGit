@@ -1133,15 +1133,22 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: engine tests, vitest, lint, e2e; look at it; smoke. [agent: claude]
 - [x] Release v0.22.0. [agent: claude]
 
-### v0.22.1 — Branch plans: exact rebase checks, cherry-pick, long histories (PLANNED) (current) (ACTIVE)
+### v0.22.1 — Branch plans: exact rebase checks, cherry-pick, long histories (PLANNED)
 **Goal:** Owner (2026-10-24): add what branch plans v0.22.0 left out.
 - [x] Rebase check commit by commit, exact on git 2.38 and later. [agent: claude]
 - [x] Without merge-tree --write-tree, say the check could not run. [agent: claude]
 - [x] Cherry-pick step: commits onto a branch, checked per commit. [agent: claude]
 - [x] Graph past 200 commits: fold older runs instead of cutting. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, branch-plans e2e; smoke. [agent: claude]
-- [ ] Owner ticks: rebase checks exact, cherry-pick plans, long histories.
 - [x] Release v0.22.1. [agent: claude]
+
+### v0.22.2 — Branch plans: resizable panes (current) (ACTIVE)
+**Goal:** Owner (2026-10-24): resizable plan panes, released fast.
+- [x] Steps and board panes resize like the review's. [agent: claude]
+- [x] Graph and step detail split by a draggable handle. [agent: claude]
+- [x] Gate: vitest, lint, branch-plans e2e with drags; zip smoke. [agent: claude]
+- [ ] Release v0.22.2.
+- [ ] Owner ticks: the plan's panes resize.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1254,3 +1261,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [ ] Branch planner over MCP: owner picks a design from the draft.
 - Owner ticks: agents explain changes; owner and agents discuss them. (deferred from v0.21.17: open when the plan view moved to v0.22.0; shipped in v0.21.17)
 - Owner ticks: agents plan branches; I approve them on the graph. (deferred from v0.22.0: open when the plan view moved to v0.22.1; shipped in v0.22.0)
+- Owner ticks: rebase checks exact, cherry-pick plans, long histories. (deferred from v0.22.1: open when the plan view moved to v0.22.2; shipped in v0.22.1)

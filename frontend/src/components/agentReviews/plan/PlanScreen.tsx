@@ -3,7 +3,7 @@ import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import Typography from "@mui/material/Typography"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { describeThrown, type AgentReview, type AgentReviewThread, type EngineClient } from "../../../engine"
 import {
   commentBranchPlanStep,
@@ -22,6 +22,9 @@ import { PlanBox } from "./PlanBox"
 import { PlanDetail } from "./PlanDetail"
 import { PlanGraph } from "./PlanGraph"
 import { firstStepToRead, planCounts } from "./planModel"
+import { useReviewGrid } from "../reviewLayout"
+import { DetailSplit } from "./DetailSplit"
+import { readDetailHeight } from "./detailHeight"
 
 // A branch plan in full view (v0.22.0, docs/prototypes/branch-plan-v1.html,
 // owner: "This is awesome. Let's bake it in!!!!"): the steps in the order the
@@ -59,6 +62,9 @@ export function PlanScreen({
   const [selected, setSelected] = useState(() => firstStepToRead(plan.steps))
   const [at, setAt] = useState(() => firstStepToRead(plan.steps))
   const [busy, setBusy] = useState(false)
+  const grid = useReviewGrid()
+  const middle = useRef<HTMLDivElement | null>(null)
+  const [detailHeight, setDetailHeight] = useState(readDetailHeight)
   const [error, setError] = useState<string | null>(null)
   const open = session.status === "pending"
   const editable = open && round.sentAt === null
@@ -206,11 +212,16 @@ export function PlanScreen({
         )}
       </Box>
       <Box
+        // v0.22.2, owner: "Make the panels resizeable in the branch plan": the
+        // steps and the board take the review's widths and handles.
+        ref={grid.ref}
+        style={grid.style}
         sx={{
+          position: "relative",
           flex: 1,
           minHeight: 0,
           display: "grid",
-          gridTemplateColumns: "260px minmax(320px, 1fr) 320px",
+          gridTemplateColumns: "var(--rv-files, 220px) minmax(320px, 1fr) var(--rv-board, 340px)",
           gridTemplateRows: "minmax(0, 1fr)",
           gap: deskGap,
           "@container (max-width: 980px)": {
@@ -219,6 +230,7 @@ export function PlanScreen({
           },
         }}
       >
+        {grid.handles}
         <Box data-testid="plan-steps" sx={{ ...paneSx, minWidth: 0, overflow: "auto", p: 0.75 }}>
           <Typography sx={{ fontWeight: 600, fontSize: 13, px: 0.75, pt: 0.5, pb: 0.75 }}>
             Steps{" "}
@@ -293,9 +305,17 @@ export function PlanScreen({
             )
           })}
         </Box>
-        <Box sx={{ ...paneSx, minWidth: 0, minHeight: 0, display: "grid", gridTemplateRows: "minmax(0, 1fr) auto" }}>
+        <Box
+          ref={middle}
+          sx={{ ...paneSx, minWidth: 0, minHeight: 0, display: "grid", gridTemplateRows: "minmax(0, 1fr) auto auto" }}
+        >
           <PlanGraph plan={plan} at={at} onAt={setAt} selected={selected} />
-          <Box sx={{ borderTop: 1, borderColor: "divider", maxHeight: 290, overflow: "auto", bgcolor: "action.hover" }}>
+          <DetailSplit
+            height={detailHeight}
+            onHeight={setDetailHeight}
+            getPaneHeight={() => middle.current?.clientHeight ?? 600}
+          />
+          <Box data-testid="plan-detail-pane" sx={{ height: detailHeight, overflow: "auto", bgcolor: "action.hover" }}>
             {step && (
               <PlanDetail
                 key={step.n}

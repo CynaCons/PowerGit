@@ -99,6 +99,23 @@ test.describe("branch plans", () => {
       await expect(fold).toHaveCount(1)
       await expect(fold).toContainText(/\d+ commits/)
       expect(await page.locator('[data-testid="plan-row"]').count()).toBeLessThan(20)
+
+      // v0.22.2, owner: "Make the panels resizeable in the branch plan": the
+      // steps pane and the step detail follow their handles.
+      const drag = async (testid: string, dx: number, dy: number) => {
+        const box = (await page.getByTestId(testid).boundingBox())!
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 5 })
+        await page.mouse.up()
+      }
+      const width = async () => (await page.getByTestId("plan-steps").boundingBox())!.width
+      const height = async () => (await page.getByTestId("plan-detail-pane").boundingBox())!.height
+      const [w0, h0] = [await width(), await height()]
+      await drag("review-files-splitter", 80, 0)
+      await drag("plan-detail-splitter", 0, -100)
+      expect(await width()).toBeGreaterThan(w0 + 40)
+      expect(await height()).toBeGreaterThan(h0 + 60)
     } finally {
       await removeRepo(dir)
     }
