@@ -1092,10 +1092,10 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 
 ### v0.21.15 — Checkout from origin/HEAD suggests the default branch's name (current) (ACTIVE)
 **Goal:** Owner (2026-10-24): checking out a remote branch suggested "HEAD" as the local name.
-- [ ] Owner's sentence as red e2e: origin/HEAD checkout suggests "HEAD".
-- [ ] Dialog resolves origin/HEAD to the branch it points at.
-- [ ] Branch name check refuses "HEAD".
-- [ ] Gate: vitest, lint, checkout e2e; smoke-test the app.
+- [x] Owner's sentence as red e2e: origin/HEAD checkout suggests "HEAD". [agent: claude]
+- [x] Dialog resolves origin/HEAD to the branch it points at. [agent: claude]
+- [x] Branch name check refuses "HEAD". [agent: claude]
+- [x] Gate: vitest, lint, checkout e2e; smoke-test the app. [agent: claude]
 - [ ] Owner ticks: checking out a remote branch suggests its name.
 
 ## Backlog

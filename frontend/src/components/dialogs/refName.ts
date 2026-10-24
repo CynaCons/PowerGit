@@ -6,7 +6,8 @@
 //   git check-ref-format --branch: no component may begin with "." or end
 //   with ".lock"; no ".." anywhere; no ASCII control character, space, ~,
 //   ^, :, ?, *, [ or \; no leading, trailing or double "/"; no trailing
-//   "."; no "@{"; not the single "@"; a branch name may not start with "-".
+//   "."; no "@{"; not the single "@"; a branch name may not start with "-"
+//   or be "HEAD" (git branch: "'HEAD' is not a valid branch name").
 
 /** The reason git would refuse `name`, "already exists" against `existing`, or null when it is fine. */
 export function refNameError(name: string, existing: readonly string[] = []): string | null {
@@ -17,6 +18,7 @@ export function refNameError(name: string, existing: readonly string[] = []): st
   if (name.endsWith(".lock") || name.includes(".lock/")) return 'cannot end in ".lock"'
   if (name.includes("@{")) return 'no "@{"'
   if (name === "@") return 'not "@"'
+  if (name === "HEAD") return 'not "HEAD"'
   if (name.endsWith(".") || /(^|\/)\./.test(name)) return 'no "." at the start or end of a part'
   // eslint-disable-next-line no-control-regex
   if (/[~^:?*[\\\x00-\x1f\x7f]/.test(name)) return "no ~ ^ : ? * [ \\ or control characters"
@@ -31,6 +33,25 @@ export function suggestLocalName(remote: string, remoteNames: readonly string[],
   if (!locals.includes(base)) return base
   for (let n = 2; n < 100; n++) if (!locals.includes(`${base}-${n}`)) return `${base}-${n}`
   return base
+}
+
+/** `origin/HEAD` is the remote's pointer at its default branch, not a branch
+ *  (v0.21.15, owner: the checkout dialog "showed me "HEAD" as a branch name").
+ *  The ref tree carries no symref, so the branch is the same remote's one at
+ *  the same tip, main or master first; any other ref comes back unchanged. */
+export function remoteHeadTarget(
+  ref: string,
+  remotes: readonly { name: string; target: string }[],
+  remoteNames: readonly string[],
+): string {
+  if (!ref.endsWith("/HEAD")) return ref
+  const remote = ref.slice(0, -"/HEAD".length)
+  if (remoteNames.length > 0 && !remoteNames.includes(remote)) return ref
+  const tip = remotes.find((r) => r.name === ref)?.target
+  if (!tip) return ref
+  const same = remotes.filter((r) => r.name !== ref && r.name.startsWith(remote + "/") && r.target === tip)
+  const pick = same.find((r) => r.name === `${remote}/main`) ?? same.find((r) => r.name === `${remote}/master`) ?? same[0]
+  return pick?.name ?? ref
 }
 
 /** A local branch name suggested from a remote-tracking one: `origin/feature/x` → `feature/x`. */

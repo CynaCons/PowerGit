@@ -8,7 +8,7 @@ import { Field } from "./Field"
 import { OpDialog, OpError } from "./OpDialog"
 import { OptionGroup, OptionRow } from "./OptionRow"
 import { QuotedRow } from "./QuotedRow"
-import { localNameFor, refNameError, suggestLocalName } from "./refName"
+import { localNameFor, refNameError, remoteHeadTarget, suggestLocalName } from "./refName"
 import { refTarget, useQuote } from "./quoteContext"
 
 // Git Extensions FormCheckoutBranch on the A shell (v0.18.11, owner: "when
@@ -54,13 +54,19 @@ export function CheckoutBranchDialog({
   const localExists = remote && locals.includes(localName)
   const tip = refTarget(refs, selected)
 
-  // The picked ref sets the defaults: Create with a free name, Keep.
+  // The picked ref sets the defaults: Create with a free name, Keep. A
+  // remote's HEAD opens on the branch it points at (the picker lists no
+  // origin/HEAD either), so the name is "main", never "HEAD".
+  const remotes = refs?.remotes
   useEffect(() => {
     if (!open) return
-    const first = branch === currentBranch ? (locals.find((b) => b !== currentBranch) ?? branch) : branch
+    const first =
+      branch === currentBranch
+        ? (locals.find((b) => b !== currentBranch) ?? branch)
+        : remoteHeadTarget(branch, remotes ?? [], remoteNames)
     setSelected(first)
     setLocal("keep")
-  }, [open, branch, currentBranch, locals])
+  }, [open, branch, currentBranch, locals, remotes, remoteNames])
   useEffect(() => {
     setMode(tag ? "detached" : "track")
     setName(remote ? suggestLocalName(selected, remoteNames, locals) : "")
