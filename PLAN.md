@@ -1226,3 +1226,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: agents and the owner review the same round together. (deferred from v0.21.14: open when the plan view moved to v0.21.15)
 - Owner ticks: checking out a remote branch suggests its name. (deferred from v0.21.15: open when the plan view moved to v0.21.16; ships in v0.21.16)
 - Owner ticks: remote and local tags tell apart; local tags push. (deferred from v0.21.16: open when the plan view moved to v0.21.17; shipped in v0.21.16)
+- [ ] Branch planner over MCP: owner picks a design from the draft.
