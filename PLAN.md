@@ -1108,15 +1108,31 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: engine tests, vitest, lint, tag e2e; look at it; smoke. [agent: claude]
 - [x] Release v0.21.16. [agent: claude]
 
-### v0.21.17 — Agent review: the author explains its changes on their lines (current) (ACTIVE)
+### v0.21.17 — Agent review: the author explains its changes on their lines
 **Goal:** Owner (2026-10-24): agents justify changes in comments the owner and agents discuss.
 - [x] Owner's sentence as red e2e: explanations open conversations. [agent: claude]
 - [x] Engine: explanations on open and revise, as threads; tests. [agent: claude]
 - [x] MCP: explanations on open and revise; docs. [agent: claude]
 - [x] View: an explanation reads as the author's conversation. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e; look at it; smoke. [agent: claude]
-- [ ] Owner ticks: agents explain changes; owner and agents discuss them.
 - [x] Release v0.21.17. [agent: claude]
+
+## v0.22 — Branch plans
+> Agents open a branch plan over MCP; PowerGit checks it with git and shows it on its graph; the owner comments per step and approves; the agent runs it. Design: docs/design/branch-planner.md, prototype docs/prototypes/branch-plan-v1.html.
+
+### v0.22.0 — Branch plans: agents propose, PowerGit checks and shows, the owner approves (current) (ACTIVE)
+**Goal:** Owner (2026-10-24): bake the branch plan prototype into PowerGit.
+- [ ] Owner's sentence as red e2e: a plan on the graph, approved.
+- [ ] Engine: plan steps simulated into a graph with lanes.
+- [ ] Engine: each step checked with git merge-tree and refs.
+- [ ] Engine: plan sessions on the agent review inbox and board.
+- [ ] Engine: progress from ref moves; stale check when inputs move.
+- [ ] MCP: branch_plan_preview, open, revise, get; docs.
+- [ ] View: plan screen with scrubber, steps, detail, board.
+- [ ] View: inbox rows and states for plans.
+- [ ] Gate: engine tests, vitest, lint, e2e; look at it; smoke.
+- [ ] Release v0.22.0.
+- [ ] Owner ticks: agents plan branches; I approve them on the graph.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1227,3 +1243,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: checking out a remote branch suggests its name. (deferred from v0.21.15: open when the plan view moved to v0.21.16; ships in v0.21.16)
 - Owner ticks: remote and local tags tell apart; local tags push. (deferred from v0.21.16: open when the plan view moved to v0.21.17; shipped in v0.21.16)
 - [ ] Branch planner over MCP: owner picks a design from the draft.
+- Owner ticks: agents explain changes; owner and agents discuss them. (deferred from v0.21.17: open when the plan view moved to v0.22.0; shipped in v0.21.17)

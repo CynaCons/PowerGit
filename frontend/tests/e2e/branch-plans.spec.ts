@@ -1,0 +1,176 @@
+import { expect, test } from "@playwright/test"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { basename, dirname, resolve } from "node:path"
+import { ENGINE_URL, engineHeaders } from "../engine"
+import { commit, currentRepoPath, git, makeRepo, openRepoOnEngine, removeRepo, write } from "../repoFixture"
+
+// v0.22.0, owner: "an MCP call or API that would enable ... some sort of like
+// visual planner for branches", then on the prototype: "A branch plan in
+// powergit would be cool ... Better than ascii", and "This is awesome. Let's
+// bake it in!!!!" An agent opens a branch plan; PowerGit checks each step
+// with git and shows the plan on its graph; the owner scrubs through it,
+// reads the conflict, comments on a step, re-checks after main moved, and
+// approves; the steps tick as the agent runs them.
+
+type Db = { exec(sql: string): void; close(): void }
+const sqlite = async () => (await import("node:sqlite" as string)) as { DatabaseSync: new (path: string) => Db }
+const SCHEMA = `
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout=5000;
+CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS seen (reader TEXT NOT NULL, channel TEXT NOT NULL, last_id INTEGER NOT NULL, updated REAL NOT NULL, PRIMARY KEY (reader, channel));
+`
+
+async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${ENGINE_URL}${path}`, { ...init, headers: engineHeaders({ "Content-Type": "application/json" }) })
+  if (!res.ok) throw new Error(`${path}: http ${res.status} ${await res.text()}`)
+  const text = await res.text()
+  return (text ? JSON.parse(text) : null) as T
+}
+
+const session = (timeout: string) => `export const SESSION = {\n  name: "app",\n  timeout: ${timeout},\n}\n`
+
+const STEPS = [
+  { op: "rebase", branch: "feature/auth", onto: "main" },
+  { op: "branch", name: "feature/billing", from: "feature/auth" },
+  { op: "commit", on: "feature/billing", label: "B1", subject: "billing: plan model", files: ["src/billing/plan.ts"] },
+  { op: "merge", from: "feature/billing", into: "feature/auth", mode: "no-ff" },
+  { op: "merge", from: "feature/auth", into: "main", mode: "no-ff" },
+  { op: "tag", name: "v1.5", at: "main" },
+]
+
+test.describe("branch plans", () => {
+  let previous: string | null = null
+  test.beforeAll(async () => {
+    previous = await currentRepoPath()
+  })
+  test.afterAll(async () => {
+    await openRepoOnEngine(previous ?? process.cwd())
+  })
+
+  test("an agent's branch plan shows on the graph, is discussed and approved, and ticks as it runs", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000)
+    const dir = makeRepo("pg-branch-plan-")
+    write(dir, "session.ts", session("30_000"))
+    commit(dir, "release 1.4")
+    git(dir, "tag", "v1.4")
+    git(dir, "checkout", "-q", "-b", "feature/auth")
+    write(dir, "session.ts", session("readTimeout(config)"))
+    commit(dir, "auth: login form and session")
+    write(dir, "token.ts", "export const refresh = () => 1\n")
+    commit(dir, "auth: refresh tokens")
+    git(dir, "checkout", "-q", "main")
+    write(dir, "session.ts", session("45_000"))
+    commit(dir, "fix: session timeout too short")
+    write(dir, "NOTES.md", "1.4.1\n")
+    commit(dir, "docs: release notes")
+    let boardPath: string | null = null
+    let db: Db | null = null
+    try {
+      const { id: repoId } = await api<{ id: string }>("/repos/open", { method: "POST", body: JSON.stringify({ path: dir }) })
+      const status = await api<{ path: string }>(`/repos/${repoId}/board/status`)
+      test.skip(!resolve(status.path).toLowerCase().startsWith(resolve(tmpdir()).toLowerCase()), "not a test board")
+      boardPath = status.path
+      mkdirSync(dirname(boardPath), { recursive: true })
+      const { DatabaseSync } = await sqlite()
+      db = new DatabaseSync(boardPath)
+      db.exec(SCHEMA)
+
+      // The preview checks the steps without opening anything.
+      const preview = await api<{ steps: { n: number; result: string; conflicts?: { path: string }[] }[] }>(
+        `/repos/${repoId}/branch-plans/preview`,
+        { method: "POST", body: JSON.stringify({ steps: STEPS }) },
+      )
+      // Merging into a branch the other side already contains cannot conflict.
+      expect(preview.steps.map((s) => s.result)).toEqual(["conflict", "ok", "unknown", "ok", "ok", "ok"])
+      expect(preview.steps[0].conflicts?.map((c) => c.path)).toEqual(["session.ts"])
+
+      await page.goto(`/?repo=${repoId}`)
+      await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
+      const plan = await api<{ id: string }>(`/repos/${repoId}/branch-plans`, {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "wait",
+          title: "Rebase auth, stack billing, merge both",
+          why: "Auth is behind main and billing needs its token refresh.",
+          agent: "auth-fix",
+          steps: STEPS,
+          explanations: [{ step: 1, body: "I keep main's 45 s and read the override after it." }],
+        }),
+      })
+
+      await page.getByTestId("agent-reviews-button").click()
+      const row = page.getByTestId("agent-review-row").filter({ hasText: "Rebase auth, stack billing" })
+      await expect(row.filter({ hasText: basename(dir) })).toContainText("Branch plan")
+      await row.click()
+
+      // The plan on the graph: steps with their checks, the scrubber, the rows.
+      const screen = page.getByTestId("plan-screen")
+      await expect(screen).toBeVisible({ timeout: 15_000 })
+      const steps = page.getByTestId("plan-step")
+      await expect(steps).toHaveCount(6)
+      await expect(steps.nth(0)).toHaveAttribute("data-result", "conflict")
+      await expect(steps.nth(1)).toHaveAttribute("data-result", "ok")
+      await page.locator('[data-testid="plan-scrub"][data-at="0"]').click()
+      await expect(page.locator('[data-testid="plan-row"]:not([data-kind="exists"])')).toHaveCount(0)
+      // From the branches' common base: release 1.4, two on main, two on auth.
+      await expect(page.locator('[data-testid="plan-row"][data-kind="exists"]')).toHaveCount(5)
+      await page.locator('[data-testid="plan-scrub"][data-at="6"]').click()
+      await expect(page.locator('[data-testid="plan-row"][data-kind="planned"]')).toHaveCount(3)
+      await expect(page.locator('[data-testid="plan-row"][data-kind="merge"]')).toHaveCount(2)
+      await expect(page.locator('[data-testid="plan-row"][data-kind="ghost"]')).toHaveCount(2)
+
+      // Step 1: the conflict, the agent's explanation, the owner's comment.
+      await steps.nth(0).click()
+      const detail = page.getByTestId("plan-detail")
+      await expect(detail.getByTestId("plan-conflict-file")).toHaveText(["session.ts"])
+      await expect(detail).toContainText("I keep main's 45 s")
+      await detail.getByTestId("plan-comment-text").fill("Squash the login commit while you are at it.")
+      await detail.getByTestId("plan-comment-send").click()
+      await expect(detail).toContainText("Squash the login commit while you are at it.")
+      await expect(page.getByTestId("board-post").filter({ hasText: "Squash the login commit" })).toHaveAttribute(
+        "data-author",
+        "human",
+      )
+
+      // Main moves: the plan says so and is checked again.
+      write(dir, "NOTES.md", "1.4.1\n1.4.2\n")
+      commit(dir, "docs: more notes")
+      await expect(page.getByTestId("plan-stale")).toBeVisible({ timeout: 15_000 })
+      await page.getByTestId("plan-recheck").click()
+      await expect(page.getByTestId("plan-stale")).toHaveCount(0)
+      await expect(steps.nth(0)).toHaveAttribute("data-result", "conflict")
+
+      // Approved: the agent runs the steps, PowerGit ticks them as the refs move.
+      await page.getByTestId("plan-approve").click()
+      await expect(page.getByTestId("plan-progress")).toContainText("0 of 6")
+      git(dir, "rebase", "-q", "-X", "theirs", "main", "feature/auth")
+      git(dir, "branch", "feature/billing", "feature/auth")
+      git(dir, "checkout", "-q", "feature/billing")
+      write(dir, "plan.ts", "export const plans = []\n")
+      commit(dir, "billing: plan model")
+      git(dir, "checkout", "-q", "feature/auth")
+      git(dir, "merge", "-q", "--no-ff", "-m", "Merge feature/billing", "feature/billing")
+      git(dir, "checkout", "-q", "main")
+      git(dir, "merge", "-q", "--no-ff", "-m", "Merge feature/auth", "feature/auth")
+      git(dir, "tag", "v1.5")
+      await expect(page.getByTestId("plan-progress")).toContainText("6 of 6", { timeout: 20_000 })
+      await expect(steps.nth(5)).toHaveAttribute("data-done", "true")
+      const done = await api<{ status: string }>(`/repos/${repoId}/agent-reviews/${plan.id}`)
+      expect(done.status).toBe("approved")
+    } finally {
+      db?.close()
+      if (boardPath)
+        for (const f of [boardPath, `${boardPath}-wal`, `${boardPath}-shm`])
+          try {
+            if (existsSync(f)) rmSync(f, { force: true })
+          } catch {
+            // left for the next run
+          }
+      await removeRepo(dir)
+    }
+  })
+})
