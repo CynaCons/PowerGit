@@ -1134,6 +1134,15 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Release v0.22.0. [agent: claude]
 - [ ] Owner ticks: agents plan branches; I approve them on the graph.
 
+### v0.22.1 — Branch plans: exact rebase checks, cherry-pick, long histories (PLANNED)
+**Goal:** Owner (2026-10-24): add what branch plans v0.22.0 left out.
+- [ ] Rebase check commit by commit with merge-tree --merge-base (git 2.40+).
+- [ ] Older git: keep the two-tip check and say it is approximate.
+- [ ] Cherry-pick step: commits onto a branch, checked per commit.
+- [ ] Graph past 200 commits: fold older runs instead of cutting.
+- [ ] Gate: engine tests, vitest, lint, branch-plans e2e; smoke.
+- [ ] Owner ticks: rebase checks exact, cherry-pick plans, long histories.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
