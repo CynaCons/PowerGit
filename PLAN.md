@@ -1120,7 +1120,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 ## v0.22 — Branch plans
 > Agents open a branch plan over MCP; PowerGit checks it with git and shows it on its graph; the owner comments per step and approves; the agent runs it. Design: docs/design/branch-planner.md, prototype docs/prototypes/branch-plan-v1.html.
 
-### v0.22.0 — Branch plans: agents propose, PowerGit checks and shows, the owner approves (current) (ACTIVE)
+### v0.22.0 — Branch plans: agents propose, PowerGit checks and shows, the owner approves
 **Goal:** Owner (2026-10-24): bake the branch plan prototype into PowerGit.
 - [x] Owner's sentence as red e2e: a plan on the graph, approved. [agent: claude]
 - [x] Engine: plan steps simulated into a graph with lanes. [agent: claude]
@@ -1132,12 +1132,11 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] View: inbox rows and states for plans. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, e2e; look at it; smoke. [agent: claude]
 - [x] Release v0.22.0. [agent: claude]
-- [ ] Owner ticks: agents plan branches; I approve them on the graph.
 
-### v0.22.1 — Branch plans: exact rebase checks, cherry-pick, long histories (PLANNED)
+### v0.22.1 — Branch plans: exact rebase checks, cherry-pick, long histories (PLANNED) (current) (ACTIVE)
 **Goal:** Owner (2026-10-24): add what branch plans v0.22.0 left out.
-- [ ] Rebase check commit by commit with merge-tree --merge-base (git 2.40+).
-- [ ] Older git: keep the two-tip check and say it is approximate.
+- [ ] Rebase check commit by commit, exact on git 2.38 and later.
+- [ ] Without merge-tree --write-tree, say the check could not run.
 - [ ] Cherry-pick step: commits onto a branch, checked per commit.
 - [ ] Graph past 200 commits: fold older runs instead of cutting.
 - [ ] Gate: engine tests, vitest, lint, branch-plans e2e; smoke.
@@ -1253,3 +1252,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: remote and local tags tell apart; local tags push. (deferred from v0.21.16: open when the plan view moved to v0.21.17; shipped in v0.21.16)
 - [ ] Branch planner over MCP: owner picks a design from the draft.
 - Owner ticks: agents explain changes; owner and agents discuss them. (deferred from v0.21.17: open when the plan view moved to v0.22.0; shipped in v0.21.17)
+- Owner ticks: agents plan branches; I approve them on the graph. (deferred from v0.22.0: open when the plan view moved to v0.22.1; shipped in v0.22.0)

@@ -164,6 +164,102 @@ public sealed class BranchPlanTests
         Assert.All(done.Steps, s => Assert.True(s.Done));
     }
 
+    // v0.22.1, owner: "Add the missing things to the planning, like the rebase
+    // check and the cherry pick". A rebase is checked commit by commit: here
+    // auth's first commit conflicts with main, and its second undoes it, so
+    // the two tips merge cleanly but the rebase stops at the first commit.
+    [Fact]
+    public void A_rebase_is_checked_commit_by_commit()
+    {
+        using TempRepo repo = new();
+        repo.Run("branch", "-q", "-D", "feature");
+        repo.Write("x.txt", "a\n");
+        repo.StageAndCommit("base");
+        repo.Run("checkout", "-q", "-b", "topic");
+        repo.Write("x.txt", "b\n");
+        repo.StageAndCommit("topic: change x");
+        string first = repo.Output("rev-parse", "--short", "HEAD").Trim();
+        repo.Write("x.txt", "a\n");
+        repo.StageAndCommit("topic: change x back");
+        repo.Run("checkout", "-q", "main");
+        repo.Write("x.txt", "m\n");
+        repo.StageAndCommit("main: change x");
+        GitHost host = Host(repo);
+
+        BranchPlanStepDto merge = host.PreviewBranchPlan([new("merge", From: "topic", Into: "main")]).Steps[0];
+        Assert.Equal("ok", merge.Result);
+        BranchPlanStepDto rebase = host.PreviewBranchPlan([new("rebase", Branch: "topic", Onto: "main")]).Steps[0];
+        Assert.Equal("conflict", rebase.Result);
+        Assert.Contains($"stops at {first}", rebase.Because);
+        BranchPlanConflictDto conflict = Assert.Single(rebase.Conflicts!);
+        Assert.Equal("x.txt", conflict.Path);
+        Assert.Equal(["main", first], conflict.Sides.Select(s => s.Label));
+        Assert.Contains("+m", conflict.Sides[0].Patch);
+        Assert.Contains("+b", conflict.Sides[1].Patch);
+
+        // A clean rebase says so, commit by commit.
+        repo.Run("checkout", "-q", "-b", "side", "HEAD~1");
+        repo.Write("y.txt", "y\n");
+        repo.StageAndCommit("side: add y");
+        repo.Run("checkout", "-q", "main");
+        BranchPlanStepDto clean = host.PreviewBranchPlan([new("rebase", Branch: "side", Onto: "main")]).Steps[0];
+        Assert.Equal(("ok", "1 commit replays cleanly"), (clean.Result, clean.Because));
+    }
+
+    [Fact]
+    public void A_cherry_pick_copies_commits_onto_a_branch_and_is_checked_per_commit()
+    {
+        using TempRepo repo = Repo();
+        GitHost host = Host(repo);
+        string token = repo.Output("rev-parse", "feature/auth").Trim();
+        string login = repo.Output("rev-parse", "feature/auth~1").Trim();
+
+        BranchPlanPreviewDto plan = host.PreviewBranchPlan(
+        [
+            new("cherry-pick", Onto: "main", Commits: [token]),
+            new("cherry-pick", Onto: "main", Commits: [login]),
+            new("cherry-pick", Onto: "main", Commits: ["nope"]),
+        ]);
+        Assert.Equal(["ok", "conflict", "invalid"], plan.Steps.Select(s => s.Result));
+        Assert.Equal("Cherry-pick 1 commit onto main", plan.Steps[0].Text);
+        BranchPlanNodeDto copy = plan.Nodes.Single(n => n.Copy == token);
+        Assert.Equal(("planned", 1, 0), (copy.Kind, copy.From, copy.Lane));
+        Assert.Null(plan.Nodes.Single(n => n.Id == token).GhostAt);
+        Assert.Equal("session.ts", Assert.Single(plan.Steps[1].Conflicts!).Path);
+        Assert.Contains("no commit nope", plan.Steps[2].Because);
+        Assert.Equal([$"git switch main", $"git cherry-pick {token[..7]}"], plan.Steps[0].Commands);
+
+        AgentReviewDto opened = host.CreateBranchPlan(new("wait", "Pick", null, "auth-fix", [new("cherry-pick", Onto: "main", Commits: [token])]));
+        host.ResolveAgentReview(opened.Id, new("approve", null, null));
+        Assert.False(host.WithBranchPlanState(host.GetAgentReview(opened.Id)!).Rounds![^1].Plan!.Steps[0].Done);
+        repo.Run("cherry-pick", token);
+        Assert.True(host.WithBranchPlanState(host.GetAgentReview(opened.Id)!).Rounds![^1].Plan!.Steps[0].Done);
+    }
+
+    [Fact]
+    public void A_long_history_folds_its_quiet_runs()
+    {
+        using TempRepo repo = new();
+        repo.Run("branch", "-q", "-D", "feature");
+        repo.Run("checkout", "-q", "-b", "topic");
+        repo.Run("checkout", "-q", "main");
+        for (int i = 0; i < 230; i++) repo.Run("commit", "-q", "--allow-empty", "-m", $"main {i}");
+        repo.Run("checkout", "-q", "topic");
+        repo.Write("t.txt", "t\n");
+        repo.StageAndCommit("topic work");
+        GitHost host = Host(repo);
+
+        BranchPlanPreviewDto plan = host.PreviewBranchPlan([new("rebase", Branch: "topic", Onto: "main")]);
+        Assert.False(plan.Truncated);
+        BranchPlanNodeDto fold = Assert.Single(plan.Nodes, n => n.Kind == "fold");
+        Assert.Matches("^[0-9]+ commits$", fold.Subject);
+        Assert.True(plan.Nodes.Count < 40, $"{plan.Nodes.Count} nodes");
+        HashSet<string> ids = [.. plan.Nodes.Select(n => n.Id)];
+        Assert.All(plan.Nodes, n => Assert.All(n.Parents, p => Assert.Contains(p, ids)));
+        Assert.Equal("ok", plan.Steps[0].Result);
+        Assert.Contains(plan.Nodes, n => n.Subject == "main 229");
+    }
+
     [Fact]
     public void A_plan_whose_inputs_moved_says_so_until_it_is_checked_again()
     {

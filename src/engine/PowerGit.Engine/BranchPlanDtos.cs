@@ -8,12 +8,14 @@ namespace PowerGit.Engine;
 /// <summary>
 ///  One step as the agent writes it. <c>op</c>: rebase {branch, onto}, branch
 ///  {name, from}, commit {on, label?, subject?, files?}, merge {from, into,
-///  mode: no-ff | ff | squash}, tag {name, at}, delete {branch}.
+///  mode: no-ff | ff | squash}, tag {name, at}, delete {branch}; v0.22.1:
+///  cherry-pick {commits, onto}.
 /// </summary>
 public sealed record BranchPlanStepRequest(
     string? Op, string? Branch = null, string? Onto = null, string? Name = null, string? From = null,
     string? Into = null, string? On = null, string? Label = null, string? Subject = null,
-    IReadOnlyList<string>? Files = null, string? Mode = null, string? At = null);
+    IReadOnlyList<string>? Files = null, string? Mode = null, string? At = null,
+    IReadOnlyList<string>? Commits = null);
 
 /// <summary>One side of a predicted conflict: the ref, its last commit on the file, and its change.</summary>
 public sealed record BranchPlanSideDto(string Label, string? Commit, string? Subject, string Patch);
