@@ -1147,7 +1147,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Steps and board panes resize like the review's. [agent: claude]
 - [x] Graph and step detail split by a draggable handle. [agent: claude]
 - [x] Gate: vitest, lint, branch-plans e2e with drags; zip smoke. [agent: claude]
-- [ ] Release v0.22.2.
+- [x] Release v0.22.2. [agent: claude]
 - [ ] Owner ticks: the plan's panes resize.
 
 ## Backlog
