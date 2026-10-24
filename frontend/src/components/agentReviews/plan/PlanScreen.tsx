@@ -24,7 +24,7 @@ import { PlanGraph } from "./PlanGraph"
 import { firstStepToRead, planCounts } from "./planModel"
 import { useReviewGrid } from "../reviewLayout"
 import { DetailSplit } from "./DetailSplit"
-import { readDetailHeight } from "./detailHeight"
+import { DETAIL_KEY, HEADER_KEY, readDetailHeight, readHeaderHeight } from "./detailHeight"
 
 // A branch plan in full view (v0.22.0, docs/prototypes/branch-plan-v1.html,
 // owner: "This is awesome. Let's bake it in!!!!"): the steps in the order the
@@ -65,6 +65,8 @@ export function PlanScreen({
   const grid = useReviewGrid()
   const middle = useRef<HTMLDivElement | null>(null)
   const [detailHeight, setDetailHeight] = useState(readDetailHeight)
+  const [headerHeight, setHeaderHeight] = useState(readHeaderHeight)
+  const screen = useRef<HTMLDivElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const open = session.status === "pending"
   const editable = open && round.sentAt === null
@@ -133,6 +135,7 @@ export function PlanScreen({
 
   return (
     <Box
+      ref={screen}
       data-testid="plan-screen"
       data-round={round.n}
       data-at={at}
@@ -146,7 +149,12 @@ export function PlanScreen({
         containerType: "inline-size",
       }}
     >
-      <Box sx={{ ...paneSx, px: 1.5, py: 1 }}>
+      <Box
+        data-testid="plan-header"
+        // v0.22.3, owner: "you didnt make the top panel resizeable": a long why
+        // scrolls inside the panel, whose height its handle sets.
+        sx={{ ...paneSx, px: 1.5, py: 1, height: headerHeight, overflow: "auto", flexShrink: 0 }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <IconButton
             size="small"
@@ -210,6 +218,17 @@ export function PlanScreen({
             {error}
           </Typography>
         )}
+      </Box>
+      <Box sx={{ mt: `calc(-1 * ${deskGap})`, mb: `calc(-1 * ${deskGap})` }}>
+        <DetailSplit
+          height={headerHeight}
+          onHeight={setHeaderHeight}
+          grow="down"
+          getMax={() => (screen.current?.clientHeight ?? 800) - 260}
+          storageKey={HEADER_KEY}
+          label="Resize the top panel"
+          testid="plan-header-splitter"
+        />
       </Box>
       <Box
         // v0.22.2, owner: "Make the panels resizeable in the branch plan": the
@@ -313,7 +332,10 @@ export function PlanScreen({
           <DetailSplit
             height={detailHeight}
             onHeight={setDetailHeight}
-            getPaneHeight={() => middle.current?.clientHeight ?? 600}
+            getMax={() => (middle.current?.clientHeight ?? 600) - 120}
+            storageKey={DETAIL_KEY}
+            label="Resize the step detail"
+            testid="plan-detail-splitter"
           />
           <Box data-testid="plan-detail-pane" sx={{ height: detailHeight, overflow: "auto", bgcolor: "action.hover" }}>
             {step && (

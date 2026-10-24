@@ -111,11 +111,15 @@ test.describe("branch plans", () => {
       }
       const width = async () => (await page.getByTestId("plan-steps").boundingBox())!.width
       const height = async () => (await page.getByTestId("plan-detail-pane").boundingBox())!.height
-      const [w0, h0] = [await width(), await height()]
+      const header = async () => (await page.getByTestId("plan-header").boundingBox())!.height
+      const [w0, h0, t0] = [await width(), await height(), await header()]
       await drag("review-files-splitter", 80, 0)
       await drag("plan-detail-splitter", 0, -100)
       expect(await width()).toBeGreaterThan(w0 + 40)
       expect(await height()).toBeGreaterThan(h0 + 60)
+      // v0.22.3, owner: "you didnt make the top panel resizeable".
+      await drag("plan-header-splitter", 0, -60)
+      expect(await header()).toBeLessThan(t0 - 40)
     } finally {
       await removeRepo(dir)
     }

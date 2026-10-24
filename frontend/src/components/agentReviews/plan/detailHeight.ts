@@ -1,22 +1,28 @@
-// The step detail's height under the plan's graph (v0.22.2), kept per user.
+// Heights on the plan screen, kept per user: the step detail under the graph
+// (v0.22.2) and the top panel (v0.22.3).
 
-const KEY = "pg.planDetailHeight"
+export const DETAIL_KEY = "pg.planDetailHeight"
 export const DETAIL_DEFAULT = 290
-export const DETAIL_MIN = 90
+export const HEADER_KEY = "pg.planHeaderHeight"
+export const HEADER_DEFAULT = 150
+export const HEIGHT_MIN = 60
 
-export function readDetailHeight(): number {
+export function readHeight(key: string, fallback: number): number {
   try {
-    const n = Number(window.localStorage.getItem(KEY))
-    return Number.isFinite(n) && n >= DETAIL_MIN ? n : DETAIL_DEFAULT
+    const n = Number(window.localStorage.getItem(key))
+    return Number.isFinite(n) && n >= HEIGHT_MIN ? n : fallback
   } catch {
-    return DETAIL_DEFAULT
+    return fallback
   }
 }
 
-export function storeDetailHeight(height: number): void {
+export function storeHeight(key: string, height: number): void {
   try {
-    window.localStorage.setItem(KEY, String(Math.round(height)))
+    window.localStorage.setItem(key, String(Math.round(height)))
   } catch {
     // Storage refused: keep the height for this window.
   }
 }
+
+export const readDetailHeight = () => readHeight(DETAIL_KEY, DETAIL_DEFAULT)
+export const readHeaderHeight = () => readHeight(HEADER_KEY, HEADER_DEFAULT)
