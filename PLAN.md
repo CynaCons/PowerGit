@@ -1116,7 +1116,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] View: an explanation reads as the author's conversation. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, agent-review e2e; look at it; smoke. [agent: claude]
 - [ ] Owner ticks: agents explain changes; owner and agents discuss them.
-- [ ] Release v0.21.17.
+- [x] Release v0.21.17. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
