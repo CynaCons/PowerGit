@@ -1097,7 +1097,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Branch name check refuses "HEAD". [agent: claude]
 - [x] Gate: vitest, lint, checkout e2e; smoke-test the app. [agent: claude]
 
-### v0.21.16 — Tags show whether they are on a remote; local tags can be pushed (current) (ACTIVE)
+### v0.21.16 — Tags show whether they are on a remote; local tags can be pushed
 **Goal:** Owner (2026-10-24): tell remote tags from local ones and push a local tag.
 - [x] Owner's sentence as red e2e: tag cloud mark and Push tag. [agent: claude]
 - [x] Engine: record each remote's tags on fetch and tag push. [agent: claude]
@@ -1107,7 +1107,15 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Create tag: option to push the new tag. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, tag e2e; look at it; smoke. [agent: claude]
 - [x] Release v0.21.16. [agent: claude]
-- [ ] Owner ticks: remote and local tags tell apart; local tags push.
+
+### v0.21.17 — Agent review: the author explains its changes on their lines (current) (ACTIVE)
+**Goal:** Owner (2026-10-24): agents justify changes in comments the owner and agents discuss.
+- [ ] Owner's sentence as red e2e: explanations open conversations.
+- [ ] Engine: explanations on open and revise, as threads; tests.
+- [ ] MCP: explanations on open and revise; docs.
+- [ ] View: an explanation reads as the author's conversation.
+- [ ] Gate: engine tests, vitest, lint, agent-review e2e; look at it; smoke.
+- [ ] Owner ticks: agents explain changes; owner and agents discuss them.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1216,3 +1224,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: earlier comments stay visible in later rounds; answers read as a conversation. (deferred from v0.21.13: owner tick open; v0.21.14 started)
 - Owner ticks: agents and the owner review the same round together. (deferred from v0.21.14: open when the plan view moved to v0.21.15)
 - Owner ticks: checking out a remote branch suggests its name. (deferred from v0.21.15: open when the plan view moved to v0.21.16; ships in v0.21.16)
+- Owner ticks: remote and local tags tell apart; local tags push. (deferred from v0.21.16: open when the plan view moved to v0.21.17; shipped in v0.21.16)
