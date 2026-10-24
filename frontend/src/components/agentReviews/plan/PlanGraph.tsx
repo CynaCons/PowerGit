@@ -1,16 +1,20 @@
 import Box from "@mui/material/Box"
 import Typography from "@mui/material/Typography"
-import { useLayoutEffect, useMemo, useRef } from "react"
+import { Fragment, useLayoutEffect, useMemo, useRef } from "react"
 import type { BranchPlan } from "../../../engine"
+import { openExternal } from "../../../hooks/useOperationActions"
 import {
   edgesAt,
   graphWidth,
   laneColor,
   laneX,
+  prForRef,
+  prsAt,
   refsAt,
   ROW_H,
   rowsAt,
   shaLabel,
+  type PlacedPr,
   type PlacedRef,
   type PlanRow,
 } from "./planModel"
@@ -130,6 +134,54 @@ function RefChip({ placed }: { placed: PlacedRef }) {
   )
 }
 
+/** v0.22.5: a branch's pull request; a link when the agent gave one. */
+function PrChip({ pr }: { pr: PlacedPr }) {
+  const tip = [pr.title, pr.state, pr.into && `into ${pr.into}`].filter(Boolean).join(", ")
+  const common = {
+    "data-testid": "plan-pr",
+    "data-branch": pr.branch,
+    title: tip || undefined,
+  }
+  if (pr.planned)
+    return (
+      <span
+        {...common}
+        className="ref pr"
+        data-planned="true"
+        style={{ borderStyle: "dashed", borderColor: "var(--pg-agent)", color: "var(--pg-agent)" }}
+      >
+        PR{pr.into ? ` → ${pr.into}` : ""}
+      </span>
+    )
+  const label = (
+    <>
+      {pr.id ?? "PR"}
+      {pr.state && <span className="pr-state">{pr.state}</span>}
+    </>
+  )
+  if (!pr.url)
+    return (
+      <span {...common} className="ref pr">
+        {label}
+      </span>
+    )
+  const url = pr.url
+  return (
+    <a
+      {...common}
+      className="ref pr"
+      href={url}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        void openExternal(url)
+      }}
+    >
+      {label}
+    </a>
+  )
+}
+
 function GraphSvg({ plan, rows, at }: { plan: BranchPlan; rows: PlanRow[]; at: number }) {
   const width = graphWidth(plan)
   const height = rows.length * ROW_H
@@ -231,6 +283,17 @@ export function PlanGraph({
 }) {
   const rows = useMemo(() => rowsAt(plan, at), [plan, at])
   const refs = useMemo(() => refsAt(plan, at), [plan, at])
+  const prs = useMemo(() => prsAt(plan, at), [plan, at])
+  const locals = useMemo(
+    () =>
+      new Set(
+        [...refs.values()]
+          .flat()
+          .filter((p) => p.kind === "local")
+          .map((p) => p.name),
+      ),
+    [refs],
+  )
   const step = plan.steps.find((s) => s.n === selected)
   const touched = new Set(step?.nodes ?? [])
   const focus = step && selected === at && touched.size > 0
@@ -295,9 +358,15 @@ export function PlanGraph({
               >
                 <span />
                 <Box sx={{ display: "flex", gap: 0.75, alignItems: "center", minWidth: 0, overflow: "hidden" }}>
-                  {(refs.get(r.node.id) ?? []).map((p) => (
-                    <RefChip key={p.name} placed={p} />
-                  ))}
+                  {(refs.get(r.node.id) ?? []).map((p) => {
+                    const pr = prForRef(prs, p, locals)
+                    return (
+                      <Fragment key={p.name}>
+                        <RefChip placed={p} />
+                        {pr && <PrChip pr={pr} />}
+                      </Fragment>
+                    )
+                  })}
                   <Typography
                     noWrap
                     sx={{

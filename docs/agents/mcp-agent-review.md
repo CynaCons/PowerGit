@@ -94,11 +94,12 @@ Explain what a diff cannot say: why this approach, what was ruled out, what a re
 Since v0.22.0 an agent can plan branch work before doing it: rebases, new branches, commits, merges, tags and deletions. PowerGit plays the plan on the repository's graph and checks each step with git; the owner sees it on PowerGit's own graph, scrubs through it step by step, comments on steps, and approves or sends it back. Nothing moves until you run the steps yourself, after approval; PowerGit then ticks each step as the refs show it ran.
 
 - `branch_plan_preview` `{ repo_path, steps }` — checks without opening anything. Returns `steps: [{ n, op, text, result, because, commands, conflicts }]` and `branches_after`.
-- `branch_plan_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, steps, explanations?: [{ step, body }], board? }` — opens round 1. A step whose result is `invalid` refuses the call with its reason.
+- `branch_plan_open` `{ repo_path, mode: "notify"|"wait", title, why?, agent?, steps, explanations?: [{ step, body }], prs?, board? }` — opens round 1. A step whose result is `invalid` refuses the call with its reason.
 - `branch_plan_wait` `{ repo_path, plan_id, timeout_ms? }` — returns when the owner sends the plan back, approves or cancels it; `timed_out: true` means call again.
 - `branch_plan_get` `{ repo_path, plan_id }` — the latest round: steps with checks, `done` per step once approved, `moved` (refs that moved since the check), and comments with their `step`.
-- `branch_plan_revise` `{ repo_path, plan_id, note?, steps?, replies?: [{ comment, body }], explanations? }` — the next round; without `steps` the same steps are checked again.
+- `branch_plan_revise` `{ repo_path, plan_id, note?, steps?, replies?: [{ comment, body }], explanations?, prs? }` — the next round; without `steps` the same steps are checked again; `prs` replaces the list.
 - `branch_plan_cancel` `{ repo_path, plan_id, reason? }`.
+- `branch_plan_pr` `{ repo_path, plan_id, branch, id?, title?, url?, state?, into? }` (since v0.22.5) — adds or updates the pull request of `branch` on a pending or approved plan.
 
 Steps, in order:
 
@@ -110,10 +111,13 @@ Steps, in order:
   { "op": "merge", "from": "feature/billing", "into": "feature/auth", "mode": "no-ff" },
   { "op": "merge", "from": "feature/auth", "into": "main", "mode": "no-ff" },
   { "op": "cherry-pick", "commits": ["4c2d9e1"], "onto": "release/1.4" },
+  { "op": "pr", "from": "feature/auth", "into": "main", "title": "Auth login" },
   { "op": "tag", "name": "v1.5", "at": "main" },
   { "op": "delete", "branch": "feature/billing" }
 ]
 ```
+
+Pull requests (since v0.22.5) work with any host: GitHub, Bitbucket, GitLab or your own. PowerGit never asks the host; it shows what you tell it. A PR is `{ branch, id?, title?, url?, state?, into? }`: `branch` is its source branch, `id` and `state` are free text (`"#42"`, `"PR-17"`, `"!9"`; `"open"`, `"merged"`, `"declined"`), `url` is an http(s) link. Each shows as a label on its branch in the plan, and the owner opens it with a click. Give the ones that exist in `prs` on open; a `pr` step is one you will open: after approval, open it on your host, then call `branch_plan_pr` with its link, and the step counts as run.
 
 What each check means:
 

@@ -5,7 +5,7 @@ namespace PowerGit.Engine.Mcp;
 public sealed class McpTools(RepoRegistry registry)
 {
     public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise", "agent_review_comment",
-        "branch_plan_preview", "branch_plan_open", "branch_plan_wait", "branch_plan_get", "branch_plan_revise", "branch_plan_cancel"];
+        "branch_plan_preview", "branch_plan_open", "branch_plan_wait", "branch_plan_get", "branch_plan_revise", "branch_plan_cancel", "branch_plan_pr"];
 
     private static readonly JsonSerializerOptions StepJson = new(JsonSerializerDefaults.Web);
 
@@ -22,7 +22,7 @@ public sealed class McpTools(RepoRegistry registry)
     {
         GitHost host = Host(args, out _);
         AgentReviewDto session = host.CreateBranchPlan(new(Required(args, "mode"), Required(args, "title"), String(args, "why"),
-            String(args, "agent"), Steps(args), String(args, "board"), PlanExplanations(args)));
+            String(args, "agent"), Steps(args), String(args, "board"), PlanExplanations(args), Prs(args)));
         return PlanPayload(host, session, false);
     }
 
@@ -48,7 +48,7 @@ public sealed class McpTools(RepoRegistry registry)
         if (args.TryGetProperty("replies", out JsonElement list) && list.ValueKind == JsonValueKind.Array)
             foreach (JsonElement reply in list.EnumerateArray()) replies.Add(new(Required(reply, "comment"), Required(reply, "body")));
         IReadOnlyList<BranchPlanStepRequest>? steps = args.TryGetProperty("steps", out _) ? Steps(args) : null;
-        AgentReviewDto session = host.ReviseBranchPlan(Required(args, "plan_id"), new(String(args, "note"), steps, replies, PlanExplanations(args)));
+        AgentReviewDto session = host.ReviseBranchPlan(Required(args, "plan_id"), new(String(args, "note"), steps, replies, PlanExplanations(args), Prs(args)));
         return PlanPayload(host, session, false);
     }
 
@@ -57,6 +57,22 @@ public sealed class McpTools(RepoRegistry registry)
         GitHost host = Host(args, out _);
         AgentReviewDto session = host.ResolveAgentReview(Required(args, "plan_id"), new("cancel", null, String(args, "reason") ?? "agent"));
         return PlanPayload(host, session, false);
+    }
+
+    // v0.22.5: a pull request on any host, as the agent describes it.
+    public object PlanPr(JsonElement args)
+    {
+        GitHost host = Host(args, out _);
+        BranchPlanPrDto pr = JsonSerializer.Deserialize<BranchPlanPrDto>(args.GetRawText(), StepJson)!;
+        AgentReviewDto session = host.SetBranchPlanPr(Required(args, "plan_id"), pr);
+        return PlanPayload(host, session, false);
+    }
+
+    private static IReadOnlyList<BranchPlanPrDto>? Prs(JsonElement args)
+    {
+        if (!args.TryGetProperty("prs", out JsonElement list)) return null;
+        if (list.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("prs must be an array");
+        return JsonSerializer.Deserialize<BranchPlanPrDto[]>(list.GetRawText(), StepJson);
     }
 
     private static IReadOnlyList<BranchPlanStepRequest> Steps(JsonElement args)
@@ -103,6 +119,7 @@ public sealed class McpTools(RepoRegistry registry)
             timed_out = timedOut, note = round.Note, sent_at = round.SentAt,
             steps = plan.Steps.Select(StepPayload),
             moved = plan.Moved,
+            prs = plan.Prs,
             comments = (state.Comments ?? []).Select(t => new
             {
                 t.Id, t.Round, step = t.Path == "plan" && int.TryParse(t.Line.AsSpan(1), out int s) ? s : (int?)null, t.Body, t.Kind,

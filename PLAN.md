@@ -1164,9 +1164,9 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 ### v0.22.5 — Branch plans: pull requests as labels with links, any host (PLANNED) (current) (ACTIVE)
 **Goal:** Owner (2026-10-25): PRs shown on the plan as clickable labels, host-agnostic.
 - [x] Owner's sentence as red e2e: PR labels link out on the plan. [agent: claude]
-- [ ] Engine: agents attach PRs to a plan; a pr step; tests.
-- [ ] MCP: prs on open and revise, branch_plan_pr to update; docs.
-- [ ] View: PR chips beside branches, clickable, planned ones dashed.
+- [x] Engine: agents attach PRs to a plan; a pr step; tests. [agent: claude]
+- [x] MCP: prs on open and revise, branch_plan_pr to update; docs. [agent: claude]
+- [x] View: PR chips beside branches, clickable, planned ones dashed. [agent: claude]
 - [ ] Gate: engine tests, vitest, lint, plan e2e; zip smoke.
 - [ ] Release v0.22.5.
 - [ ] Owner ticks: PRs show on plans and open on click.

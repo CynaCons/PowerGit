@@ -142,6 +142,9 @@ public sealed class McpHostTests
         JsonElement got = await c.Tool("branch_plan_get", new { repo_path = h.Repo.Dir, plan_id = id });
         Assert.Equal("approved", got.GetProperty("status").GetString());
         Assert.False(got.GetProperty("steps")[0].GetProperty("done").GetBoolean());
+        JsonElement pr = await c.Tool("branch_plan_pr", new { repo_path = h.Repo.Dir, plan_id = id, branch = "topic", id = "PR-17", url = "https://bitbucket.example.com/pull-requests/17", state = "open", into = branch });
+        JsonElement label = Assert.Single(pr.GetProperty("prs").EnumerateArray());
+        Assert.Equal(("topic", "PR-17"), (label.GetProperty("branch").GetString(), label.GetProperty("id").GetString()));
         JsonElement bad = await c.Raw("tools/call", new { name = "branch_plan_open", arguments = new { repo_path = h.Repo.Dir, mode = "wait", title = "Bad", steps = new[] { new { op = "merge", from = "nope", into = branch } } } }, result: true);
         Assert.True(bad.GetProperty("isError").GetBoolean());
         Assert.Contains("step 1 cannot run", bad.GetProperty("content")[0].GetProperty("text").GetString());

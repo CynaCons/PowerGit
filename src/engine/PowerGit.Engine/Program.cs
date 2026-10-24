@@ -786,6 +786,10 @@ repo.MapPost("/branch-plans/{sid}/revise", (string sid, BranchPlanReviseRequest 
 repo.MapPost("/branch-plans/{sid}/comments", (string sid, BranchPlanCommentRequest body, GitHost git) =>
     AgentReviewCall(() => git.CommentBranchPlanStep(sid, body)));
 
+// v0.22.5: the agent adds or updates a pull request on the plan (any host).
+repo.MapPost("/branch-plans/{sid}/prs", (string sid, BranchPlanPrDto body, GitHost git) =>
+    AgentReviewCall(() => git.SetBranchPlanPr(sid, body)));
+
 repo.MapPost("/branch-plans/{sid}/recheck", (string sid, GitHost git) =>
     AgentReviewCall(() => git.RecheckBranchPlan(sid)));
 

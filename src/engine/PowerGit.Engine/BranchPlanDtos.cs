@@ -9,13 +9,14 @@ namespace PowerGit.Engine;
 ///  One step as the agent writes it. <c>op</c>: rebase {branch, onto}, branch
 ///  {name, from}, commit {on, label?, subject?, files?}, merge {from, into,
 ///  mode: no-ff | ff | squash}, tag {name, at}, delete {branch}; v0.22.1:
-///  cherry-pick {commits, onto}.
+///  cherry-pick {commits, onto}; v0.22.5: pr {from, into, title}, a pull
+///  request the agent will open on its host.
 /// </summary>
 public sealed record BranchPlanStepRequest(
     string? Op, string? Branch = null, string? Onto = null, string? Name = null, string? From = null,
     string? Into = null, string? On = null, string? Label = null, string? Subject = null,
     IReadOnlyList<string>? Files = null, string? Mode = null, string? At = null,
-    IReadOnlyList<string>? Commits = null);
+    IReadOnlyList<string>? Commits = null, string? Title = null);
 
 /// <summary>One side of a predicted conflict: the ref, its last commit on the file, and its change.</summary>
 public sealed record BranchPlanSideDto(string Label, string? Commit, string? Subject, string Patch);
@@ -55,17 +56,26 @@ public sealed record BranchPlanRefDto(string Name, string Kind, IReadOnlyList<Br
 public sealed record BranchPlanPreviewDto(
     IReadOnlyList<BranchPlanStepDto> Steps, IReadOnlyList<BranchPlanNodeDto> Nodes, IReadOnlyList<string> Lanes,
     IReadOnlyList<BranchPlanRefDto> Refs, IReadOnlyDictionary<string, string> Inputs, string CheckedAt,
-    bool Truncated = false, IReadOnlyList<string>? Moved = null);
+    bool Truncated = false, IReadOnlyList<string>? Moved = null, IReadOnlyList<BranchPlanPrDto>? Prs = null);
+
+/// <summary>
+///  v0.22.5: a pull request the agent describes, on any host (owner: "At work,
+///  we work with bitbucket. So keep it generic, agents should be able to fill
+///  their PR infos"). Id is free text ("#42", "PR-17", "!9"); State too
+///  (open, merged, declined, draft ...); Url, when given, is an http(s) link.
+///  PowerGit never asks a host about it: it shows and links what it is told.
+/// </summary>
+public sealed record BranchPlanPrDto(string? Branch, string? Id = null, string? Title = null, string? Url = null, string? State = null, string? Into = null);
 
 public sealed record BranchPlanExplainRequest(int Step, string? Body);
 
 public sealed record BranchPlanRequest(
     string? Mode, string? Title, string? Why, string? Agent, IReadOnlyList<BranchPlanStepRequest>? Steps,
-    string? Board = null, IReadOnlyList<BranchPlanExplainRequest>? Explanations = null);
+    string? Board = null, IReadOnlyList<BranchPlanExplainRequest>? Explanations = null, IReadOnlyList<BranchPlanPrDto>? Prs = null);
 
 public sealed record BranchPlanReviseRequest(
     string? Note, IReadOnlyList<BranchPlanStepRequest>? Steps, IReadOnlyList<AgentReviewReplyRequest>? Replies,
-    IReadOnlyList<BranchPlanExplainRequest>? Explanations = null);
+    IReadOnlyList<BranchPlanExplainRequest>? Explanations = null, IReadOnlyList<BranchPlanPrDto>? Prs = null);
 
 public sealed record BranchPlanCommentRequest(int Step, string? Body);
 

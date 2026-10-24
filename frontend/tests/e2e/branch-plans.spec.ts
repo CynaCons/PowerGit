@@ -207,6 +207,9 @@ test.describe("branch plans", () => {
       await expect(planned).not.toHaveAttribute("data-planned", "true")
       await expect(planned).toHaveAttribute("href", url)
       await expect(planned).toContainText("!9")
+      // The PR is the agent's word: the merge before it has not run.
+      await expect(page.getByTestId("plan-step").nth(0)).not.toHaveAttribute("data-done", "true")
+      await expect(page.getByTestId("plan-progress")).toContainText("1 of 2")
 
       // Only web links are accepted.
       const bad = await fetch(`${ENGINE_URL}/repos/${repoId}/branch-plans/${plan.id}/prs`, {

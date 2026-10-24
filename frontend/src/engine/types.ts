@@ -203,6 +203,20 @@ export type BranchPlanSpec = {
   files?: string[] | null
   mode?: string | null
   at?: string | null
+  /** v0.22.5: a pr step's title. */
+  title?: string | null
+}
+/**
+ *  v0.22.5: a pull request as the agent describes it, on any host (GitHub,
+ *  Bitbucket, GitLab ...): id and state are free text, url an http(s) link.
+ */
+export type BranchPlanPr = {
+  branch: string
+  id: string | null
+  title: string | null
+  url: string | null
+  state: string | null
+  into: string | null
 }
 export type BranchPlanResult = "ok" | "conflict" | "risk" | "unknown" | "invalid"
 export type BranchPlanSide = { label: string; commit: string | null; subject: string | null; patch: string }
@@ -248,6 +262,7 @@ export type BranchPlan = {
   truncated: boolean
   /** On a read while the plan waits: the refs that moved since the check. */
   moved?: string[] | null
+  prs?: BranchPlanPr[] | null
 }
 export type AgentReviewReply = { author: string; body: string; at: string; boardId: number | null }
 export type AgentReviewThread = {

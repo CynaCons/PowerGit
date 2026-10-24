@@ -505,6 +505,23 @@ html {
   color: var(--pg-ref-tag-fg, #6d28d9);
 }
 
+/* v0.22.5: a branch plan's pull request label, a link to it on its host. */
+.ref.pr {
+  background: transparent;
+  border: 1px solid var(--pg-ref-local-fg, #2563eb);
+  text-decoration: none;
+}
+a.ref.pr {
+  cursor: pointer;
+}
+a.ref.pr:hover {
+  text-decoration: underline;
+}
+.ref.pr .pr-state {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
 .ref-cloud {
   font-size: 11px !important;
   flex-shrink: 0;

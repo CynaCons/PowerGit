@@ -92,8 +92,9 @@ public sealed partial class GitHost
     }
 
     /// <summary>Plays and checks the steps; nothing in the repository moves.</summary>
-    public BranchPlanPreviewDto PreviewBranchPlan(IReadOnlyList<BranchPlanStepRequest>? steps)
+    public BranchPlanPreviewDto PreviewBranchPlan(IReadOnlyList<BranchPlanStepRequest>? steps, IReadOnlyList<BranchPlanPrDto>? prs = null)
     {
+        List<BranchPlanPrDto> cleanPrs = [.. (prs ?? []).Select(CleanPr)];
         string root = RequireRoot();
         if (steps is not { Count: > 0 }) throw new InvalidOperationException("a plan needs at least one step");
         if (steps.Count > 40) throw new InvalidOperationException("a plan has at most 40 steps");
@@ -112,7 +113,8 @@ public sealed partial class GitHost
             [.. s.Timeline.Select(kv => new BranchPlanRefDto(kv.Key, s.RefKind.GetValueOrDefault(kv.Key, "local"), kv.Value))],
             new Dictionary<string, string>(s.Inputs, StringComparer.Ordinal),
             Timestamp(),
-            truncated);
+            truncated,
+            Prs: cleanPrs);
     }
 
     private static IEnumerable<string?> StepRefs(BranchPlanStepRequest st) => [st.Branch, st.Onto, st.From, st.Into, st.On, st.At];
@@ -347,8 +349,18 @@ public sealed partial class GitHost
                     ? new(n, op, text, st, "ok", "its commits stay on another branch", cmd)
                     : new(n, op, text, st, "risk", $"commits only on {st.Branch} would be lost", cmd);
             }
+            case "pr":
+            {
+                string text = $"Open a pull request from {st.From} into {st.Into}" + (st.Title?.Trim() is { Length: > 0 } t ? $": {t}" : "");
+                string[] cmd = ["(the agent opens it on its host, then reports it with branch_plan_pr)"];
+                string? from = Need(st.From);
+                if (from is null) return Invalid(text, Missing(st.From), cmd);
+                if (Need(st.Into) is null) return Invalid(text, Missing(st.Into), cmd);
+                if (st.From == st.Into) return Invalid(text, "a pull request needs two branches", cmd);
+                return new(n, op, text, st, "ok", "opened by the agent; it links here once the agent reports it", cmd, Nodes: [from]);
+            }
             default:
-                return Invalid(op.Length == 0 ? "Unknown step" : op, "op must be rebase, branch, commit, merge, cherry-pick, tag or delete");
+                return Invalid(op.Length == 0 ? "Unknown step" : op, "op must be rebase, branch, commit, merge, cherry-pick, pr, tag or delete");
         }
     }
 
@@ -630,7 +642,7 @@ public sealed partial class GitHost
         if (mode is not ("notify" or "wait")) throw new InvalidOperationException("mode must be notify or wait");
         string title = req.Title?.Trim() ?? "";
         if (title.Length == 0 || title.Length > 200) throw new InvalidOperationException("title must be 1 to 200 characters");
-        BranchPlanPreviewDto plan = PreviewBranchPlan(req.Steps);
+        BranchPlanPreviewDto plan = PreviewBranchPlan(req.Steps, req.Prs);
         RefuseInvalid(plan);
         string id = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(20));
         string now = Timestamp();
@@ -681,7 +693,7 @@ public sealed partial class GitHost
         {
             AgentReviewDto session = RequirePlanPending(id);
             AgentReviewRoundDto previous = LatestRound(session)!;
-            BranchPlanPreviewDto plan = PreviewBranchPlan(req.Steps is { Count: > 0 } steps ? steps : [.. previous.Plan!.Steps.Select(x => x.Spec)]);
+            BranchPlanPreviewDto plan = PreviewBranchPlan(req.Steps is { Count: > 0 } steps ? steps : [.. previous.Plan!.Steps.Select(x => x.Spec)], req.Prs ?? previous.Plan!.Prs);
             RefuseInvalid(plan);
             AgentReviewRoundDto round = new(previous.N + 1, Timestamp(), null, Clean(req.Note), [], [], [], plan);
             List<AgentReviewThreadDto> threads = WithPlanExplanations(session, round, req.Explanations);
@@ -730,7 +742,7 @@ public sealed partial class GitHost
         {
             AgentReviewDto session = RequirePlanPending(id);
             AgentReviewRoundDto round = LatestRound(session)!;
-            BranchPlanPreviewDto plan = PreviewBranchPlan([.. round.Plan!.Steps.Select(x => x.Spec)]);
+            BranchPlanPreviewDto plan = PreviewBranchPlan([.. round.Plan!.Steps.Select(x => x.Spec)], round.Plan!.Prs);
             AgentReviewDto updated = session with { Rounds = [.. session.Rounds!.Take(session.Rounds!.Count - 1), round with { Plan = plan }], UpdatedAt = Timestamp() };
             WriteAgentReview(updated);
             return updated;
@@ -755,7 +767,16 @@ public sealed partial class GitHost
         else if (session.Status == "approved")
         {
             bool[] done = [.. plan.Steps.Select(x => StepRan(x, plan, now))];
-            for (int i = done.Length - 1; i > 0; i--) if (done[i]) done[i - 1] = true;
+            // A step that ran means the git steps before it ran. v0.22.5: a pr
+            // step is the agent's word, not git's, so it neither ticks them
+            // nor is ticked by them.
+            bool later = false;
+            for (int i = done.Length - 1; i >= 0; i--)
+            {
+                if (plan.Steps[i].Op == "pr") continue;
+                done[i] |= later;
+                later = done[i];
+            }
             state = plan with { Steps = [.. plan.Steps.Select((x, i) => x with { Done = done[i] })] };
         }
         return session with { Rounds = [.. session.Rounds!.Take(session.Rounds!.Count - 1), round with { Plan = state }] };
@@ -822,12 +843,49 @@ public sealed partial class GitHost
                 }
                 return true;
             }
+            case "pr":
+                return (plan.Prs ?? []).Any(p => p.Branch == st.From && p.Url is not null && (p.Into is null || st.Into is null || p.Into == st.Into));
             case "tag":
                 return At(st.Name) is not null;
             case "delete":
                 return At(st.Branch) is null;
             default:
                 return false;
+        }
+    }
+
+    /// <summary>v0.22.5: a PR as the agent gives it: a branch, short free text, an http(s) link or none.</summary>
+    private static BranchPlanPrDto CleanPr(BranchPlanPrDto pr)
+    {
+        static string? Cut(string? v, int max) => v?.Trim() is { Length: > 0 } t ? (t.Length > max ? t[..max] : t) : null;
+        string branch = Cut(pr.Branch, 250) ?? throw new InvalidOperationException("a pull request needs its branch");
+        string? url = Cut(pr.Url, 2000);
+        if (url is not null && !(Uri.TryCreate(url, UriKind.Absolute, out Uri? u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp)))
+            throw new InvalidOperationException($"a pull request's url must be an http(s) link: {url}");
+        return new(branch, Cut(pr.Id, 40), Cut(pr.Title, 200), url, Cut(pr.State, 40), Cut(pr.Into, 250));
+    }
+
+    /// <summary>
+    ///  v0.22.5: the agent adds or updates a PR on the plan (one per branch),
+    ///  while it waits or once approved: a planned pr step then ticks.
+    /// </summary>
+    public AgentReviewDto SetBranchPlanPr(string id, BranchPlanPrDto pr)
+    {
+        BranchPlanPrDto clean = CleanPr(pr);
+        lock (_agentReviewWriteGate)
+        {
+            AgentReviewDto session = GetAgentReview(id) ?? throw new KeyNotFoundException("agent review session not found");
+            if (session.Kind != "plan") throw new InvalidOperationException("this agent review is not a branch plan");
+            if (session.Status is not ("pending" or "approved")) throw new AgentReviewStateException($"the plan is {session.Status}");
+            AgentReviewRoundDto round = LatestRound(session)!;
+            List<BranchPlanPrDto> prs = [.. (round.Plan!.Prs ?? []).Where(p => p.Branch != clean.Branch), clean];
+            AgentReviewDto updated = session with
+            {
+                Rounds = [.. session.Rounds!.Take(session.Rounds!.Count - 1), round with { Plan = round.Plan with { Prs = prs } }],
+                UpdatedAt = Timestamp(),
+            };
+            WriteAgentReview(updated);
+            return updated;
         }
     }
 

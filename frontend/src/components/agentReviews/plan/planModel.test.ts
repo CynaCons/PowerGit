@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { BranchPlan, BranchPlanNode } from "../../../engine"
-import { edgesAt, firstStepToRead, planCounts, refsAt, rowsAt, shaLabel, stateAt } from "./planModel"
+import { edgesAt, firstStepToRead, planCounts, prForRef, prsAt, refsAt, rowsAt, shaLabel, stateAt } from "./planModel"
 
 const node = (
   id: string,
@@ -96,6 +96,42 @@ describe("planModel", () => {
     expect(refsAt(plan, 1).get("a'")).toEqual([{ name: "auth", kind: "local", planned: true }])
     expect(refsAt(plan, 2).get("m2")).toEqual([{ name: "main", kind: "local", planned: true }])
     expect(refsAt(plan, 2).get("base")).toEqual([{ name: "v1", kind: "tag", planned: false }])
+  })
+
+  it("labels a branch with its PR: reported ones from the start, planned ones from their step", () => {
+    const withPrs: BranchPlan = {
+      ...plan,
+      steps: [
+        ...plan.steps,
+        {
+          n: 3,
+          op: "pr",
+          text: "",
+          spec: { op: "pr", from: "auth", into: "main" },
+          result: "ok",
+          because: "",
+          commands: [],
+          done: false,
+        },
+      ],
+      prs: [
+        {
+          branch: "fix",
+          id: "PR-17",
+          title: null,
+          url: "https://bitbucket.example.com/pr/17",
+          state: "open",
+          into: null,
+        },
+      ],
+    }
+    expect(prsAt(withPrs, 2).has("auth")).toBe(false)
+    expect(prsAt(withPrs, 3).get("auth")).toMatchObject({ planned: true, into: "main", url: null })
+    expect(prsAt(withPrs, 0).get("fix")).toMatchObject({ id: "PR-17", planned: false })
+    const prs = prsAt(withPrs, 0)
+    expect(prForRef(prs, { name: "origin/fix", kind: "remote", planned: false }, new Set())?.id).toBe("PR-17")
+    expect(prForRef(prs, { name: "origin/fix", kind: "remote", planned: false }, new Set(["fix"]))).toBeUndefined()
+    expect(prForRef(prs, { name: "fix", kind: "tag", planned: false }, new Set())).toBeUndefined()
   })
 
   it("draws a line to every parent shown, dashed for the plan's nodes", () => {

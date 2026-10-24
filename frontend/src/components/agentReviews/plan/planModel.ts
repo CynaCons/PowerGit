@@ -1,4 +1,4 @@
-import type { BranchPlan, BranchPlanNode, BranchPlanRef, BranchPlanStep } from "../../../engine"
+import type { BranchPlan, BranchPlanNode, BranchPlanPr, BranchPlanRef, BranchPlanStep } from "../../../engine"
 
 // The branch plan on the graph (v0.22.0, docs/prototypes/branch-plan-v1.html):
 // which nodes show at a scrubber position, in what state, where each ref is,
@@ -8,6 +8,8 @@ export type NodeState = "exists" | "planned" | "merge" | "ghost" | "fold"
 export type PlanRow = { node: BranchPlanNode; state: NodeState; index: number }
 export type PlacedRef = { name: string; kind: BranchPlanRef["kind"]; planned: boolean }
 export type Edge = { d: string; lane: number; dashed: boolean; ghost: boolean }
+/** v0.22.5: a PR label; planned: a pr step the agent has not reported yet. */
+export type PlacedPr = BranchPlanPr & { planned: boolean }
 
 export const ROW_H = 28
 export const LANE_X0 = 14
@@ -42,6 +44,37 @@ export function refsAt(plan: BranchPlan, at: number): Map<string, PlacedRef[]> {
     out.set(pos.node, [...(out.get(pos.node) ?? []), { name: ref.name, kind: ref.kind, planned: pos.step > 0 }])
   }
   return out
+}
+
+/**
+ *  v0.22.5: the PR label of each branch at a position: the PRs the agent
+ *  reported, and the pr steps up to there it has not reported yet.
+ */
+export function prsAt(plan: BranchPlan, at: number): Map<string, PlacedPr> {
+  const out = new Map<string, PlacedPr>()
+  for (const s of plan.steps) {
+    const from = s.spec.from
+    if (s.op !== "pr" || s.n > at || !from) continue
+    out.set(from, {
+      branch: from,
+      id: null,
+      title: s.spec.title ?? null,
+      url: null,
+      state: null,
+      into: s.spec.into ?? null,
+      planned: true,
+    })
+  }
+  for (const pr of plan.prs ?? []) out.set(pr.branch, { ...pr, planned: false })
+  return out
+}
+
+/** The PR label beside a ref chip: a local branch by name, a remote one by the name after its remote. */
+export function prForRef(prs: Map<string, PlacedPr>, ref: PlacedRef, locals: Set<string>): PlacedPr | undefined {
+  if (ref.kind === "local") return prs.get(ref.name)
+  if (ref.kind !== "remote") return undefined
+  const branch = ref.name.slice(ref.name.indexOf("/") + 1)
+  return locals.has(branch) ? undefined : prs.get(branch)
 }
 
 /** The lines from each row to its parents among the rows shown. */

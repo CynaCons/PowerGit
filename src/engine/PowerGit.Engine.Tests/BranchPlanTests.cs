@@ -276,4 +276,37 @@ public sealed class BranchPlanTests
         Assert.Empty(host.WithBranchPlanState(rechecked).Rounds![0].Plan!.Moved!);
         Assert.Equal(6, rechecked.Rounds![0].Plan!.Nodes.Count(n => n.Kind == "exists"));
     }
+
+    [Fact]
+    public void Pull_requests_on_any_host_are_kept_on_the_plan_and_tick_their_step()
+    {
+        using TempRepo repo = Repo();
+        GitHost host = Host(repo);
+        BranchPlanPreviewDto preview = host.PreviewBranchPlan(
+        [
+            new("pr", From: "feature/auth", Into: "main", Title: "Auth login"),
+            new("pr", From: "feature/auth", Into: "feature/auth"),
+            new("pr", From: "nope", Into: "main"),
+        ]);
+        Assert.Equal(["ok", "invalid", "invalid"], preview.Steps.Select(s => s.Result));
+        Assert.Equal("Open a pull request from feature/auth into main: Auth login", preview.Steps[0].Text);
+
+        const string bitbucket = "https://bitbucket.example.com/projects/WEB/repos/web/pull-requests/17";
+        AgentReviewDto plan = host.CreateBranchPlan(new("wait", "PRs", null, "auth-fix", [new("tag", Name: "v9", At: "main"), new("pr", From: "feature/auth", Into: "main")],
+            Prs: [new("main", "PR-3", " Older ", bitbucket, "merged")]));
+        Assert.Equal(("PR-3", "Older"), (plan.Rounds![0].Plan!.Prs![0].Id, plan.Rounds![0].Plan!.Prs![0].Title));
+        Assert.Throws<InvalidOperationException>(() => host.SetBranchPlanPr(plan.Id, new("feature/auth", Url: "javascript:alert(1)")));
+        Assert.Throws<InvalidOperationException>(() => host.SetBranchPlanPr(plan.Id, new(" ", Url: bitbucket)));
+        Assert.Equal(["main"], host.RecheckBranchPlan(plan.Id).Rounds![0].Plan!.Prs!.Select(p => p.Branch));
+
+        host.ResolveAgentReview(plan.Id, new("approve", null, null));
+        Assert.False(host.WithBranchPlanState(host.GetAgentReview(plan.Id)!).Rounds![0].Plan!.Steps[1].Done);
+        host.SetBranchPlanPr(plan.Id, new("feature/auth", "!9", null, "https://git.example.org/team/web/-/merge_requests/9", "open", "main"));
+        AgentReviewDto read = host.WithBranchPlanState(host.GetAgentReview(plan.Id)!);
+        // The PR ticks its own step only: the tag before it has not run.
+        Assert.Equal([false, true], read.Rounds![0].Plan!.Steps.Select(x => x.Done));
+        Assert.Equal(["main", "feature/auth"], read.Rounds![0].Plan!.Prs!.Select(p => p.Branch));
+        repo.Run("tag", "v9", "main");
+        Assert.Equal([true, true], host.WithBranchPlanState(host.GetAgentReview(plan.Id)!).Rounds![0].Plan!.Steps.Select(x => x.Done));
+    }
 }
