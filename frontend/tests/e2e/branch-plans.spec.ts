@@ -52,6 +52,58 @@ test.describe("branch plans", () => {
     await openRepoOnEngine(previous ?? process.cwd())
   })
 
+  // v0.22.1, owner: "Add the missing things to the planning, like the rebase
+  // check and the cherry pick": a cherry-pick step is checked commit by
+  // commit, and a long history folds its quiet run instead of being cut.
+  test("a cherry-pick step shows its copy, and a long history folds its quiet run", async ({ page }) => {
+    test.setTimeout(150_000)
+    const dir = makeRepo("pg-branch-plan-pick-")
+    git(dir, "checkout", "-q", "-b", "topic")
+    write(dir, "fix.ts", "export const fixed = true\n")
+    commit(dir, "fix: guard the empty repo")
+    const fix = git(dir, "rev-parse", "HEAD").trim()
+    git(dir, "checkout", "-q", "main")
+    for (let i = 0; i < 150; i++) git(dir, "commit", "-q", "--allow-empty", "-m", `main ${i}`)
+    try {
+      const { id: repoId } = await api<{ id: string }>("/repos/open", {
+        method: "POST",
+        body: JSON.stringify({ path: dir }),
+      })
+      await page.goto(`/?repo=${repoId}`)
+      await expect(page.getByTestId("status-branch")).toHaveText("main", { timeout: 30_000 })
+      await api(`/repos/${repoId}/branch-plans`, {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "wait",
+          title: "Bring the empty-repo fix to main",
+          agent: "auth-fix",
+          steps: [{ op: "cherry-pick", commits: [fix], onto: "main" }],
+        }),
+      })
+      await page.getByTestId("agent-reviews-button").click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Bring the empty-repo fix" })
+        .filter({ hasText: basename(dir) })
+        .click()
+      const step = page.getByTestId("plan-step")
+      await expect(step).toHaveCount(1, { timeout: 15_000 })
+      await expect(step).toHaveAttribute("data-result", "ok")
+      await expect(step).toContainText("Cherry-pick 1 commit onto main")
+      await expect(step).toContainText("1 commit replays cleanly")
+      await page.locator('[data-testid="plan-scrub"][data-at="1"]').click()
+      await expect(page.locator('[data-testid="plan-row"][data-kind="planned"]')).toContainText(
+        "fix: guard the empty repo",
+      )
+      const fold = page.locator('[data-testid="plan-row"][data-kind="fold"]')
+      await expect(fold).toHaveCount(1)
+      await expect(fold).toContainText(/\d+ commits/)
+      expect(await page.locator('[data-testid="plan-row"]').count()).toBeLessThan(20)
+    } finally {
+      await removeRepo(dir)
+    }
+  })
+
   test("an agent's branch plan shows on the graph, is discussed and approved, and ticks as it runs", async ({
     page,
   }) => {

@@ -14,12 +14,14 @@ namespace PowerGit.Engine;
 ///  always. The result is the graph the owner scrubs through
 ///  (docs/prototypes/branch-plan-v1.html): every node with the step that
 ///  brings it and the step that replaces it, lanes per branch, and each ref's
-///  place at every step. A rebase is checked as the merge of its two tips,
-///  which is what git 2.38's merge-tree can answer in one call.
+///  place at every step. v0.22.1: rebases and cherry-picks are replayed
+///  commit by commit (<see cref="ReplayOnto"/>); a long history folds its
+///  quiet runs (<see cref="FoldQuietRuns"/>).
 /// </summary>
 public sealed partial class GitHost
 {
-    private const int PlanCommitCap = 200;
+    private const int PlanCommitCap = 5000;
+    private const int PlanFoldAbove = 120;
 
     private sealed class PlanNode
     {
@@ -35,6 +37,7 @@ public sealed partial class GitHost
         public List<string>? Files { get; init; }
         public long Time { get; init; }
         public int Lane { get; set; } = -1;
+        public string? Tree { get; init; }
     }
 
     private sealed class PlanState(string root, GitHost git)
@@ -50,6 +53,8 @@ public sealed partial class GitHost
         public HashSet<string> Locals = new(StringComparer.Ordinal);
         public HashSet<string> Tags = new(StringComparer.Ordinal);
         public HashSet<string> Remotes = new(StringComparer.Ordinal);
+        /// <summary>v0.22.1: commits a cherry-pick names, loaded so the graph shows where they come from.</summary>
+        public HashSet<string> Picked = new(StringComparer.Ordinal);
         public long Clock;
 
         public void Move(string name, string? node, int step)
@@ -97,6 +102,7 @@ public sealed partial class GitHost
         bool truncated = LoadPlanCommits(s);
         List<BranchPlanStepDto> checkedSteps = [];
         for (int i = 0; i < steps.Count; i++) checkedSteps.Add(PlayStep(s, steps[i], i + 1));
+        FoldQuietRuns(s, checkedSteps);
         List<string> lanes = AssignPlanLanes(s, steps);
         List<PlanNode> ordered = OrderPlanNodes(s);
         return new(
@@ -139,12 +145,17 @@ public sealed partial class GitHost
             s.Refs[name] = sha;
             s.RefKind.TryAdd(name, "local");
         }
+        foreach (string c in steps.SelectMany(st => st.Commits ?? []))
+        {
+            CommandResult r = RunTimed(s.Root, 30_000, NoIsNotFailure, "rev-parse", "--verify", "--quiet", c.Trim() + "^{commit}");
+            if (r.ExitCode == 0) s.Picked.Add(r.StdOut.Trim());
+        }
     }
 
     /// <summary>The commits from the plan's refs down to their common base, newest first.</summary>
     private bool LoadPlanCommits(PlanState s)
     {
-        List<string> tips = [.. s.Inputs.Values.Distinct(StringComparer.Ordinal)];
+        List<string> tips = [.. s.Inputs.Values.Concat(s.Picked).Distinct(StringComparer.Ordinal)];
         if (tips.Count == 0) return false;
         string baseSha = tips[0];
         if (tips.Count > 1)
@@ -153,20 +164,20 @@ public sealed partial class GitHost
             if (mb.ExitCode == 0 && mb.StdOut.Trim().Length > 0) baseSha = mb.StdOut.Trim();
         }
         List<string> args = ["-c", "core.quotepath=false", "log", "--topo-order", "--decorate=full", $"-n{PlanCommitCap + 1}",
-            "--format=%H%x1f%P%x1f%an%x1f%ct%x1f%s%x1f%D", .. tips, "--not", baseSha + "^@"];
+            "--format=%H%x1f%P%x1f%an%x1f%ct%x1f%s%x1f%D%x1f%T", .. tips, "--not", baseSha + "^@"];
         CommandResult log = Run(s.Root, [.. args]);
         string[] lines = log.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         bool truncated = lines.Length > PlanCommitCap;
         foreach (string line in lines.Take(PlanCommitCap))
         {
             string[] f = line.Split('\u001f');
-            if (f.Length < 6) continue;
+            if (f.Length < 7) continue;
             long time = long.TryParse(f[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out long t) ? t : 0;
             s.Clock = Math.Max(s.Clock, time);
             s.Nodes[f[0]] = new PlanNode
             {
                 Id = f[0], Sha = f[0], Parents = [.. f[1].Split(' ', StringSplitOptions.RemoveEmptyEntries)],
-                Kind = "exists", Subject = f[4], Author = f[2], Time = time,
+                Kind = "exists", Subject = f[4], Author = f[2], Time = time, Tree = f[6],
             };
             foreach (string deco in f[5].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             {
@@ -210,24 +221,33 @@ public sealed partial class GitHost
                     if (s.Ancestors(onto).Contains(tip) && tip != onto) s.Move(st.Branch!, onto, n);
                     return new(n, op, text, st, "ok", $"{st.Branch} is already on top of {st.Onto}", cmd);
                 }
-                (string result, string because, List<BranchPlanConflictDto>? conflicts) = CheckJoin(s, onto, tip, st.Onto!, st.Branch!);
-                string parent = onto;
-                List<string> touched = [];
-                foreach (PlanNode c in moving)
+                // v0.22.1: replayed commit by commit, as git rebase does.
+                (string result, string because, List<BranchPlanConflictDto>? conflicts, List<string> copies) = ReplayOnto(s, moving, onto, st.Onto!, n, Tick);
+                foreach (PlanNode c in moving) c.GhostAt ??= n;
+                s.Move(st.Branch!, copies[^1], n);
+                return new(n, op, text, st, result, because, cmd, conflicts, [.. copies, .. moving.Select(c => c.Id)]);
+            }
+            case "cherry-pick":
+            {
+                IReadOnlyList<string> named = st.Commits ?? [];
+                string text = $"Cherry-pick {named.Count} commit{S(named.Count)} onto {st.Onto}";
+                string? onto = Need(st.Onto);
+                List<PlanNode> picks = [];
+                foreach (string name in named)
                 {
-                    PlanNode copy = new()
-                    {
-                        Id = $"{c.Id}@{n}", Parents = [parent], Kind = "planned", From = n, Subject = c.Subject, Author = c.Author,
-                        Copy = c.Id, Files = s.FilesOf(c), Time = Tick(),
-                    };
-                    s.Nodes[copy.Id] = copy;
-                    c.GhostAt ??= n;
-                    parent = copy.Id;
-                    touched.Add(copy.Id);
-                    touched.Add(c.Id);
+                    PlanNode? c = PlanCommit(s, name);
+                    if (c is null) return Invalid(text, $"there is no commit {name}", [$"git switch {st.Onto}", $"git cherry-pick {name}"]);
+                    if (c.Parents.Count > 1) return Invalid(text, $"{c.Sha![..7]} is a merge; cherry-pick it with -m by hand", []);
+                    if (c.Parents.Count == 0) return Invalid(text, $"{c.Sha![..7]} is a root commit", []);
+                    picks.Add(c);
                 }
-                s.Move(st.Branch!, parent, n);
-                return new(n, op, text, st, result, because, cmd, conflicts, touched);
+                string[] cmd = [$"git switch {st.Onto}", $"git cherry-pick {string.Join(' ', picks.Select(c => c.Sha![..7]))}"];
+                if (picks.Count == 0) return Invalid(text, "name at least one commit", cmd);
+                if (onto is null) return Invalid(text, Missing(st.Onto), cmd);
+                if (s.RefKind.GetValueOrDefault(st.Onto!) is "tag" or "remote") return Invalid(text, $"{st.Onto} is not a local branch", cmd);
+                (string result, string because, List<BranchPlanConflictDto>? conflicts, List<string> copies) = ReplayOnto(s, picks, onto, st.Onto!, n, Tick);
+                s.Move(st.Onto!, copies[^1], n);
+                return new(n, op, text, st, result, because, cmd, conflicts, copies);
             }
             case "branch":
             {
@@ -328,7 +348,152 @@ public sealed partial class GitHost
                     : new(n, op, text, st, "risk", $"commits only on {st.Branch} would be lost", cmd);
             }
             default:
-                return Invalid(op.Length == 0 ? "Unknown step" : op, "op must be rebase, branch, commit, merge, tag or delete");
+                return Invalid(op.Length == 0 ? "Unknown step" : op, "op must be rebase, branch, commit, merge, cherry-pick, tag or delete");
+        }
+    }
+
+    /// <summary>A commit a step names, read from git with all its parents (the graph trims those it does not show).</summary>
+    private PlanNode? PlanCommit(PlanState s, string name)
+    {
+        CommandResult r = RunTimed(s.Root, 30_000, NoIsNotFailure, "rev-parse", "--verify", "--quiet", name.Trim() + "^{commit}");
+        if (r.ExitCode != 0) return null;
+        string sha = r.StdOut.Trim();
+        string[] f = Run(s.Root, "log", "-1", "--format=%H%x1f%P%x1f%an%x1f%ct%x1f%s%x1f%T", sha).StdOut.Trim().Split('\u001f');
+        if (f.Length < 6) return null;
+        return new PlanNode
+        {
+            Id = f[0], Sha = f[0], Parents = [.. f[1].Split(' ', StringSplitOptions.RemoveEmptyEntries)], Kind = "exists",
+            Subject = f[4], Author = f[2], Tree = f[5],
+        };
+    }
+
+    /// <summary>
+    ///  v0.22.1: the commits replayed one by one onto <paramref name="onto"/>,
+    ///  exactly as rebase and cherry-pick apply them. git 2.38's merge-tree
+    ///  takes no merge base, so each replay merges the commit with a throwaway
+    ///  commit whose tree is the result so far and whose parent is the commit's
+    ///  parent: their merge base is that parent, which is the three-way merge
+    ///  git itself runs. The throwaway commits are never referenced. Returns
+    ///  the planned copies (each with its tree while the replay stays clean).
+    /// </summary>
+    private (string Result, string Because, List<BranchPlanConflictDto>? Conflicts, List<string> Copies) ReplayOnto(
+        PlanState s, List<PlanNode> commits, string onto, string ontoLabel, int step, Func<long> tick)
+    {
+        string? tree = s.Nodes.GetValueOrDefault(onto)?.Tree;
+        string result = "ok", because = $"{commits.Count} commit{S(commits.Count)} replay{(commits.Count == 1 ? "s" : "")} cleanly";
+        List<BranchPlanConflictDto>? conflicts = null;
+        if (tree is null) (result, because) = ("unknown", $"{ontoLabel} is planned at this point: checked once its commits exist");
+        string parent = onto;
+        List<string> copies = [];
+        foreach (PlanNode c in commits)
+        {
+            if (result == "ok" && tree is not null)
+            {
+                if (c.Sha is null || c.Parents.Count != 1)
+                {
+                    (result, because, tree) = ("unknown", "planned commits are checked once they exist", null);
+                }
+                else
+                {
+                    (string? next, string? stop, List<BranchPlanConflictDto>? files) = ReplayOne(s, tree, c, onto, ontoLabel);
+                    if (stop is not null) (result, because, conflicts, tree) = (files is null ? "unknown" : "conflict", stop, files, null);
+                    else tree = next;
+                }
+            }
+            PlanNode copy = new()
+            {
+                Id = $"{c.Id}@{step}", Parents = [parent], Kind = "planned", From = step, Subject = c.Subject, Author = c.Author,
+                Copy = c.Id, Files = s.FilesOf(c), Time = tick(), Tree = result == "ok" ? tree : null,
+            };
+            s.Nodes[copy.Id] = copy;
+            parent = copy.Id;
+            copies.Add(copy.Id);
+        }
+        return (result, because, conflicts, copies);
+    }
+
+    /// <summary>One commit replayed on a tree: the new tree, or why it stops (with the conflicted files when git says so).</summary>
+    private (string? Tree, string? Stop, List<BranchPlanConflictDto>? Conflicts) ReplayOne(PlanState s, string tree, PlanNode c, string onto, string ontoLabel)
+    {
+        string parentSha = c.Parents[0];
+        CommandResult temp = Run(s.Root, "-c", "user.name=PowerGit", "-c", "user.email=powergit@localhost",
+            "commit-tree", tree, "-p", parentSha, "-m", "powergit branch plan check");
+        if (temp.ExitCode != 0) return (null, "git could not stage the check: " + temp.StdErr.Trim(), null);
+        CommandResult r = RunTimed(s.Root, 60_000, NoIsNotFailure, "-c", "core.quotepath=false", "merge-tree", "--write-tree", "--name-only", "--no-messages", temp.StdOut.Trim(), c.Sha!);
+        string[] lines = r.StdOut.Split('\n');
+        if (r.ExitCode == 0) return (lines[0].Trim(), null, null);
+        if (r.ExitCode != 1)
+            return (null, "this git cannot check it (merge-tree --write-tree needs git 2.38 or later): " + (r.StdErr.Trim() is { Length: > 0 } e ? e.Split('\n')[0] : "no output"), null);
+        List<string> files = [.. lines.Skip(1).TakeWhile(l => l.Trim().Length > 0).Select(l => l.Trim()).Distinct(StringComparer.Ordinal)];
+        string? mb = s.Nodes.GetValueOrDefault(onto)?.Sha is { } ontoSha ? RunTimed(s.Root, 30_000, NoIsNotFailure, "merge-base", ontoSha, c.Sha!).StdOut.Trim() : null;
+        List<BranchPlanConflictDto> conflicts = [];
+        foreach (string file in files.Take(10))
+        {
+            string[] last = mb is { Length: > 0 } && s.Nodes[onto].Sha is { } os
+                ? Run(s.Root, "log", "-1", "--format=%h%x1f%s", $"{mb}..{os}", "--", file).StdOut.Trim().Split('\u001f')
+                : [];
+            conflicts.Add(new(file,
+            [
+                new(ontoLabel, last.Length > 0 && last[0].Length > 0 ? last[0] : null, last.Length > 1 ? last[1] : null, FilePatch(s, parentSha, tree, file)),
+                new(c.Sha![..7], c.Sha[..7], c.Subject, FilePatch(s, parentSha, c.Sha, file)),
+            ]));
+        }
+        return (null, $"stops at {c.Sha![..7]} ({c.Subject}) on {string.Join(", ", files)}", conflicts);
+    }
+
+    private string FilePatch(PlanState s, string from, string to, string file)
+    {
+        string[] lines = Run(s.Root, "-c", "core.quotepath=false", "diff", "--no-color", "-U2", from, to, "--", file).StdOut.Split('\n');
+        int start = Array.FindIndex(lines, l => l.StartsWith("@@", StringComparison.Ordinal));
+        return start < 0 ? "" : string.Join('\n', lines.Skip(start).Take(40)).TrimEnd();
+    }
+
+    /// <summary>
+    ///  v0.22.1: a long history keeps what the plan needs (tips, branch points,
+    ///  merges, refs, every node a step touches, the newest commits of each
+    ///  ref) and folds each quiet run of commits between them into one node.
+    /// </summary>
+    private static void FoldQuietRuns(PlanState s, IReadOnlyList<BranchPlanStepDto> steps)
+    {
+        if (s.Nodes.Count <= PlanFoldAbove) return;
+        Dictionary<string, int> children = s.Nodes.Keys.ToDictionary(k => k, _ => 0, StringComparer.Ordinal);
+        Dictionary<string, string> childOf = new(StringComparer.Ordinal);
+        foreach (PlanNode n in s.Nodes.Values)
+            foreach (string p in n.Parents)
+            {
+                children[p]++;
+                childOf[p] = n.Id;
+            }
+        HashSet<string> keep = new(StringComparer.Ordinal);
+        foreach (PlanNode n in s.Nodes.Values)
+            if (n.Kind != "exists" || n.GhostAt is not null || n.Parents.Count != 1 || children[n.Id] != 1) keep.Add(n.Id);
+        foreach (BranchPlanStepDto step in steps) keep.UnionWith(step.Nodes ?? []);
+        foreach (List<BranchPlanRefPosDto> at in s.Timeline.Values)
+            foreach (BranchPlanRefPosDto pos in at)
+            {
+                // A ref's place and the newest commits under it.
+                string? id = pos.Node;
+                for (int i = 0; i < 4 && id is not null && s.Nodes.TryGetValue(id, out PlanNode? node); i++)
+                {
+                    keep.Add(id);
+                    id = node.Parents.FirstOrDefault();
+                }
+            }
+        foreach (PlanNode top in s.Nodes.Values.ToList())
+        {
+            if (keep.Contains(top.Id) || !s.Nodes.ContainsKey(top.Id) || !childOf.TryGetValue(top.Id, out string? child) || !keep.Contains(child)) continue;
+            List<PlanNode> run = [top];
+            while (run[^1].Parents[0] is var p && !keep.Contains(p) && s.Nodes.ContainsKey(p)) run.Add(s.Nodes[p]);
+            if (run.Count < 2) continue;
+            PlanNode fold = new()
+            {
+                Id = $"fold:{top.Id}", Parents = [run[^1].Parents[0]], Kind = "fold", Subject = $"{run.Count} commits", Time = top.Time,
+            };
+            foreach (PlanNode r in run) s.Nodes.Remove(r.Id);
+            s.Nodes[fold.Id] = fold;
+            PlanNode below = s.Nodes[child];
+            int at = below.Parents.IndexOf(top.Id);
+            below.Parents[at] = fold.Id;
         }
     }
 
@@ -644,6 +809,18 @@ public sealed partial class GitHost
                 if (from is null || into is null || into == plan.Inputs.GetValueOrDefault(st.Into!)) return false;
                 if (st.Mode == "squash") return true;
                 return (st.Mode == "ff" || into != from) && IsAncestor(from, into);
+            }
+            case "cherry-pick":
+            {
+                // Done once the branch moved and git cherry finds each commit's change in it.
+                string? onto = At(st.Onto);
+                if (onto is null || onto == plan.Inputs.GetValueOrDefault(st.Onto!)) return false;
+                foreach (string c in st.Commits ?? [])
+                {
+                    CommandResult r = RunTimed(RequireRoot(), 30_000, NoIsNotFailure, "cherry", onto, c, c + "^");
+                    if (r.ExitCode != 0 || !r.StdOut.TrimStart().StartsWith('-')) return false;
+                }
+                return true;
             }
             case "tag":
                 return At(st.Name) is not null;

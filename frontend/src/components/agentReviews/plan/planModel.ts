@@ -4,7 +4,7 @@ import type { BranchPlan, BranchPlanNode, BranchPlanRef, BranchPlanStep } from "
 // which nodes show at a scrubber position, in what state, where each ref is,
 // and the lines between them. Pure; PlanGraph draws it.
 
-export type NodeState = "exists" | "planned" | "merge" | "ghost"
+export type NodeState = "exists" | "planned" | "merge" | "ghost" | "fold"
 export type PlanRow = { node: BranchPlanNode; state: NodeState; index: number }
 export type PlacedRef = { name: string; kind: BranchPlanRef["kind"]; planned: boolean }
 export type Edge = { d: string; lane: number; dashed: boolean; ghost: boolean }
@@ -66,7 +66,7 @@ export function edgesAt(rows: PlanRow[]): Edge[] {
       edges.push({
         d,
         lane: Math.max(row.node.lane, parent.node.lane),
-        dashed: row.state !== "exists",
+        dashed: row.state !== "exists" && row.state !== "fold",
         ghost: row.state === "ghost",
       })
     }
@@ -95,6 +95,7 @@ export const firstStepToRead = (steps: BranchPlanStep[]) =>
 
 /** Short form of a node's commit: the SHA for an existing one, its original's with a prime for a rebased copy. */
 export function shaLabel(node: BranchPlanNode): string {
+  if (node.kind === "fold") return ""
   if (node.sha) return node.sha.slice(0, 7)
   if (node.copy) return `${node.copy.slice(0, 7)}′`
   return "planned"

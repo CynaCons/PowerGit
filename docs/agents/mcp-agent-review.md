@@ -109,6 +109,7 @@ Steps, in order:
   { "op": "commit", "on": "feature/billing", "subject": "billing: plan model", "files": ["src/billing/plan.ts"] },
   { "op": "merge", "from": "feature/billing", "into": "feature/auth", "mode": "no-ff" },
   { "op": "merge", "from": "feature/auth", "into": "main", "mode": "no-ff" },
+  { "op": "cherry-pick", "commits": ["4c2d9e1"], "onto": "release/1.4" },
   { "op": "tag", "name": "v1.5", "at": "main" },
   { "op": "delete", "branch": "feature/billing" }
 ]
@@ -117,7 +118,7 @@ Steps, in order:
 What each check means:
 
 - `ok`: git or the refs say it works (a merge into a branch the other side already contains, a clean `git merge-tree`, a free name).
-- `conflict`: `git merge-tree --write-tree` stops; `conflicts` names the files, and the owner sees both sides' change to each. A rebase is checked as the merge of its two tips.
+- `conflict`: `git merge-tree --write-tree` stops; `conflicts` names the files, and the owner sees both sides' change to each. Rebases and cherry-picks (since v0.22.1) are replayed commit by commit, as git applies them, and say which commit stops (`stops at 77d0b11 (…) on session.ts`); commits after a stop are not checked. Needs git 2.38 or later; an older git says the check could not run.
 - `risk`: planned commits' declared `files` overlap the other side's changes, or a delete would lose commits.
 - `unknown`: planned commits nobody can check yet. Declare `files` on planned commits so merges after them can be checked for overlap.
 - `invalid`: it cannot run (a missing ref, a taken name, a fast-forward that is not one).

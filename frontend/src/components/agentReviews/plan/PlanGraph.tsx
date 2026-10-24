@@ -166,6 +166,19 @@ function GraphSvg({ plan, rows, at }: { plan: BranchPlan; rows: PlanRow[]; at: n
               <circle cx={cx} cy={cy} r={9} fill="none" stroke="var(--pg-review-rejected, #dc2626)" strokeWidth={1.4} />
             )}
             {r.state === "exists" && <circle cx={cx} cy={cy} r={5} fill={color} />}
+            {r.state === "fold" && (
+              // v0.22.1: a quiet run of commits, folded.
+              <line
+                x1={cx}
+                y1={cy - 7}
+                x2={cx}
+                y2={cy + 7}
+                stroke={color}
+                strokeWidth={3}
+                strokeDasharray="1.5 3"
+                strokeLinecap="round"
+              />
+            )}
             {r.state === "ghost" && (
               <circle
                 cx={cx}
@@ -289,7 +302,9 @@ export function PlanGraph({
                     noWrap
                     sx={{
                       fontSize: 12.5,
-                      color: r.state === "ghost" ? "text.disabled" : "text.primary",
+                      color:
+                        r.state === "ghost" ? "text.disabled" : r.state === "fold" ? "text.secondary" : "text.primary",
+                      fontStyle: r.state === "fold" ? "italic" : "normal",
                       textDecoration: r.state === "ghost" ? "line-through" : "none",
                     }}
                   >
@@ -302,7 +317,7 @@ export function PlanGraph({
                   )}
                 </Box>
                 <Typography noWrap sx={{ fontSize: 12, color: "text.secondary", pr: 1 }}>
-                  {r.node.author ?? (r.state === "merge" ? "" : "planned")}
+                  {r.node.author ?? (r.state === "merge" || r.state === "fold" ? "" : "planned")}
                 </Typography>
                 <Typography
                   noWrap

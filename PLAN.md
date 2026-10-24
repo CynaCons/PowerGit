@@ -1135,10 +1135,10 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 
 ### v0.22.1 — Branch plans: exact rebase checks, cherry-pick, long histories (PLANNED) (current) (ACTIVE)
 **Goal:** Owner (2026-10-24): add what branch plans v0.22.0 left out.
-- [ ] Rebase check commit by commit, exact on git 2.38 and later.
-- [ ] Without merge-tree --write-tree, say the check could not run.
-- [ ] Cherry-pick step: commits onto a branch, checked per commit.
-- [ ] Graph past 200 commits: fold older runs instead of cutting.
+- [x] Rebase check commit by commit, exact on git 2.38 and later. [agent: claude]
+- [x] Without merge-tree --write-tree, say the check could not run. [agent: claude]
+- [x] Cherry-pick step: commits onto a branch, checked per commit. [agent: claude]
+- [x] Graph past 200 commits: fold older runs instead of cutting. [agent: claude]
 - [ ] Gate: engine tests, vitest, lint, branch-plans e2e; smoke.
 - [ ] Owner ticks: rebase checks exact, cherry-pick plans, long histories.
 

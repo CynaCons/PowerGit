@@ -112,6 +112,14 @@ describe("planModel", () => {
     expect(firstStepToRead([])).toBe(1)
   })
 
+  it("draws a fold solid and gives it no SHA", () => {
+    const fold = { ...node("f", 0, ["base"], "exists"), kind: "fold" as const, sha: null, subject: "227 commits" }
+    expect(stateAt(fold, 0)).toBe("fold")
+    expect(shaLabel(fold)).toBe("")
+    const rows = rowsAt({ ...plan, nodes: [fold, plan.nodes[4]] }, 0)
+    expect(edgesAt(rows)).toEqual([expect.objectContaining({ dashed: false })])
+  })
+
   it("labels a rebased copy with its original and a prime", () => {
     expect(shaLabel(plan.nodes[1])).toBe("a000000′")
     expect(shaLabel(plan.nodes[2])).toBe("fix0000")

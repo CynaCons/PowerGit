@@ -224,7 +224,8 @@ export type BranchPlanNode = {
   sha: string | null
   parents: string[]
   lane: number
-  kind: "exists" | "planned" | "merge"
+  /** v0.22.1: "fold" stands for a quiet run of commits in a long history; its subject says how many. */
+  kind: "exists" | "planned" | "merge" | "fold"
   from: number
   ghostAt: number | null
   subject: string

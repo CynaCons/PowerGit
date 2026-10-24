@@ -64,7 +64,9 @@ public sealed class BranchPlanTests
         Assert.Equal(["conflict", "ok", "unknown", "ok", "ok", "ok"], plan.Steps.Select(s => s.Result));
         BranchPlanConflictDto conflict = Assert.Single(plan.Steps[0].Conflicts!);
         Assert.Equal("session.ts", conflict.Path);
-        Assert.Equal(["main", "feature/auth"], conflict.Sides.Select(s => s.Label));
+        // v0.22.1: the rebase stops at auth's first commit; its side is named by that commit.
+        string login = repo.Output("rev-parse", "--short", "feature/auth~1").Trim();
+        Assert.Equal(["main", login], conflict.Sides.Select(s => s.Label));
         Assert.Contains("45_000", conflict.Sides[0].Patch);
         Assert.Contains("readTimeout(config)", conflict.Sides[1].Patch);
         Assert.Equal("fix: session timeout too short", conflict.Sides[0].Subject);
