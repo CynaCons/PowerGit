@@ -40,7 +40,8 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage | Out-Null
 
 Copy-Item (Join-Path $release "powergit.exe") $stage
-Copy-Item (Join-Path $release "powergit-engine*.exe") $stage
+# The exact name: a renamed running engine (powergit-engine-<ver>-running.exe) must not ship.
+Copy-Item (Join-Path $release "powergit-engine.exe") $stage
 
 $dist = Join-Path $repo "dist"
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
