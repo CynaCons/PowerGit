@@ -10,6 +10,13 @@ try and show me suggestions or possible designs for this."
 
 This is a set of options to pick from, not an approved design.
 
+Then: "A branch plan in powergit would be cool, that is true. Better than
+ascii." The direction is the plan opened in PowerGit (§4.3), on its own
+graph, with step comments and approval; the pictures in §3 stay as what
+`branch_plan_preview` returns to an agent. Prototype:
+`docs/prototypes/branch-plan-v1.html` (tabs: plan screen, inbox, states,
+cadence, MCP).
+
 ## 1. The idea in one picture
 
 An agent describes a plan ("rebase auth onto main, branch billing off it, two

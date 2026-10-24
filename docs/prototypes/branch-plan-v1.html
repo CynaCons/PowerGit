@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Branch plan in PowerGit</title>
+<style>
+  :root {
+    --page: #e3e7ee; --surface: #ffffff; --sunken: #f6f8fb;
+    --text: #101827; --text-2: #334155; --meta: #5b6778; --faint: #8a94a3;
+    --border: #d6dce5; --border-soft: #e6eaf0;
+    --primary: #1553c9; --on-primary: #fff; --sel-bg: #dbeafe; --sel-border: #2563eb;
+    --chip-bg: #eff6ff; --chip-fg: #2563eb; --tag-bg: #f5f3ff; --tag-fg: #6d28d9;
+    --add-bg: #e6f7ec; --add-fg: #0f5132; --del-bg: #fdecec; --del-fg: #842029;
+    --ok: #059669; --ok-bg: #ecfdf5; --bad: #dc2626; --bad-bg: #fef2f2; --wait: #b45309; --wait-bg: #fffbeb;
+    --agent: #7c3aed; --agent-bg: #f5f3ff; --sys: #475569; --sys-bg: #f1f5f9;
+    --lane-0: #3b8fd6; --lane-1: #e0569a; --lane-2: #1fa61d; --ghost: #a0a0a0;
+    --card: 0 1px 2px rgba(16, 24, 39, 0.08);
+    --font: system-ui, "Segoe WPC", "Segoe UI", Ubuntu, "Noto Sans", Inter, sans-serif;
+    --code: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --page: #0c1117; --surface: #182029; --sunken: #141b23;
+    --text: #e6e9ef; --text-2: #b6bcc6; --meta: #98a4b3; --faint: #6b7686;
+    --border: #2a3340; --border-soft: #222a35;
+    --primary: #3b7bff; --on-primary: #0b1220; --sel-bg: #1f3a5f; --sel-border: #60a5fa;
+    --chip-bg: #1f3a5f; --chip-fg: #bfdbfe; --tag-bg: #2a2142; --tag-fg: #c4b5fd;
+    --add-bg: #0f2e1d; --add-fg: #9be9b5; --del-bg: #3a1518; --del-fg: #f5b5b5;
+    --ok: #34d399; --ok-bg: #0b3d2e; --bad: #f87171; --bad-bg: #3a1518; --wait: #fbbf24; --wait-bg: #3a2a0a;
+    --agent: #a78bfa; --agent-bg: #2a2142; --sys: #98a4b3; --sys-bg: #1e2732;
+    --lane-0: #78b4e6; --lane-1: #f064a0; --lane-2: #24c221; --ghost: #6b7686;
+    --card: none;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--font); font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--sel-border); outline-offset: 1px; }
+  header.top { display: flex; align-items: center; gap: 12px; padding: 12px 18px 10px; flex-wrap: wrap; }
+  header.top h1 { font-size: 15px; font-weight: 600; margin: 0 8px 0 0; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tabs button, .btn { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 5px 11px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.quiet { background: transparent; border-color: transparent; color: var(--meta); }
+  .btn.quiet:hover { color: var(--text); background: var(--sunken); }
+  .spacer { flex: 1; }
+  .note { color: var(--meta); font-size: 12.5px; max-width: 74ch; }
+  main { padding: 0 18px 24px; }
+
+  /* the window */
+  .win { display: grid; grid-template-columns: 44px minmax(0, 1fr); height: 840px; background: var(--page); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .rail { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; }
+  .rail i { font-style: normal; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; color: var(--meta); position: relative; }
+  .rail i.on { background: var(--sel-bg); color: var(--primary); }
+  .rail i sup { position: absolute; top: 2px; right: 1px; background: var(--primary); color: var(--on-primary); border-radius: 8px; font-size: 9.5px; padding: 0 4px; line-height: 14px; }
+  .screen { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; gap: 8px; padding: 8px; }
+  .pane { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--card); min-width: 0; min-height: 0; }
+  .head { padding: 10px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .head .title { font-size: 15px; font-weight: 600; }
+  .head .sub { color: var(--meta); font-size: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+  .chip.wait { background: var(--wait-bg); color: var(--wait); }
+  .chip.bad { background: var(--bad-bg); color: var(--bad); }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); }
+  .chip.agent { background: var(--agent-bg); color: var(--agent); }
+  .chip.sys { background: var(--sys-bg); color: var(--sys); }
+  .body { display: grid; grid-template-columns: 268px minmax(0, 1fr) 300px; gap: 8px; min-height: 0; }
+
+  /* steps */
+  .steps { display: flex; flex-direction: column; }
+  .steps .ph { padding: 10px 12px 6px; font-weight: 600; display: flex; align-items: baseline; gap: 6px; }
+  .steps .ph span { color: var(--meta); font-weight: 400; font-size: 12px; }
+  .steplist { overflow: auto; padding: 2px 6px 6px; flex: 1; }
+  .step { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; padding: 8px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .step:hover { background: var(--sunken); }
+  .step[aria-current="true"] { background: var(--sel-bg); border-color: var(--sel-border); }
+  .step .n { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--agent); color: var(--agent); display: grid; place-items: center; font-size: 11px; font-weight: 600; margin-top: 1px; background: var(--surface); }
+  .step.done .n { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .step.ahead .what { color: var(--meta); }
+  .step .what { font-weight: 500; }
+  .step .check { font-size: 12px; margin-top: 2px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .c-ok { color: var(--ok); } .c-bad { color: var(--bad); } .c-unk { color: var(--meta); } .c-wait { color: var(--wait); }
+  .rc { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--chip-bg); color: var(--chip-fg); white-space: nowrap; font-weight: 500; }
+  .rc.plan { background: transparent; color: var(--agent); border: 1px dashed var(--agent); }
+  .rc.tag { background: var(--tag-bg); color: var(--tag-fg); }
+  .rc.remote { background: var(--sunken); color: var(--meta); }
+  .steps .foot { border-top: 1px solid var(--border-soft); padding: 8px 12px; font-size: 12px; color: var(--meta); display: grid; gap: 2px; }
+
+  /* graph */
+  .graphpane { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; }
+  .scrub { padding: 10px 14px 8px; border-bottom: 1px solid var(--border-soft); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+  .scrub .end { font-size: 12px; color: var(--meta); min-width: 44px; }
+  .scrub .end.r { text-align: right; }
+  .track { position: relative; height: 34px; }
+  .track .line { position: absolute; left: 10px; right: 10px; top: 11px; height: 2px; background: var(--border); }
+  .track .fill { position: absolute; left: 10px; top: 11px; height: 2px; background: var(--agent); transition: width .35s ease; }
+  .track button { position: absolute; top: 2px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface); font-size: 10.5px; font-weight: 600; color: var(--meta); cursor: pointer; padding: 0; }
+  .track button.past { border-color: var(--agent); color: var(--agent); }
+  .track button.cur { background: var(--agent); color: #fff; border-color: var(--agent); }
+  .track button.risk::after { content: ""; position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); border: 1.5px solid var(--surface); }
+  .track .lbl { position: absolute; top: 24px; font-size: 10.5px; color: var(--meta); transform: translateX(-50%); white-space: nowrap; }
+  .grid { position: relative; overflow: auto; }
+  .rows { position: relative; }
+  .row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 110px 86px; height: 30px; align-items: center; border-bottom: 1px solid var(--border-soft); transition: opacity .25s; }
+  .row.dim { opacity: .38; }
+  .row.hl { background: color-mix(in srgb, var(--agent-bg) 70%, transparent); }
+  .row .msg { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center; }
+  .row .msg .t { overflow: hidden; text-overflow: ellipsis; }
+  .row.ghost .msg .t { color: var(--faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--faint) 60%, transparent); }
+  .row.planned .msg .t { color: var(--text-2); }
+  .row .who { color: var(--meta); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .row .sha { color: var(--meta); font-size: 12px; text-align: right; padding-right: 12px; }
+  .row .sha.plan { color: var(--agent); }
+  .gsvg { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+  .gsvg g.n { transition: transform .5s cubic-bezier(.2, .8, .2, 1), opacity .3s; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 7px 14px; border-top: 1px solid var(--border-soft); font-size: 11.5px; color: var(--meta); align-items: center; }
+  .legend svg { vertical-align: -2px; margin-right: 4px; }
+
+  /* detail */
+  .detail { border-top: 1px solid var(--border); background: var(--sunken); padding: 10px 14px 12px; max-height: 270px; overflow: auto; }
+  .detail h3 { margin: 0 0 6px; font-size: 13.5px; display: flex; gap: 8px; align-items: center; }
+  .cmd { font-family: var(--code); font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; margin: 6px 0 8px; white-space: pre-wrap; color: var(--text-2); }
+  .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 10px; }
+  .side { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .side .sh { padding: 4px 10px; font-size: 12px; color: var(--meta); border-bottom: 1px solid var(--border-soft); display: flex; gap: 6px; align-items: center; }
+  .side div.l { padding: 1px 10px; font-size: 12px; white-space: pre; }
+  .side .l.a { background: var(--add-bg); color: var(--add-fg); }
+  .side .l.d { background: var(--del-bg); color: var(--del-fg); }
+  .side .l.c { color: var(--meta); }
+  .conv { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  .msgline { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
+  .disc { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+  .disc.agent { background: var(--agent-bg); color: var(--agent); border: 1px solid color-mix(in srgb, var(--agent) 40%, transparent); }
+  .disc.you { background: var(--chip-bg); color: var(--chip-fg); }
+  .disc.pg { background: var(--sys-bg); color: var(--sys); }
+  .msgline .who2 { font-weight: 600; font-size: 12.5px; }
+  .msgline .who2.agent { color: var(--agent); }
+  .msgline .who2 span { font-weight: 400; color: var(--meta); font-size: 11.5px; margin-left: 6px; }
+  .msgline p { margin: 1px 0 0; color: var(--text-2); }
+  .reply { display: flex; gap: 6px; }
+  .reply input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; background: var(--surface); color: var(--text); font: inherit; }
+
+  /* board */
+  .board { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; min-height: 0; }
+  .board .bh { padding: 10px 12px; border-bottom: 1px solid var(--border-soft); display: flex; gap: 8px; align-items: center; }
+  .board .bh .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .posts { overflow: auto; padding: 10px 12px; }
+  .ev { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; margin-bottom: 10px; font-size: 12.5px; }
+  .ev .sq { width: 10px; height: 10px; border: 1.5px solid var(--sys); border-radius: 2px; margin: 4px 6px; }
+  .ev .evt { color: var(--sys); }
+  .ref { color: var(--primary); cursor: pointer; font-weight: 500; }
+  .verdict { border-top: 1px solid var(--border-soft); padding: 10px 12px; display: grid; gap: 8px; }
+  .meter { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--border-soft); }
+  .meter i { display: block; }
+  .vrow { display: flex; gap: 10px; font-size: 12px; color: var(--meta); flex-wrap: wrap; }
+  .vrow b { font-weight: 600; color: var(--text); }
+  .verdict textarea { width: 100%; min-height: 46px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: inherit; background: var(--surface); color: var(--text); }
+  .acts { display: flex; gap: 8px; }
+  .acts .btn { flex: 1; }
+  .banner { margin: 0 0 8px; padding: 8px 12px; border-radius: 6px; font-size: 12.5px; display: flex; gap: 8px; align-items: center; }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+  .banner.wait { background: var(--wait-bg); color: var(--wait); }
+  .banner.bad { background: var(--bad-bg); color: var(--bad); }
+
+  /* other tabs */
+  .sheet { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .sheet h2 { font-size: 15px; margin: 0 0 4px; }
+  .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; }
+  .state { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .state h3 { margin: 0 0 2px; font-size: 13.5px; }
+  .state.wide { grid-column: span 2; }
+  @media (max-width: 900px) { .state.wide { grid-column: auto; } }
+  .state .note { margin-bottom: 10px; }
+  .mini .step { cursor: default; }
+  .inbox .irow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border-soft); align-items: center; cursor: pointer; }
+  .inbox .irow:hover { background: var(--sunken); }
+  .inbox .irow .ttl { font-weight: 500; }
+  .inbox .irow .sub { color: var(--meta); font-size: 12px; }
+  .seq2 { position: relative; margin-top: 14px; }
+  .seq2 .actors { display: grid; grid-template-columns: 1fr 1fr 1fr; text-align: center; font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .seq2 .lifelines i { position: absolute; top: 30px; bottom: 0; width: 0; border-left: 1px dashed var(--border); }
+  .sq2 { position: relative; height: 40px; }
+  .sq2 .lab2 { position: absolute; top: 4px; text-align: center; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+  .sq2 .lab2 b { color: var(--agent); font-weight: 600; }
+  .sq2 .ar { position: absolute; top: 26px; height: 0; border-top: 1.5px solid var(--meta); }
+  .sq2 .ar::after { content: ""; position: absolute; right: -2px; top: -5.5px; border: 4.5px solid transparent; border-left: 7px solid var(--meta); }
+  .sq2 .ar.back::after { right: auto; left: -2px; border-left: 4.5px solid transparent; border-right: 7px solid var(--meta); }
+  .seq { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; position: relative; margin-top: 12px; }
+  .seq .actor { text-align: center; font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .seq .msg2 { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 7px 0; border-bottom: 1px dashed var(--border-soft); font-size: 12.5px; }
+  .seq .arrow { display: flex; align-items: center; gap: 6px; }
+  .seq .arrow .bar { flex: 1; height: 0; border-top: 1.5px solid var(--meta); position: relative; }
+  .seq .arrow .bar::after { content: ""; position: absolute; right: -1px; top: -5px; border: 4.5px solid transparent; border-left: 7px solid var(--meta); }
+  .seq .arrow.back .bar::after { right: auto; left: -1px; border-left: 4.5px solid transparent; border-right: 7px solid var(--meta); }
+  .seq .lab { font-size: 12px; color: var(--text-2); }
+  .seq .lab b { color: var(--agent); font-weight: 600; }
+  pre.code { font-family: var(--code); font-size: 12px; background: var(--sunken); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; overflow: auto; margin: 8px 0 14px; color: var(--text-2); }
+  .cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 14px; }
+  @media (max-width: 1100px) { .body { grid-template-columns: 220px minmax(0, 1fr); } .board { display: none; } }
+  @media (max-width: 760px) { .body { grid-template-columns: 1fr; } .win { height: auto; } .steps { max-height: 260px; } .row { grid-template-columns: 80px minmax(0, 1fr) 70px; } .row .who { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .gsvg g.n, .track .fill, .row { transition: none !important; } }
+</style>
+<body>
+<header class="top">
+  <h1>Branch plan in PowerGit</h1>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <span class="spacer"></span>
+  <button class="btn" id="theme" aria-label="Switch light or dark">Dark</button>
+</header>
+<main id="main"></main>
+
+<script>
+/* ---------- the plan (one model, every tab reads it) ---------- */
+const PLAN = {
+  title: "Rebase auth, stack billing, merge both",
+  agent: "auth-fix",
+  why: "Auth is two commits behind main and billing needs its token refresh. Rebase auth first so billing starts from main's session fix, then merge both and tag v1.5.",
+  steps: [
+    { n: 1, op: "Rebase", what: ["feature/auth", "onto", "main"], check: "bad", checkText: "conflict in src/session.ts",
+      git: "git rebase main feature/auth", rows: ["a41p", "77dp", "a41", "77d", "9b2", "c71"] },
+    { n: 2, op: "Create", what: ["feature/billing", "from", "feature/auth"], check: "ok", checkText: "name is free",
+      git: "git branch feature/billing feature/auth", rows: ["a41p"] },
+    { n: 3, op: "Commit twice on", what: ["feature/billing"], check: "unk", checkText: "planned, touches src/billing/ only",
+      git: "(the agent writes B1 and B2)", rows: ["b1", "b2"] },
+    { n: 4, op: "Merge", what: ["feature/billing", "into", "feature/auth"], check: "unk", checkText: "no overlap found",
+      git: "git switch feature/auth\ngit merge --no-ff feature/billing", rows: ["m1", "b2", "a41p"] },
+    { n: 5, op: "Merge", what: ["feature/auth", "into", "main"], check: "ok", checkText: "clean, 9 files",
+      git: "git switch main\ngit merge --no-ff feature/auth\ngit tag v1.5", rows: ["m2", "m1", "9b2"] },
+  ],
+};
+/* rows, newest first; lane 0 main, 1 auth, 2 billing. from: the step that brings it, ghostAt: the step that replaces it */
+const COMMITS = [
+  { id: "m2",   lane: 0, from: 5, kind: "merge", msg: "Merge feature/auth into main", who: "auth-fix", sha: "planned", parents: ["9b2", "m1"] },
+  { id: "m1",   lane: 1, from: 4, kind: "merge", msg: "Merge feature/billing into feature/auth", who: "auth-fix", sha: "planned", parents: ["a41p", "b2"] },
+  { id: "b2",   lane: 2, from: 3, kind: "plan", msg: "billing: invoices from plans", who: "auth-fix", sha: "planned", parents: ["b1"] },
+  { id: "b1",   lane: 2, from: 3, kind: "plan", msg: "billing: plan model", who: "auth-fix", sha: "planned", parents: ["a41p"] },
+  { id: "a41p", lane: 1, from: 1, kind: "plan", msg: "auth: refresh tokens before expiry", who: "Mira Chen", sha: "a41c2e9′", parents: ["77dp"], slide: "a41" },
+  { id: "77dp", lane: 1, from: 1, kind: "plan", msg: "auth: login form and session", who: "Mira Chen", sha: "77d0b11′", parents: ["9b2"], slide: "77d", risk: true },
+  { id: "9b2",  lane: 0, from: 0, kind: "exists", msg: "docs: release notes for 1.4.1", who: "Tom Reyes", sha: "9b2d4f1", parents: ["c71"] },
+  { id: "a41",  lane: 1, from: 0, kind: "exists", msg: "auth: refresh tokens before expiry", who: "Mira Chen", sha: "a41c2e9", parents: ["77d"], ghostAt: 1 },
+  { id: "c71",  lane: 0, from: 0, kind: "exists", msg: "fix: session timeout too short", who: "Tom Reyes", sha: "c71e0aa", parents: ["3f0"], partner: true },
+  { id: "77d",  lane: 1, from: 0, kind: "exists", msg: "auth: login form and session", who: "Mira Chen", sha: "77d0b11", parents: ["3f0"], ghostAt: 1 },
+  { id: "3f0",  lane: 0, from: 0, kind: "exists", msg: "Release 1.4", who: "Tom Reyes", sha: "3f02a1c", parents: [] },
+];
+let ROW = {};
+const BYID = Object.fromEntries(COMMITS.map(c => [c.id, c]));
+const layout = step => (ROW = Object.fromEntries(COMMITS.filter(c => c.from <= step).map((c, i) => [c.id, i])));
+const RH = 30, X0 = 18, DX = 20;
+const laneVar = l => `var(--lane-${l})`;
+
+function refsAt(step) {
+  const r = {};
+  const add = (id, html) => (r[id] = (r[id] || "") + html);
+  const chip = (cls, icon, name) => `<span class="rc ${cls}">${icon}${name}</span>`;
+  const fork = "<svg width='9' height='9' viewBox='0 0 10 10' aria-hidden='true'><circle cx='3' cy='2' r='1.4' fill='none' stroke='currentColor'/><circle cx='3' cy='8' r='1.4' fill='none' stroke='currentColor'/><circle cx='7.5' cy='3.5' r='1.4' fill='none' stroke='currentColor'/><path d='M3 3.4V6.6M3 6C3 4.5 7.5 5.6 7.5 4.9' fill='none' stroke='currentColor'/></svg>";
+  add(step >= 5 ? "m2" : "9b2", chip(step >= 5 ? "plan" : "", fork, "main"));
+  const authAt = step >= 4 ? "m1" : step >= 1 ? "a41p" : "a41";
+  add(authAt, chip(step >= 1 ? "plan" : "", fork, "feature/auth"));
+  add("77d", chip("remote", "☁ ", "origin/feature/auth"));
+  if (step >= 2) add(step >= 3 ? "b2" : "a41p", chip("plan", fork, "feature/billing"));
+  add("3f0", chip("tag", "", "v1.4"));
+  if (step >= 5) add("m2", chip("plan", "", "v1.5"));
+  return r;
+}
+
+const REAL = { a41p: "5e81c0d", "77dp": "2b9f310", b1: "d04a7e2" };
+
+/* ---------- state ---------- */
+const S = { tab: "A", step: 1, shown: 1, prevShown: 0, mode: "review", sentNote: "", running: 0, theme: "light" };
+const comments = {
+  1: [["agent", "auth-fix", "explains the step", "c71e0aa raised the timeout to 45 s; 77d0b11 reads it from config. I keep main's 45 s as the default and read the override after it. The rebase stops once, at 77d0b11."],
+      ["you", "You", "", "Fine. Squash 77d0b11 into a41c2e9 while you are at it, the login form commit does not build alone."]],
+  4: [["agent", "auth-fix", "explains the step", "A merge commit keeps billing as one unit inside auth, so it can be reverted alone."]],
+};
+
+/* ---------- graph ---------- */
+function visible(c, step) { return c.from <= step; }
+function nodeState(c, step, real = {}) {
+  if (c.ghostAt !== undefined && step >= c.ghostAt) return "ghost";
+  if (real[c.id]) return "exists";
+  return c.kind === "exists" ? "exists" : c.kind;
+}
+function graphSVG(step, sel, real = {}) {
+  layout(step);
+  const h = Object.keys(ROW).length * RH;
+  const x = c => X0 + c.lane * DX, y = id => ROW[id] * RH + RH / 2;
+  let edges = "", nodes = "";
+  for (const c of COMMITS) {
+    if (!visible(c, step)) continue;
+    const st = nodeState(c, step, real);
+    for (const pid of c.parents) {
+      const p = BYID[pid];
+      if (ROW[pid] === undefined) continue;
+      const x1 = x(c), y1 = y(c.id), x2 = x(p), y2 = y(pid);
+      const planned = c.kind !== "exists" && !real[c.id];
+      const color = st === "ghost" ? "var(--ghost)" : laneVar(c.lane === p.lane ? c.lane : Math.max(c.lane, p.lane));
+      const dash = planned || st === "ghost" ? `stroke-dasharray="4 3"` : "";
+      const d = x1 === x2 ? `M${x1} ${y1} L${x2} ${y2}` : `M${x1} ${y1} L${x1} ${y2 - RH * 0.7} Q${x1} ${y2 - 4} ${x2} ${y2}`;
+      const d2 = x1 > x2 ? `M${x1} ${y1} L${x1} ${y2 - 14} Q${x1} ${y2} ${x2 + 6} ${y2}` : x1 < x2 ? `M${x1} ${y1} Q${x2} ${y1} ${x2} ${y1 + 14} L${x2} ${y2}` : d;
+      edges += `<path d="${d2}" fill="none" stroke="${color}" stroke-width="1.8" ${dash} opacity="${st === "ghost" ? .7 : 1}"/>`;
+    }
+  }
+  for (const c of COMMITS) {
+    if (!visible(c, step)) continue;
+    const st = nodeState(c, step, real), cx = x(c), cy = y(c.id), col = laneVar(c.lane);
+    let shape;
+    if (st === "exists") shape = `<circle cx="${cx}" cy="${cy}" r="5.5" fill="${col}"/>`;
+    else if (st === "ghost") shape = `<circle cx="${cx}" cy="${cy}" r="5" fill="var(--surface)" stroke="var(--ghost)" stroke-width="1.4" stroke-dasharray="2.5 2"/>`;
+    else if (st === "merge") shape = `<rect x="${cx - 5.5}" y="${cy - 5.5}" width="11" height="11" transform="rotate(45 ${cx} ${cy})" fill="var(--surface)" stroke="${col}" stroke-width="2"/>`;
+    else shape = `<circle cx="${cx}" cy="${cy}" r="5.5" fill="var(--surface)" stroke="${col}" stroke-width="2"/>`;
+    const risky = !real[c.id] && ((c.risk && step >= 1) || (c.partner && step >= 1 && sel === 1));
+    const ring = risky ? `<circle cx="${cx}" cy="${cy}" r="9" fill="none" stroke="var(--bad)" stroke-width="1.4"/>` : "";
+    const stepNo = c.kind !== "exists" && !real[c.id] ? `<text x="${X0 + 3 * DX - 2}" y="${cy + 4}" font-size="10" font-weight="700" fill="var(--agent)" font-family="var(--font)">${c.from}</text>` : "";
+    nodes += `<g class="n" data-id="${c.id}">${ring}${shape}${stepNo}</g>`;
+  }
+  return `<svg class="gsvg" width="92" height="${h}" viewBox="0 0 92 ${h}" aria-hidden="true">${edges}${nodes}</svg>`;
+}
+function rowsHTML(step, sel, real = {}) {
+  const refs = refsAt(step);
+  const involved = sel ? new Set(PLAN.steps[sel - 1].rows) : null;
+  return COMMITS.map(c => {
+    if (!visible(c, step)) return "";
+    const st = nodeState(c, step, real);
+    const cls = [st === "ghost" ? "ghost" : "", c.kind !== "exists" && !real[c.id] ? "planned" : "", involved && !involved.has(c.id) ? "dim" : "", involved && involved.has(c.id) && sel === step ? "hl" : ""].join(" ");
+    const shaCls = c.kind !== "exists" && !real[c.id] ? "sha plan" : "sha";
+    const note = st === "ghost" ? `<span class="chip sys">replaced by step 1</span>` : real[c.id] ? `<span class="chip ok">step ${c.from} done</span>` : c.risk ? `<span class="chip bad">conflict at step 1</span>` : "";
+    return `<div class="row ${cls}" data-row="${c.id}"><span></span><div class="msg">${(refs[c.id] || "").replaceAll(real[c.id] ? 'rc plan' : '@@', 'rc')}<span class="t">${c.msg}</span>${note}</div><div class="who">${c.who}</div><div class="${shaCls}">${real[c.id] || c.sha}</div></div>`;
+  }).join("");
+}
+function slideRebased() {
+  if (S.prevShown >= 1 || S.shown < 1) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const c of COMMITS.filter(c => c.slide)) {
+    const g = document.querySelector(`.gsvg g.n[data-id="${c.id}"]`);
+    if (!g) continue;
+    const dy = (ROW[c.slide] - ROW[c.id]) * RH;
+    if (!Number.isFinite(dy)) continue;
+    g.style.transition = "none"; g.style.transform = `translateY(${dy}px)`; g.style.opacity = ".2";
+    requestAnimationFrame(() => requestAnimationFrame(() => { g.style.transition = ""; g.style.transform = ""; g.style.opacity = ""; }));
+  }
+}
+
+/* ---------- pieces ---------- */
+const rcName = s => s === "onto" || s === "from" || s === "into" ? ` ${s} ` : `<span class="rc ${s.startsWith("feature/billing") ? "plan" : ""}">${s}</span>`;
+const checkIcon = c => c === "ok" ? "✓" : c === "bad" ? "!" : c === "wait" ? "…" : "?";
+function stepHTML(s, { cur, done, ahead, mini } = {}) {
+  const cls = s.check === "ok" ? "c-ok" : s.check === "bad" ? "c-bad" : s.check === "wait" ? "c-wait" : "c-unk";
+  const nc = comments[s.n] ? `${comments[s.n].length} comment${comments[s.n].length > 1 ? "s" : ""}` : "";
+  return `<div class="step ${done ? "done" : ""} ${ahead ? "ahead" : ""}" ${mini ? "" : `data-step="${s.n}" role="button" tabindex="0"`} aria-current="${!!cur}">
+    <span class="n">${done ? "✓" : s.n}</span>
+    <div><div class="what">${s.op} ${s.what.map(rcName).join("")}</div>
+    <div class="check"><span class="${cls}">${checkIcon(s.check)} ${s.checkText}</span><span style="color:var(--meta)">${nc}</span></div></div></div>`;
+}
+function convHTML(n) {
+  const list = comments[n] || [];
+  return `<div class="conv">${list.map(([k, who, tag, text]) => `<div class="msgline"><span class="disc ${k}">${k === "agent" ? "AF" : "Y"}</span><div><div class="who2 ${k}">${who}${tag ? `<span>${tag}</span>` : ""}</div><p>${text}</p></div></div>`).join("") || `<div style="color:var(--meta);margin-bottom:8px">No comments on step ${n}.</div>`}
+    <div class="reply"><input id="reply" placeholder="Comment on step ${n}" aria-label="Comment on step ${n}"/><button class="btn" data-say="${n}">Comment</button></div></div>`;
+}
+function detailHTML(n) {
+  const s = PLAN.steps[n - 1];
+  let check = "";
+  if (n === 1) check = `<div class="banner bad">git merge-tree stops on src/session.ts: both sides change line 12.</div>
+    <div class="sides">
+      <div class="side"><div class="sh"><span class="rc">main</span> c71e0aa fix: session timeout too short</div><div class="l c"> 11  export const SESSION = {</div><div class="l d">-12    timeout: 30_000,</div><div class="l a">+12    timeout: 45_000,</div></div>
+      <div class="side"><div class="sh"><span class="rc">feature/auth</span> 77d0b11 auth: login form and session</div><div class="l c"> 11  export const SESSION = {</div><div class="l d">-12    timeout: 30_000,</div><div class="l a">+12    timeout: readTimeout(config),</div></div>
+    </div>`;
+  if (n === 2) check = `<div class="banner ok">No branch is called feature/billing, here or on origin.</div>`;
+  if (n === 3) check = `<div class="banner wait">B1 and B2 do not exist yet. The agent says they touch src/billing/ only; auth's commits do not touch it.</div>`;
+  if (n === 4) check = `<div class="banner wait">Checked against what the agent declared for step 3: no file is changed on both sides. Checked again for real once B1 and B2 exist.</div>`;
+  if (n === 5) check = `<div class="banner ok">git merge-tree: clean. 9 files change on main.</div>`;
+  return `<h3><span class="step" style="padding:0;display:inline"><span class="n" style="display:inline-grid">${n}</span></span>${s.op} ${s.what.map(rcName).join("")}</h3>
+    ${check}<div class="cmd">${s.git}</div>${convHTML(n)}`;
+}
+function scrubHTML(step) {
+  const pct = i => 3 + i * 18.8;
+  const lbl = ["now", "rebase", "branch", "commits", "merge", "merge, tag"];
+  return `<div class="scrub"><span></span><div class="track">
+    <div class="line"></div><div class="fill" style="width:calc(${pct(step) - 3}% - 10px)"></div>
+    ${[0, 1, 2, 3, 4, 5].map(i => `<button style="left:${pct(i)}%" class="${i < step ? "past" : ""} ${i === step ? "cur" : ""} ${i === 1 ? "risk" : ""}" data-scrub="${i}" aria-label="${i ? "After step " + i : "Now"}">${i || "·"}</button><span class="lbl" style="left:${pct(i)}%">${lbl[i]}</span>`).join("")}
+    </div><span></span></div>`;
+}
+function boardHTML() {
+  return `<div class="bh"><span class="disc agent" style="width:22px;height:22px">AF</span><div><div style="font-weight:600">auth-fix</div><div style="font-size:11.5px;color:var(--meta)">reading the channel</div></div><span class="spacer"></span><span class="dot" title="reading now"></span></div>
+  <div class="posts">
+    <div class="ev"><span class="sq"></span><div class="evt">Plan opened · round 1 · 5 steps, 1 conflict risk<br><span style="color:var(--meta)">${PLAN.title}</span></div></div>
+    <div class="msgline"><span class="disc agent">AF</span><div><div class="who2 agent">auth-fix</div><p>${PLAN.why}</p></div></div>
+    <div class="msgline"><span class="disc you">Y</span><div><div class="who2">You</div><p><span class="ref" data-jump="1">step 1</span> Squash 77d0b11 into a41c2e9 while you are at it, the login form commit does not build alone.</p></div></div>
+    <div class="msgline"><span class="disc agent">AF</span><div><div class="who2 agent">auth-fix</div><p><span class="ref" data-jump="1">step 1</span> Will do. Round 2 rebases with --autosquash; still one stop at src/session.ts.</p></div></div>
+  </div>
+  <div class="reply" style="padding:8px 12px;border-top:1px solid var(--border-soft)"><input placeholder="Message auth-fix" aria-label="Message auth-fix"/></div>`;
+}
+function verdictHTML() {
+  if (S.mode === "approved") return `<div class="verdict"><div class="banner ok">Approved. auth-fix runs the steps; each one ticks here when its refs move.</div>
+    <div class="vrow"><b>${S.running}</b> of 5 steps done</div><div class="meter"><i style="width:${S.running * 20}%;background:var(--ok)"></i></div></div>`;
+  if (S.mode === "sent") return `<div class="verdict"><div class="banner wait">Sent back to auth-fix with 1 comment. Waiting for round 2.</div></div>`;
+  return `<div class="verdict">
+    <div class="vrow"><span><b>2</b> checked clean</span><span><b>1</b> conflict to resolve</span><span><b>2</b> checked once the commits exist</span></div>
+    <div class="meter"><i style="width:40%;background:var(--ok)"></i><i style="width:20%;background:var(--bad)"></i><i style="width:40%;background:var(--faint)"></i></div>
+    <textarea placeholder="Note to auth-fix with the plan (optional)" aria-label="Note to auth-fix"></textarea>
+    <div class="acts"><button class="btn" data-act="send">Send back</button><button class="btn primary" data-act="approve">Approve plan</button></div></div>`;
+}
+
+/* ---------- tab A: the plan screen ---------- */
+function screenA() {
+  const step = S.shown, sel = S.step;
+  const statusChip = S.mode === "approved" ? `<span class="chip ok">approved · running</span>` : S.mode === "sent" ? `<span class="chip sys">agent's turn</span>` : `<span class="chip wait">your turn</span>`;
+  return `<div class="win">
+    <nav class="rail" aria-label="PowerGit"><i title="History">⎇</i><i title="Commit">✎</i><i title="Stash">▤</i><i class="on" title="Agent reviews and plans">⚑<sup>2</sup></i><span class="spacer"></span><i title="Settings">⚙</i></nav>
+    <div class="screen">
+      <div class="pane head"><button class="btn quiet" aria-label="Back to the inbox">←</button>
+        <div><div class="title">${PLAN.title}</div><div class="sub">Branch plan by auth-fix · round 1 · checked against the repository 2 minutes ago</div></div>
+        <span class="spacer"></span><span class="chip bad">1 conflict risk</span>${statusChip}</div>
+      <div class="body">
+        <section class="pane steps" aria-label="Steps">
+          <div class="ph">Steps <span>in the order the agent runs them</span></div>
+          <div class="steplist">${PLAN.steps.map(s => stepHTML(s, { cur: s.n === sel, done: S.mode === "approved" && s.n <= S.running, ahead: s.n > step })).join("")}</div>
+          <div class="foot"><span>Branches touched: main, feature/auth, feature/billing (new)</span><span>Nothing moves until you approve and the agent runs it.</span></div>
+        </section>
+        <section class="pane graphpane" aria-label="Graph with the plan">
+          ${scrubHTML(step)}
+          <div class="grid"><div class="rows">${graphSVG(step, sel)}${rowsHTML(step, sel)}</div></div>
+          <div>
+            <div class="legend">
+              <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="var(--lane-0)"/></svg>exists</span>
+              <span><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--lane-1)" stroke-width="2"/></svg>planned commit</span>
+              <span><svg width="12" height="12"><rect x="2.5" y="2.5" width="7" height="7" transform="rotate(45 6 6)" fill="none" stroke="var(--lane-1)" stroke-width="2"/></svg>planned merge</span>
+              <span><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--ghost)" stroke-dasharray="2.5 2"/></svg>replaced by a rebase</span>
+              <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="none" stroke="var(--bad)" stroke-width="1.4"/></svg>conflict risk</span>
+              <span style="color:var(--agent);font-weight:600">3</span><span style="margin-left:-10px">step that brings it</span>
+            </div>
+            <div class="detail" aria-live="polite">${detailHTML(sel)}</div>
+          </div>
+        </section>
+        <aside class="pane board" aria-label="Board">${boardHTML()}${verdictHTML()}</aside>
+      </div>
+    </div></div>
+    <p class="note" style="margin-top:10px">Drag through the steps above the graph, or pick a step: the graph replays the plan on the real history, rebased commits slide onto their new base, and rows the step does not touch fade. Approve to see the plan tick as the agent runs it.</p>`;
+}
+
+/* ---------- tab B: inbox ---------- */
+function screenB() {
+  const rows = [
+    ["⎇", "Rebase auth, stack billing, merge both", "Branch plan · auth-fix · round 1 · 5 steps", `<span class="chip bad">1 conflict risk</span> <span class="chip wait">your turn</span>`, "A"],
+    ["✎", "Renew expired tokens", "Review · auth-fix · round 2 · 1 file", `<span class="chip wait">your turn</span>`, ""],
+    ["⎇", "Release branch for 1.4.2", "Branch plan · release-bot · round 2 · 3 steps", `<span class="chip sys">agent's turn</span>`, ""],
+    ["✎", "Cancel superseded refreshes", "Review · codex · approved", `<span class="chip ok">approved</span>`, ""],
+    ["⎇", "Split the monorepo tooling branch", "Branch plan · tooling · ran 4 of 4 steps", `<span class="chip ok">done</span>`, ""],
+  ];
+  return `<div class="sheet" style="max-width:760px"><h2>Agent reviews and plans</h2>
+    <p class="note">Plans share the inbox, the badge and the board with reviews. A plan's icon is the branch; its row says how many steps and what the checks found.</p>
+    <div class="inbox" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:10px">
+    ${rows.map(r => `<div class="irow" ${r[4] ? `data-tab="${r[4]}"` : ""}><span style="color:${r[0] === "⎇" ? "var(--agent)" : "var(--meta)"};font-size:15px">${r[0]}</span><div><div class="ttl">${r[1]}</div><div class="sub">${r[2]}</div></div><div>${r[3]}</div></div>`).join("")}
+    </div></div>`;
+}
+
+/* ---------- tab C: states ---------- */
+function miniSteps(list) { return `<div class="mini" style="border:1px solid var(--border-soft);border-radius:8px;padding:4px">${list.join("")}</div>`; }
+function screenC() {
+  const s = PLAN.steps;
+  const round2 = [
+    stepHTML({ ...s[0], op: "Rebase with autosquash", checkText: "conflict in src/session.ts · revised" }),
+    stepHTML(s[1]), stepHTML(s[2]), stepHTML(s[3]), stepHTML(s[4]),
+  ];
+  const running = s.map((x, i) => stepHTML(i < 2 ? x : { ...x, check: i === 2 ? "wait" : x.check, checkText: i === 2 ? "running: B1 committed, B2 not yet" : x.checkText }, { done: i < 2, cur: i === 2 }));
+  const stale = s.map((x, i) => stepHTML(i === 0 ? { ...x, check: "wait", checkText: "main moved: check again" } : i === 4 ? { ...x, check: "wait", checkText: "main moved: check again" } : x));
+  const invalid = [stepHTML(s[0]), stepHTML({ ...s[1], check: "bad", checkText: "feature/billing already exists on origin" }), stepHTML(s[2])];
+  return `<div class="states">
+    <div class="state"><h3>Round 2: the agent revised the plan</h3><p class="note">Your comment on step 1 came back as a revised step. Changed steps say so; the rest carry their checks over, like carried changes in a review.</p>${miniSteps(round2)}
+      <div class="banner wait" style="margin-top:8px">Step 1 revised: rebase now squashes 77d0b11 into a41c2e9. Still one stop at src/session.ts.</div></div>
+    <div class="state wide"><h3>Approved and running</h3><p class="note">PowerGit runs nothing. It watches the refs: when feature/auth lands on its rebased commits the step ticks, and the planned rows turn into real commits with real SHAs.</p>
+      <div class="graphpane" style="border:1px solid var(--border-soft);border-radius:8px;overflow:hidden;margin-bottom:10px"><div class="grid"><div class="rows">${graphSVG(3, 3, REAL)}${rowsHTML(3, 3, REAL)}</div></div></div>${miniSteps(running)}</div>
+    <div class="state"><h3>The repository moved</h3><p class="note">Someone pushed to main after the check. Steps whose inputs moved are re-checked before you can approve.</p>
+      <div class="banner wait">main moved: 2 new commits since the plan was checked. <button class="btn" style="margin-left:auto">Check again</button></div>${miniSteps(stale)}</div>
+    <div class="state"><h3>A step cannot run</h3><p class="note">Names, refs and order are checked before anything else. The agent gets the reason back from the MCP call before you ever see the plan.</p>${miniSteps(invalid)}
+      <div class="banner bad" style="margin-top:8px">Step 2: a branch called feature/billing already exists on origin. Pick another name or start from origin/feature/billing.</div></div>
+  </div>`;
+}
+
+/* ---------- tab D: cadence ---------- */
+function screenD() {
+  const X = [16.67, 50, 83.33];
+  const m = (from, to, label) => {
+    const l = Math.min(X[from], X[to]), w = Math.abs(X[to] - X[from]);
+    return `<div class="sq2"><span class="lab2" style="left:${l}%;width:${w}%">${label}</span><span class="ar ${from > to ? "back" : ""}" style="left:${l}%;width:${w}%"></span></div>`;
+  };
+  return `<div class="sheet" style="max-width:980px"><h2>The cadence</h2>
+    <p class="note">The same loop as an agent review: the agent proposes, PowerGit checks and shows, you decide, the board carries the talk. Execution stays with the agent.</p>
+    <div class="seq2"><div class="actors"><span style="color:var(--agent)">Agent</span><span>PowerGit</span><span>You</span></div>
+      <div class="lifelines"><i style="left:16.67%"></i><i style="left:50%"></i><i style="left:83.33%"></i></div>
+      ${m(0, 1, "<b>branch_plan_preview</b> steps; nothing moves")}
+      ${m(1, 0, "pictures and checks: step 1 conflicts in src/session.ts")}
+      ${m(0, 1, "<b>branch_plan_open</b> mode wait, explanations per step")}
+      ${m(1, 2, "inbox badge; the plan on the graph")}
+      ${m(2, 1, "comment on step 1; send back")}
+      ${m(1, 0, "board: round 1 sent, c1 on step 1")}
+      ${m(0, 1, "<b>branch_plan_revise</b> round 2, reply to c1")}
+      ${m(2, 1, "approve")}
+      ${m(1, 0, "board: approved, run steps 1 to 5")}
+      ${m(0, 1, "runs git; refs move")}
+      ${m(1, 2, "each step ticks as its refs land")}
+    </div></div>`;
+}
+
+/* ---------- tab E: MCP ---------- */
+function screenE() {
+  return `<div class="sheet"><h2>The MCP tools</h2>
+  <p class="note">Built on the agent review: same inbox, rounds, board and approval. A plan is a session of kind "plan"; its steps take the place of changes.</p>
+  <div class="cols2"><div>
+  <pre class="code">branch_plan_preview {
+  repo_path, steps: [
+    { op: "rebase", branch: "feature/auth", onto: "main" },
+    { op: "branch", name: "feature/billing", from: "feature/auth" },
+    { op: "commit", on: "feature/billing", label: "B1",
+      subject: "billing: plan model", files: ["src/billing/"] },
+    { op: "merge", from: "feature/billing", into: "feature/auth", mode: "no-ff" },
+    { op: "merge", from: "feature/auth", into: "main", mode: "no-ff" },
+    { op: "tag", name: "v1.5", at: "main" }
+  ]
+}
+→ { steps: [{ n, result: "ok" | "conflict" | "unknown" | "invalid",
+              files, because }], branches_after, ascii }</pre>
+  <pre class="code">branch_plan_open    { repo_path, mode: "wait", title, why, agent,
+                      steps, explanations?: [{ step, body }] }
+branch_plan_wait    { repo_path, plan_id, timeout_ms? }
+branch_plan_revise  { repo_path, plan_id, note?, steps,
+                      replies?: [{ comment, body }] }
+branch_plan_get     { repo_path, plan_id }   → steps, checks, comments,
+                                               progress: [{ step, done, at }]</pre></div><div>
+  <pre class="code">// what each step is checked with, without touching the tree
+rebase       git merge-tree --merge-base per commit, in order
+merge        git merge-tree --write-tree &lt;into&gt; &lt;from&gt;
+branch, tag  the name is free here and on every remote
+commit       planned: overlap of the declared files with the
+             other side of every later merge
+delete       not checked out anywhere, merged or the plan says so
+order        every ref a step needs exists by then
+
+// re-check when an input moves (watcher on refs)
+main moved → steps 1 and 5 back to "check again"</pre>
+  <pre class="code">// progress, once approved: PowerGit maps ref moves to steps
+feature/auth  a41c2e9 → 5e81c0d   step 1 done (2 commits, tree as checked)
+feature/billing  created at 5e81c0d   step 2 done
+feature/billing  +2 commits         step 3 done</pre></div></div></div>`;
+}
+
+/* ---------- render ---------- */
+const TABS = [["A", "Plan screen"], ["B", "Inbox"], ["C", "States"], ["D", "Cadence"], ["E", "MCP"]];
+function render() {
+  document.getElementById("tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("");
+  const main = document.getElementById("main");
+  main.innerHTML = S.tab === "A" ? screenA() : S.tab === "B" ? screenB() : S.tab === "C" ? screenC() : S.tab === "D" ? screenD() : screenE();
+  if (S.tab === "A") slideRebased();
+  S.prevShown = S.shown;
+  document.getElementById("theme").textContent = S.theme === "light" ? "Dark" : "Light";
+}
+function go(step) { S.shown = step; if (step > 0) S.step = step; render(); }
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-tab],[data-step],[data-scrub],[data-jump],[data-act],[data-say],#theme");
+  if (!el) return;
+  if (el.id === "theme") { S.theme = S.theme === "light" ? "dark" : "light"; document.documentElement.dataset.theme = S.theme; render(); return; }
+  if (el.dataset.tab) { S.tab = el.dataset.tab; render(); return; }
+  if (el.dataset.step) return go(+el.dataset.step);
+  if (el.dataset.scrub !== undefined) return go(+el.dataset.scrub);
+  if (el.dataset.jump) return go(+el.dataset.jump);
+  if (el.dataset.say) {
+    const v = document.getElementById("reply").value.trim();
+    if (!v) return;
+    (comments[el.dataset.say] ||= []).push(["you", "You", "", v]); render(); return;
+  }
+  if (el.dataset.act === "send") { S.mode = "sent"; render(); return; }
+  if (el.dataset.act === "approve") {
+    S.mode = "approved"; S.running = 0; go(0);
+    const tick = () => { if (S.mode !== "approved" || S.running >= 5) return; S.running++; go(S.running); setTimeout(tick, 1100); };
+    setTimeout(tick, 600);
+  }
+});
+document.addEventListener("keydown", e => {
+  if (S.tab !== "A" || e.target.matches("input,textarea")) return;
+  if (e.key === "ArrowRight") go(Math.min(5, S.shown + 1));
+  if (e.key === "ArrowLeft") go(Math.max(0, S.shown - 1));
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset.step) { e.preventDefault(); go(+e.target.dataset.step); }
+});
+render();
+</script>
+</body>
+</html>
