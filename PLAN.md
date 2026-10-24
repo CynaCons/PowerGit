@@ -1141,7 +1141,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Graph past 200 commits: fold older runs instead of cutting. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, branch-plans e2e; smoke. [agent: claude]
 - [ ] Owner ticks: rebase checks exact, cherry-pick plans, long histories.
-- [ ] Release v0.22.1.
+- [x] Release v0.22.1. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
