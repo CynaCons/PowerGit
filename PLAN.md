@@ -1182,7 +1182,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Owner's sentence as e2e: comment dropped on the Markdown preview. [agent: claude]
 - [x] Preview in blocks; comment button per block, threads under it. [agent: claude]
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
-- [ ] Release v0.22.7.
+- [x] Release v0.22.7. [agent: claude]
 - [ ] Owner ticks: comments drop directly in the Markdown preview.
 
 ## Backlog
