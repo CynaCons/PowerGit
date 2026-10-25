@@ -1175,7 +1175,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Owner's sentence as e2e: Markdown file switches to preview. [agent: claude]
 - [x] Changes / Preview switch over Markdown files in reviews. [agent: claude]
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
-- [ ] Release v0.22.6.
+- [x] Release v0.22.6. [agent: claude]
 - [ ] Owner ticks: Markdown files preview in agent reviews.
 
 ## Backlog
