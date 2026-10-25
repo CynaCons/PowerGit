@@ -1195,6 +1195,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [ ] Gate: tsc, lint, unit, review e2e; zip smoke.
 - [ ] Release v0.22.8.
 - [ ] Owner ticks: only accepted unchanged changes are greyed out.
+- [x] Accept all at the top of a file with several changes. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches

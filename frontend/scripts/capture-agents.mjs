@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, chann
 CREATE TABLE IF NOT EXISTS seen (reader TEXT NOT NULL, channel TEXT NOT NULL, last_id INTEGER NOT NULL, updated REAL NOT NULL, PRIMARY KEY (reader, channel));
 `)
 const post = (channel, author, text) =>
-  board.prepare("INSERT INTO messages (channel, author, text, created) VALUES (?, ?, ?, ?)").run(channel, author, text, Date.now() / 1000)
+  board
+    .prepare("INSERT INTO messages (channel, author, text, created) VALUES (?, ?, ?, ?)")
+    .run(channel, author, text, Date.now() / 1000)
 const reading = (channel, reader) => {
   const last = board.prepare("SELECT COALESCE(MAX(id), 0) AS id FROM messages WHERE channel = ?").get(channel).id
   board
@@ -73,7 +75,15 @@ function commit(message, who = "Maya Chen <maya@example.com>", hours = 5) {
   git("add", "-A")
   execFileSync("git", ["commit", "-q", "-m", message], {
     cwd: dir,
-    env: { ...process.env, GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: email, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: name,
+      GIT_AUTHOR_EMAIL: email,
+      GIT_COMMITTER_NAME: name,
+      GIT_COMMITTER_EMAIL: email,
+      GIT_AUTHOR_DATE: date,
+      GIT_COMMITTER_DATE: date,
+    },
   })
 }
 const TOM = "Tom Ellis <tom@example.com>"
@@ -81,7 +91,8 @@ const RIYA = "Riya Patel <riya@example.com>"
 
 git("init", "-q", "-b", "main")
 git("config", "core.autocrlf", "false")
-const session = (timeout) => `export const SESSION = {\n  cookie: "inv_session",\n  timeout: ${timeout},\n  sameSite: "lax",\n}\n`
+const session = (timeout) =>
+  `export const SESSION = {\n  cookie: "inv_session",\n  timeout: ${timeout},\n  sameSite: "lax",\n}\n`
 const client = `import { SESSION } from "./session"
 
 export type Request = { path: string; body?: unknown }
@@ -104,7 +115,10 @@ write("README.md", "# Invoicing\n\nIssue, send and collect invoices.\n")
 write("src/session.ts", session("30_000"))
 write("src/api/client.ts", client)
 commit("init: invoicing service skeleton")
-write("src/invoice.ts", `export type Line = { label: string; qty: number; unit: number }\n\nexport type Invoice = { id: string; customer: string; lines: Line[] }\n\nexport const total = (inv: Invoice) => inv.lines.reduce((s, l) => s + l.qty * l.unit, 0)\n`)
+write(
+  "src/invoice.ts",
+  `export type Line = { label: string; qty: number; unit: number }\n\nexport type Invoice = { id: string; customer: string; lines: Line[] }\n\nexport const total = (inv: Invoice) => inv.lines.reduce((s, l) => s + l.qty * l.unit, 0)\n`,
+)
 commit("invoice: model and totals", TOM)
 // Months of ordinary work: features that overlap and merge back.
 const on = (branch) => git("checkout", "-q", branch)
@@ -120,7 +134,15 @@ const merge = (branch, who = "Maya Chen <maya@example.com>") => {
   const [name, email] = who.match(/^(.*) <(.*)>$/).slice(1)
   execFileSync("git", ["merge", "-q", "--no-ff", "-m", `Merge branch '${branch}'`, branch], {
     cwd: dir,
-    env: { ...process.env, GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: email, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: name,
+      GIT_AUTHOR_EMAIL: email,
+      GIT_COMMITTER_NAME: name,
+      GIT_COMMITTER_EMAIL: email,
+      GIT_AUTHOR_DATE: date,
+      GIT_COMMITTER_DATE: date,
+    },
   })
   git("branch", "-q", "-d", branch)
 }
@@ -143,28 +165,43 @@ work("feature/currency", "src/currency.ts", "currency: format amounts per locale
 merge("feature/taxes", RIYA)
 work("feature/currency", "src/currency.test.ts", "currency: rounding tests", TOM)
 merge("feature/currency")
-write("src/api/invoices.ts", `import { call } from "./client"\nimport type { Invoice } from "../invoice"\n\nexport const listInvoices = () => call<Invoice[]>({ path: "/invoices" })\n`)
+write(
+  "src/api/invoices.ts",
+  `import { call } from "./client"\nimport type { Invoice } from "../invoice"\n\nexport const listInvoices = () => call<Invoice[]>({ path: "/invoices" })\n`,
+)
 commit("api: list invoices")
 git("tag", "v1.2")
-write("src/invoice.ts", `export type Line = { label: string; qty: number; unit: number }\n\nexport type Invoice = { id: string; customer: string; lines: Line[] }\n\nexport const total = (inv: Invoice) =>\n  Math.round(inv.lines.reduce((s, l) => s + l.qty * l.unit, 0) * 100) / 100\n`)
+write(
+  "src/invoice.ts",
+  `export type Line = { label: string; qty: number; unit: number }\n\nexport type Invoice = { id: string; customer: string; lines: Line[] }\n\nexport const total = (inv: Invoice) =>\n  Math.round(inv.lines.reduce((s, l) => s + l.qty * l.unit, 0) * 100) / 100\n`,
+)
 commit("fix: round totals to the cent", RIYA)
 
 // feature/auth: a longer session, a login route.
 git("checkout", "-q", "-b", "feature/auth")
 write("src/session.ts", session("readTimeout(config)"))
 commit("auth: session timeout from config", TOM, 3)
-write("src/api/login.ts", `import { call } from "./client"\n\nexport const login = (email: string, password: string) =>\n  call<{ ok: boolean }>({ path: "/login", body: { email, password } })\n`)
+write(
+  "src/api/login.ts",
+  `import { call } from "./client"\n\nexport const login = (email: string, password: string) =>\n  call<{ ok: boolean }>({ path: "/login", body: { email, password } })\n`,
+)
 commit("auth: login route", TOM, 2)
 git("checkout", "-q", "main")
 write("src/session.ts", session("45_000"))
 commit("fix: session timeout too short", RIYA)
-write("README.md", "# Invoicing\n\nIssue, send and collect invoices.\n\nRun `npm start`, then open http://localhost:3000.\n")
+write(
+  "README.md",
+  "# Invoicing\n\nIssue, send and collect invoices.\n\nRun `npm start`, then open http://localhost:3000.\n",
+)
 commit("docs: how to run it")
 git("tag", "v1.3")
 
 // feature/reminders: Riya's branch, behind main.
 git("checkout", "-q", "-b", "feature/reminders", "v1.2")
-write("src/reminders.ts", `import type { Invoice } from "./invoice"\n\nexport const overdue = (inv: Invoice, due: Date) => Date.now() > due.getTime()\n`)
+write(
+  "src/reminders.ts",
+  `import type { Invoice } from "./invoice"\n\nexport const overdue = (inv: Invoice, due: Date) => Date.now() > due.getTime()\n`,
+)
 commit("reminders: overdue check", RIYA, 4)
 git("checkout", "-q", "main")
 
@@ -230,7 +267,10 @@ try {
   let up = false
   for (let i = 0; i < 60 && !up; i++) {
     await new Promise((r) => setTimeout(r, 1000))
-    up = await fetch(`http://127.0.0.1:${port}`).then(() => true, () => false)
+    up = await fetch(`http://127.0.0.1:${port}`).then(
+      () => true,
+      () => false,
+    )
   }
   if (!up) throw new Error("vite did not start")
 
@@ -248,7 +288,11 @@ try {
       { path: "docs/retries.md", status: "A" },
     ],
     explanations: [
-      { path: "src/api/client.ts", line: "+9", body: "Only gateway errors: a **500** is our bug and should surface, not be hidden by a retry." },
+      {
+        path: "src/api/client.ts",
+        line: "+9",
+        body: "Only gateway errors: a **500** is our bug and should surface, not be hidden by a retry.",
+      },
     ],
   })
   const channel = review.board
@@ -288,7 +332,12 @@ try {
         into: "main",
       },
     ],
-    explanations: [{ step: 1, body: "Main changed the same timeout in *fix: session timeout too short*. Keep `readTimeout(config)` with 45 s as its default." }],
+    explanations: [
+      {
+        step: 1,
+        body: "Main changed the same timeout in *fix: session timeout too short*. Keep `readTimeout(config)` with 45 s as its default.",
+      },
+    ],
   })
 
   if (plan.board) reading(plan.board, "claude")
@@ -339,7 +388,11 @@ try {
   await page.waitForTimeout(1500)
   const asked = await api(`/repos/${repo}/agent-reviews/${review.id}`)
   const question = asked.comments.find((c) => c.kind === "ask")
-  post(channel, "claude", `${question.id}: Yes. I will add ±20 % jitter in the next round, and a test that pins it with a seeded random.`)
+  post(
+    channel,
+    "claude",
+    `${question.id}: Yes. I will add ±20 % jitter in the next round, and a test that pins it with a seeded random.`,
+  )
   reading(channel, "claude")
   await page.getByTestId("round-change").first().getByTestId("verdict-accept").click()
   await page.waitForTimeout(3500)
@@ -394,6 +447,10 @@ try {
   await browser.close()
   console.log(`agent screenshots captured to ${assets}; sample repository at ${dir}`)
 } finally {
-  vite.kill()
+  // shell: true puts a shell between us and Vite; on Windows only the tree
+  // kill reaches Vite and its esbuild, which would otherwise hold
+  // node_modules (package-windows.ps1's npm ci then fails).
+  if (process.platform === "win32") spawn("taskkill", ["/pid", String(vite.pid), "/t", "/f"], { stdio: "ignore" })
+  else vite.kill()
   board.close()
 }

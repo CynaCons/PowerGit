@@ -108,5 +108,9 @@ try {
   await browser.close()
   console.log(`showcase screenshots captured to ${assets}`)
 } finally {
-  vite.kill()
+  // shell: true puts a shell between us and Vite; on Windows only the tree
+  // kill reaches Vite and its esbuild, which would otherwise hold
+  // node_modules (package-windows.ps1's npm ci then fails).
+  if (process.platform === "win32") spawn("taskkill", ["/pid", String(vite.pid), "/t", "/f"], { stdio: "ignore" })
+  else vite.kill()
 }

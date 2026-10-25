@@ -126,6 +126,7 @@ export function RoundDiff(props: RoundDiffProps) {
           Only the lines captured with this round are shown: the file has changed since.
         </Typography>
       )}
+      {props.editable && hunks.length > 1 && <AcceptAll hunks={hunks} {...props} />}
       {hunks.length === 0 && (
         <Typography color="text.secondary" sx={{ fontSize: 13 }}>
           No changes in this file.
@@ -139,6 +140,32 @@ export function RoundDiff(props: RoundDiffProps) {
         ),
       )}
       <EarlierCards {...props} />
+    </Box>
+  )
+}
+
+/**
+ * v0.22.8, owner: "a button 'accept all' when there are several chunks in a
+ * file. Button only at the top." Accepts every change of the file at once.
+ */
+function AcceptAll({ hunks, ...p }: RoundDiffProps & { hunks: RoundHunk[] }) {
+  const done = hunks.every((h) => liveVerdict(p.round, h, p.path, p.doc) === "accept")
+  return (
+    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+      <VerdictButton
+        testid="file-accept-all"
+        active={done}
+        tone="accept"
+        disabled={done}
+        onClick={() =>
+          p.onVerdict(
+            hunks.flatMap((h) => h.keys),
+            "ok",
+          )
+        }
+      >
+        Accept all {hunks.length} changes
+      </VerdictButton>
     </Box>
   )
 }

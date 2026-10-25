@@ -273,6 +273,52 @@ test.describe("agent review rounds", () => {
     }
   })
 
+  // v0.22.8, owner: "Give me also a button 'accept all' when there are several
+  // chunks in a file. Button only at the top."
+  test("a file with several changes accepts them all from its top", async ({ page }) => {
+    test.setTimeout(60_000)
+    const dir = makeRepo("pg-review-accept-all-")
+    try {
+      const repoId = await openInApp(page, dir)
+      await api(`/repos/${repoId}/agent-reviews`, {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "wait",
+          title: "Accept them all",
+          agent: "auth-fix",
+          files: [
+            {
+              path: "t.txt",
+              status: "M",
+              patch: "@@ -3 +3 @@\n-line 3\n+line 3 changed\n@@ -25 +25 @@\n-line 25\n+line 25 changed\n",
+            },
+            { path: "u.txt", status: "M", patch: "@@ -1 +1 @@\n-one\n+uno\n" },
+          ],
+        }),
+      })
+      await page.getByTestId("agent-reviews-button").click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Accept them all" })
+        .filter({ hasText: basename(dir) })
+        .click()
+      const all = page.getByTestId("file-accept-all")
+      await expect(all).toHaveCount(1)
+      await expect(all).toHaveText("Accept all 2 changes")
+      await all.click()
+      await expect(page.getByTestId("round-change").nth(0)).toHaveAttribute("data-verdict", "accept")
+      await expect(page.getByTestId("round-change").nth(1)).toHaveAttribute("data-verdict", "accept")
+      await expect(all).toBeDisabled()
+
+      // One change: no button.
+      await page.getByTestId("round-file").filter({ hasText: "u.txt" }).first().click()
+      await expect(page.getByTestId("round-diff")).toHaveAttribute("data-path", "u.txt")
+      await expect(all).toHaveCount(0)
+    } finally {
+      await removeRepo(dir)
+    }
+  })
+
   test("without powerchannel the column lists the rounds and the round still goes back", async ({ page }) => {
     test.setTimeout(60_000)
     const dir = makeRepo("pg-review-noboard-")
