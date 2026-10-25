@@ -1192,7 +1192,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 **Goal:** Owner (2026-10-25): only changes accepted before are greyed out in later rounds.
 - [x] Owner's sentence as e2e: unreviewed carried change stays bright. [agent: claude]
 - [x] Dim a carried change only when it was accepted before. [agent: claude]
-- [ ] Gate: tsc, lint, unit, review e2e; zip smoke.
+- [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
 - [ ] Release v0.22.8.
 - [ ] Owner ticks: only accepted unchanged changes are greyed out.
 - [x] Accept all at the top of a file with several changes. [agent: claude]
