@@ -19,6 +19,8 @@ import type { RoundActions } from "./RoundBox"
 import { Chip } from "./reviewChips"
 import { ReviewIntro } from "./ReviewIntro"
 import { ResizableTop } from "./ResizableTop"
+import { isMarkdown } from "./markdownPreview"
+import { MarkdownPreview, MarkdownSwitch } from "./MarkdownView"
 import { RoundDiff } from "./RoundDiff"
 import { setReviewDiff, useReviewDiff } from "./reviewDiffView"
 import { ReviewFiles } from "./ReviewFiles"
@@ -71,6 +73,8 @@ export function ReviewScreen({
   const [picked, setPicked] = useState<{ path: string; key: string } | null>(null)
   const [cursor, setCursor] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // v0.22.6: a Markdown file shows its changes or its preview.
+  const [mdPreview, setMdPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const open = session.status === "pending"
   const editable = open && round.n === latest.n && round.sentAt === null
@@ -88,6 +92,7 @@ export function ReviewScreen({
       : (round.files[0]?.path ?? "")
   const replyOff = !open ? null : board.available && session.board ? null : "Replies need powerchannel."
   const counts = roundCounts(round, doc, threads)
+  const markdown = isMarkdown(filePath) && round.files.some((f) => f.path === filePath)
   const previous = session.rounds?.find((r) => r.n === round.n - 1)?.changes ?? []
   // v0.21.8: the bottom diff's options; whitespace stays as captured.
   const diffView = useReviewDiff()
@@ -322,33 +327,41 @@ export function ReviewScreen({
           <ReviewFiles round={round} doc={doc} current={filePath} onPick={setPath} left={left} earlier={earlier} />
         </Box>
         <Box sx={{ ...paneSx, position: "relative", minHeight: 0, minWidth: 0, display: "flex", gridArea: "diff" }}>
-          <Box data-testid="round-diff-scroll" sx={{ flex: 1, minWidth: 0, overflow: "auto", p: 1.25, pb: 6 }}>
-            <RoundDiff
-              round={round}
-              path={filePath}
-              doc={doc}
-              threads={threads}
-              editable={editable}
-              canAsk={canAsk}
-              previous={previous}
-              cursor={cursor}
-              picked={picked}
-              onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
-              onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
-              onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
-              onComment={comments.add}
-              edits={comments.edits}
-              rounds={session.rounds ?? []}
-              earlier={earlier}
-              onReply={open && !replyOff ? comments.reply : undefined}
-              replyOff={replyOff}
-              onCursor={setCursor}
-              options={diffView.options}
-              wrap={diffView.wrap}
-              sourceText={source.text}
-              sourceSettled={source.settled}
-            />
-            {editable && (
+          <Box
+            data-testid="round-diff-scroll"
+            sx={{ flex: 1, minWidth: 0, overflow: "auto", p: 1.25, pb: 6, display: "flex", flexDirection: "column" }}
+          >
+            {markdown && <MarkdownSwitch preview={mdPreview} onPreview={setMdPreview} />}
+            {markdown && mdPreview ? (
+              <MarkdownPreview round={round} path={filePath} sourceText={source.text} settled={source.settled} />
+            ) : (
+              <RoundDiff
+                round={round}
+                path={filePath}
+                doc={doc}
+                threads={threads}
+                editable={editable}
+                canAsk={canAsk}
+                previous={previous}
+                cursor={cursor}
+                picked={picked}
+                onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
+                onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
+                onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
+                onComment={comments.add}
+                edits={comments.edits}
+                rounds={session.rounds ?? []}
+                earlier={earlier}
+                onReply={open && !replyOff ? comments.reply : undefined}
+                replyOff={replyOff}
+                onCursor={setCursor}
+                options={diffView.options}
+                wrap={diffView.wrap}
+                sourceText={source.text}
+                sourceSettled={source.settled}
+              />
+            )}
+            {editable && !(markdown && mdPreview) && (
               <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}>
                 A accept · R reject · C comment · J / K next / previous change · a click on a line number comments on
                 that line · Ctrl+Enter sends the round

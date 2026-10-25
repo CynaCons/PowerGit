@@ -1171,6 +1171,9 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Release v0.22.5. [agent: claude]
 - [ ] Owner ticks: PRs show on plans and open on click.
 
+### v0.22.6 — Agent reviews: Markdown preview switch
+**Goal:** Owner (2026-10-25): a Markdown file in a review switches to a rendered preview.
+
 ## Backlog
 - Drop leftover 2021 origin branches
 - Component/UI test coverage: stash flow, gitignore preview dialog, commit-dialog multi-select semantics, remote config dialog, blob viewer content
