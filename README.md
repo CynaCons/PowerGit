@@ -1,222 +1,278 @@
-# PowerGit
-
-[![ci](https://github.com/CynaCons/PowerGit/actions/workflows/ci.yml/badge.svg?branch=powergit)](https://github.com/CynaCons/PowerGit/actions/workflows/ci.yml)
-
-**A new frontend for [Git Extensions](https://github.com/gitextensions/gitextensions) — modern, portable, cross-platform.**
-
-PowerGit keeps everything that makes Git Extensions great — especially its
-revision graph — and rebuilds the way it looks and feels: a React + Material UI
-running in a lightweight Tauri shell, talking to a self-contained C# git engine.
-
-> **Scope of this fork:** we are building a _new frontend_, not rewriting git
-> plumbing. Git Extensions is the **behavioural reference**, not shared code:
-> the engine is a small `net10.0` host around the git CLI, and the lane
-> layout is a TypeScript reimplementation of GE's `RevisionGraph`, verified
-> against golden fixtures taken from GE's own tests (`tools/ge-parity/`).
-> The upstream WinForms app is kept as a read-only mirror on `master` for
-> exactly that reason. Today the product is the **Browse experience**
-> (revision graph, commit details, diffs, staging, branches, stashes). More
-> surfaces follow.
-
-## Why
-
-|            | Git Extensions (WinForms) | PowerGit                                                                     |
-| ---------- | ------------------------- | ---------------------------------------------------------------------------- |
-| UI toolkit | Windows Forms             | React + Material, Tauri shell                                                |
-| Platform   | Windows only              | Windows and Linux (Ubuntu 22.04 / 24.04 / 26.04)                             |
-| Install    | Heavy installer           | Portable zip — one exe + one sidecar                                         |
-| Graph      | The gold standard         | Reimplemented lane layout, GE colours, golden-tested against GE, virtualized |
-
-## Highlights
-
-- **A grid you can shape** — drag the header dividers to resize the graph,
-  author, date and SHA columns (double-click restores); a graph wider than
-  its column gets a discreet scrollbar, Shift+wheel scrolls it. Diffs and
-  the commit dialog highlight code by the file's language, light and dark.
-- **Merge, rebase and conflicts, in the app** — merge with the fast-forward
-  and squash options, rebase onto anything, rebase interactively with a
-  reorderable list of commits, and resolve conflicts file by file (take
-  either side, or open your merge tool) from a banner that says what is in
-  progress and offers Continue, Skip and Abort.
-- **A commit menu that has everything** — checkout, branch, tag, cherry-pick,
-  revert, reset, compare, copy, archive and open in browser, with the same
-  shortcuts the toolbar shows; branches and tags have their own menu.
-- **See what git actually ran** — one line at the bottom opens a console with
-  every command, its output and its exit code, and a failure says why on its
-  own. Credentials never reach it.
-- **The graph, always complete** — all branches, all tags, stashes as nodes;
-  Git Extensions lane colours and a lane layout checked against GE's own
-  graph snapshots; smooth up to thousands of commits.
-- **Everything in reach** — commit details, changed files, the full repo tree
-  at any revision, unified diffs with context/full-file/whitespace options.
-- **Undo from where you are reading** — right-click a file in the diff view,
-  or select lines inside the diff, and reset them. Reset means the diff on
-  screen and nothing more: on Working directory it restores from the index, so
-  staged work survives; on Index it unstages and leaves the file alone; on a
-  commit it reverses that change into the working tree and stages it, without
-  touching history. Every one of them says what survives before it runs.
-- **Real staging** — FormCommit-style window: unstaged │ staged │ diff │
-  message, multi-select, right-click stage/delete/gitignore (with preview).
-- **Branch operations with GE guards** — checkout, reset, rebase from the
-  graph's right-click menu; manage remotes, tags and submodules from the tree.
-- **Self-sufficient packaging** — the app spawns its own .NET 10 engine
-  sidecar; no prerequisites on the machine.
+<h1 align="center">
+  <img src="website/public/logo.svg" alt="" width="40" height="40" /><br />
+  PowerGit
+</h1>
 
 <p align="center">
-  <img src="website/public/assets/browse.png" alt="PowerGit Browse" width="820" />
+  <b>A fast, portable git client for Windows and Linux, where your coding agents ask for your review.</b>
 </p>
 
-More screenshots and an interactive live demo:
-**[cynacons.github.io/PowerGit](https://cynacons.github.io/PowerGit/)**
+<p align="center">
+  <a href="https://github.com/CynaCons/PowerGit/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/CynaCons/PowerGit?label=release" /></a>
+  <img alt="Windows and Linux" src="https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-2563eb" />
+  <img alt="MCP server" src="https://img.shields.io/badge/MCP-Claude%20Code%20%7C%20Codex-7c3aed" />
+  <a href="LICENSE.md"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-555" /></a>
+</p>
 
-## Following the checked-out branch
+<p align="center">
+  <a href="https://cynacons.github.io/PowerGit/">Website and live demo</a> ·
+  <a href="https://github.com/CynaCons/PowerGit/releases/latest">Download</a> ·
+  <a href="docs/agents/mcp-agent-review.md">Agent integration docs</a>
+</p>
 
-The graph rings every commit the checked-out branch reaches and, by
-default, greys out everything else, so its history and the merges into it
-stand out. The pill at the bottom of the graph column switches between all
-ancestors and the first-parent line, and turns the ring or the dimming off.
+<p align="center">
+  <img src="website/public/assets/agent-review.png" alt="An agent review in PowerGit: the agent's changes with a verdict per change, its explanation on a line, the owner's question and the agent's answer, and the review's channel" width="900" />
+</p>
 
-## If something goes wrong
+PowerGit is a desktop git client built on the revision graph of
+[Git Extensions](https://github.com/gitextensions/gitextensions). It covers the
+daily work: a complete graph, staging, merge, rebase, conflicts and the full
+commit menu. It also runs an [MCP](https://modelcontextprotocol.io) server, so
+Claude Code, Codex and other agents can bring their work to you:
 
-Rail → **Diagnostic snapshot** (above Settings) writes a zip next to the
-logs with the app and engine logs, the engine's state and the page's own
-diagnostics; attach it to your report. Should the window ever stop
-responding, or stop redrawing while the app still reacts to clicks, the
-app's shell notices within about 20 seconds, writes the same snapshot on
-its own, reloads the view, and if that does not bring the picture back,
-asks in a native dialog whether to restart. The next launch says what
-happened and where the snapshot is. If the window looks frozen but the
-app still reacts, press **Diagnostic snapshot twice**: the app takes that
-as "the display is dead", reloads its view, and a third press offers a
-restart in a native dialog. On Linux WebKitGTK paints with the GPU since
-0.20.7; if the window goes black or stops redrawing on your
-driver/compositor, `POWERGIT_SOFTWARE_RENDER=1` turns its DMA-BUF
-renderer and accelerated compositing off, as every release before 0.20.7 did. On a Wayland session
-the AppImage now runs natively on Wayland instead of XWayland;
-`POWERGIT_X11=1` restores XWayland, and `POWERGIT_NO_FRAME_SYNC=1` turns
-off X11 frame synchronisation there. If the picture ever freezes while the
-app still reacts, `Ctrl+Shift+F3`, `Ctrl+Shift+F6` and `Ctrl+Shift+F8`
-(also in Settings → Tools → Recovery experiments) try to bring it back,
-and `scripts/freeze-dump.sh` collects a report from a terminal — see
-`docs/ubuntu-freeze.md`. Settings → Tools → Open logs folder shows the
-files.
+- **Agent reviews.** The agent opens a review of its changes. You accept or
+  reject each change, comment on lines, and send the round back. The agent
+  revises until you approve, then commits.
+- **Branch plans.** Before an agent rebases, merges or cherry-picks, it shows
+  you the plan on your own graph. PowerGit checks every step with git and
+  predicts conflicts before anything moves.
+- **A channel to talk on.** While you review, you ask the agent questions and
+  it answers on the line you asked about.
 
-Report a bug: https://github.com/CynaCons/PowerGit/issues (attach the
-diagnostic snapshot from Settings → Diagnostics).
+It runs locally. There is no account and no cloud service: reviews, plans
+and the channel stay on your machine.
 
-## Updating
+## Contents
 
-Settings → Updates → "Check for updates" asks GitHub for the latest release,
-verifies its signature and, on "Download and restart", installs it and
-reopens PowerGit. Nothing is checked or downloaded unless you press the
-button. Works for the Windows installer and the Linux AppImage (the AppImage
-must be writable); the portable zip is replaced by hand.
+- [Work with coding agents](#work-with-coding-agents)
+- [Connect your agent](#connect-your-agent)
+- [A complete git client](#a-complete-git-client)
+- [Install](#install)
+- [Troubleshooting](#troubleshooting)
+- [Build from source](#build-from-source)
+- [PowerGit and Git Extensions](#powergit-and-git-extensions)
 
-## Status & roadmap
+## Work with coding agents
 
-Tracked openly in [PLAN.md](PLAN.md). Release v0.15.0 brings Git
-Extensions' own operations into the app: merge, rebase (including
-interactive), cherry-pick and revert now stop on a conflict instead of
-undoing themselves, with a banner that offers Resolve, Continue, Skip and
-Abort, and a resolve dialog that takes either side or opens your merge
-tool. The commit menu is the full Git Extensions one, settings gained
-identity scopes, tool pickers and switchable confirmations, and a git
-console at the bottom shows every command PowerGit runs. It builds on
-v0.14.3's grid work and v0.14.1's diagnostic snapshot and watchdog.
-Parked: worktrees and hotkey remapping UI.
+### Agent reviews
 
-On Linux, PowerGit runs natively on Wayland when `WAYLAND_DISPLAY` is set,
-disables WebKitGTK's DMA-BUF renderer and accelerated compositing, probes paint
-and liveness, and uses a snapshot → reload → restart watchdog; X11 sessions
-use `POWERGIT_NO_FRAME_SYNC=1` as the fallback.
+An agent calls `agent_review_open` with its changes: the working tree, a
+range of commits, or patches. The review shows up in PowerGit's **Agent
+reviews** inbox, from every repository you use.
 
-Recent repositories now load even when no repository is open after restart.
-Settings → Updates → Open app location reveals the running AppImage. Updates
-replace it in place, so its filename may still contain the original version.
+- **A verdict per change.** Accept or reject each change, or mark single
+  lines. A file shows how much of it is decided.
+- **Comments on lines.** A comment goes back with the round. A question
+  goes to the agent at once, and its answer appears under your line.
+- **Rounds.** The agent revises and opens round 2. A change that did not
+  move keeps your verdict, a revised one says so, and earlier conversations
+  stay on their lines.
+- **The agent explains itself.** The author can attach explanations to
+  lines, such as why this approach or what it ruled out, and you reply in
+  the same thread.
+- **Other agents review too.** A second agent, for example Codex reviewing
+  Claude's work, comments on lines beside you, and you keep or dismiss its
+  comments.
+- **Markdown documents.** A `.md` file switches between its changes and a
+  rendered preview, and you comment directly on a paragraph, list or table.
+- **Three modes.** *Wait* holds the agent until you decide. *Notify* leaves an
+  item in your inbox while the agent goes on. *Silent* opens nothing.
 
-**If the window stops repainting on an X11 session, set
-`POWERGIT_NO_FRAME_SYNC=1`; to capture it for a report, run this from a
-terminal while it is still frozen** — the app kept running underneath in every
-captured freeze, so the picture has to be examined from outside:
+<p align="center">
+  <img src="website/public/assets/agent-review-markdown.png" alt="A Markdown file reviewed in its preview, with a comment on its table" width="820" />
+</p>
 
+### Branch plans
+
+An agent calls `branch_plan_open` with steps: rebase, branch, commit, merge,
+cherry-pick, tag, delete, or open a pull request. PowerGit plays the plan on
+the repository's real graph without moving a single ref:
+
+- **A scrubber** steps through the plan. Planned commits are hollow, commits
+  a rebase replaces are struck through, and each branch label moves to where
+  the step leaves it.
+- **Every step is checked with git.** Merges go through
+  `git merge-tree`, and rebases and cherry-picks are replayed commit by commit.
+  A predicted conflict names the file and shows both sides' change.
+- **You approve or send it back,** with a comment on any step. Once
+  approved, the agent runs the steps and PowerGit ticks each one as the refs
+  move. If your branches move while the plan waits, PowerGit offers to check
+  it again.
+- **Pull requests from any host.** The agent reports each PR's id, title,
+  state and link, from GitHub, Bitbucket, GitLab or your own server. The PR
+  shows as a label on its branch and opens on click.
+
+<p align="center">
+  <img src="website/public/assets/branch-plan.png" alt="A branch plan: a rebase step predicted to stop on src/session.ts, with both sides of the conflict" width="820" />
+</p>
+
+### Talk while you review
+
+With [PowerChannel](https://github.com/CynaCons/PowerChannel) installed, each
+review and plan gets a channel. PowerGit shows whether the agent is reading
+it. Questions, answers and round summaries go there, and you can message the
+agent at any time from the review screen.
+
+## Connect your agent
+
+PowerGit must be running. The MCP endpoint is a private per-user pipe on
+Windows, or a local socket on Linux. It holds no token on disk and accepts
+nothing from the network.
+
+**Claude Code**
+
+```bash
+claude mcp add powergit -- "C:\Users\<you>\AppData\Local\PowerGit\powergit.exe" mcp
 ```
-bash freeze-dump.sh
+
+**Codex** (`~/.codex/config.toml`)
+
+```toml
+[mcp_servers.powergit]
+command = "C:/Users/<you>/AppData/Local/PowerGit/powergit.exe"
+args = ["mcp"]
 ```
 
-It is attached to each release. It reads `/proc` for the app's threads, asks
-whether the engine is still answering, collects the logs and the shell's
-`probe.txt`, records the display stack (backend, frame-sync state, compositor
-log, WebKitGTK and mutter versions), and writes one `.tar.gz` to send back.
-Nothing is killed or modified. `bash freeze-dump.sh recover 3` asks the
-frozen app to run a recovery step (`3`, `6`, `8` first). Install `elfutils`
-or `gdb` first for full backtraces.
+On Linux, use the AppImage's path instead. Any MCP client that speaks stdio
+works the same way, with `powergit mcp` as the command.
 
-v0.15.3 stops that inspector being the only way in. The console at the bottom
-of the window has a second tab, **APP LOG**, showing what PowerGit recorded
-about itself: errors, focus and visibility changes, refresh timings, long
-tasks and every `console.*` call, with a filter and Copy all. Open it from
-Settings → Tools → Open app log, or press Ctrl+Shift+`. It needs no developer
-tools and behaves the same on every platform. "Open developer tools" now says
-whether the inspector actually opened instead of doing nothing visible.
+| Tools | What the agent does with them |
+| --- | --- |
+| `agent_review_open`, `agent_review_wait`, `agent_review_get`, `agent_review_revise`, `agent_review_list`, `agent_review_cancel` | Open a review of its changes, wait for your verdicts, read your comments, open the next round |
+| `agent_review_comment` | Review beside you as a second agent |
+| `branch_plan_preview`, `branch_plan_open`, `branch_plan_wait`, `branch_plan_get`, `branch_plan_revise`, `branch_plan_cancel` | Check a plan without opening it, open it for you, see each step's check and whether it ran |
+| `branch_plan_pr` | Attach a pull request from any host to a branch of the plan |
 
-## Development
+Payloads, the review loop and the channel protocol are documented in
+[Agent review over MCP](docs/agents/mcp-agent-review.md).
 
-Windows dev machine; .NET 10 SDK, Node 22, Rust.
+## A complete git client
+
+<p align="center">
+  <img src="website/public/assets/sample-browse.png" alt="PowerGit Browse: the revision graph with merged feature branches, the repository tree and commit details" width="900" />
+</p>
+
+- **The revision graph.** All branches, tags and stashes, with Git
+  Extensions' lane colours and a lane layout checked against Git Extensions'
+  own graph tests. It is virtualised, and was measured on a 100,000-commit
+  repository. Follow the checked-out
+  branch, highlight a commit's ancestry, show only chosen branches, and jump
+  to HEAD, parent or child.
+- **Staging.** The commit window has unstaged, staged, diff and message
+  panes. Stage or reset whole files or selected lines, and it stays fast with
+  thousands of changed files.
+- **Merge, rebase and conflicts.** Fast-forward and squash merges, rebase and
+  interactive rebase, cherry-pick and revert. An operation that stops on a
+  conflict shows a banner with Resolve, Continue, Skip and Abort. Resolve
+  file by file, or open your merge tool.
+- **The full commit menu.** Checkout, branch, tag, cherry-pick, revert,
+  reset, compare, save as patch, archive and open in browser, with Git
+  Extensions' shortcuts.
+- **Undo from the diff.** Select lines in a diff and reset just those, or
+  reverse one change of an old commit into the working tree. Each reset says
+  what it keeps before it runs.
+- **Your own review.** Mark lines as reviewed in any diff and leave
+  comments. The review survives restarts and exports to Markdown.
+- **Tags, remotes and submodules.** Each tag shows whether a remote has it,
+  and a local tag can be pushed. Remotes and submodules are managed from the
+  repository tree.
+- **Diffs.** Syntax highlighting, context lines, full file, whitespace and
+  wrap options, a file list or a directory tree, and the full repository tree
+  at any commit.
+- **The git console.** One line at the bottom shows the last command, and a
+  click opens every command PowerGit ran, with its output and exit code.
+  Credentials never reach it.
+- **Always current.** A watcher follows `.git`, so a commit from a terminal
+  or an agent shows up at once.
+- **Light and dark, zoom, keyboard.** Git Extensions' default shortcuts work,
+  and letter keys never steal from the commit message.
+
+## Install
+
+| Platform | File | Notes |
+| --- | --- | --- |
+| Windows | `PowerGit_<version>_x64-setup.exe` | Installer, updates itself |
+| Windows | `PowerGit_<version>_win64.zip` | Portable: unzip and run `powergit.exe` |
+| Linux | `PowerGit_<version>_amd64.AppImage` | `chmod +x` and run; updates itself |
+
+All files are on the [releases page](https://github.com/CynaCons/PowerGit/releases/latest).
+PowerGit brings its own .NET git engine. It only needs `git` on `PATH`, and
+on Linux the WebKitGTK stack (`libwebkit2gtk-4.1-0`, `libgtk-3-0`,
+`libayatana-appindicator3-1`, `librsvg2-2`).
+
+Ubuntu **22.04, 24.04 and 26.04** are supported. Each release AppImage is
+launched in stock containers of all three before it is published. Other
+distributions with WebKitGTK 2.40 or later should work, but are untested.
+
+**Updates.** Settings → Updates → *Check for updates* asks GitHub for the
+latest release, verifies its signature and installs it. PowerGit checks
+nothing unless you press the button. The portable zip is replaced by hand.
+
+`powergit <path>` opens that repository. Without a path, the last one
+reopens.
+
+## Troubleshooting
+
+- **Diagnostic snapshot.** The rail's *Diagnostic snapshot* button writes
+  one zip with the app's and engine's logs and state. Attach it to an
+  [issue](https://github.com/CynaCons/PowerGit/issues).
+- **A frozen window.** If the window stops responding or redrawing, the
+  shell notices within about 20 seconds. It takes a snapshot, reloads the
+  view, and offers to restart. Pressing *Diagnostic snapshot* twice does the
+  same by hand.
+- **Linux display problems.**
+  - `POWERGIT_SOFTWARE_RENDER=1` turns off GPU rendering.
+  - `POWERGIT_X11=1` runs under XWayland instead of native Wayland.
+  - `POWERGIT_NO_FRAME_SYNC=1` turns off X11 frame sync.
+  - See [docs/ubuntu-freeze.md](docs/ubuntu-freeze.md) for the recovery keys
+    and `freeze-dump.sh`.
+- **The app log.** Press Ctrl+Shift+\` to see what PowerGit recorded about
+  itself, without developer tools.
+
+## Build from source
+
+Requirements: .NET 10 SDK, Node 22 and Rust.
 
 ```bash
 # engine tests
 dotnet test src/engine/PowerGit.Engine.sln
 
-# UI dev server (+ engine)
+# UI dev server with the engine
 cd frontend && npm ci && npm run dev:all
 
-# headless proof
-npm run test:e2e          # functional
-npm run test:resolution   # layout at 5 viewports up to 4K fullscreen
+# unit and end-to-end tests
+npm run test:unit
+npm run test:e2e
 
-# packaged Windows artifacts into dist/
+# Windows artifacts into dist/
 pwsh scripts/package-windows.ps1
 ```
 
-All git I/O goes through the engine (`http://127.0.0.1:7733`, bearer-token
-gated); the UI never shells out to git. Agent guidance lives in
-[AGENTS.md](AGENTS.md); requirements in [docs/srs](docs/srs/README.md).
+All git I/O goes through the engine (`http://127.0.0.1:7733`, gated by a
+bearer token); the UI never runs git itself. Contributor and agent guidance is
+in [AGENTS.md](AGENTS.md), requirements in [docs/srs](docs/srs/README.md),
+and the open plan in [PLAN.md](PLAN.md).
 
-The `powergit` branch is the product. The upstream Git Extensions tree lives
-on `master` as a read-only behavioural reference; check it out beside this
-clone with `git worktree add ../gitextensions-ref master`.
+## PowerGit and Git Extensions
 
-## Releases
+PowerGit is a new frontend, not a rewrite of git. It uses Git Extensions as
+its behavioural reference, but shares no code with it:
 
-Tags trigger CI builds for Windows (portable zip + installer) and Linux
-(AppImage + deb): see the
-[releases page](https://github.com/CynaCons/PowerGit/releases).
+- **The engine** is a small `net10.0` host around the git CLI.
+- **The lane layout** is a TypeScript reimplementation of Git Extensions'
+  `RevisionGraph`, verified against golden fixtures taken from Git
+  Extensions' own tests (`tools/ge-parity/`).
+- **The `powergit` branch** is the product. The upstream WinForms app is kept
+  as a read-only mirror on `master`, as that reference.
 
-### Linux install notes
-
-Download the `.AppImage`, `chmod +x` it and run it; the `.deb` installs the
-same binaries under `/usr`. Both need the distro's WebKitGTK stack
-(`libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`,
-`librsvg2-2`) and `git` on `PATH`.
-
-`powergit <path>` opens that repository; without it the last one reopens — Settings → Behaviour.
-
-## Agent review (MCP)
-
-With PowerGit running, connect Claude Code in one line:
-`claude mcp add powergit -- "C:\Users\<you>\AppData\Local\PowerGit\powergit.exe" mcp`.
-An agent opens a review; you accept or reject each change, comment on lines and send the round back, and the agent revises until you approve. With [PowerChannel](https://github.com/CynaCons/PowerChannel) installed, each review gets a channel where you and the agent talk between rounds.
-Codex, Linux/AppImage, tool schemas, and the Silent / Notify / Wait workflow are documented in [Agent review over MCP](docs/agents/mcp-agent-review.md).
-
-Supported Ubuntu versions: **22.04, 24.04 and 26.04**. Every release
-AppImage is launched in stock containers of all three before it is
-published (`docker/appimage-check/run-matrix.sh`), so a version-skew crash
-like v0.12.3's `libmount.so.1: version MOUNT_2_40 not found` on 26.04 fails
-the release instead of the user. Other distros with WebKitGTK 2.40+ should
-work but are untested. To check an artifact yourself:
-`pwsh scripts/appimage-matrix.ps1 <file.AppImage>` (Docker Desktop required).
+|  | Git Extensions | PowerGit |
+| --- | --- | --- |
+| UI | Windows Forms | React and Material UI in a Tauri shell |
+| Platforms | Windows | Windows and Linux |
+| Install | Installer | Installer, portable zip, AppImage |
+| Agents | None | MCP server: reviews, branch plans, channel |
 
 ## License
 
-GPL-3.0 — PowerGit is a combined work with Git Extensions.
-See [LICENSE.md](LICENSE.md).
+GPL-3.0. PowerGit is a combined work with Git Extensions; see
+[LICENSE.md](LICENSE.md).

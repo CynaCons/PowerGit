@@ -1184,6 +1184,10 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.7. [agent: claude]
 - [ ] Owner ticks: comments drop directly in the Markdown preview.
+- [x] README rewritten around agent integration and the git client. [agent: claude]
+- [x] Landing page redesigned as a git graph, with agent sections. [agent: claude]
+- [x] Showcase screenshots from a sample repo with real reviews and plans. [agent: claude]
+- [ ] Publish the site to Pages and check it live.
 
 ## Backlog
 - Drop leftover 2021 origin branches

@@ -18,12 +18,29 @@ const root = new URL("../..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/
 const assets = `${root}/website/public/assets`
 mkdirSync(assets, { recursive: true })
 
-const vite = spawn("npm", ["run", "dev"], { cwd: `${root}/frontend`, shell: true, stdio: "ignore" })
+// SHOWCASE_PORT + VITE_ENGINE_URL: a private engine (e2e-harness.ps1) whose
+// origins allow that port; the repository is PowerGit's own checkout.
+const port = Number(process.env.SHOWCASE_PORT ?? 1420)
+const engine = process.env.VITE_ENGINE_URL
+if (engine) {
+  const { readOrCreateToken } = await import("./engine-token.mjs")
+  const res = await fetch(`${engine}/repos/open`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${readOrCreateToken()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ path: root }),
+  })
+  if (!res.ok) throw new Error(`open ${root}: http ${res.status}`)
+}
+const vite = spawn("npx", ["--no-install", "vite", "--port", String(port), "--strictPort"], {
+  cwd: `${root}/frontend`,
+  shell: true,
+  stdio: "ignore",
+})
 try {
   let up = false
   for (let i = 0; i < 60 && !up; i++) {
     await new Promise((r) => setTimeout(r, 1000))
-    up = await fetch("http://127.0.0.1:1420")
+    up = await fetch(`http://127.0.0.1:${port}`)
       .then(() => true)
       .catch(() => false)
   }
@@ -41,7 +58,7 @@ try {
       localStorage.setItem("pg.rail", "expanded")
       localStorage.setItem("pg.diffTree", "1")
     }, theme)
-    await page.goto("http://127.0.0.1:1420")
+    await page.goto(`http://127.0.0.1:${port}`)
     await page.waitForSelector('[data-testid="grid-row"]', { timeout: 30000 })
     // Let history settle (eager pages) so the graph is complete.
     await page.waitForTimeout(1500)
