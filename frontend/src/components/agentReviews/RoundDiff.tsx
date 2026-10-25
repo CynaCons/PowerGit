@@ -189,7 +189,10 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
   const hunk: RoundHunk = block.hunk
   const verdict = liveVerdict(p.round, hunk, p.path, p.doc)
   const change = hunk.change
-  const carried = change?.origin === "carried" && verdict === change.verdict && p.round.n > 1
+  // A change that did not move dims only when it was accepted before and still
+  // is (v0.22.8, owner: "they are greyed out on subsequent rounds, but I never
+  // really reviewed them").
+  const carried = change?.origin === "carried" && change.verdict === "accept" && verdict === "accept" && p.round.n > 1
   const focused = change !== null && p.cursor === change.id
   const set = (target: "accept" | "reject") =>
     p.onVerdict(hunk.keys, verdict === target ? undefined : target === "accept" ? "ok" : "rejected")
@@ -200,6 +203,7 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
       data-change={change?.id ?? ""}
       data-verdict={verdict}
       data-origin={change?.origin ?? ""}
+      data-dimmed={carried ? "true" : undefined}
       onMouseDown={() => change && p.onCursor(change.id)}
       sx={{
         border: 1,

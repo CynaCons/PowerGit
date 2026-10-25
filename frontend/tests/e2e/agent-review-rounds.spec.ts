@@ -226,6 +226,53 @@ test.describe("agent review rounds", () => {
     }
   })
 
+  // v0.22.8, owner: "In multi-round reviews, don't grey out chunks which have
+  // not been approved before and which did not change ... they are greyed out
+  // on subsequent rounds, but I never really reviewed them."
+  test("an unchanged change stays bright in round 2 unless it was accepted", async ({ page }) => {
+    test.setTimeout(60_000)
+    const dir = makeRepo("pg-review-carried-")
+    const patch = "@@ -3 +3 @@\n-line 3\n+line 3 changed\n@@ -25 +25 @@\n-line 25\n+line 25 changed\n"
+    try {
+      const repoId = await openInApp(page, dir)
+      const session = await api<{ id: string }>(`/repos/${repoId}/agent-reviews`, {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "wait",
+          title: "Carried changes",
+          agent: "auth-fix",
+          files: [{ path: "t.txt", status: "M", patch }],
+        }),
+      })
+      await page.getByTestId("agent-reviews-button").click()
+      await page
+        .getByTestId("agent-review-row")
+        .filter({ hasText: "Carried changes" })
+        .filter({ hasText: basename(dir) })
+        .click()
+      const accepted = page.getByTestId("round-change").filter({ hasText: "line 3 changed" })
+      const untouched = page.getByTestId("round-change").filter({ hasText: "line 25 changed" })
+      await accepted.getByTestId("verdict-accept").click()
+      await expect(accepted).toHaveAttribute("data-verdict", "accept")
+      await page.getByTestId("round-send").click()
+      await expect(page.getByTestId("round-box")).toHaveAttribute("data-state", "sent")
+
+      // The agent sends both back unchanged.
+      await api(`/repos/${repoId}/agent-reviews/${session.id}/revise`, {
+        method: "POST",
+        body: JSON.stringify({ note: "Same again.", files: [{ path: "t.txt", status: "M", patch }] }),
+      })
+      await expect(page.getByTestId("agent-review-screen")).toHaveAttribute("data-round", "2", { timeout: 15_000 })
+      await expect(accepted).toHaveAttribute("data-origin", "carried")
+      await expect(untouched).toHaveAttribute("data-origin", "carried")
+      await expect(accepted).toHaveAttribute("data-dimmed", "true")
+      await expect(untouched).not.toHaveAttribute("data-dimmed", "true")
+      await expect(untouched).toHaveCSS("opacity", "1")
+    } finally {
+      await removeRepo(dir)
+    }
+  })
+
   test("without powerchannel the column lists the rounds and the round still goes back", async ({ page }) => {
     test.setTimeout(60_000)
     const dir = makeRepo("pg-review-noboard-")

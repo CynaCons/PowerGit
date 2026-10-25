@@ -1177,17 +1177,24 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.6. [agent: claude]
 
-### v0.22.7 — Agent reviews: comments in the Markdown preview (current) (ACTIVE)
+### v0.22.7 — Agent reviews: comments in the Markdown preview
 **Goal:** Owner (2026-10-25): comments are dropped directly in the Markdown preview.
 - [x] Owner's sentence as e2e: comment dropped on the Markdown preview. [agent: claude]
 - [x] Preview in blocks; comment button per block, threads under it. [agent: claude]
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.7. [agent: claude]
-- [ ] Owner ticks: comments drop directly in the Markdown preview.
 - [x] README rewritten around agent integration and the git client. [agent: claude]
 - [x] Landing page redesigned as a git graph, with agent sections. [agent: claude]
 - [x] Showcase screenshots from a sample repo with real reviews and plans. [agent: claude]
-- [ ] Publish the site to Pages and check it live.
+- [x] Publish the site to Pages and check it live. [agent: claude]
+
+### v0.22.8 — Agent reviews: unreviewed carried changes stay bright (current) (ACTIVE)
+**Goal:** Owner (2026-10-25): only changes accepted before are greyed out in later rounds.
+- [x] Owner's sentence as e2e: unreviewed carried change stays bright. [agent: claude]
+- [x] Dim a carried change only when it was accepted before. [agent: claude]
+- [ ] Gate: tsc, lint, unit, review e2e; zip smoke.
+- [ ] Release v0.22.8.
+- [ ] Owner ticks: only accepted unchanged changes are greyed out.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1306,3 +1313,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: the review's top panel resizes. (deferred from v0.22.4)
 - Owner ticks: PRs show on plans and open on click. (deferred from v0.22.5)
 - Owner ticks: Markdown files preview in agent reviews. (deferred from v0.22.6)
+- Owner ticks: comments drop directly in the Markdown preview. (deferred from v0.22.7)
