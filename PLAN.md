@@ -1161,7 +1161,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: tsc, lint, review layout e2e with the drag. [agent: claude]
 - [x] Release v0.22.4. [agent: claude]
 
-### v0.22.5 — Branch plans: pull requests as labels with links, any host (PLANNED) (current) (ACTIVE)
+### v0.22.5 — Branch plans: pull requests as labels with links, any host (PLANNED)
 **Goal:** Owner (2026-10-25): PRs shown on the plan as clickable labels, host-agnostic.
 - [x] Owner's sentence as red e2e: PR labels link out on the plan. [agent: claude]
 - [x] Engine: agents attach PRs to a plan; a pr step; tests. [agent: claude]
@@ -1169,10 +1169,14 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] View: PR chips beside branches, clickable, planned ones dashed. [agent: claude]
 - [x] Gate: engine tests, vitest, lint, plan e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.5. [agent: claude]
-- [ ] Owner ticks: PRs show on plans and open on click.
 
-### v0.22.6 — Agent reviews: Markdown preview switch
+### v0.22.6 — Agent reviews: Markdown preview switch (current) (ACTIVE)
 **Goal:** Owner (2026-10-25): a Markdown file in a review switches to a rendered preview.
+- [x] Owner's sentence as e2e: Markdown file switches to preview. [agent: claude]
+- [x] Changes / Preview switch over Markdown files in reviews. [agent: claude]
+- [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
+- [ ] Release v0.22.6.
+- [ ] Owner ticks: Markdown files preview in agent reviews.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1289,3 +1293,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: the plan's panes resize. (deferred from v0.22.2: open when the plan view moved to v0.22.3; shipped in v0.22.2)
 - Owner ticks: every plan panel resizes. (deferred from v0.22.3: open when the plan view moved to v0.22.4; shipped in v0.22.3)
 - Owner ticks: the review's top panel resizes. (deferred from v0.22.4)
+- Owner ticks: PRs show on plans and open on click. (deferred from v0.22.5)
