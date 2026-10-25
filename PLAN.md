@@ -1170,13 +1170,20 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: engine tests, vitest, lint, plan e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.5. [agent: claude]
 
-### v0.22.6 — Agent reviews: Markdown preview switch (current) (ACTIVE)
+### v0.22.6 — Agent reviews: Markdown preview switch
 **Goal:** Owner (2026-10-25): a Markdown file in a review switches to a rendered preview.
 - [x] Owner's sentence as e2e: Markdown file switches to preview. [agent: claude]
 - [x] Changes / Preview switch over Markdown files in reviews. [agent: claude]
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.6. [agent: claude]
-- [ ] Owner ticks: Markdown files preview in agent reviews.
+
+### v0.22.7 — Agent reviews: comments in the Markdown preview (current) (ACTIVE)
+**Goal:** Owner (2026-10-25): comments are dropped directly in the Markdown preview.
+- [x] Owner's sentence as e2e: comment dropped on the Markdown preview. [agent: claude]
+- [x] Preview in blocks; comment button per block, threads under it. [agent: claude]
+- [ ] Gate: tsc, lint, unit, review e2e; zip smoke.
+- [ ] Release v0.22.7.
+- [ ] Owner ticks: comments drop directly in the Markdown preview.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1294,3 +1301,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: every plan panel resizes. (deferred from v0.22.3: open when the plan view moved to v0.22.4; shipped in v0.22.3)
 - Owner ticks: the review's top panel resizes. (deferred from v0.22.4)
 - Owner ticks: PRs show on plans and open on click. (deferred from v0.22.5)
+- Owner ticks: Markdown files preview in agent reviews. (deferred from v0.22.6)

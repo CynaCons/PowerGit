@@ -40,8 +40,15 @@ export type ThreadActions = {
   dismiss?: () => void
 }
 
-
-export function EditBox({ text, onCancel, onSave }: { text: string; onCancel: () => void; onSave: (text: string) => void }) {
+export function EditBox({
+  text,
+  onCancel,
+  onSave,
+}: {
+  text: string
+  onCancel: () => void
+  onSave: (text: string) => void
+}) {
   const [value, setValue] = useState(text)
   const save = () => value.trim() && onSave(value.trim())
   return (

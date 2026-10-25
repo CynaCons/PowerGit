@@ -18,7 +18,7 @@ import { Chip, VerdictButton } from "./reviewChips"
 import { LineThreads } from "./LineThreads"
 import { hunksOf, liveVerdict, quotedLine, type EarlierThreads, type HunkRow, type RoundHunk } from "./roundModel"
 import { Thread, type CommentKind } from "./RoundThread"
-import { replyProps } from "./threadActions"
+import { lineComments, replyProps } from "./threadActions"
 import type { CommentEdits } from "./useRoundComments"
 import { roundBlocks, sourceFor, type RoundBlock } from "./roundContext"
 import { useRowTokens } from "./useRowTokens"
@@ -135,12 +135,7 @@ export function RoundDiff(props: RoundDiffProps) {
         block.kind === "gap" ? (
           <GapRows key={`gap${block.rows[0].key}`} rows={block.rows} tokens={tokens} {...props} />
         ) : (
-          <HunkCard
-            key={`${block.hunk.oldStart}:${block.hunk.newStart}`}
-            block={block}
-            tokens={tokens}
-            {...props}
-          />
+          <HunkCard key={`${block.hunk.oldStart}:${block.hunk.newStart}`} block={block} tokens={tokens} {...props} />
         ),
       )}
       <EarlierCards {...props} />
@@ -307,10 +302,7 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
 
 function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
   const state = row.kind === "context" ? undefined : p.doc?.files[p.path]?.lines[row.key]
-  const comments = p.doc?.files[p.path]?.comments.filter((c) => c.line === row.key) ?? []
-  const loose = p.threads.filter(
-    (t) => t.round === p.round.n && t.path === p.path && t.line === row.key && !comments.some((c) => c.text === t.body),
-  )
+  const { comments, loose } = lineComments(p, row.key)
   const picked = p.picked?.path === p.path && p.picked.key === row.key
   const bg =
     row.kind === "add"

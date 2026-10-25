@@ -159,11 +159,7 @@ export type EarlierThreads = {
   byFile: Map<string, AgentReviewThread[]>
 }
 
-export function placeThreads(
-  rounds: AgentReviewRound[],
-  threads: AgentReviewThread[],
-  viewed: number,
-): EarlierThreads {
+export function placeThreads(rounds: AgentReviewRound[], threads: AgentReviewThread[], viewed: number): EarlierThreads {
   const out: EarlierThreads = { byChange: new Map(), removed: [], byFile: new Map() }
   const push = <K>(map: Map<K, AgentReviewThread[]>, key: K, t: AgentReviewThread) =>
     map.set(key, [...(map.get(key) ?? []), t])

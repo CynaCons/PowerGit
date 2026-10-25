@@ -93,6 +93,7 @@ export function ReviewScreen({
   const replyOff = !open ? null : board.available && session.board ? null : "Replies need powerchannel."
   const counts = roundCounts(round, doc, threads)
   const markdown = isMarkdown(filePath) && round.files.some((f) => f.path === filePath)
+  const FileView = markdown && mdPreview ? MarkdownPreview : RoundDiff
   const previous = session.rounds?.find((r) => r.n === round.n - 1)?.changes ?? []
   // v0.21.8: the bottom diff's options; whitespace stays as captured.
   const diffView = useReviewDiff()
@@ -332,35 +333,31 @@ export function ReviewScreen({
             sx={{ flex: 1, minWidth: 0, overflow: "auto", p: 1.25, pb: 6, display: "flex", flexDirection: "column" }}
           >
             {markdown && <MarkdownSwitch preview={mdPreview} onPreview={setMdPreview} />}
-            {markdown && mdPreview ? (
-              <MarkdownPreview round={round} path={filePath} sourceText={source.text} settled={source.settled} />
-            ) : (
-              <RoundDiff
-                round={round}
-                path={filePath}
-                doc={doc}
-                threads={threads}
-                editable={editable}
-                canAsk={canAsk}
-                previous={previous}
-                cursor={cursor}
-                picked={picked}
-                onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
-                onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
-                onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
-                onComment={comments.add}
-                edits={comments.edits}
-                rounds={session.rounds ?? []}
-                earlier={earlier}
-                onReply={open && !replyOff ? comments.reply : undefined}
-                replyOff={replyOff}
-                onCursor={setCursor}
-                options={diffView.options}
-                wrap={diffView.wrap}
-                sourceText={source.text}
-                sourceSettled={source.settled}
-              />
-            )}
+            <FileView
+              round={round}
+              path={filePath}
+              doc={doc}
+              threads={threads}
+              editable={editable}
+              canAsk={canAsk}
+              previous={previous}
+              cursor={cursor}
+              picked={picked}
+              onPick={(lineKey) => setPicked(lineKey ? { path: filePath, key: lineKey } : null)}
+              onVerdict={(keys, state) => setVerdict(filePath, keys, state)}
+              onMark={(lineKey, state) => setVerdict(filePath, [lineKey], state)}
+              onComment={comments.add}
+              edits={comments.edits}
+              rounds={session.rounds ?? []}
+              earlier={earlier}
+              onReply={open && !replyOff ? comments.reply : undefined}
+              replyOff={replyOff}
+              onCursor={setCursor}
+              options={diffView.options}
+              wrap={diffView.wrap}
+              sourceText={source.text}
+              sourceSettled={source.settled}
+            />
             {editable && !(markdown && mdPreview) && (
               <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}>
                 A accept · R reject · C comment · J / K next / previous change · a click on a line number comments on

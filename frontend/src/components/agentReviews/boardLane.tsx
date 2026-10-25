@@ -126,7 +126,8 @@ export function EventNode({ kind }: { kind: EventKind }) {
         height: 10,
         borderRadius: "2px",
         border: 2,
-        borderColor: kind === "approved" ? "var(--pg-review-accept)" : kind === "opened" ? "text.secondary" : EVENT_FILL[kind],
+        borderColor:
+          kind === "approved" ? "var(--pg-review-accept)" : kind === "opened" ? "text.secondary" : EVENT_FILL[kind],
         bgcolor: EVENT_FILL[kind],
         boxShadow: ring,
       }}

@@ -6,8 +6,7 @@
 import type { AgentReviewEverywhereItem } from "../../engine"
 
 export type ReviewOpenPlan =
-  | { action: "open"; sessionId: string }
-  | { action: "switch"; root: string; sessionId: string }
+  { action: "open"; sessionId: string } | { action: "switch"; root: string; sessionId: string }
 
 export function reviewOpenPlan(
   item: Pick<AgentReviewEverywhereItem, "repo"> & { session: { id: string } },

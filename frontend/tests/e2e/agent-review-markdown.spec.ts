@@ -79,4 +79,50 @@ test.describe("agent review markdown preview", () => {
     await expect(page.getByTestId("round-diff")).toHaveAttribute("data-path", "notes.txt")
     await expect(page.getByTestId("md-view-preview")).toHaveCount(0)
   })
+
+  // v0.22.7, owner: "when I am reviewing markdowns, give me the ability to
+  // drop a comment directly in the markdown". A comment on a block of the
+  // preview is a comment on its first line: the Changes view shows it there.
+  test("a comment dropped on the preview shows under its block and on its line", async ({ page }) => {
+    test.setTimeout(90_000)
+    const dir = makeRepo("pg-review-markdown-comment-")
+    write(dir, "README.md", "# Guide\n\nIntro text.\n")
+    commit(dir, "start")
+    write(dir, "README.md", "# Guide\n\nIntro text.\n\n## Install\n\n- Run **setup**\n- Open the app\n")
+    const { id } = await api<{ id: string }>("/repos/open", { method: "POST", body: JSON.stringify({ path: dir }) })
+    await api(`/repos/${id}/agent-reviews`, {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "wait",
+        title: "Docs comments",
+        agent: "docs-test",
+        worktree: true,
+        files: [{ path: "README.md", status: "M" }],
+      }),
+    })
+    await page.goto(`/?repo=${id}`)
+    await page.getByTestId("agent-reviews-button").click()
+    await page
+      .getByTestId("agent-review-row")
+      .filter({ hasText: "Docs comments" })
+      .filter({ hasText: basename(dir) })
+      .click()
+    await page.getByTestId("md-view-preview").click()
+
+    // Line 7 is the list: its block's button opens the draft.
+    const list = page.locator('[data-testid="md-block"][data-line="7"]')
+    await expect(list.locator("li")).toHaveCount(2)
+    await list.hover()
+    await list.getByTestId("md-comment").click()
+    await expect(list).toContainText("Comment on line 7")
+    await page.getByTestId("comment-draft").fill("Say which setup.")
+    await page.getByTestId("comment-add").click()
+    await expect(list.getByTestId("thread-body")).toHaveText("Say which setup.")
+    await expect(page.getByTestId("round-box")).toContainText("1 comment")
+
+    // The same comment on line 7 of the changes.
+    await page.getByTestId("md-view-changes").click()
+    await expect(page.getByTestId("round-diff").getByTestId("thread-body")).toHaveText("Say which setup.")
+    await expect(page.locator('[data-testid="round-line"][data-key="+7"]')).toBeVisible()
+  })
 })

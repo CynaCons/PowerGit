@@ -100,7 +100,10 @@ export function RoundBox({
     return (
       <Message state="closed">
         <Typography sx={text}>
-          <Box component="strong" sx={{ color: session.status === "approved" ? "var(--pg-review-accept)" : "text.primary" }}>
+          <Box
+            component="strong"
+            sx={{ color: session.status === "approved" ? "var(--pg-review-accept)" : "text.primary" }}
+          >
             {session.status === "approved"
               ? "Approved."
               : session.status === "cancelled"
@@ -151,11 +154,15 @@ export function RoundBox({
         </Button>
       </Box>
       <Meter counts={counts} />
-      <Box sx={{ display: "flex", flexWrap: "wrap", columnGap: 1.25, rowGap: 0.25, fontSize: 12, color: "text.secondary" }}>
+      <Box
+        sx={{ display: "flex", flexWrap: "wrap", columnGap: 1.25, rowGap: 0.25, fontSize: 12, color: "text.secondary" }}
+      >
         <Count n={counts.accept} label="accepted" color="var(--pg-review-accept)" />
         <Count n={counts.reject} label="rejected" color="var(--pg-review-rejected)" />
         {counts.mixed > 0 && <Count n={counts.mixed} label="mixed" color="var(--pg-review-todo)" />}
-        {counts.undecided > 0 && <Count n={counts.undecided} label="undecided" color="var(--pg-review-todo-stripe, #d99a2b)" />}
+        {counts.undecided > 0 && (
+          <Count n={counts.undecided} label="undecided" color="var(--pg-review-todo-stripe, #d99a2b)" />
+        )}
         <Count n={counts.comments} label={counts.comments === 1 ? "comment" : "comments"} />
       </Box>
       <Box

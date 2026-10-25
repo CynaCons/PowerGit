@@ -32,3 +32,12 @@ export function replyProps(p: RoundDiffProps, thread: AgentReviewThread | null) 
     ? { onReply: (body: string) => onReply(thread, body) }
     : { onReply: null, replyOff: p.replyOff ?? null }
 }
+
+/** The owner's comments on a line from the review file, and the questions whose file comment is gone. */
+export function lineComments(p: RoundDiffProps, line: string) {
+  const comments = p.doc?.files[p.path]?.comments.filter((c) => c.line === line) ?? []
+  const loose = p.threads.filter(
+    (t) => t.round === p.round.n && t.path === p.path && t.line === line && !comments.some((c) => c.text === t.body),
+  )
+  return { comments, loose }
+}

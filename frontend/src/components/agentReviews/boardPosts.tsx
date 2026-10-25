@@ -96,7 +96,12 @@ function PostGroup({
       <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, minHeight: 22, minWidth: 0 }}>
         <Typography
           noWrap
-          sx={{ fontWeight: 600, fontSize: 12.5, color: human ? "text.primary" : "var(--pg-agent)", lineHeight: "22px" }}
+          sx={{
+            fontWeight: 600,
+            fontSize: 12.5,
+            color: human ? "text.primary" : "var(--pg-agent)",
+            lineHeight: "22px",
+          }}
         >
           {human ? "You" : first.author}
         </Typography>

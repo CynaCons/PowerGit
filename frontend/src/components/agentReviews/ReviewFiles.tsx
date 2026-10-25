@@ -29,9 +29,7 @@ export function ReviewFiles({
   const setPath = onPick
   return (
     <>
-    <Typography sx={{ fontSize: 12, color: "text.secondary", px: 1.25, py: 1 }}>
-        Files · round {round.n}
-      </Typography>
+      <Typography sx={{ fontSize: 12, color: "text.secondary", px: 1.25, py: 1 }}>Files · round {round.n}</Typography>
       {round.files.map((f) => {
         const hunks = hunksOf(
           f.patch,
