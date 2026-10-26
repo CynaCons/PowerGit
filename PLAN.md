@@ -1203,7 +1203,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Inbox: dismiss a review; a Dismissed filter. [agent: claude]
 - [x] Board: round summaries fold behind Show n lines. [agent: claude]
 - [x] Gate: engine tests, unit, lint, review e2e; zip smoke. [agent: claude]
-- [ ] Release v0.22.9.
+- [x] Release v0.22.9. [agent: claude]
 - [ ] Owner ticks: reviews dismiss and the board reads clean.
 
 ## Backlog
