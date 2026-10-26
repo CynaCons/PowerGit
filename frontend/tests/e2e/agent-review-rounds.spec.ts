@@ -169,7 +169,13 @@ test.describe("agent review rounds", () => {
       await page.getByTestId("round-send").click()
       await expect(page.getByTestId("round-box")).toHaveAttribute("data-state", "sent")
       await expect(page.getByTestId("agent-review-turn")).toContainText("round 1 sent · agent revising")
-      await expect(page.getByTestId("board-post").filter({ hasText: "Round 1 sent" })).toContainText("✗ h2")
+      // v0.22.9, owner: the per-file dump "is really polluting the chat". The
+      // round's verdict lines stay folded until asked for.
+      const sentPost = page.getByTestId("board-post").filter({ hasText: "Round 1 sent" })
+      await expect(sentPost).toContainText("1 accepted, 1 rejected")
+      await expect(sentPost).not.toContainText("✗ h2")
+      await sentPost.getByTestId("board-details-toggle").click()
+      await expect(sentPost).toContainText("✗ h2")
 
       // The agent restores line 25 its own way and opens round 2.
       write(

@@ -3,8 +3,10 @@ import Button from "@mui/material/Button"
 import IconButton from "@mui/material/IconButton"
 import RefreshIcon from "@mui/icons-material/Refresh"
 import CloseIcon from "@mui/icons-material/Close"
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined"
 import Typography from "@mui/material/Typography"
 import { useState } from "react"
+import { describeThrown } from "../../engine"
 import type { AgentReviewEverywhereItem } from "../../engine"
 import { paneSx, deskGap } from "../../theme/panels"
 import { ageOf } from "./agentReviewModel"
@@ -17,12 +19,15 @@ import { filterReviews, onBoard, turnLabel, waitingForYou, type InboxFilter } fr
 // age. The filter starts on what waits for the owner. Since v0.21.10 the
 // inbox holds every open repository's reviews, and each row names the
 // repository it lives in (`data-testid="agent-review-repo"`, plain words).
+// v0.22.9: a row is dismissed from its right end; a pending review is then
+// cancelled. Dismissed reviews have their own filter.
 
 export function AgentReviewInbox({
   sessions,
   openError,
   onOpen,
   onDismissError,
+  onDismiss,
   onRefresh,
   onClose,
 }: {
@@ -30,6 +35,7 @@ export function AgentReviewInbox({
   openError: string | null
   onOpen: (item: AgentReviewEverywhereItem) => void
   onDismissError?: () => void
+  onDismiss?: (item: AgentReviewEverywhereItem) => Promise<void>
   onRefresh: () => void
   onClose: () => void
 }) {
@@ -39,6 +45,11 @@ export function AgentReviewInbox({
   // The engine orders the rows newest first; the filter only drops some.
   const keptIds = new Set(filterReviews(summaries, filter).map((s) => s.id))
   const shown = sessions.filter((i) => keptIds.has(i.session.id))
+  const [dismissError, setDismissError] = useState<string | null>(null)
+  const dismiss = (item: AgentReviewEverywhereItem) => {
+    setDismissError(null)
+    onDismiss?.(item).catch((e) => setDismissError(describeThrown(e)))
+  }
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: deskGap }}>
       <Box sx={{ ...paneSx, px: 1.5, py: 1, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
@@ -50,6 +61,7 @@ export function AgentReviewInbox({
             ["waiting", "Waiting for you"],
             ["open", "Open"],
             ["all", "All"],
+            ["dismissed", "Dismissed"],
           ] as const
         ).map(([value, label]) => (
           <Button
@@ -70,6 +82,11 @@ export function AgentReviewInbox({
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
+      {dismissError && (
+        <Box data-testid="agent-review-dismiss-error" sx={{ ...paneSx, px: 1.5, py: 1 }}>
+          <Typography sx={{ fontSize: 12, color: "error.main" }}>Could not dismiss: {dismissError}</Typography>
+        </Box>
+      )}
       {openError && (
         <Box
           data-testid="agent-review-open-error"
@@ -93,7 +110,9 @@ export function AgentReviewInbox({
               ? "No agent reviews. An agent opens one with agent_review_open over powergit mcp."
               : filter === "waiting"
                 ? "Nothing waits for you."
-                : "No open reviews."}
+                : filter === "dismissed"
+                  ? "No dismissed reviews."
+                  : "No open reviews."}
           </Typography>
         )}
         {shown.map((item) => {
@@ -103,12 +122,20 @@ export function AgentReviewInbox({
           return (
             <Box
               key={s.id}
-              component="button"
+              role="button"
+              tabIndex={0}
               data-testid="agent-review-row"
               data-status={s.status}
               data-mode={s.mode}
               data-turn={s.turn ?? ""}
+              data-dismissed={s.closedAt ? "true" : undefined}
               onClick={() => onOpen(item)}
+              onKeyDown={(e) => {
+                if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault()
+                  onOpen(item)
+                }
+              }}
               sx={{
                 width: "100%",
                 border: 0,
@@ -120,11 +147,12 @@ export function AgentReviewInbox({
                 px: 1.5,
                 py: 1,
                 display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 150px 200px 80px",
+                gridTemplateColumns: "minmax(0, 1fr) 150px 200px 80px 32px",
                 gap: 1.5,
                 alignItems: "center",
                 cursor: "pointer",
                 "&:hover": { bgcolor: "action.hover" },
+                "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 },
               }}
             >
               <Box sx={{ minWidth: 0 }}>
@@ -190,6 +218,22 @@ export function AgentReviewInbox({
               <Typography sx={{ fontSize: 12, color: "text.secondary", textAlign: "right" }}>
                 {ageOf(s.updatedAt)}
               </Typography>
+              {onDismiss && !s.closedAt ? (
+                <IconButton
+                  size="small"
+                  data-testid="agent-review-dismiss"
+                  title={s.status === "pending" ? "Cancel and dismiss" : "Dismiss"}
+                  aria-label={s.status === "pending" ? `Cancel and dismiss ${s.title}` : `Dismiss ${s.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    dismiss(item)
+                  }}
+                >
+                  <ArchiveOutlinedIcon fontSize="small" />
+                </IconButton>
+              ) : (
+                <span />
+              )}
             </Box>
           )
         })}

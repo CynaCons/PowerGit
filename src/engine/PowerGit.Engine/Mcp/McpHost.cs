@@ -222,6 +222,7 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
                 "agent_review_get" => _tools.Get(args, _stopping.Token),
                 "agent_review_list" => _tools.List(args),
                 "agent_review_cancel" => _tools.Cancel(args, _stopping.Token),
+                "agent_review_close" => _tools.Close(args, _stopping.Token),
                 "agent_review_revise" => _tools.Revise(args, _stopping.Token),
                 "agent_review_comment" => _tools.Comment(args),
                 "branch_plan_preview" => _tools.PlanPreview(args),
@@ -254,9 +255,10 @@ public sealed class McpHost(RepoRegistry registry, string endpoint, string engin
         Tool("branch_plan_wait", "Wait until the owner sends the plan back, approves or cancels it; never auto-approves. Returns the steps with their checks and the comments (with step numbers).", ["repo_path", "plan_id"], new { repo_path = S(), plan_id = S(), timeout_ms = I() }),
         Tool("branch_plan_get", "Get a branch plan: its steps with checks and done flags (once approved, as the refs show them run), the refs that moved since it was checked, and the comments.", ["repo_path", "plan_id"], new { repo_path = S(), plan_id = S() }),
         Tool("branch_plan_revise", "Open the plan's next round: new steps (or the same ones checked again), a reply per comment answered, explanations, prs (replaces the list).", ["repo_path", "plan_id"], new { repo_path = S(), plan_id = S(), note = S(), steps = new { type = "array", items = new { type = "object" } }, replies = new { type = "array", items = new { type = "object" } }, explanations = new { type = "array", items = new { type = "object" } }, prs = new { type = "array", items = new { type = "object" } } }),
-        Tool("branch_plan_cancel", "Cancel a pending branch plan.", ["repo_path", "plan_id"], new { repo_path = S(), plan_id = S(), reason = S() }),
+        Tool("branch_plan_cancel", "Cancel a pending branch plan; on a finished one it closes it, keeping its outcome.", ["repo_path", "plan_id"], new { repo_path = S(), plan_id = S(), reason = S() }),
         Tool("branch_plan_pr", "Add or update a pull request on a pending or approved plan, one per branch, on any host: branch (its source branch), id (free text: \"#42\", \"PR-17\", \"!9\"), title, url (http or https; the owner opens it from the plan), state (free text: open, merged, declined ...), into. Call it after you open a PR for a pr step: the step then counts as run.", ["repo_path", "plan_id", "branch"], new { repo_path = S(), plan_id = S(), branch = S(), id = S(), title = S(), url = S(), state = S(), into = S() }),
-        Tool("agent_review_cancel", "Cancel a pending agent review.", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), reason = S() }),
+        Tool("agent_review_cancel", "Cancel a pending agent review. On a review that is already approved, cancelled or expired it closes it instead (see agent_review_close).", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), reason = S() }),
+        Tool("agent_review_close", "Close an agent review in any state once you are done with it: a pending one is cancelled, a finished one keeps its outcome (approved stays approved). Closed reviews leave the owner's inbox lists. Also closes branch plans (plan_id as review_id).", ["repo_path", "review_id"], new { repo_path = S(), review_id = S(), reason = S() }),
     ];
     private static object Tool(string name, string description, string[] required, object properties) => new { name, description, inputSchema = new { type = "object", properties, required } };
     private static object S() => new { type = "string" }; private static object B() => new { type = "boolean" }; private static object I() => new { type = "integer" };

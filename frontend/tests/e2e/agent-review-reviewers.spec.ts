@@ -101,6 +101,7 @@ test.describe("agent review with a reviewer agent", () => {
       await page.getByTestId("round-send").click()
       await expect(page.getByTestId("round-box")).toHaveAttribute("data-state", "sent")
       const sent = page.getByTestId("board-post").filter({ hasText: "Round 1 sent" })
+      await sent.getByTestId("board-details-toggle").click()
       await expect(sent).toContainText("Guard the null case.")
       await expect(sent).toContainText("codex-review")
       await expect(sent).not.toContainText("Typo here.")

@@ -84,6 +84,12 @@ export const agentReviewBoard = (engine: EngineClient, id: string, after: number
 
 export const postAgentReviewBoard = (engine: EngineClient, id: string, text: string) =>
   engine.request(`${root(engine)}/${encodeURIComponent(id)}/board`, post({ text })).then(json<BoardMessage>)
+/** v0.22.9: close a review from the cross-repository inbox; a pending one is cancelled. */
+export const closeAgentReviewAnywhere = (engine: EngineClient, repoId: string, id: string) =>
+  engine
+    .request(`/agent-reviews/${encodeURIComponent(repoId)}/${encodeURIComponent(id)}/close`, post({}))
+    .then(json<AgentReview>)
+
 export const resolveAgentReview = (
   engine: EngineClient,
   id: string,

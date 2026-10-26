@@ -160,6 +160,22 @@ app.MapGet("/agent-reviews", (RepoRegistry repos) =>
     return Results.Ok(GitHost.ListAgentReviewsEverywhere(roots));
 });
 
+// v0.22.9: close a review from the cross-repository inbox. The repository
+// is one of the inbox's roots; a pending review is cancelled, a finished one
+// keeps its outcome. A repository that is not open gets a host of its own for
+// the call, so /repos/current and the recents do not move.
+app.MapPost("/agent-reviews/{repoId}/{sid}/close", (string repoId, string sid, RepoRegistry repos) =>
+{
+    string? root = AgentReviewRepos.List()
+        .Concat(repos.List().Select(r => r.Root))
+        .Concat(RecentsStore.List().Select(r => r.Root))
+        .FirstOrDefault(r => { try { return GitHost.IdFor(Path.GetFullPath(r)) == repoId; } catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return false; } });
+    if (root is null) return Results.Json(new ErrorResponse("repository not found"), statusCode: StatusCodes.Status404NotFound);
+    GitHost git = repos.Get(repoId) ?? new GitHost();
+    if (git.Current is null) git.Open(root);
+    return AgentReviewCall(() => git.ResolveAgentReview(sid, new("close", null, "owner")));
+});
+
 // The recents as repositories with their worktrees (v0.20.10, the start
 // pane's repository cards): one `git worktree list` per repository.
 app.MapGet("/repos/workspaces", async (Workspaces workspaces, HttpContext ctx) =>

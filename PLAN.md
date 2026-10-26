@@ -1188,14 +1188,23 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Showcase screenshots from a sample repo with real reviews and plans. [agent: claude]
 - [x] Publish the site to Pages and check it live. [agent: claude]
 
-### v0.22.8 — Agent reviews: unreviewed carried changes stay bright (current) (ACTIVE)
+### v0.22.8 — Agent reviews: unreviewed carried changes stay bright
 **Goal:** Owner (2026-10-25): only changes accepted before are greyed out in later rounds.
 - [x] Owner's sentence as e2e: unreviewed carried change stays bright. [agent: claude]
 - [x] Dim a carried change only when it was accepted before. [agent: claude]
 - [x] Gate: tsc, lint, unit, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.8. [agent: claude]
-- [ ] Owner ticks: only accepted unchanged changes are greyed out.
 - [x] Accept all at the top of a file with several changes. [agent: claude]
+
+### v0.22.9 — Agent reviews: close any review; a quieter board (current) (ACTIVE)
+**Goal:** Owner (2026-10-26): reviews close or dismiss in any state; round summaries fold.
+- [x] Owner's sentences as e2e: close an approved review; folded round post. [agent: claude]
+- [x] Engine and MCP: close a review in any state; agent_review_close. [agent: claude]
+- [x] Inbox: dismiss a review; a Dismissed filter. [agent: claude]
+- [x] Board: round summaries fold behind Show n lines. [agent: claude]
+- [ ] Gate: engine tests, unit, lint, review e2e; zip smoke.
+- [ ] Release v0.22.9.
+- [ ] Owner ticks: reviews dismiss and the board reads clean.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1315,3 +1324,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: PRs show on plans and open on click. (deferred from v0.22.5)
 - Owner ticks: Markdown files preview in agent reviews. (deferred from v0.22.6)
 - Owner ticks: comments drop directly in the Markdown preview. (deferred from v0.22.7)
+- Owner ticks: only accepted unchanged changes are greyed out. (deferred from v0.22.8)

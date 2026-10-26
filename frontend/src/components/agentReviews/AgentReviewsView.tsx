@@ -2,6 +2,7 @@ import Box from "@mui/material/Box"
 import Paper from "@mui/material/Paper"
 import Typography from "@mui/material/Typography"
 import type { EngineClient } from "../../engine"
+import { closeAgentReviewAnywhere } from "../../engine/agentReviews"
 import { useAgentReviewSession } from "../../hooks/useAgentReviewSession"
 import type { AgentReviewsInbox } from "../../hooks/useAgentReviewsChrome"
 import { paneSx } from "../../theme/panels"
@@ -38,6 +39,10 @@ export function AgentReviewsView({
           openError={inbox.openError}
           onOpen={(item) => inbox.openReview(item)}
           onDismissError={inbox.clearError}
+          onDismiss={async (item) => {
+            await closeAgentReviewAnywhere(engine, item.repo.id, item.session.id)
+            await refresh()
+          }}
           onRefresh={() => void refresh()}
           onClose={onClose}
         />

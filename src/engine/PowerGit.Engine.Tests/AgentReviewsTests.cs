@@ -56,6 +56,27 @@ public sealed class AgentReviewsTests : IClassFixture<WebApplicationFactory<Prog
         Assert.DoesNotContain(host.ListAgentReviews().Sessions, s => s.Id == notify.Id && s.Unread);
     }
 
+    // v0.22.9, owner: an agent "cannot close an approved review. It refuses with not pending."
+    [Fact]
+    public void A_review_closes_in_any_state_and_a_finished_one_keeps_its_outcome()
+    {
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        AgentReviewDto approved = host.CreateAgentReview(Request());
+        host.ResolveAgentReview(approved.Id, new("approve", null, null));
+        AgentReviewDto closed = host.ResolveAgentReview(approved.Id, new("cancel", null, "agent"));
+        Assert.Equal("approved", closed.Status);
+        Assert.NotNull(closed.ClosedAt);
+        Assert.Equal(closed.ClosedAt, host.ResolveAgentReview(approved.Id, new("close", null, null)).ClosedAt);
+
+        AgentReviewDto pending = host.CreateAgentReview(Request("notify"));
+        Assert.True(host.ListAgentReviews().Badge > 0);
+        AgentReviewDto gone = host.ResolveAgentReview(pending.Id, new("close", null, "agent"));
+        Assert.Equal(("cancelled", "agent"), (gone.Status, gone.Reason));
+        Assert.NotNull(gone.ClosedAt);
+        Assert.Equal(0, host.ListAgentReviews().Badge);
+        Assert.All(host.ListAgentReviews().Sessions, s => Assert.NotNull(s.ClosedAt));
+    }
+
     [Fact]
     public async Task Wait_wakes_on_resolve_and_timeout_never_approves()
     {

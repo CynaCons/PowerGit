@@ -138,7 +138,7 @@ works the same way, with `powergit mcp` as the command.
 
 | Tools | What the agent does with them |
 | --- | --- |
-| `agent_review_open`, `agent_review_wait`, `agent_review_get`, `agent_review_revise`, `agent_review_list`, `agent_review_cancel` | Open a review of its changes, wait for your verdicts, read your comments, open the next round |
+| `agent_review_open`, `agent_review_wait`, `agent_review_get`, `agent_review_revise`, `agent_review_list`, `agent_review_cancel`, `agent_review_close` | Open a review of its changes, wait for your verdicts, read your comments, open the next round, close it when done |
 | `agent_review_comment` | Review beside you as a second agent |
 | `branch_plan_preview`, `branch_plan_open`, `branch_plan_wait`, `branch_plan_get`, `branch_plan_revise`, `branch_plan_cancel` | Check a plan without opening it, open it for you, see each step's check and whether it ran |
 | `branch_plan_pr` | Attach a pull request from any host to a branch of the plan |

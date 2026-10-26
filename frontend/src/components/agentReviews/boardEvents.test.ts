@@ -21,6 +21,19 @@ describe("board events", () => {
     expect(e.markdown).toBe("one thing")
   })
 
+  it("puts listed comments and explanations among the folded extra lines", () => {
+    const sent = parsePowerGitEvent(
+      "Round 2 sent · review abcd · 3 accepted, 0 rejected, 0 undecided, 1 comment\n  c4  f.txt:9  rename it\n✓ h1 h2 h3",
+    )
+    expect(sent.extra).toEqual(["c4  f.txt:9  rename it"])
+    expect(sent.markdown).toBe("")
+    const opened = parsePowerGitEvent(
+      "Round 2 opened · review abcd · 1 unchanged, 1 revised, 0 new, 0 removed\nFixed it.\nc2 answered: done\nc5 explains f.txt:3: why",
+    )
+    expect(opened.markdown).toBe("Fixed it.")
+    expect(opened.extra).toEqual(["c2 answered: done", "c5 explains f.txt:3: why"])
+  })
+
   it("knows approvals and leaves other posts alone", () => {
     expect(eventKind("Approved · review abcd · round 2 · 1 of 2 changes accepted")).toBe("approved")
     expect(eventKind("Round about things")).toBeNull()

@@ -4,8 +4,12 @@
 // the verdict lines as a compact list in the review's verdict colours
 // (RoundDiff.tsx: ✗ rejected, ~ mixed, ? undecided, ✓ accepted) with their
 // indented lines nested. The "details:" line is for the agent and stays off.
+// v0.22.9: the verdict lines and the event's extra lines are folded behind
+// "Show n lines", so the owner's and the agent's own posts stay easy to find.
 import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
+import { useState } from "react"
 import { Markdown } from "../Markdown"
 import { parsePowerGitEvent } from "./boardEvents"
 
@@ -18,6 +22,8 @@ const MARK_COLOR: Record<string, string> = {
 
 export function PowerGitEventView({ text, at }: { text: string; at?: string }) {
   const event = parsePowerGitEvent(text)
+  const [open, setOpen] = useState(false)
+  const folded = event.verdicts.reduce((n, v) => n + 1 + v.children.length, 0) + event.extra.length
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }}>
       <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, minWidth: 0 }}>
@@ -44,7 +50,32 @@ export function PowerGitEventView({ text, at }: { text: string; at?: string }) {
           <Markdown text={event.markdown} fold />
         </Box>
       )}
-      {event.verdicts.length > 0 && (
+      {folded > 0 && (
+        <Button
+          size="small"
+          data-testid="board-details-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          sx={{ alignSelf: "flex-start", textTransform: "none", fontSize: 12, py: 0, px: 0.5, minWidth: 0 }}
+        >
+          {open ? "Hide details" : `Show ${folded} line${folded === 1 ? "" : "s"}`}
+        </Button>
+      )}
+      {open && event.extra.length > 0 && (
+        <Box
+          data-testid="board-extra"
+          sx={{
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: "text.secondary",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {event.extra.join("\n")}
+        </Box>
+      )}
+      {open && event.verdicts.length > 0 && (
         <Box
           component="ul"
           data-testid="board-verdicts"

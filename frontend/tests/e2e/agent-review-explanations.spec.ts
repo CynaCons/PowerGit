@@ -140,6 +140,7 @@ test.describe("agent review explanations", () => {
       await expect(page.getByTestId("round-box")).toHaveAttribute("data-state", "sent")
       const sent = page.getByTestId("board-post").filter({ hasText: "Round 1 sent" })
       await expect(sent).toContainText("0 comments")
+      if (await sent.getByTestId("board-details-toggle").count()) await sent.getByTestId("board-details-toggle").click()
       await expect(sent).not.toContainText("callers stop repeating it")
 
       // Round 2 brings a new explanation; round 1's conversation stays.

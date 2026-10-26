@@ -140,7 +140,7 @@ public sealed partial class GitHost
         AgentReviewSummaryDto[] summaries = [.. sessions.Select(ToSummary)];
         WithLastReads(summaries, sessions, boardPath ?? PowerChannel.DefaultPath());
         // A Wait review counts while it is the owner's turn; a Notify one while unread.
-        int badge = sessions.Count(s => (s.Mode == "wait" && s.Status == "pending" && TurnOf(s) != "agent") || (s.Mode == "notify" && s.Unread && s.Status == "pending"));
+        int badge = sessions.Count(s => s.ClosedAt is null && ((s.Mode == "wait" && s.Status == "pending" && TurnOf(s) != "agent") || (s.Mode == "notify" && s.Unread && s.Status == "pending")));
         return new AgentReviewListDto(summaries, badge);
     }
 
@@ -206,8 +206,17 @@ public sealed partial class GitHost
         string now = Timestamp();
         AgentReviewDto updated;
         if (action == "ack") updated = current with { Unread = false, UpdatedAt = now };
+        else if (action is ("close" or "cancel") && current.Status != "pending")
+        {
+            // v0.22.9, owner: an agent "cannot close an approved review. It
+            // refuses with not pending." A finished review is closed instead:
+            // it keeps its outcome and leaves the inbox's lists.
+            updated = current with { ClosedAt = current.ClosedAt ?? now, Unread = false, UpdatedAt = now };
+        }
         else
         {
+            bool close = action == "close";
+            if (close) action = "cancel";
             if (action is not ("approve" or "request_changes" or "cancel" or "expire"))
                 throw new InvalidOperationException("unknown agent review action");
             if (current.Status != "pending") throw new AgentReviewStateException("agent review session is not pending");
@@ -225,12 +234,12 @@ public sealed partial class GitHost
             {
                 "approve" => current with { Status = "approved", UpdatedAt = now, ResolvedAt = now, Resolution = new(req.Summary, []) },
                 "request_changes" => current with { Status = "changes_requested", UpdatedAt = now, ResolvedAt = now, Resolution = new(req.Summary, ReadReviewComments(id)) },
-                "cancel" => current with { Status = "cancelled", UpdatedAt = now, ResolvedAt = now, Reason = req.Reason ?? "owner" },
+                "cancel" => current with { Status = "cancelled", UpdatedAt = now, ResolvedAt = now, Reason = req.Reason ?? "owner", ClosedAt = close ? now : null },
                 _ => current with { Status = "expired", UpdatedAt = now, ResolvedAt = now, Reason = req.Reason ?? "host_gone" },
             };
         }
         WriteAgentReview(updated);
-        if (updated.Status != "pending") AfterClosed(updated);
+        if (updated.Status != "pending" && current.Status == "pending") AfterClosed(updated);
         return updated;
     }
 
@@ -368,7 +377,7 @@ public sealed partial class GitHost
     // v0.22.0: a branch plan counts its steps where a review counts files.
     private static AgentReviewSummaryDto ToSummary(AgentReviewDto s) =>
         new(s.Id, s.Mode, s.Title, s.Agent, s.Branch, s.Kind == "plan" ? LatestRound(s)?.Plan?.Steps.Count ?? 0 : s.Files.Count,
-            s.Status, s.Unread, s.CreatedAt, s.UpdatedAt, LatestRound(s)?.N ?? 1, TurnOf(s), s.Board, Kind: s.Kind);
+            s.Status, s.Unread, s.CreatedAt, s.UpdatedAt, LatestRound(s)?.N ?? 1, TurnOf(s), s.Board, Kind: s.Kind, ClosedAt: s.ClosedAt);
 }
 
 public sealed class AgentReviewStateException(string message) : InvalidOperationException(message);

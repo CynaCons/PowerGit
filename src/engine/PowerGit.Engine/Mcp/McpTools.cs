@@ -4,7 +4,7 @@ namespace PowerGit.Engine.Mcp;
 
 public sealed class McpTools(RepoRegistry registry)
 {
-    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_revise", "agent_review_comment",
+    public static readonly string[] Names = ["agent_review_open", "agent_review_wait", "agent_review_get", "agent_review_list", "agent_review_cancel", "agent_review_close", "agent_review_revise", "agent_review_comment",
         "branch_plan_preview", "branch_plan_open", "branch_plan_wait", "branch_plan_get", "branch_plan_revise", "branch_plan_cancel", "branch_plan_pr"];
 
     private static readonly JsonSerializerOptions StepJson = new(JsonSerializerDefaults.Web);
@@ -114,7 +114,7 @@ public sealed class McpTools(RepoRegistry registry)
         BranchPlanPreviewDto plan = round.Plan!;
         return new
         {
-            plan_id = state.Id, state.Status, state.Mode, state.Title,
+            plan_id = state.Id, state.Status, closed_at = state.ClosedAt, state.Mode, state.Title,
             round = round.N, rounds = state.Rounds!.Count, turn = GitHost.TurnOf(state), board = state.Board,
             timed_out = timedOut, note = round.Note, sent_at = round.SentAt,
             steps = plan.Steps.Select(StepPayload),
@@ -205,6 +205,14 @@ public sealed class McpTools(RepoRegistry registry)
         return new { sessions = host.ListAgentReviews().Sessions };
     }
 
+    // v0.22.9: close any review; a pending one is cancelled, a finished one keeps its outcome.
+    public object Close(JsonElement args, CancellationToken ct)
+    {
+        GitHost host = Host(args, out _);
+        AgentReviewDto session = host.ResolveAgentReview(Required(args, "review_id"), new("close", null, String(args, "reason") ?? "agent"));
+        return Payload(host, session, false, ct);
+    }
+
     public object Cancel(JsonElement args, CancellationToken ct)
     {
         GitHost host = Host(args, out _);
@@ -247,7 +255,7 @@ public sealed class McpTools(RepoRegistry registry)
         string? review = host.ReadReview(session.Id);
         return new
         {
-            review_id = session.Id, session.Status, session.Mode, session.Title,
+            review_id = session.Id, session.Status, closed_at = session.ClosedAt, session.Mode, session.Title,
             timed_out = timedOut,
             summary_note = session.Resolution?.Summary,
             comments = session.Resolution?.Comments ?? [],
@@ -272,7 +280,7 @@ public sealed class McpTools(RepoRegistry registry)
         static int[] Span(int start, int count) => [start, start + Math.Max(count, 1) - 1];
         return new
         {
-            review_id = session.Id, session.Status, session.Mode, session.Title,
+            review_id = session.Id, session.Status, closed_at = session.ClosedAt, session.Mode, session.Title,
             round = round.N,
             rounds = session.Rounds!.Count,
             turn = GitHost.TurnOf(session),

@@ -9,7 +9,10 @@
 // lines keep their marks with the two-space indented lines under their
 // parent; "details:" lines are quoted; review_id= and the agent-facing
 // "Reply with `cN: …`" hint are dropped; everything else (the round title,
-// the agent's why or note, "cN answered:") is Markdown.
+// the agent's why or note) is Markdown. v0.22.9, owner: the per-file dump
+// "is really polluting the chat": the verdict lines, comments listed without
+// a verdict above them and the "cN explains / answered" lists are the
+// event's extra lines, which the board keeps folded.
 
 export type VerdictLine = {
   mark: string
@@ -25,6 +28,8 @@ export type PowerGitEvent = {
   facts: string
   markdown: string
   verdicts: VerdictLine[]
+  /** Listed comments without a verdict line above them, and "cN explains / answered" lines. */
+  extra: string[]
   details: string
 }
 
@@ -39,6 +44,7 @@ const VERDICT = /^[✗~?✓] /
 const INDENTED = /^ {2}\S/
 const DETAILS = /^details: /
 const AGENT_HINT = /^Reply with `cN/
+const LISTED = /^c\d+ (explains|answered)\b/
 
 export function eventKind(text: string): EventKind | null {
   const first = text.split("\n", 1)[0]
@@ -49,12 +55,15 @@ export function parsePowerGitEvent(text: string): PowerGitEvent {
   const lines = text.split("\n").filter((l) => !l.startsWith("review_id=") && !AGENT_HINT.test(l))
   const markdown: string[] = []
   const verdicts: VerdictLine[] = []
+  const extra: string[] = []
   let details = ""
   for (const line of lines.slice(1)) {
     if (VERDICT.test(line)) {
       verdicts.push({ mark: line[0], text: line.slice(2), children: [] })
     } else if (INDENTED.test(line) && verdicts.length > 0) {
       verdicts[verdicts.length - 1].children.push(line.replace(/^ {2}/, ""))
+    } else if (INDENTED.test(line) || LISTED.test(line)) {
+      extra.push(line.trim())
     } else if (DETAILS.test(line)) {
       details = line
     } else {
@@ -68,6 +77,7 @@ export function parsePowerGitEvent(text: string): PowerGitEvent {
     facts: parts.slice(1).join(", "),
     markdown: markdown.join("\n").trim(),
     verdicts,
+    extra,
     details,
   }
 }

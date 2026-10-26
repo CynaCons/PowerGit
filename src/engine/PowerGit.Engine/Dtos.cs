@@ -102,7 +102,7 @@ public sealed record AgentReviewDto(
     string? Board = null, long BoardCursor = 0,
     IReadOnlyList<AgentReviewRoundDto>? Rounds = null,
     IReadOnlyList<AgentReviewThreadDto>? Comments = null,
-    string? Kind = null);
+    string? Kind = null, string? ClosedAt = null);
 /// <summary>One change (a diff hunk) of a round. Origin: new / carried / revised;
 ///  verdict: accept / reject / mixed / undecided, stamped when the round is sent.</summary>
 public sealed record AgentReviewChangeDto(
@@ -124,7 +124,8 @@ public sealed record AgentReviewThreadDto(
 public sealed record AgentReviewSummaryDto(
     string Id, string Mode, string Title, string? Agent, string? Branch,
     int FileCount, string Status, bool Unread, string CreatedAt, string UpdatedAt,
-    int Round = 1, string? Turn = null, string? Board = null, string? LastRead = null, string? Kind = null);
+    int Round = 1, string? Turn = null, string? Board = null, string? LastRead = null, string? Kind = null,
+    string? ClosedAt = null);
 public sealed record AgentReviewRequest(
     string Mode, string Title, string? Why, string? Agent, string? Branch,
     string? Base, string? Head, bool? Worktree, IReadOnlyList<AgentReviewFileDto>? Files,

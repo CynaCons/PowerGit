@@ -269,15 +269,18 @@ export function clock(iso: string): string {
 /** The review key of a round's line marks: the session id for round 1, `<id>-r<n>` after. */
 export const roundKey = (id: string, n: number) => (n <= 1 ? id : `${id}-r${n}`)
 
-export type InboxFilter = "waiting" | "open" | "all"
+// v0.22.9: a closed (dismissed) review leaves every list but "Dismissed".
+export type InboxFilter = "waiting" | "open" | "all" | "dismissed"
 
 export const waitingForYou = (s: AgentReviewSummary) =>
-  s.status === "pending" && (s.mode === "wait" ? s.turn !== "agent" : s.unread)
+  !s.closedAt && s.status === "pending" && (s.mode === "wait" ? s.turn !== "agent" : s.unread)
 
 export function filterReviews(sessions: AgentReviewSummary[], filter: InboxFilter) {
-  if (filter === "all") return sessions
-  if (filter === "open") return sessions.filter((s) => s.status === "pending")
-  return sessions.filter(waitingForYou)
+  if (filter === "dismissed") return sessions.filter((s) => s.closedAt)
+  const kept = sessions.filter((s) => !s.closedAt)
+  if (filter === "all") return kept
+  if (filter === "open") return kept.filter((s) => s.status === "pending")
+  return kept.filter(waitingForYou)
 }
 
 /** The agent read its channel in the last minute. */

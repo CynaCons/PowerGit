@@ -161,6 +161,8 @@ export type AgentReviewSummary = {
   lastRead?: string | null
   /** v0.22.0: "plan" for a branch plan (fileCount is then its step count). */
   kind?: "plan" | null
+  /** v0.22.9: when the review was closed (dismissed); it then leaves the inbox's lists. */
+  closedAt?: string | null
 }
 export type AgentReviewFile = { path: string; status: string; patch: string | null }
 export type AgentReviewVerdict = "accept" | "reject" | "mixed" | "undecided"
