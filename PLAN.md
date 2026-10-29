@@ -1210,7 +1210,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Owner's sentence as e2e: cancel from the overview with a message. [agent: claude]
 - [x] Inbox Cancel with a message; agent reads it on the board and in MCP. [agent: claude]
 - [x] Gate: engine tests, unit, lint, review e2e; zip smoke. [agent: claude]
-- [ ] Release v0.22.10.
+- [x] Release v0.22.10. [agent: claude]
 - [ ] Owner ticks: a review cancels from the overview and the agent knows.
 
 ## Backlog
