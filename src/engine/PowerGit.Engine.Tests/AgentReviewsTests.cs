@@ -77,6 +77,18 @@ public sealed class AgentReviewsTests : IClassFixture<WebApplicationFactory<Prog
         Assert.All(host.ListAgentReviews().Sessions, s => Assert.NotNull(s.ClosedAt));
     }
 
+    // v0.22.10, owner: "an option to cancel the review, and the agent should be notified."
+    [Fact]
+    public void The_owner_cancels_with_a_message_the_agent_reads()
+    {
+        using TempRepo repo = new(); GitHost host = new(); host.Open(repo.Dir);
+        AgentReviewDto review = host.CreateAgentReview(Request());
+        AgentReviewDto cancelled = host.ResolveAgentReview(review.Id, new("cancel", "  Superseded by the retry branch.  ", "owner"));
+        Assert.Equal(("cancelled", "owner", "Superseded by the retry branch."), (cancelled.Status, cancelled.Reason, cancelled.Resolution?.Summary));
+        Assert.Null(cancelled.ClosedAt);
+        Assert.Contains(host.ListAgentReviews().Sessions, s => s.Id == review.Id && s.Status == "cancelled");
+    }
+
     [Fact]
     public async Task Wait_wakes_on_resolve_and_timeout_never_approves()
     {

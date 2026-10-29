@@ -234,7 +234,12 @@ public sealed partial class GitHost
             {
                 "approve" => current with { Status = "approved", UpdatedAt = now, ResolvedAt = now, Resolution = new(req.Summary, []) },
                 "request_changes" => current with { Status = "changes_requested", UpdatedAt = now, ResolvedAt = now, Resolution = new(req.Summary, ReadReviewComments(id)) },
-                "cancel" => current with { Status = "cancelled", UpdatedAt = now, ResolvedAt = now, Reason = req.Reason ?? "owner", ClosedAt = close ? now : null },
+                // v0.22.10: the owner's message to the agent goes with the cancel (Resolution.Summary).
+                "cancel" => current with
+                {
+                    Status = "cancelled", UpdatedAt = now, ResolvedAt = now, Reason = req.Reason ?? "owner", ClosedAt = close ? now : null,
+                    Resolution = Clean(req.Summary) is { } message ? new(message, []) : current.Resolution,
+                },
                 _ => current with { Status = "expired", UpdatedAt = now, ResolvedAt = now, Reason = req.Reason ?? "host_gone" },
             };
         }

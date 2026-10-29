@@ -31,7 +31,7 @@ test.describe("closing agent reviews", () => {
   })
 
   test("an approved review closes, and the inbox dismisses reviews", async ({ page }) => {
-    test.setTimeout(60_000)
+    test.setTimeout(120_000)
     const dir = makeRepo("pg-review-close-")
     try {
       const { id: repoId } = await api<{ id: string }>("/repos/open", {
@@ -78,17 +78,39 @@ test.describe("closing agent reviews", () => {
       await expect(row("Finished, to dismiss")).toHaveCount(1)
       await expect(row("Approved then closed")).toHaveCount(0)
 
-      // The owner dismisses the finished one and cancels the waiting one.
+      // The owner dismisses the finished one; a waiting one has Cancel instead.
+      await expect(row("Still waiting").getByTestId("agent-review-dismiss")).toHaveCount(0)
       await row("Finished, to dismiss").getByTestId("agent-review-dismiss").click()
       await expect(row("Finished, to dismiss")).toHaveCount(0)
+
+      // v0.22.10, owner: "an option to cancel the review, and the agent should
+      // be notified." Cancelled with a message: the review stays listed, and
+      // the agent reads the message with the review.
+      await row("Still waiting").getByTestId("agent-review-cancel").click()
+      await page.getByTestId("cancel-message").fill("Superseded by the retry branch.")
+      await page.getByTestId("cancel-confirm").click()
+      await expect(page.getByTestId("cancel-review-dialog")).toHaveCount(0)
+      await expect(row("Still waiting")).toHaveAttribute("data-status", "cancelled")
+      await expect(row("Still waiting").getByTestId("agent-review-cancel")).toHaveCount(0)
+      const waiting = (
+        await api<{ sessions: { id: string; title: string }[] }>(`/repos/${repoId}/agent-reviews`)
+      ).sessions.find((x) => x.title === "Still waiting")!
+      const read = await api<{ status: string; reason: string; resolution: { summary: string } }>(
+        `/repos/${repoId}/agent-reviews/${waiting.id}`,
+      )
+      expect([read.status, read.reason, read.resolution.summary]).toEqual([
+        "cancelled",
+        "owner",
+        "Superseded by the retry branch.",
+      ])
+
+      // Then dismissed like any finished review.
       await row("Still waiting").getByTestId("agent-review-dismiss").click()
       await expect(rows).toHaveCount(0)
-
       await page.getByTestId("inbox-filter-dismissed").click()
       await expect(rows).toHaveCount(3)
       await expect(row("Finished, to dismiss")).toHaveAttribute("data-status", "approved")
       await expect(row("Still waiting")).toHaveAttribute("data-status", "cancelled")
-      await expect(row("Still waiting").getByTestId("agent-review-dismiss")).toHaveCount(0)
     } finally {
       await removeRepo(dir)
     }

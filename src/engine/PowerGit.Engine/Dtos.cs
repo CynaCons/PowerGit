@@ -150,6 +150,8 @@ public sealed record AgentReviewBoardDto(
     string? Agent, string? LastRead, bool Reading);
 public sealed record BoardPostRequest(string Text);
 public sealed record AgentReviewResolveRequest(string Action, string? Summary, string? Reason);
+/// <summary>v0.22.10: the owner cancels a review from the inbox, with an optional message to the agent.</summary>
+public sealed record AgentReviewCancelRequest(string? Message);
 public sealed record AgentReviewWaitDto(AgentReviewDto Session, bool TimedOut);
 public sealed record AgentReviewListDto(IReadOnlyList<AgentReviewSummaryDto> Sessions, int Badge);
 /// <summary>v0.21.10: a repository in the cross-repository review panel, named by its folder.</summary>

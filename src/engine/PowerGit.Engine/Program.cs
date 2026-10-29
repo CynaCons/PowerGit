@@ -165,16 +165,18 @@ app.MapGet("/agent-reviews", (RepoRegistry repos) =>
 // keeps its outcome. A repository that is not open gets a host of its own for
 // the call, so /repos/current and the recents do not move.
 app.MapPost("/agent-reviews/{repoId}/{sid}/close", (string repoId, string sid, RepoRegistry repos) =>
-{
-    string? root = AgentReviewRepos.List()
-        .Concat(repos.List().Select(r => r.Root))
-        .Concat(RecentsStore.List().Select(r => r.Root))
-        .FirstOrDefault(r => { try { return GitHost.IdFor(Path.GetFullPath(r)) == repoId; } catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return false; } });
-    if (root is null) return Results.Json(new ErrorResponse("repository not found"), statusCode: StatusCodes.Status404NotFound);
-    GitHost git = repos.Get(repoId) ?? new GitHost();
-    if (git.Current is null) git.Open(root);
-    return AgentReviewCall(() => git.ResolveAgentReview(sid, new("close", null, "owner")));
-});
+    InboxReviewHost(repoId, repos) is { } git
+        ? AgentReviewCall(() => git.ResolveAgentReview(sid, new("close", null, "owner")))
+        : Results.Json(new ErrorResponse("repository not found"), statusCode: StatusCodes.Status404NotFound));
+
+// v0.22.10, owner: "In the overview of all reviews, there should be an option
+// to cancel the review, and the agent should be notified." The review stays
+// listed as cancelled; the message goes to the agent on the board and in
+// agent_review_wait / get (cancel_message).
+app.MapPost("/agent-reviews/{repoId}/{sid}/cancel", (string repoId, string sid, AgentReviewCancelRequest body, RepoRegistry repos) =>
+    InboxReviewHost(repoId, repos) is { } git
+        ? AgentReviewCall(() => git.ResolveAgentReview(sid, new("cancel", body.Message, "owner")))
+        : Results.Json(new ErrorResponse("repository not found"), statusCode: StatusCodes.Status404NotFound));
 
 // The recents as repositories with their worktrees (v0.20.10, the start
 // pane's repository cards): one `git worktree list` per repository.
@@ -749,6 +751,26 @@ repo.MapGet("/agent-reviews/{sid}/diff", (string sid, string? path, int? round, 
 
 // v0.21.1 rounds (docs/design/agent-review-rounds.md §6): the owner sends a
 // round back or asks at once; the agent revises (MCP, or here for tests).
+// The host for a review of the cross-repository inbox: the open session for
+// that repository, or one of its own for the call when it is not open, so
+// /repos/current and the recents do not move. Null when the id is none of the
+// inbox's repositories.
+static GitHost? InboxReviewHost(string repoId, RepoRegistry repos)
+{
+    string? root = AgentReviewRepos.List()
+        .Concat(repos.List().Select(r => r.Root))
+        .Concat(RecentsStore.List().Select(r => r.Root))
+        .FirstOrDefault(r =>
+        {
+            try { return GitHost.IdFor(Path.GetFullPath(r)) == repoId; }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return false; }
+        });
+    if (root is null) return null;
+    GitHost git = repos.Get(repoId) ?? new GitHost();
+    if (git.Current is null) git.Open(root);
+    return git;
+}
+
 static IResult AgentReviewCall(Func<object> call)
 {
     try { return Results.Ok(call()); }

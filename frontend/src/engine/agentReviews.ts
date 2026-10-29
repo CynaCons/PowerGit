@@ -90,6 +90,15 @@ export const closeAgentReviewAnywhere = (engine: EngineClient, repoId: string, i
     .request(`/agent-reviews/${encodeURIComponent(repoId)}/${encodeURIComponent(id)}/close`, post({}))
     .then(json<AgentReview>)
 
+/** v0.22.10: cancel a review from the inbox; the message goes to the agent. */
+export const cancelAgentReviewAnywhere = (engine: EngineClient, repoId: string, id: string, message: string) =>
+  engine
+    .request(
+      `/agent-reviews/${encodeURIComponent(repoId)}/${encodeURIComponent(id)}/cancel`,
+      post({ message: message.trim() || null }),
+    )
+    .then(json<AgentReview>)
+
 export const resolveAgentReview = (
   engine: EngineClient,
   id: string,

@@ -4,6 +4,7 @@ import IconButton from "@mui/material/IconButton"
 import RefreshIcon from "@mui/icons-material/Refresh"
 import CloseIcon from "@mui/icons-material/Close"
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined"
+import BlockIcon from "@mui/icons-material/Block"
 import Typography from "@mui/material/Typography"
 import { useState } from "react"
 import { describeThrown } from "../../engine"
@@ -11,6 +12,7 @@ import type { AgentReviewEverywhereItem } from "../../engine"
 import { paneSx, deskGap } from "../../theme/panels"
 import { ageOf } from "./agentReviewModel"
 import { Chip } from "./reviewChips"
+import { CancelReviewDialog } from "./CancelReviewDialog"
 import { filterReviews, onBoard, turnLabel, waitingForYou, type InboxFilter } from "./roundModel"
 
 // The agent reviews, full view (v0.21.3, tab "Inbox" of
@@ -19,8 +21,9 @@ import { filterReviews, onBoard, turnLabel, waitingForYou, type InboxFilter } fr
 // age. The filter starts on what waits for the owner. Since v0.21.10 the
 // inbox holds every open repository's reviews, and each row names the
 // repository it lives in (`data-testid="agent-review-repo"`, plain words).
-// v0.22.9: a row is dismissed from its right end; a pending review is then
-// cancelled. Dismissed reviews have their own filter.
+// v0.22.9: a finished row is dismissed from its right end; dismissed reviews
+// have their own filter. v0.22.10: a pending row is cancelled there instead,
+// with an optional message the agent receives.
 
 export function AgentReviewInbox({
   sessions,
@@ -28,6 +31,7 @@ export function AgentReviewInbox({
   onOpen,
   onDismissError,
   onDismiss,
+  onCancel,
   onRefresh,
   onClose,
 }: {
@@ -36,6 +40,7 @@ export function AgentReviewInbox({
   onOpen: (item: AgentReviewEverywhereItem) => void
   onDismissError?: () => void
   onDismiss?: (item: AgentReviewEverywhereItem) => Promise<void>
+  onCancel?: (item: AgentReviewEverywhereItem, message: string) => Promise<void>
   onRefresh: () => void
   onClose: () => void
 }) {
@@ -46,9 +51,10 @@ export function AgentReviewInbox({
   const keptIds = new Set(filterReviews(summaries, filter).map((s) => s.id))
   const shown = sessions.filter((i) => keptIds.has(i.session.id))
   const [dismissError, setDismissError] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<AgentReviewEverywhereItem | null>(null)
   const dismiss = (item: AgentReviewEverywhereItem) => {
     setDismissError(null)
-    onDismiss?.(item).catch((e) => setDismissError(describeThrown(e)))
+    onDismiss?.(item).catch((e) => setDismissError(`Could not dismiss: ${describeThrown(e)}`))
   }
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: deskGap }}>
@@ -84,7 +90,7 @@ export function AgentReviewInbox({
       </Box>
       {dismissError && (
         <Box data-testid="agent-review-dismiss-error" sx={{ ...paneSx, px: 1.5, py: 1 }}>
-          <Typography sx={{ fontSize: 12, color: "error.main" }}>Could not dismiss: {dismissError}</Typography>
+          <Typography sx={{ fontSize: 12, color: "error.main" }}>{dismissError}</Typography>
         </Box>
       )}
       {openError && (
@@ -218,12 +224,25 @@ export function AgentReviewInbox({
               <Typography sx={{ fontSize: 12, color: "text.secondary", textAlign: "right" }}>
                 {ageOf(s.updatedAt)}
               </Typography>
-              {onDismiss && !s.closedAt ? (
+              {onCancel && s.status === "pending" && !s.closedAt ? (
+                <IconButton
+                  size="small"
+                  data-testid="agent-review-cancel"
+                  title="Cancel the review"
+                  aria-label={`Cancel ${s.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCancelling(item)
+                  }}
+                >
+                  <BlockIcon fontSize="small" />
+                </IconButton>
+              ) : onDismiss && s.status !== "pending" && !s.closedAt ? (
                 <IconButton
                   size="small"
                   data-testid="agent-review-dismiss"
-                  title={s.status === "pending" ? "Cancel and dismiss" : "Dismiss"}
-                  aria-label={s.status === "pending" ? `Cancel and dismiss ${s.title}` : `Dismiss ${s.title}`}
+                  title="Dismiss"
+                  aria-label={`Dismiss ${s.title}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     dismiss(item)
@@ -238,6 +257,22 @@ export function AgentReviewInbox({
           )
         })}
       </Box>
+      {cancelling && onCancel && (
+        <CancelReviewDialog
+          item={cancelling}
+          onClose={() => setCancelling(null)}
+          onCancel={async (message) => {
+            setDismissError(null)
+            try {
+              await onCancel(cancelling, message)
+              setCancelling(null)
+            } catch (e) {
+              setDismissError(`Could not cancel: ${describeThrown(e)}`)
+              setCancelling(null)
+            }
+          }}
+        />
+      )}
     </Box>
   )
 }

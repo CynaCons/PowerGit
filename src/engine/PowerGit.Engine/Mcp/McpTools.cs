@@ -115,6 +115,8 @@ public sealed class McpTools(RepoRegistry registry)
         return new
         {
             plan_id = state.Id, state.Status, closed_at = state.ClosedAt, state.Mode, state.Title,
+            reason = state.Status is "cancelled" or "expired" ? state.Reason : null,
+            cancel_message = state.Status == "cancelled" ? state.Resolution?.Summary : null,
             round = round.N, rounds = state.Rounds!.Count, turn = GitHost.TurnOf(state), board = state.Board,
             timed_out = timedOut, note = round.Note, sent_at = round.SentAt,
             steps = plan.Steps.Select(StepPayload),
@@ -281,6 +283,9 @@ public sealed class McpTools(RepoRegistry registry)
         return new
         {
             review_id = session.Id, session.Status, closed_at = session.ClosedAt, session.Mode, session.Title,
+            // v0.22.10: who cancelled it and the owner's message, if any.
+            reason = session.Status is "cancelled" or "expired" ? session.Reason : null,
+            cancel_message = session.Status == "cancelled" ? session.Resolution?.Summary : null,
             round = round.N,
             rounds = session.Rounds!.Count,
             turn = GitHost.TurnOf(session),

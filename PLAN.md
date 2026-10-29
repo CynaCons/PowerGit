@@ -1196,7 +1196,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Release v0.22.8. [agent: claude]
 - [x] Accept all at the top of a file with several changes. [agent: claude]
 
-### v0.22.9 — Agent reviews: close any review; a quieter board (current) (ACTIVE)
+### v0.22.9 — Agent reviews: close any review; a quieter board
 **Goal:** Owner (2026-10-26): reviews close or dismiss in any state; round summaries fold.
 - [x] Owner's sentences as e2e: close an approved review; folded round post. [agent: claude]
 - [x] Engine and MCP: close a review in any state; agent_review_close. [agent: claude]
@@ -1204,7 +1204,14 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Board: round summaries fold behind Show n lines. [agent: claude]
 - [x] Gate: engine tests, unit, lint, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.9. [agent: claude]
-- [ ] Owner ticks: reviews dismiss and the board reads clean.
+
+### v0.22.10 — Agent reviews: cancel from the overview, the agent told (current) (ACTIVE)
+**Goal:** Owner (2026-10-29): cancel a review from the overview; the agent is notified.
+- [x] Owner's sentence as e2e: cancel from the overview with a message. [agent: claude]
+- [x] Inbox Cancel with a message; agent reads it on the board and in MCP. [agent: claude]
+- [ ] Gate: engine tests, unit, lint, review e2e; zip smoke.
+- [ ] Release v0.22.10.
+- [ ] Owner ticks: a review cancels from the overview and the agent knows.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1325,3 +1332,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: Markdown files preview in agent reviews. (deferred from v0.22.6)
 - Owner ticks: comments drop directly in the Markdown preview. (deferred from v0.22.7)
 - Owner ticks: only accepted unchanged changes are greyed out. (deferred from v0.22.8)
+- Owner ticks: reviews dismiss and the board reads clean. (deferred from v0.22.9)

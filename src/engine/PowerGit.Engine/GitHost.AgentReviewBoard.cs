@@ -128,7 +128,9 @@ public sealed partial class GitHost
             PostToBoard(session, BoardHuman, $"Approved · review {Short(session.Id)} · round {round?.N ?? 1} · {accepted} of {total} changes accepted"
                 + (session.Resolution?.Summary is { Length: > 0 } note ? "\n" + note : ""));
         }
-        else if (session.Status == "cancelled" && session.Reason == "owner") PostToBoard(session, BoardHuman, $"Cancelled · review {Short(session.Id)}");
+        else if (session.Status == "cancelled" && session.Reason == "owner")
+            PostToBoard(session, BoardHuman, $"Cancelled · {(session.Kind == "plan" ? "plan" : "review")} {Short(session.Id)}"
+                + (session.Resolution?.Summary is { Length: > 0 } message ? "\n" + message : ""));
         else PostToBoard(session, BoardEvents, $"Review closed · {session.Status}" + (session.Reason is { } reason ? $" ({reason})" : ""));
     }
 
