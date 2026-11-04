@@ -1222,7 +1222,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 ### v0.22.12 — AppImage repack passes appimagetool's permission check (current) (ACTIVE)
 **Goal:** Ship the Linux build and updater manifest v0.22.11 missed.
 - [x] Open AppDir permissions before the AppImage repack. [agent: claude]
-- [ ] Release v0.22.12: Linux build and updater manifest pass in CI.
+- [x] Release v0.22.12: Linux build and updater manifest pass in CI. [agent: claude]
 - [ ] Owner ticks: review cards show the class and the function.
 
 ## Backlog
