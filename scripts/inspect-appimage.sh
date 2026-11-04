@@ -356,6 +356,11 @@ else
   APPIMAGETOOL="appimagetool"
 fi
 
+# appimagetool's continuous build (since 2026-11-01) refuses an AppDir with
+# 0700 directories, which is what the extraction leaves.
+chmod -R a+rX "$ROOT"
+chmod a+rx "$ROOT/AppRun"
+
 REPACK="$(pwd)/fixed.AppImage"
 ARCH=${ARCH:-x86_64} $APPIMAGETOOL "$ROOT" "$REPACK" >/dev/null
 DEST=${OUT:-$APPIMAGE}
