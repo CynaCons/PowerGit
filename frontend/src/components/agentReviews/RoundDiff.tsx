@@ -21,6 +21,7 @@ import { Thread, type CommentKind } from "./RoundThread"
 import { lineComments, replyProps } from "./threadActions"
 import type { CommentEdits } from "./useRoundComments"
 import { roundBlocks, sourceFor, type RoundBlock } from "./roundContext"
+import { hunkTitle } from "./roundScope"
 import { useRowTokens } from "./useRowTokens"
 
 // The middle column of the review (v0.21.3, layout A of
@@ -91,18 +92,17 @@ const VERDICT_BG: Record<AgentReviewVerdict, string> = {
 export function RoundDiff(props: RoundDiffProps) {
   const { round, path } = props
   const file = round.files.find((f) => f.path === path)
-  const hunks = hunksOf(
-    file?.patch ?? null,
-    round.changes.filter((c) => c.path === path),
+  const hunks = useMemo(
+    () =>
+      hunksOf(
+        file?.patch ?? null,
+        round.changes.filter((c) => c.path === path),
+      ),
+    [file?.patch, round.changes, path],
   )
   const { options, sourceText } = props
-  const blocks = useMemo(() => {
-    const hunks = hunksOf(
-      file?.patch ?? null,
-      round.changes.filter((c) => c.path === path),
-    )
-    return roundBlocks(hunks, sourceFor(sourceText, hunks), options)
-  }, [file?.patch, round.changes, path, sourceText, options])
+  const source = useMemo(() => sourceFor(sourceText, hunks), [sourceText, hunks])
+  const blocks = useMemo(() => roundBlocks(hunks, source, options), [hunks, source, options])
   const rows = useMemo(
     () => blocks.flatMap((b) => (b.kind === "gap" ? b.rows : [...b.before, ...b.core, ...b.after])),
     [blocks],
@@ -111,7 +111,7 @@ export function RoundDiff(props: RoundDiffProps) {
   const { wrap } = props
   const digits = String(Math.max(1, ...rows.map((r) => Math.max(r.oldNum ?? 0, r.newNum ?? 0)))).length
   if (!file) return <EarlierCards {...props} gone />
-  const fromFile = sourceFor(sourceText, hunks) !== null
+  const fromFile = source !== null
   const wantsMore = options.full || options.context > 3
   return (
     <Box
@@ -136,7 +136,13 @@ export function RoundDiff(props: RoundDiffProps) {
         block.kind === "gap" ? (
           <GapRows key={`gap${block.rows[0].key}`} rows={block.rows} tokens={tokens} {...props} />
         ) : (
-          <HunkCard key={`${block.hunk.oldStart}:${block.hunk.newStart}`} block={block} tokens={tokens} {...props} />
+          <HunkCard
+            key={`${block.hunk.oldStart}:${block.hunk.newStart}`}
+            block={block}
+            source={source}
+            tokens={tokens}
+            {...props}
+          />
         ),
       )}
       <EarlierCards {...props} />
@@ -212,8 +218,13 @@ function GapRows({ rows, ...p }: LineProps & { rows: HunkRow[] }) {
   )
 }
 
-function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { kind: "hunk" }> }) {
+function HunkCard({
+  block,
+  source,
+  ...p
+}: LineProps & { block: Extract<RoundBlock, { kind: "hunk" }>; source: string[] | null }) {
   const hunk: RoundHunk = block.hunk
+  const title = hunkTitle(p.path, source, hunk)
   const verdict = liveVerdict(p.round, hunk, p.path, p.doc)
   const change = hunk.change
   // A change that did not move dims only when it was accepted before and still
@@ -263,11 +274,17 @@ function HunkCard({ block, ...p }: LineProps & { block: Extract<RoundBlock, { ki
             color: "text.secondary",
             flex: "1 1 200px",
             minWidth: 0,
+            overflowWrap: "anywhere",
           }}
-          noWrap
         >
           {change ? `${change.id}  ` : ""}
-          {hunk.header}
+          {title.numbers}
+          {title.scope && (
+            <Box component="span" data-testid="round-scope" sx={{ color: "text.primary" }}>
+              {" "}
+              {title.scope}
+            </Box>
+          )}
         </Typography>
         {change?.origin === "carried" && p.round.n > 1 && change.verdict === "accept" && (
           <Chip tone="accept">accepted in round {p.round.n - 1} · unchanged</Chip>

@@ -1205,13 +1205,20 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: engine tests, unit, lint, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.9. [agent: claude]
 
-### v0.22.10 — Agent reviews: cancel from the overview, the agent told (current) (ACTIVE)
+### v0.22.10 — Agent reviews: cancel from the overview, the agent told
 **Goal:** Owner (2026-10-29): cancel a review from the overview; the agent is notified.
 - [x] Owner's sentence as e2e: cancel from the overview with a message. [agent: claude]
 - [x] Inbox Cancel with a message; agent reads it on the board and in MCP. [agent: claude]
 - [x] Gate: engine tests, unit, lint, review e2e; zip smoke. [agent: claude]
 - [x] Release v0.22.10. [agent: claude]
-- [ ] Owner ticks: a review cancels from the overview and the agent knows.
+
+### v0.22.11 — Agent reviews: cards name the class and the function (current) (ACTIVE)
+**Goal:** Owner (2026-11-04): every change card shows its class and function, even above the context.
+- [x] Owner's sentence as e2e: card names class and function above context. [agent: claude]
+- [x] Work out a change's class and function from the file for Python, C, C++. [agent: claude]
+- [ ] Gate: unit, lint, review e2e; look at a card; zip smoke.
+- [ ] Release v0.22.11.
+- [ ] Owner ticks: review cards show the class and the function.
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1333,3 +1340,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: comments drop directly in the Markdown preview. (deferred from v0.22.7)
 - Owner ticks: only accepted unchanged changes are greyed out. (deferred from v0.22.8)
 - Owner ticks: reviews dismiss and the board reads clean. (deferred from v0.22.9)
+- Owner ticks: a review cancels from the overview and the agent knows. (deferred from v0.22.10: open when the plan view moved to v0.22.11)
