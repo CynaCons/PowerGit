@@ -40,8 +40,11 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage | Out-Null
 
 Copy-Item (Join-Path $release "powergit.exe") $stage
-# The exact name: a renamed running engine (powergit-engine-<ver>-running.exe) must not ship.
-Copy-Item (Join-Path $release "powergit-engine.exe") $stage
+# The sidecar build-engine-sidecar.ps1 made, under the name the shell starts.
+# Not target\release\powergit-engine.exe: Tauri's copy there follows cargo's
+# build-script layout, and with rustc 1.100 it is no longer made there
+# (v0.22.13 release CI). A renamed running engine never ships either way.
+Copy-Item (Join-Path $frontend "src-tauri\binaries\powergit-engine-x86_64-pc-windows-msvc.exe") (Join-Path $stage "powergit-engine.exe")
 
 $dist = Join-Path $repo "dist"
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
