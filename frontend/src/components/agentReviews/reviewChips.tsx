@@ -7,9 +7,11 @@ import Button from "@mui/material/Button"
 export function Chip({
   tone,
   children,
+  testid,
 }: {
   tone: "accept" | "agent" | "wait" | "info" | "muted" | "reject"
   children: React.ReactNode
+  testid?: string
 }) {
   const palette = {
     accept: ["var(--pg-review-accept-bg)", "var(--pg-review-accept)"],
@@ -22,6 +24,7 @@ export function Chip({
   return (
     <Box
       component="span"
+      data-testid={testid}
       sx={{
         display: "inline-block",
         borderRadius: 2.5,

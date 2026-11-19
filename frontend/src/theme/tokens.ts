@@ -65,6 +65,14 @@ export type Tokens = {
     context: string
     gutter: string
     gutterBorder: string
+    /** v0.22.13: a quieter tint behind changed lines; the bar in the gutter carries the state. */
+    addedBg: string
+    removedBg: string
+    addedBar: string
+    removedBar: string
+    /** A TODO / FIXME label inside a comment. */
+    tagBg: string
+    tagFg: string
   }
   /** v0.15.0: "C" is an unmerged (conflicted) path. */
   fileStatus: Record<"A" | "M" | "D" | "R" | "U" | "C" | "other", string>
@@ -158,6 +166,12 @@ export const light: Tokens = {
     context: "#000000",
     gutter: "#8a8a8a",
     gutterBorder: "#e0e0e0",
+    addedBg: "rgba(24, 145, 0, 0.06)",
+    removedBg: "rgba(211, 0, 11, 0.05)",
+    addedBar: "#2da44e",
+    removedBar: "#cf222e",
+    tagBg: "#faeeda",
+    tagFg: "#7a4a06",
   },
   fileStatus: {
     A: "#189100",
@@ -249,6 +263,12 @@ export const dark: Tokens = {
     context: "#e6e9ef",
     gutter: "#98a1ad",
     gutterBorder: "#364150",
+    addedBg: "rgba(46, 160, 67, 0.12)",
+    removedBg: "rgba(248, 81, 73, 0.1)",
+    addedBar: "#3fb950",
+    removedBar: "#f85149",
+    tagBg: "rgba(250, 199, 117, 0.18)",
+    tagFg: "#fac775",
   },
   fileStatus: {
     A: "#5ee38a",
@@ -358,6 +378,12 @@ export function cssVariables(t: Tokens): Record<string, string> {
     "--pg-diff-context": t.diff.context,
     "--pg-diff-gutter": t.diff.gutter,
     "--pg-diff-gutter-border": t.diff.gutterBorder,
+    "--pg-diff-added-bg": t.diff.addedBg,
+    "--pg-diff-removed-bg": t.diff.removedBg,
+    "--pg-diff-added-bar": t.diff.addedBar,
+    "--pg-diff-removed-bar": t.diff.removedBar,
+    "--pg-code-tag-bg": t.diff.tagBg,
+    "--pg-code-tag-fg": t.diff.tagFg,
     "--pg-file-a": t.fileStatus.A,
     "--pg-file-m": t.fileStatus.M,
     "--pg-file-d": t.fileStatus.D,

@@ -3,6 +3,7 @@ import { useTheme } from "@mui/material/styles"
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import type { DiffDto } from "../engine"
 import { languageForPath, tokenizeLines, type Token } from "../highlight"
+import { codeTokens } from "./codeTokens"
 import { codeSx } from "../theme"
 import { useCodeWrap } from "./codeWrap"
 import { ContentNotice } from "./ContentNotice"
@@ -29,10 +30,13 @@ function useDiffTokens(
   const [tokens, setTokens] = useState<{ key: string; map: Map<number, Token[]> } | null>(null)
   const key = `${mode}|${path}|${text}`
   useEffect(() => {
-    const lang = languageForPath(path)
+    const raw = text.split("\n")
+    // Line 1 of the file, when the diff shows it: a shebang names the
+    // language of a script without an extension (v0.22.13).
+    const first = lines.findIndex((l) => l.kind !== "other" && (l.newNum === 1 || l.oldNum === 1))
+    const lang = languageForPath(path, first >= 0 ? raw[first].slice(1) : undefined)
     if (!lang) return
     const indexes: number[] = []
-    const raw = text.split("\n")
     const code: string[] = []
     lines.forEach((l, i) => {
       if (l.kind === "other") return
@@ -341,11 +345,7 @@ export const DiffView = forwardRef<
             </span>
           )}
           {highlighted
-            ? highlighted.map((t, j) => (
-                <span key={j} className="diff-token" style={{ color: t.color }}>
-                  {t.content}
-                </span>
-              ))
+            ? codeTokens(highlighted)
             : line.segments.map((s, j) => (
                 <span key={j} style={{ color: s.color, fontWeight: s.bold ? 700 : 400 }}>
                   {(j === 0 && sign !== null ? s.text.slice(1) : s.text) || (sign === null ? " " : "")}

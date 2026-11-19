@@ -1219,11 +1219,20 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Gate: unit, lint, review e2e; look at a card; zip smoke. [agent: claude]
 - [x] Release v0.22.11, Windows only. [agent: claude]
 
-### v0.22.12 — AppImage repack passes appimagetool's permission check (current) (ACTIVE)
+### v0.22.12 — AppImage repack passes appimagetool's permission check
 **Goal:** Ship the Linux build and updater manifest v0.22.11 missed.
 - [x] Open AppDir permissions before the AppImage repack. [agent: claude]
 - [x] Release v0.22.12: Linux build and updater manifest pass in CI. [agent: claude]
-- [ ] Owner ticks: review cards show the class and the function.
+
+### v0.22.13 — Code in the review reads as code: comments, tags, languages (current) (ACTIVE)
+**Goal:** Owner: comments in the review look less like plain text.
+- [x] Comments in slate italics, doc tags violet, TODO-style tags labelled. [agent: claude]
+- [x] Quieter changed-line tint with a gutter bar in both diffs. [agent: claude]
+- [x] Language label on review cards; thirty more languages and shebangs. [agent: claude]
+- [x] Python, Markdown and Rust grammars end their strings and fences. [agent: claude]
+- [x] Gate: unit, lint, diff and review e2e, light and dark look. [agent: claude]
+- [ ] Owner ticks: comments and code read clearly in the review. [agent: claude]
+- [ ] Release v0.22.13. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
@@ -1347,3 +1356,4 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - Owner ticks: reviews dismiss and the board reads clean. (deferred from v0.22.9)
 - Owner ticks: a review cancels from the overview and the agent knows. (deferred from v0.22.10: open when the plan view moved to v0.22.11)
 - Owner ticks: review cards show the class and the function. (deferred from v0.22.11: tracked in v0.22.12)
+- Owner ticks: review cards show the class and the function. (deferred from v0.22.12: owner tick, carried while v0.22.13 is current)

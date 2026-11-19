@@ -9,7 +9,8 @@ import type {
   AgentReviewVerdict,
   DiffOptions,
 } from "../../engine"
-import type { Token } from "../../highlight"
+import { languageForPath, languageName, type Token } from "../../highlight"
+import { codeTokens } from "../codeTokens"
 import type { LineState, ReviewDoc } from "../../review/reviewModel"
 import { cycle } from "../../review/reviewModel"
 import { Conversation } from "./Conversation"
@@ -76,6 +77,12 @@ const VERDICT_COLOR: Record<AgentReviewVerdict, string> = {
   reject: "var(--pg-review-rejected)",
   mixed: "var(--pg-review-todo)",
   undecided: "divider",
+}
+/** A changed line's tint, and the bar that says added or removed (v0.22.13). */
+const ROW_TINT: Record<HunkRow["kind"], readonly [string, string | null]> = {
+  add: ["var(--pg-diff-added-bg, rgba(24,145,0,.06))", "var(--pg-diff-added-bar, #2da44e)"],
+  remove: ["var(--pg-diff-removed-bg, rgba(211,0,11,.05))", "var(--pg-diff-removed-bar, #cf222e)"],
+  context: ["transparent", null],
 }
 /** The human review's stripe on the code (app.css .diff-row-review-*). */
 const STRIPE: Partial<Record<string, string>> = {
@@ -235,6 +242,8 @@ function HunkCard({
   const set = (target: "accept" | "reject") =>
     p.onVerdict(hunk.keys, verdict === target ? undefined : target === "accept" ? "ok" : "rejected")
   const older = change ? (p.earlier.byChange.get(change.id) ?? []) : []
+  // v0.22.13: the card names its language (a shebang counts for scripts).
+  const lang = languageForPath(p.path, source?.[0] ?? hunk.rows.find((r) => r.newNum === 1)?.text)
   return (
     <Box
       data-testid="round-change"
@@ -286,6 +295,11 @@ function HunkCard({
             </Box>
           )}
         </Typography>
+        {lang && (
+          <Chip tone="muted" testid="round-language">
+            {languageName(lang)}
+          </Chip>
+        )}
         {change?.origin === "carried" && p.round.n > 1 && change.verdict === "accept" && (
           <Chip tone="accept">accepted in round {p.round.n - 1} · unchanged</Chip>
         )}
@@ -352,12 +366,7 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
   const state = row.kind === "context" ? undefined : p.doc?.files[p.path]?.lines[row.key]
   const { comments, loose } = lineComments(p, row.key)
   const picked = p.picked?.path === p.path && p.picked.key === row.key
-  const bg =
-    row.kind === "add"
-      ? "var(--pg-diff-added-bg, rgba(24,145,0,.1))"
-      : row.kind === "remove"
-        ? "var(--pg-diff-removed-bg, rgba(211,0,11,.08))"
-        : "transparent"
+  const [bg, bar] = ROW_TINT[row.kind]
   const fg =
     row.kind === "add" ? "var(--pg-diff-added)" : row.kind === "remove" ? "var(--pg-diff-removed)" : "text.primary"
   const tokens = p.tokens?.get(row)
@@ -408,6 +417,8 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
             verticalAlign: "top",
             cursor: markable ? "pointer" : "default",
             bgcolor: bg,
+            // v0.22.13: the bar says added or removed; the sign left the code.
+            boxShadow: bar ? `inset -3px 0 0 ${bar}` : "none",
             "& .diff-row-mark": { height: 18, cursor: "inherit" },
           }}
         >
@@ -426,14 +437,7 @@ function LineRow({ row, ...p }: LineProps & { row: HunkRow }) {
             boxShadow: (shown && STRIPE[shown]) ?? "none",
           }}
         >
-          {row.kind === "add" ? "+" : row.kind === "remove" ? "-" : " "}
-          {tokens
-            ? tokens.map((t, j) => (
-                <span key={j} className="diff-token" style={{ color: t.color }}>
-                  {t.content}
-                </span>
-              ))
-            : row.text}
+          {tokens ? codeTokens(tokens) : row.text}
         </Box>
       </Box>
       {(comments.length > 0 || loose.length > 0 || picked) && (

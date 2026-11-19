@@ -186,6 +186,34 @@ html {
 .diff-row-removed {
   background: var(--pg-diff-removed-bg, rgba(211, 0, 11, 0.1));
 }
+/* v0.22.13, owner: code in the review "looks less like plain text". The
+   tint is quieter (theme/tokens.ts diff.addedBg) so the syntax colours
+   read; a bar on the gutter's edge says added or removed, and the +/- sign
+   steps back: still in the text for copy and tests (plainTextOf leaves it
+   out), drawn at zero width. Line numbers still tell the two apart (an
+   added line has no old number, a removed one no new number). */
+.diff-row-added .diff-row-gutter {
+  box-shadow: inset -3px 0 0 var(--pg-diff-added-bar, #2da44e);
+}
+.diff-row-removed .diff-row-gutter {
+  box-shadow: inset -3px 0 0 var(--pg-diff-removed-bar, #cf222e);
+}
+.diff-row-sign {
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  vertical-align: top;
+}
+/* A TODO / FIXME / HACK / XXX / NOTE inside a comment (highlight.ts
+   markCommentTags), in the diff, the agent review and the file viewer. */
+.code-tag {
+  font-style: normal;
+  font-size: 0.85em;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--pg-code-tag-bg, #faeeda);
+  color: var(--pg-code-tag-fg, #7a4a06);
+}
 .diff-row-gutter {
   flex-shrink: 0;
   position: sticky;

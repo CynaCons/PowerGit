@@ -7,7 +7,10 @@
 // never the WASM/Oniguruma engine — see docs/agents/memories/webkitgtk-css.md
 // for why a .wasm load over `tauri://` is unverified on WebKitGTK) and is
 // only pulled in once a file of that language is actually opened.
-import type { HighlighterCore, LanguageRegistration } from "shiki/core"
+import type { HighlighterCore } from "shiki/core"
+import { LANG_LOADERS, RUNTIME_LANG_LOADERS } from "./highlightLanguages"
+
+export { languageForPath, languageName } from "./highlightLanguages"
 
 // TextMate tokenizing is synchronous per line; running it over a huge file
 // would stall the UI thread for a visible moment. Plain preformatted text is
@@ -18,150 +21,110 @@ import type { HighlighterCore, LanguageRegistration } from "shiki/core"
 const MAX_HIGHLIGHT_CHARS = 400_000 // ~400 KB
 const MAX_HIGHLIGHT_LINES = 20_000
 
-const THEME = "light-plus"
+// VS Code's Light+ / Dark+ with PowerGit's comment ink on top (v0.22.13,
+// owner: comments in the review "look less like plain text"). Light+ draws
+// comments green, the same hue as an added line's tint, so on an added row a
+// comment read as plain code. Comments take a slate ink in italics, their
+// markers (// /* */ #) a fainter one, and doc tags (@param, <summary>,
+// javadoc) their own violet; Python docstrings count as comments.
+const THEME = "pg-light-plus"
+const DARK_THEME = "pg-dark-plus"
+
+export const COMMENT_INK = {
+  light: { text: "#6b7280", mark: "#a3a9b3", tag: "#8250df" },
+  dark: { text: "#8b949e", mark: "#6e7681", tag: "#d2a8ff" },
+} as const
+
+type ThemeJson = { name?: string; tokenColors?: { scope?: string | string[]; settings: Record<string, string> }[] }
+
+/** A copy of `base` named `name` whose comment rules win (later rules of the same selector override). */
+export function withCommentInk<T extends ThemeJson>(base: T, name: string, mode: "light" | "dark"): T {
+  const ink = COMMENT_INK[mode]
+  return {
+    ...base,
+    name,
+    tokenColors: [
+      ...(base.tokenColors ?? []),
+      {
+        scope: ["comment", "string.quoted.docstring", "string.comment.buffered.block.pug"],
+        settings: { foreground: ink.text, fontStyle: "italic" },
+      },
+      {
+        scope: [
+          "punctuation.definition.comment",
+          "comment.block.documentation punctuation.definition.tag",
+          "punctuation.definition.string.begin.docstring",
+          "punctuation.definition.string.end.docstring",
+        ],
+        settings: { foreground: ink.mark, fontStyle: "" },
+      },
+      {
+        scope: [
+          "storage.type.class.jsdoc",
+          "punctuation.definition.block.tag.jsdoc",
+          "keyword.other.documentation",
+          "comment.block.documentation entity.name.tag",
+          "comment.block.javadoc keyword",
+        ],
+        settings: { foreground: ink.tag, fontStyle: "" },
+      },
+    ],
+  }
+}
+
 const TOKEN_CACHE_MAX_CHARS = 8 * 1024 * 1024
 const TOKEN_CACHE_MAX_ENTRIES = 64
 
-// Extension (lowercased, no dot) -> Shiki language id. One canonical id per
-// language; the id doubles as the key into LANG_LOADERS below, so callers
-// never need to know Shiki's own alias list.
-const EXTENSION_LANG: Readonly<Record<string, string>> = {
-  ts: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  tsx: "tsx",
-  js: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  jsx: "jsx",
-  json: "json",
-  css: "css",
-  html: "html",
-  htm: "html",
-  md: "markdown",
-  markdown: "markdown",
-  py: "python",
-  rs: "rust",
-  go: "go",
-  java: "java",
-  c: "c",
-  h: "cpp",
-  cpp: "cpp",
-  cc: "cpp",
-  hpp: "cpp",
-  cs: "csharp",
-  sh: "bash",
-  bash: "bash",
-  yaml: "yaml",
-  yml: "yaml",
-  toml: "toml",
-  xml: "xml",
-  sql: "sql",
-  rb: "ruby",
-  php: "php",
-  swift: "swift",
-  kt: "kotlin",
-  lua: "lua",
-  ini: "ini",
-  diff: "diff",
-  patch: "diff",
-}
+type Kind = "precompiled" | "runtime"
 
-// Basenames that carry the language in the filename rather than an
-// extension (Dockerfile, Makefile have no ".ext"); matched case-insensitively.
-const BASENAME_LANG: Readonly<Record<string, string>> = {
-  dockerfile: "dockerfile",
-  makefile: "makefile",
-}
-
-// One explicit, static `import()` per grammar — no template-string/dynamic
-// specifier, so bundlers can analyse and code-split each of these on its
-// own. Keyed by the same canonical id EXTENSION_LANG/BASENAME_LANG return.
-const LANG_LOADERS: Readonly<Record<string, () => Promise<{ default: LanguageRegistration[] }>>> = {
-  typescript: () => import("@shikijs/langs-precompiled/typescript"),
-  tsx: () => import("@shikijs/langs-precompiled/tsx"),
-  javascript: () => import("@shikijs/langs-precompiled/javascript"),
-  jsx: () => import("@shikijs/langs-precompiled/jsx"),
-  json: () => import("@shikijs/langs-precompiled/json"),
-  css: () => import("@shikijs/langs-precompiled/css"),
-  html: () => import("@shikijs/langs-precompiled/html"),
-  markdown: () => import("@shikijs/langs-precompiled/markdown"),
-  python: () => import("@shikijs/langs-precompiled/python"),
-  rust: () => import("@shikijs/langs-precompiled/rust"),
-  go: () => import("@shikijs/langs-precompiled/go"),
-  java: () => import("@shikijs/langs-precompiled/java"),
-  c: () => import("@shikijs/langs-precompiled/c"),
-  cpp: () => import("@shikijs/langs-precompiled/cpp"),
-  csharp: () => import("@shikijs/langs-precompiled/csharp"),
-  bash: () => import("@shikijs/langs-precompiled/bash"),
-  yaml: () => import("@shikijs/langs-precompiled/yaml"),
-  toml: () => import("@shikijs/langs-precompiled/toml"),
-  xml: () => import("@shikijs/langs-precompiled/xml"),
-  sql: () => import("@shikijs/langs-precompiled/sql"),
-  ruby: () => import("@shikijs/langs-precompiled/ruby"),
-  php: () => import("@shikijs/langs-precompiled/php"),
-  swift: () => import("@shikijs/langs-precompiled/swift"),
-  kotlin: () => import("@shikijs/langs-precompiled/kotlin"),
-  lua: () => import("@shikijs/langs-precompiled/lua"),
-  ini: () => import("@shikijs/langs-precompiled/ini"),
-  diff: () => import("@shikijs/langs-precompiled/diff"),
-  dockerfile: () => import("@shikijs/langs-precompiled/dockerfile"),
-  makefile: () => import("@shikijs/langs-precompiled/makefile"),
-}
-
-/**
- * Maps a repo-relative (or absolute) file path to a Shiki language id, or
- * null when the extension/filename isn't recognised — callers must fall
- * back to plain text in that case.
- */
-export function languageForPath(path: string): string | null {
-  const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"))
-  const base = (slash >= 0 ? path.slice(slash + 1) : path).toLowerCase()
-  const dot = base.lastIndexOf(".")
-  // dot <= 0 covers both "no extension" and a dotfile like ".gitignore"
-  // (its only dot is the leading one), so both fall through to the
-  // basename map, which is where Dockerfile/Makefile live anyway.
-  if (dot <= 0) return BASENAME_LANG[base] ?? null
-  return EXTENSION_LANG[base.slice(dot + 1)] ?? BASENAME_LANG[base] ?? null
-}
-
-async function createCoreHighlighter(): Promise<HighlighterCore> {
-  const [{ createHighlighterCore }, { createJavaScriptRawEngine }, { default: lightPlus }, { default: darkPlus }] =
-    await Promise.all([
-      import("shiki/core"),
-      import("@shikijs/engine-javascript"),
-      import("@shikijs/themes/light-plus"),
-      import("@shikijs/themes/dark-plus"),
-    ])
+async function createCoreHighlighter(kind: Kind): Promise<HighlighterCore> {
+  const [
+    { createHighlighterCore },
+    { createJavaScriptRawEngine, createJavaScriptRegexEngine },
+    { default: lightPlus },
+    { default: darkPlus },
+  ] = await Promise.all([
+    import("shiki/core"),
+    import("@shikijs/engine-javascript"),
+    import("@shikijs/themes/light-plus"),
+    import("@shikijs/themes/dark-plus"),
+  ])
   return createHighlighterCore({
-    themes: [lightPlus, darkPlus],
+    themes: [withCommentInk(lightPlus, THEME, "light"), withCommentInk(darkPlus, DARK_THEME, "dark")],
     langs: [],
     // The pure-JS raw engine consumes precompiled grammars, so first use of
     // a language skips the main-thread regex compilation cost (v0.18.18)
     // while still avoiding Shiki's Oniguruma .wasm over Tauri's custom
     // `tauri://` scheme, which is unverified on the WebKitGTK target.
-    engine: createJavaScriptRawEngine(),
+    // The few grammars whose precompiled form is broken
+    // (highlightLanguages.ts RUNTIME_LANG_LOADERS) compile on the JS regex
+    // engine instead, in a highlighter of their own.
+    engine: kind === "runtime" ? createJavaScriptRegexEngine() : createJavaScriptRawEngine(),
   })
 }
 
-let highlighterPromise: Promise<HighlighterCore> | null = null
+const highlighterPromises: Partial<Record<Kind, Promise<HighlighterCore>>> = {}
 const loadedLangs = new Set<string>()
 
-function getHighlighter(): Promise<HighlighterCore> {
-  if (!highlighterPromise) {
-    highlighterPromise = createCoreHighlighter().catch((e: unknown) => {
-      // Don't cache a permanent failure — a transient issue (e.g. a chunk
-      // that failed to load) should get a fresh attempt on the next file.
-      highlighterPromise = null
-      throw e
-    })
-  }
-  return highlighterPromise
+const kindOf = (lang: string): Kind => (lang in RUNTIME_LANG_LOADERS ? "runtime" : "precompiled")
+
+function getHighlighter(lang: string): Promise<HighlighterCore> {
+  const kind = kindOf(lang)
+  const existing = highlighterPromises[kind]
+  if (existing) return existing
+  const created = createCoreHighlighter(kind).catch((e: unknown) => {
+    // Don't cache a permanent failure — a transient issue (e.g. a chunk
+    // that failed to load) should get a fresh attempt on the next file.
+    delete highlighterPromises[kind]
+    throw e
+  })
+  highlighterPromises[kind] = created
+  return created
 }
 
 async function ensureLanguageLoaded(highlighter: HighlighterCore, lang: string): Promise<void> {
   if (loadedLangs.has(lang)) return
-  const loader = LANG_LOADERS[lang]
+  const loader = RUNTIME_LANG_LOADERS[lang] ?? LANG_LOADERS[lang]
   if (!loader) throw new Error(`no grammar loader registered for "${lang}"`)
   const mod = await loader()
   await highlighter.loadLanguage(mod.default)
@@ -185,7 +148,7 @@ export async function highlightToHtml(code: string, lang: string | null): Promis
     if (lines > MAX_HIGHLIGHT_LINES) return null
   }
   try {
-    const highlighter = await getHighlighter()
+    const highlighter = await getHighlighter(lang)
     await ensureLanguageLoaded(highlighter, lang)
     return highlighter.codeToHtml(code, { lang, theme: THEME })
   } catch {
@@ -193,9 +156,39 @@ export async function highlightToHtml(code: string, lang: string | null): Promis
   }
 }
 
-export type Token = { content: string; color?: string }
+/**
+ * One coloured run of a line. `italic` comes from the theme (comments);
+ * `tag` marks a TODO / FIXME / HACK / XXX / NOTE inside a comment, drawn as
+ * a small label (codeTokens.tsx).
+ */
+export type Token = { content: string; color?: string; italic?: boolean; tag?: boolean }
 
-const DARK_THEME = "dark-plus"
+const HAS_TAG = /\b(?:TODO|FIXME|HACK|XXX|NOTE)\b/
+const CODE_TAG = new RegExp(HAS_TAG.source, "g")
+
+/** Splits the comment runs of a line around their TODO-style tags. */
+export function markCommentTags(line: Token[], mode: "light" | "dark"): Token[] {
+  const ink = COMMENT_INK[mode].text
+  // A comment run: the comment ink, or italic (only comments are, in these
+  // themes; some grammars give a codetag its own keyword colour).
+  const inComment = (t: Token) => t.italic === true || t.color?.toLowerCase() === ink
+  if (!line.some((t) => inComment(t) && HAS_TAG.test(t.content))) return line
+  const out: Token[] = []
+  for (const t of line) {
+    if (!inComment(t) || !HAS_TAG.test(t.content)) {
+      out.push(t)
+      continue
+    }
+    let at = 0
+    for (const m of t.content.matchAll(CODE_TAG)) {
+      if (m.index > at) out.push({ ...t, content: t.content.slice(at, m.index) })
+      out.push({ content: m[0], color: t.color, tag: true })
+      at = m.index + m[0].length
+    }
+    if (at < t.content.length) out.push({ ...t, content: t.content.slice(at) })
+  }
+  return out
+}
 
 type TokenizingHighlighter = Pick<HighlighterCore, "codeToTokensBase">
 
@@ -257,7 +250,17 @@ function tokensFromHighlighter(
   mode: "light" | "dark",
 ): Token[][] {
   const themed = highlighter.codeToTokensBase(code, { lang, theme: mode === "dark" ? DARK_THEME : THEME })
-  return themed.map((line) => line.map((t) => ({ content: t.content, color: t.color })))
+  return themed.map((line) =>
+    markCommentTags(
+      line.map((t) => {
+        const token: Token = { content: t.content, color: t.color }
+        // Shiki's FontStyle.Italic is bit 1; -1 / undefined mean "not set".
+        if (t.fontStyle !== undefined && t.fontStyle > 0 && (t.fontStyle & 1) === 1) token.italic = true
+        return token
+      }),
+      mode,
+    ),
+  )
 }
 
 async function tokenizeLinesCached(
@@ -290,7 +293,7 @@ export async function tokenizeLines(
   if (!lang) return null
   try {
     return await tokenizeLinesCached(code, lang, mode, async () => {
-      const highlighter = await getHighlighter()
+      const highlighter = await getHighlighter(lang)
       await ensureLanguageLoaded(highlighter, lang)
       return highlighter
     })

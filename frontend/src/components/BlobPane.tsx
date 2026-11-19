@@ -82,7 +82,8 @@ export function BlobPane({
     // resolves.
     setHtml(null)
     if (text === null || !highlightable) return
-    const lang = path ? languageForPath(path) : null
+    // Line 1 for a shebang (v0.22.13): an extensionless script still colours.
+    const lang = path ? languageForPath(path, text.slice(0, 200).split("\n")[0]) : null
     if (!lang) return
     let cancelled = false
     highlightToHtml(text, lang).then((result) => {
