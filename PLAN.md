@@ -1232,7 +1232,7 @@ Released as v0.20.3 on 2026-09-22 with the owner tick above still open, at the o
 - [x] Python, Markdown and Rust grammars end their strings and fences. [agent: claude]
 - [x] Gate: unit, lint, diff and review e2e, light and dark look. [agent: claude]
 - [ ] Owner ticks: comments and code read clearly in the review. [agent: claude]
-- [ ] Release v0.22.13. [agent: claude]
+- [x] Release as v0.22.14 after fixing the Windows zip packaging. [agent: claude]
 
 ## Backlog
 - Drop leftover 2021 origin branches
